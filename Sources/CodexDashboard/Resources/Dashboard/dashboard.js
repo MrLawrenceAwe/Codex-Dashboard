@@ -11,18 +11,24 @@ const ids = {
 };
 
 let threads = [];
-let totalThreadCount = 0;
 let statusFilter = 'all';
 let searchTerm = '';
-let groupByProject = true;
+let viewMode = 'projects';
+const collapsedProjects = new Set();
 let mutationObserver;
 let resizeObserver;
 let observedSidebar;
 let isOpen = false;
 
 function handleHostNavigation(event) {
-  if (!isOpen) return;
   const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest(`#${ids.navButton}`)) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === 'click') openPage();
+    return;
+  }
+  if (event.type !== 'click' || !isOpen) return;
   if (target?.closest('aside') && !target.closest(`#${ids.navButton}`)) closePage();
 }
 
@@ -33,6 +39,8 @@ function iconSVG(name) {
     arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
     search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
     pin: '<path d="m9 3 6 0-1 6 3 3v2H7v-2l3-3zM12 14v7"/>',
+    gitChanges: '<circle cx="6" cy="5" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M8 6h5a5 5 0 0 1 5 5v-3"/>',
+    chevron: '<path d="m9 18 6-6-6-6"/>',
   };
   return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
 }
@@ -58,9 +66,8 @@ function filteredThreads() {
   const query = searchTerm.trim().toLowerCase();
   return threads.filter((thread) => {
     const filterMatch = statusFilter === 'all'
-      || (statusFilter === 'running' && thread.status === 'running')
-      || (statusFilter === 'pinned' && thread.isPinned);
-    const searchMatch = !query || `${thread.title} ${thread.preview} ${thread.workspace}`.toLowerCase().includes(query);
+      || (statusFilter === 'running' && thread.status === 'running');
+    const searchMatch = !query || `${thread.title} ${thread.preview} ${thread.workspace} ${thread.workspacePath}`.toLowerCase().includes(query);
     return filterMatch && searchMatch;
   });
 }
@@ -83,7 +90,7 @@ function openThread(thread) {
   link.remove();
 }
 
-function threadMarkup(thread, grouped = false) {
+function threadMarkup(thread, showProject = false) {
   return `
     <article class="dashboard-thread" data-status="${escapeHTML(thread.status)}" data-thread-id="${escapeHTML(thread.id)}">
       <div class="dashboard-status-dot" title="${escapeHTML(thread.status)}"></div>
@@ -94,7 +101,7 @@ function threadMarkup(thread, grouped = false) {
         </div>
         <p>${escapeHTML(thread.preview || 'No preview available')}</p>
         <div class="dashboard-meta">
-          ${grouped ? '' : `<span>${escapeHTML(thread.workspace)}</span>`}
+          ${showProject ? `<span>${escapeHTML(thread.workspace)}</span>` : ''}
           <span>${relativeTime(thread.updatedAt)}</span>
           ${thread.model ? `<span>${escapeHTML(thread.model)}</span>` : ''}
         </div>
@@ -107,31 +114,44 @@ function threadMarkup(thread, grouped = false) {
 }
 
 function listMarkup(visibleThreads) {
-  if (!groupByProject) return visibleThreads.map((thread) => threadMarkup(thread)).join('');
+  if (viewMode === 'updated') {
+    return [...visibleThreads]
+      .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+      .map((thread) => threadMarkup(thread, true))
+      .join('');
+  }
   const groups = new Map();
   visibleThreads.forEach((thread) => {
-    const project = String(thread.workspace || 'Unassigned project').trim() || 'Unassigned project';
-    if (!groups.has(project)) groups.set(project, []);
-    groups.get(project).push(thread);
+    const projectPath = String(thread.workspacePath).trim();
+    if (!groups.has(projectPath)) groups.set(projectPath, { path: projectPath, name: thread.workspace, threads: [] });
+    groups.get(projectPath).threads.push(thread);
   });
-  return [...groups].map(([project, projectThreads]) => `
-    <section class="dashboard-project-group" aria-label="${escapeHTML(project)} project">
+  return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
+    const isCollapsed = collapsedProjects.has(projectPath);
+    const projectListID = `dashboard-project-${index}`;
+    return `
+    <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${escapeHTML(project)} project">
       <header class="dashboard-project-heading">
-        <div class="dashboard-project-title"><span class="dashboard-project-icon">${iconSVG('project')}</span><h3>${escapeHTML(project)}</h3></div>
-        <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+        <button type="button" class="dashboard-project-toggle" data-project-toggle="${escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
+          <span class="dashboard-project-title">
+            <span class="dashboard-project-chevron">${iconSVG('chevron')}</span>
+            <span class="dashboard-project-icon">${iconSVG('project')}</span>
+            <span class="dashboard-project-name">${escapeHTML(project)}</span>
+            ${projectThreads.some((thread) => thread.gitStatus === 'modified') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconSVG('gitChanges')}<span>Uncommitted</span></span>` : ''}
+          </span>
+          <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+        </button>
       </header>
-      <div class="dashboard-project-list">${projectThreads.map((thread) => threadMarkup(thread, true)).join('')}</div>
-    </section>`).join('');
+      <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((thread) => threadMarkup(thread)).join('')}</div>
+    </section>`;
+  }).join('');
 }
 
 function render() {
   const page = document.getElementById(ids.page);
   if (!page) return;
   const running = threads.filter((thread) => thread.status === 'running').length;
-  const pinned = threads.filter((thread) => thread.isPinned).length;
   page.querySelector('[data-count-running]').textContent = String(running);
-  page.querySelector('[data-count-pinned]').textContent = String(pinned);
-  page.querySelector('[data-count-total]').textContent = String(totalThreadCount);
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === statusFilter;
     button.classList.toggle('is-active', isActive);
@@ -140,20 +160,21 @@ function render() {
   const filterCounts = {
     all: threads.length,
     running,
-    pinned,
   };
   page.querySelectorAll('[data-filter-count]').forEach((count) => {
     count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
   });
+  page.querySelectorAll('[data-view]').forEach((button) => {
+    const isActive = button.dataset.view === viewMode;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
 
   const visibleThreads = filteredThreads();
-  page.querySelector('[data-group-toggle]').classList.toggle('is-active', groupByProject);
-  page.querySelector('[data-group-toggle]').setAttribute('aria-pressed', String(groupByProject));
-  page.querySelector('[data-group-toggle-label]').textContent = groupByProject ? 'Grouped by project' : 'Group by project';
-  page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'} in this view`;
+  page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'}`;
   const list = page.querySelector('[data-thread-list]');
   if (!visibleThreads.length) {
-    list.innerHTML = `<div class="dashboard-empty"><strong>No matching threads</strong><span>Try another filter or search term.</span></div>`;
+    list.innerHTML = `<div class="dashboard-empty"><strong>No threads found</strong></div>`;
     return;
   }
   list.innerHTML = listMarkup(visibleThreads);
@@ -199,11 +220,6 @@ function createNavigation() {
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
     <strong class="dashboard-nav-count" data-navigation-count>0</strong>`;
-  button.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    openPage();
-  });
   if (reference.insertAfter) reference.element.after(button);
   else reference.element.parentElement.insertBefore(button, reference.element);
   return true;
@@ -216,44 +232,29 @@ function createPage() {
   page.innerHTML = `
     <div class="dashboard-shell">
       <header class="dashboard-header">
-        <div>
-          <div class="dashboard-kicker">WORK OVERVIEW</div>
-          <h1>Threads</h1>
-          <p>Your Codex conversations across every workspace.</p>
-        </div>
-        <div class="dashboard-live-pill">Local overview</div>
+        <h1>Threads</h1>
       </header>
       <section class="dashboard-stats" aria-label="Thread summary">
         <div class="dashboard-stat" data-tone="running">
-          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Running now</span>
+          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Running</span>
           <strong data-count-running>0</strong>
-          <small>Active responses</small>
-        </div>
-        <div class="dashboard-stat" data-tone="pinned">
-          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Pinned</span>
-          <strong data-count-pinned>0</strong>
-          <small>Saved for quick access</small>
-        </div>
-        <div class="dashboard-stat">
-          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Total threads</span>
-          <strong data-count-total>0</strong>
-          <small>Across your workspaces</small>
         </div>
       </section>
-      <p class="dashboard-scope" data-dashboard-scope></p>
       <div class="dashboard-section-header">
         <div class="dashboard-section-title">
-          <h2>Thread list</h2>
-          <p data-visible-summary>0 threads in this view</p>
+          <p data-visible-summary>0 threads</p>
         </div>
         <div class="dashboard-toolbar">
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
             <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
-            <button type="button" data-filter="pinned">Pinned <span class="dashboard-filter-count" data-filter-count="pinned">0</span></button>
+          </div>
+          <div class="dashboard-view-options" aria-label="View threads">
+            <span class="dashboard-control-label">View</span>
+            <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
+            <button type="button" data-view="updated" aria-pressed="false">Last updated</button>
           </div>
           <label class="dashboard-search" aria-label="Search loaded threads">${iconSVG('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
-          <button type="button" class="dashboard-view-toggle" data-group-toggle aria-pressed="true">${iconSVG('project')}<span data-group-toggle-label>Grouped by project</span></button>
         </div>
       </div>
       <main class="dashboard-list" data-thread-list></main>
@@ -264,15 +265,25 @@ function createPage() {
       render();
     });
   });
+  page.querySelectorAll('[data-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      viewMode = button.dataset.view;
+      render();
+    });
+  });
   page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
     searchTerm = event.target.value;
     render();
   });
-  page.querySelector('[data-group-toggle]').addEventListener('click', () => {
-    groupByProject = !groupByProject;
-    render();
-  });
   page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
+    const projectToggle = event.target.closest('[data-project-toggle]');
+    if (projectToggle) {
+      const projectPath = projectToggle.dataset.projectToggle;
+      if (collapsedProjects.has(projectPath)) collapsedProjects.delete(projectPath);
+      else collapsedProjects.add(projectPath);
+      render();
+      return;
+    }
     const button = event.target.closest('[data-open-thread]');
     if (!button) return;
     const thread = threads.find((item) => item.id === button.dataset.openThread);
@@ -300,18 +311,9 @@ function closePage() {
 
 function update(nextSnapshot) {
   threads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
-  totalThreadCount = Number.isFinite(nextSnapshot?.totalThreadCount)
-    ? Math.max(threads.length, nextSnapshot.totalThreadCount)
-    : threads.length;
   const activeCount = threads.filter((thread) => thread.status === 'running').length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) count.textContent = String(activeCount);
-  const scope = document.querySelector('[data-dashboard-scope]');
-  if (scope) {
-    scope.textContent = totalThreadCount > threads.length
-      ? `Showing the ${threads.length} most recently updated threads. Search and filters cover these loaded threads.`
-      : `Showing all ${totalThreadCount} threads.`;
-  }
   render();
 }
 
@@ -344,6 +346,8 @@ function ensureMounted() {
     resizeObserver = new ResizeObserver(syncContentInset);
     observeSidebar();
   }
+  document.addEventListener('pointerdown', handleHostNavigation, true);
+  document.addEventListener('mousedown', handleHostNavigation, true);
   document.addEventListener('click', handleHostNavigation, true);
   return Boolean(
     document.getElementById(ids.style)
@@ -359,6 +363,8 @@ function destroy() {
   mutationObserver = undefined;
   resizeObserver = undefined;
   observedSidebar = undefined;
+  document.removeEventListener('pointerdown', handleHostNavigation, true);
+  document.removeEventListener('mousedown', handleHostNavigation, true);
   document.removeEventListener('click', handleHostNavigation, true);
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');

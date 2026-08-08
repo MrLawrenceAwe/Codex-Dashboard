@@ -18,6 +18,11 @@ enum ThreadRepositoryError: LocalizedError {
 }
 
 actor CodexThreadRepository {
+    private struct CachedGitStatus: Sendable {
+        let value: WorkspaceGitStatus
+        let checkedAt: Date
+    }
+
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
@@ -36,6 +41,8 @@ actor CodexThreadRepository {
 
     private let stateDatabaseURL: URL
     private let activityDatabaseURL: URL
+    private var gitStatusCache: [String: CachedGitStatus] = [:]
+    private let gitStatusCacheLifetime: TimeInterval = 10
 
     init(
         stateDatabaseURL: URL = AppConfiguration.stateDatabaseURL,
@@ -79,6 +86,11 @@ actor CodexThreadRepository {
         }
 
         let latestActivity = Dictionary(uniqueKeysWithValues: activity.map { ($0.threadId, $0.lastActivity) })
+        let workspacePaths = Set(threads.map(\.cwd))
+        var gitStatuses: [String: WorkspaceGitStatus] = [:]
+        for path in workspacePaths {
+            gitStatuses[path] = workspaceGitStatus(at: path)
+        }
         let now = Int64(Date().timeIntervalSince1970)
         let dashboardThreads = threads.map { thread in
             let lastLogTime = latestActivity[thread.id] ?? 0
@@ -94,10 +106,12 @@ actor CodexThreadRepository {
                 title: thread.title,
                 preview: thread.preview,
                 workspace: directoryName.isEmpty ? thread.cwd : directoryName,
+                workspacePath: thread.cwd,
                 updatedAt: thread.updatedAt,
                 isPinned: thread.isPinned != 0,
                 model: thread.model,
-                status: status
+                status: status,
+                gitStatus: gitStatuses[thread.cwd] ?? .notRepository
             )
         }
         return ThreadSnapshot(
@@ -105,6 +119,65 @@ actor CodexThreadRepository {
             totalThreadCount: threads.first?.totalCount ?? 0,
             warning: warning
         )
+    }
+
+    private func workspaceGitStatus(at path: String) -> WorkspaceGitStatus {
+        let checkedAt = Date()
+        if let cached = gitStatusCache[path],
+           checkedAt.timeIntervalSince(cached.checkedAt) < gitStatusCacheLifetime {
+            return cached.value
+        }
+
+        guard containsGitMetadata(at: path) else {
+            let status: WorkspaceGitStatus = .notRepository
+            gitStatusCache[path] = CachedGitStatus(value: status, checkedAt: checkedAt)
+            return status
+        }
+
+        let process = Process()
+        let output = Pipe()
+        let errorOutput = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", path, "status", "--porcelain=v1", "--untracked-files=normal"]
+        process.standardOutput = output
+        process.standardError = errorOutput
+
+        let status: WorkspaceGitStatus
+        do {
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            _ = errorOutput.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus != 0 {
+                status = .notRepository
+            } else if data.isEmpty {
+                status = .clean
+            } else {
+                status = .modified
+            }
+        } catch {
+            status = .notRepository
+        }
+        gitStatusCache[path] = CachedGitStatus(value: status, checkedAt: checkedAt)
+        return status
+    }
+
+    private func containsGitMetadata(at path: String) -> Bool {
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return false
+        }
+
+        var directory = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        while true {
+            if fileManager.fileExists(atPath: directory.appendingPathComponent(".git").path) {
+                return true
+            }
+            let parent = directory.deletingLastPathComponent()
+            if parent.path == directory.path { return false }
+            directory = parent
+        }
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {
