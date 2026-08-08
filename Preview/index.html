@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Dashboard Preview</title>
+    <style>
+      :root { color-scheme: dark; font-family: -apple-system, sans-serif; background: #171817; color: #eee; }
+      body { margin: 0; }
+      .mock-app { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+      .mock-sidebar { padding: 28px 18px; border-right: 1px solid #303330; color: #929792; }
+      .mock-sidebar button { display: block; width: 100%; margin: 12px 0; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; }
+      .mock-main { display: grid; place-items: center; color: #777; }
+    </style>
+  </head>
+  <body>
+    <div class="mock-app">
+      <aside class="mock-sidebar">
+        <strong>Codex</strong>
+        <button data-app-action-sidebar-thread-id="local:thread-dashboard">Build tasks dashboard</button>
+        <button data-app-action-sidebar-thread-id="local:thread-review">Review project for bugs</button>
+      </aside>
+      <main class="mock-main">Conversation surface</main>
+    </div>
+    <script src="./preview.js"></script>
+  </body>
+</html>
