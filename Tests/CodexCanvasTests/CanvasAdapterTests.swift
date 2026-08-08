@@ -52,7 +52,8 @@ final class CanvasAdapterTests: XCTestCase {
     }
 
     func testTaskStoreLoadsLocalCodexThreads() async throws {
-        let tasks = await TaskStore().load()
+        let snapshot = try await TaskStore().load()
+        let tasks = snapshot.tasks
         XCTAssertFalse(tasks.isEmpty)
         XCTAssertTrue(tasks.allSatisfy { !$0.id.isEmpty && !$0.title.isEmpty })
         XCTAssertTrue(tasks.contains { $0.cwd.contains("/Users/lawrenceawe/") })
@@ -61,8 +62,20 @@ final class CanvasAdapterTests: XCTestCase {
     func testTaskStoreStillLoadsThreadsWhenActivityDatabaseIsMissing() async throws {
         let missingDatabase = "/tmp/codex-dashboard-missing-activity-\(UUID().uuidString).sqlite"
         let store = TaskStore(logsDatabase: missingDatabase)
-        let tasks = await store.load()
-        XCTAssertFalse(tasks.isEmpty)
-        XCTAssertFalse(tasks.contains { $0.status == "running" })
+        let snapshot = try await store.load()
+        XCTAssertFalse(snapshot.tasks.isEmpty)
+        XCTAssertFalse(snapshot.tasks.contains { $0.status == "running" })
+        XCTAssertNotNil(snapshot.warning)
+    }
+
+    func testTaskStoreReportsMissingStateDatabase() async throws {
+        let missingDatabase = "/tmp/codex-dashboard-missing-state-\(UUID().uuidString).sqlite"
+        let store = TaskStore(stateDatabase: missingDatabase)
+        do {
+            _ = try await store.load()
+            XCTFail("Expected the missing state database to be reported")
+        } catch TaskStoreError.missingDatabase(let database) {
+            XCTAssertEqual(database, missingDatabase)
+        }
     }
 }
