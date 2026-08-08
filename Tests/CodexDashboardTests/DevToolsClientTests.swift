@@ -13,6 +13,9 @@ final class DevToolsClientTests: XCTestCase {
             )
         )
         XCTAssertTrue(adapter.expression.contains("const pageHost = sidebar?.parentElement"))
+        XCTAssertTrue(adapter.expression.contains("type: 'navigate-to-route'"))
+        XCTAssertTrue(adapter.expression.contains("path: `/local/${encodeURIComponent(thread.id)}`"))
+        XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
 

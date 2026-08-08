@@ -82,12 +82,13 @@ function openThread(thread) {
     target.click();
     return;
   }
-  const link = document.createElement('a');
-  link.href = `codex://threads/${encodeURIComponent(thread.id)}`;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  link.remove();
+  window.dispatchEvent(new MessageEvent('message', {
+    data: {
+      type: 'navigate-to-route',
+      path: `/local/${encodeURIComponent(thread.id)}`,
+    },
+    source: null,
+  }));
 }
 
 function threadMarkup(thread, showProject = false) {
