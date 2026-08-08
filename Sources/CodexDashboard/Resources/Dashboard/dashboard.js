@@ -289,7 +289,9 @@ function createPage() {
     const thread = threads.find((item) => item.id === button.dataset.openThread);
     if (thread) openThread(thread);
   });
-  document.body.append(page);
+  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
+  const pageHost = sidebar?.parentElement || document.body;
+  pageHost.append(page);
 }
 
 function openPage() {
