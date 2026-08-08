@@ -28,6 +28,15 @@
 #codex-dashboard-navigation .dashboard-nav-count { min-width: 18px; padding: 0 5px; border: 0; border-radius: 4px; background: rgba(255,255,255,.055); color: var(--db-muted); font-size: 10px; font-weight: 550; line-height: 18px; text-align: center; }
 #codex-dashboard-navigation[aria-current="page"] { background: var(--item-background-color, rgba(255,255,255,.07)); }
 
+/*
+ * Codex lets thread actions and the resize handle extend beyond the sidebar.
+ * The dashboard is mounted in the same shell stacking context so lifting the
+ * sidebar here keeps those controls above the fixed page surface.
+ */
+html.codex-dashboard-open aside.app-shell-left-panel {
+  z-index: 2147483645;
+}
+
 #codex-dashboard-page {
   position: fixed;
   z-index: 2147483644;

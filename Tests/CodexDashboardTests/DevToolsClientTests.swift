@@ -7,6 +7,12 @@ final class DevToolsClientTests: XCTestCase {
         let adapter = try DashboardAdapter.load()
         XCTAssertTrue(adapter.expression.contains("window.__codexDashboard"))
         XCTAssertTrue(adapter.expression.contains("#codex-dashboard-page"))
+        XCTAssertTrue(
+            adapter.expression.contains(
+                "html.codex-dashboard-open aside.app-shell-left-panel"
+            )
+        )
+        XCTAssertTrue(adapter.expression.contains("const pageHost = sidebar?.parentElement"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
 
