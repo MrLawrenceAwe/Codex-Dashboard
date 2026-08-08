@@ -1,21 +1,19 @@
 const existing = window.__codexDashboard;
-if (existing?.version === CANVAS_VERSION) {
+if (existing?.version === DASHBOARD_VERSION) {
   return existing.ensureMounted();
 }
 existing?.destroy?.();
-window.__codexCanvas?.destroy?.();
-document.documentElement.classList.remove('cc-canvas-open', 'cc-focus-mode');
-document.getElementById('codex-canvas-launcher')?.remove();
-document.getElementById('codex-canvas-page')?.remove();
 
 const ids = {
   style: 'codex-dashboard-style',
-  navigation: 'codex-dashboard-navigation',
+  navButton: 'codex-dashboard-navigation',
   page: 'codex-dashboard-page',
 };
 
-let taskData = [];
-let selectedFilter = 'active';
+const activeStatuses = new Set(['running', 'recent']);
+const statusLabels = { running: 'Running', recent: 'Recent', idle: 'Idle' };
+let tasks = [];
+let statusFilter = 'current';
 let searchTerm = '';
 let mutationObserver;
 let resizeObserver;
@@ -25,13 +23,12 @@ let isOpen = false;
 function handleHostNavigation(event) {
   if (!isOpen) return;
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest('aside') && !target.closest(`#${ids.navigation}`)) closePage();
+  if (target?.closest('aside') && !target.closest(`#${ids.navButton}`)) closePage();
 }
 
-function icon(name) {
+function iconSVG(name) {
   const paths = {
     tasks: '<path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
-    close: '<path d="M6 6l12 12M18 6L6 18"/>',
     arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
     search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
     pin: '<path d="m9 3 6 0-1 6 3 3v2H7v-2l3-3zM12 14v7"/>',
@@ -56,12 +53,12 @@ function relativeTime(timestamp) {
   return `${days}d ago`;
 }
 
-function visibleTasks() {
+function filteredTasks() {
   const query = searchTerm.trim().toLowerCase();
-  return taskData.filter((task) => {
-    const filterMatch = selectedFilter === 'all'
-      || (selectedFilter === 'active' && ['running', 'recent'].includes(task.status))
-      || task.status === selectedFilter;
+  return tasks.filter((task) => {
+    const filterMatch = statusFilter === 'all'
+      || (statusFilter === 'current' && activeStatuses.has(task.status))
+      || task.status === statusFilter;
     const searchMatch = !query || `${task.title} ${task.preview} ${task.workspace}`.toLowerCase().includes(query);
     return filterMatch && searchMatch;
   });
@@ -88,28 +85,28 @@ function openTask(task) {
 function render() {
   const page = document.getElementById(ids.page);
   if (!page) return;
-  const running = taskData.filter((task) => task.status === 'running').length;
-  const recent = taskData.filter((task) => task.status === 'recent').length;
+  const running = tasks.filter((task) => task.status === 'running').length;
+  const recent = tasks.filter((task) => task.status === 'recent').length;
   page.querySelector('[data-count-running]').textContent = String(running);
   page.querySelector('[data-count-recent]').textContent = String(recent);
-  page.querySelector('[data-count-total]').textContent = String(taskData.length);
+  page.querySelector('[data-count-total]').textContent = String(tasks.length);
   page.querySelectorAll('[data-filter]').forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.filter === selectedFilter);
+    button.classList.toggle('is-active', button.dataset.filter === statusFilter);
   });
 
-  const tasks = visibleTasks();
+  const visibleTasks = filteredTasks();
   const list = page.querySelector('[data-task-list]');
-  if (!tasks.length) {
+  if (!visibleTasks.length) {
     list.innerHTML = `<div class="dashboard-empty"><strong>No matching tasks</strong><span>Try another filter or search term.</span></div>`;
     return;
   }
-  list.innerHTML = tasks.map((task) => `
+  list.innerHTML = visibleTasks.map((task) => `
     <article class="dashboard-task" data-status="${escapeHTML(task.status)}" data-task-id="${escapeHTML(task.id)}">
       <div class="dashboard-status-dot" title="${escapeHTML(task.status)}"></div>
       <div class="dashboard-task-copy">
         <div class="dashboard-task-title-row">
           <h2>${escapeHTML(task.title)}</h2>
-          ${task.isPinned ? `<span class="dashboard-pin" title="Pinned">${icon('pin')}</span>` : ''}
+          ${task.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconSVG('pin')}</span>` : ''}
         </div>
         <p>${escapeHTML(task.preview || 'No preview available')}</p>
         <div class="dashboard-meta">
@@ -119,16 +116,10 @@ function render() {
         </div>
       </div>
       <div class="dashboard-task-actions">
-        <span class="dashboard-status-label">${task.status === 'running' ? 'Running' : task.status === 'recent' ? 'Recent' : 'Idle'}</span>
-        <button type="button" data-open-task="${escapeHTML(task.id)}">Open ${icon('arrow')}</button>
+        <span class="dashboard-status-label">${statusLabels[task.status] ?? task.status}</span>
+        <button type="button" data-open-task="${escapeHTML(task.id)}">Open ${iconSVG('arrow')}</button>
       </div>
     </article>`).join('');
-  list.querySelectorAll('[data-open-task]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const task = taskData.find((item) => item.id === button.dataset.openTask);
-      if (task) openTask(task);
-    });
-  });
 }
 
 function findSidebarReference() {
@@ -153,13 +144,13 @@ function createNavigation() {
   const reference = findSidebarReference();
   if (!reference?.element?.parentElement) return false;
   const button = document.createElement('button');
-  button.id = ids.navigation;
+  button.id = ids.navButton;
   button.type = 'button';
   button.className = reference.element.className;
   button.setAttribute('aria-label', 'Dashboard');
   button.innerHTML = `
     <div class="dashboard-nav-copy">
-      <span class="dashboard-nav-icon">${icon('tasks')}</span>
+      <span class="dashboard-nav-icon">${iconSVG('tasks')}</span>
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
     <strong class="dashboard-nav-count" data-navigation-count>0</strong>`;
@@ -189,29 +180,34 @@ function createPage() {
       <section class="dashboard-stats" aria-label="Task summary">
         <div><strong data-count-running>0</strong><span>Running now</span></div>
         <div><strong data-count-recent>0</strong><span>Recently active</span></div>
-        <div><strong data-count-total>0</strong><span>Visible tasks</span></div>
+        <div><strong data-count-total>0</strong><span>Total tasks</span></div>
       </section>
       <div class="dashboard-toolbar">
         <div class="dashboard-filters">
-          <button type="button" data-filter="active" class="is-active">Active</button>
+          <button type="button" data-filter="current" class="is-active">Current</button>
           <button type="button" data-filter="running">Running</button>
           <button type="button" data-filter="recent">Recent</button>
           <button type="button" data-filter="all">All</button>
         </div>
-        <label class="dashboard-search">${icon('search')}<input type="search" placeholder="Search tasks" data-dashboard-search /></label>
+        <label class="dashboard-search">${iconSVG('search')}<input type="search" placeholder="Search tasks" data-dashboard-search /></label>
       </div>
       <main class="dashboard-list" data-task-list></main>
-      <div class="dashboard-feedback" data-dashboard-feedback aria-live="polite"></div>
     </div>`;
   page.querySelectorAll('[data-filter]').forEach((button) => {
     button.addEventListener('click', () => {
-      selectedFilter = button.dataset.filter;
+      statusFilter = button.dataset.filter;
       render();
     });
   });
   page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
     searchTerm = event.target.value;
     render();
+  });
+  page.querySelector('[data-task-list]').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-open-task]');
+    if (!button) return;
+    const task = tasks.find((item) => item.id === button.dataset.openTask);
+    if (task) openTask(task);
   });
   document.body.append(page);
 }
@@ -222,7 +218,7 @@ function openPage() {
   isOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
-  document.getElementById(ids.navigation)?.setAttribute('aria-current', 'page');
+  document.getElementById(ids.navButton)?.setAttribute('aria-current', 'page');
   render();
 }
 
@@ -230,12 +226,12 @@ function closePage() {
   isOpen = false;
   document.getElementById(ids.page)?.classList.remove('is-open');
   document.documentElement.classList.remove('codex-dashboard-open');
-  document.getElementById(ids.navigation)?.removeAttribute('aria-current');
+  document.getElementById(ids.navButton)?.removeAttribute('aria-current');
 }
 
-function update(tasks) {
-  taskData = Array.isArray(tasks) ? tasks : [];
-  const activeCount = taskData.filter((task) => ['running', 'recent'].includes(task.status)).length;
+function update(nextTasks) {
+  tasks = Array.isArray(nextTasks) ? nextTasks : [];
+  const activeCount = tasks.filter((task) => activeStatuses.has(task.status)).length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) count.textContent = String(activeCount);
   render();
@@ -246,12 +242,12 @@ function ensureMounted() {
   if (!document.getElementById(ids.style)) {
     const style = document.createElement('style');
     style.id = ids.style;
-    style.textContent = CANVAS_CSS;
+    style.textContent = DASHBOARD_CSS;
     document.head.append(style);
   }
   const pageWasMissing = !document.getElementById(ids.page);
   if (pageWasMissing) createPage();
-  if (!document.getElementById(ids.navigation)) createNavigation();
+  if (!document.getElementById(ids.navButton)) createNavigation();
   syncContentInset();
   if (isOpen && pageWasMissing) openPage();
 
@@ -259,7 +255,7 @@ function ensureMounted() {
     mutationObserver = new MutationObserver(() => {
       const restoredPage = !document.getElementById(ids.page);
       if (restoredPage) createPage();
-      if (!document.getElementById(ids.navigation)) createNavigation();
+      if (!document.getElementById(ids.navButton)) createNavigation();
       if (isOpen && restoredPage) openPage();
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
@@ -274,7 +270,7 @@ function ensureMounted() {
   return Boolean(
     document.getElementById(ids.style)
       && document.getElementById(ids.page)
-      && document.getElementById(ids.navigation)
+      && document.getElementById(ids.navButton)
   );
 }
 
@@ -293,5 +289,5 @@ function destroy() {
   delete window.__codexDashboard;
 }
 
-window.__codexDashboard = { version: CANVAS_VERSION, ensureMounted, destroy, open: openPage, close: closePage, update };
+window.__codexDashboard = { version: DASHBOARD_VERSION, ensureMounted, destroy, open: openPage, update };
 return ensureMounted();

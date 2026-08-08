@@ -5,7 +5,7 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>CodexCanvas</string>
+  <string>CodexDashboard</string>
   <key>CFBundleIdentifier</key>
   <string>local.lawrenceawe.codex-dashboard</string>
   <key>CFBundleInfoDictionaryVersion</key>
