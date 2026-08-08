@@ -17,7 +17,7 @@ final class DevToolsClientTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("DashboardPreview/preview.js")
         let preview = try String(contentsOf: previewURL, encoding: .utf8)
-        XCTAssertTrue(preview.contains("update({ tasks, totalTaskCount:"))
+        XCTAssertTrue(preview.contains("update({ threads, totalThreadCount:"))
         XCTAssertFalse(preview.contains("update(["))
     }
 

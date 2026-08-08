@@ -1,6 +1,6 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS controller for an active-task dashboard
+Codex Dashboard is a native macOS controller for an active-thread dashboard
 inside the Codex experience in ChatGPT. It follows the useful part of Attune's
 architecture—a normal app relaunch with a loopback-only DevTools bridge—while
 keeping functional UI extensions separate from Attune's deliberately CSS-only
@@ -25,7 +25,7 @@ This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
 4. Select **Dashboard** directly in the Codex sidebar. The dashboard opens in
    the main content pane while the rest of Codex navigation stays available.
 
-The controller must remain open to refresh task activity and restore the dashboard after renderer reloads. Use
+The controller must remain open to refresh thread activity and restore the dashboard after renderer reloads. Use
 **Disable Dashboard** to unload the injected UI immediately. A normal ChatGPT restart also
 removes it.
 
@@ -34,8 +34,8 @@ removes it.
 - Native SwiftUI control panel; no browser controller or Node runtime.
 - Loopback-only Chromium DevTools connection.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
-- Local task metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
-- The dashboard loads the 60 most recently active tasks and reports the full task total; search and filters apply to the loaded set.
+- Local thread metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
+- Threads are ordered by their last update. The dashboard loads the latest 60 and reports the full thread total; search and filters apply to the loaded set.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.

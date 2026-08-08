@@ -10,12 +10,11 @@ const ids = {
   page: 'codex-dashboard-page',
 };
 
-const activeStatuses = new Set(['running', 'recent']);
-const statusLabels = { running: 'Running', recent: 'Recent', idle: 'Idle' };
-let tasks = [];
-let totalTaskCount = 0;
-let statusFilter = 'current';
+let threads = [];
+let totalThreadCount = 0;
+let statusFilter = 'all';
 let searchTerm = '';
+let groupByProject = true;
 let mutationObserver;
 let resizeObserver;
 let observedSidebar;
@@ -29,7 +28,8 @@ function handleHostNavigation(event) {
 
 function iconSVG(name) {
   const paths = {
-    tasks: '<path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+    threads: '<path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+    project: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5l2 2H19.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>',
     arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
     search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
     pin: '<path d="m9 3 6 0-1 6 3 3v2H7v-2l3-3zM12 14v7"/>',
@@ -54,19 +54,19 @@ function relativeTime(timestamp) {
   return `${days}d ago`;
 }
 
-function filteredTasks() {
+function filteredThreads() {
   const query = searchTerm.trim().toLowerCase();
-  return tasks.filter((task) => {
-    const filterMatch = statusFilter === 'loaded'
-      || (statusFilter === 'current' && activeStatuses.has(task.status))
-      || task.status === statusFilter;
-    const searchMatch = !query || `${task.title} ${task.preview} ${task.workspace}`.toLowerCase().includes(query);
+  return threads.filter((thread) => {
+    const filterMatch = statusFilter === 'all'
+      || (statusFilter === 'running' && thread.status === 'running')
+      || (statusFilter === 'pinned' && thread.isPinned);
+    const searchMatch = !query || `${thread.title} ${thread.preview} ${thread.workspace}`.toLowerCase().includes(query);
     return filterMatch && searchMatch;
   });
 }
 
-function openTask(task) {
-  const threadKey = `local:${task.id}`;
+function openThread(thread) {
+  const threadKey = `local:${thread.id}`;
   const target = document.querySelector(
     `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
   );
@@ -76,51 +76,87 @@ function openTask(task) {
     return;
   }
   const link = document.createElement('a');
-  link.href = `codex://threads/${encodeURIComponent(task.id)}`;
+  link.href = `codex://threads/${encodeURIComponent(thread.id)}`;
   link.hidden = true;
   document.body.append(link);
   link.click();
   link.remove();
 }
 
+function threadMarkup(thread, grouped = false) {
+  return `
+    <article class="dashboard-thread" data-status="${escapeHTML(thread.status)}" data-thread-id="${escapeHTML(thread.id)}">
+      <div class="dashboard-status-dot" title="${escapeHTML(thread.status)}"></div>
+      <div class="dashboard-thread-copy">
+        <div class="dashboard-thread-title-row">
+          <h2>${escapeHTML(thread.title)}</h2>
+          ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconSVG('pin')}</span>` : ''}
+        </div>
+        <p>${escapeHTML(thread.preview || 'No preview available')}</p>
+        <div class="dashboard-meta">
+          ${grouped ? '' : `<span>${escapeHTML(thread.workspace)}</span>`}
+          <span>${relativeTime(thread.updatedAt)}</span>
+          ${thread.model ? `<span>${escapeHTML(thread.model)}</span>` : ''}
+        </div>
+      </div>
+      <div class="dashboard-thread-actions">
+        ${thread.status === 'running' ? '<span class="dashboard-status-label">Running</span>' : ''}
+        <button type="button" data-open-thread="${escapeHTML(thread.id)}">Open ${iconSVG('arrow')}</button>
+      </div>
+    </article>`;
+}
+
+function listMarkup(visibleThreads) {
+  if (!groupByProject) return visibleThreads.map((thread) => threadMarkup(thread)).join('');
+  const groups = new Map();
+  visibleThreads.forEach((thread) => {
+    const project = String(thread.workspace || 'Unassigned project').trim() || 'Unassigned project';
+    if (!groups.has(project)) groups.set(project, []);
+    groups.get(project).push(thread);
+  });
+  return [...groups].map(([project, projectThreads]) => `
+    <section class="dashboard-project-group" aria-label="${escapeHTML(project)} project">
+      <header class="dashboard-project-heading">
+        <div class="dashboard-project-title"><span class="dashboard-project-icon">${iconSVG('project')}</span><h3>${escapeHTML(project)}</h3></div>
+        <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+      </header>
+      <div class="dashboard-project-list">${projectThreads.map((thread) => threadMarkup(thread, true)).join('')}</div>
+    </section>`).join('');
+}
+
 function render() {
   const page = document.getElementById(ids.page);
   if (!page) return;
-  const running = tasks.filter((task) => task.status === 'running').length;
-  const recent = tasks.filter((task) => task.status === 'recent').length;
+  const running = threads.filter((thread) => thread.status === 'running').length;
+  const pinned = threads.filter((thread) => thread.isPinned).length;
   page.querySelector('[data-count-running]').textContent = String(running);
-  page.querySelector('[data-count-recent]').textContent = String(recent);
-  page.querySelector('[data-count-total]').textContent = String(totalTaskCount);
+  page.querySelector('[data-count-pinned]').textContent = String(pinned);
+  page.querySelector('[data-count-total]').textContent = String(totalThreadCount);
   page.querySelectorAll('[data-filter]').forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.filter === statusFilter);
+    const isActive = button.dataset.filter === statusFilter;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+  const filterCounts = {
+    all: threads.length,
+    running,
+    pinned,
+  };
+  page.querySelectorAll('[data-filter-count]').forEach((count) => {
+    count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
   });
 
-  const visibleTasks = filteredTasks();
-  const list = page.querySelector('[data-task-list]');
-  if (!visibleTasks.length) {
-    list.innerHTML = `<div class="dashboard-empty"><strong>No matching tasks</strong><span>Try another filter or search term.</span></div>`;
+  const visibleThreads = filteredThreads();
+  page.querySelector('[data-group-toggle]').classList.toggle('is-active', groupByProject);
+  page.querySelector('[data-group-toggle]').setAttribute('aria-pressed', String(groupByProject));
+  page.querySelector('[data-group-toggle-label]').textContent = groupByProject ? 'Grouped by project' : 'Group by project';
+  page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'} in this view`;
+  const list = page.querySelector('[data-thread-list]');
+  if (!visibleThreads.length) {
+    list.innerHTML = `<div class="dashboard-empty"><strong>No matching threads</strong><span>Try another filter or search term.</span></div>`;
     return;
   }
-  list.innerHTML = visibleTasks.map((task) => `
-    <article class="dashboard-task" data-status="${escapeHTML(task.status)}" data-task-id="${escapeHTML(task.id)}">
-      <div class="dashboard-status-dot" title="${escapeHTML(task.status)}"></div>
-      <div class="dashboard-task-copy">
-        <div class="dashboard-task-title-row">
-          <h2>${escapeHTML(task.title)}</h2>
-          ${task.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconSVG('pin')}</span>` : ''}
-        </div>
-        <p>${escapeHTML(task.preview || 'No preview available')}</p>
-        <div class="dashboard-meta">
-          <span>${escapeHTML(task.workspace)}</span>
-          <span>${relativeTime(task.updatedAt)}</span>
-          ${task.model ? `<span>${escapeHTML(task.model)}</span>` : ''}
-        </div>
-      </div>
-      <div class="dashboard-task-actions">
-        <span class="dashboard-status-label">${statusLabels[task.status] ?? task.status}</span>
-        <button type="button" data-open-task="${escapeHTML(task.id)}">Open ${iconSVG('arrow')}</button>
-      </div>
-    </article>`).join('');
+  list.innerHTML = listMarkup(visibleThreads);
 }
 
 function findSidebarReference() {
@@ -159,7 +195,7 @@ function createNavigation() {
   button.setAttribute('aria-label', 'Dashboard');
   button.innerHTML = `
     <div class="dashboard-nav-copy">
-      <span class="dashboard-nav-icon">${iconSVG('tasks')}</span>
+      <span class="dashboard-nav-icon">${iconSVG('threads')}</span>
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
     <strong class="dashboard-nav-count" data-navigation-count>0</strong>`;
@@ -176,32 +212,51 @@ function createNavigation() {
 function createPage() {
   const page = document.createElement('section');
   page.id = ids.page;
-  page.setAttribute('aria-label', 'Codex task dashboard');
+  page.setAttribute('aria-label', 'Codex thread dashboard');
   page.innerHTML = `
     <div class="dashboard-shell">
       <header class="dashboard-header">
         <div>
           <div class="dashboard-kicker">WORK OVERVIEW</div>
-          <h1>Tasks</h1>
-          <p>What Codex is working on, and what moved recently.</p>
+          <h1>Threads</h1>
+          <p>Your Codex conversations across every workspace.</p>
         </div>
+        <div class="dashboard-live-pill">Local overview</div>
       </header>
-      <section class="dashboard-stats" aria-label="Task summary">
-        <div><strong data-count-running>0</strong><span>Running now</span></div>
-        <div><strong data-count-recent>0</strong><span>Recently active</span></div>
-        <div><strong data-count-total>0</strong><span>Total tasks</span></div>
+      <section class="dashboard-stats" aria-label="Thread summary">
+        <div class="dashboard-stat" data-tone="running">
+          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Running now</span>
+          <strong data-count-running>0</strong>
+          <small>Active responses</small>
+        </div>
+        <div class="dashboard-stat" data-tone="pinned">
+          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Pinned</span>
+          <strong data-count-pinned>0</strong>
+          <small>Saved for quick access</small>
+        </div>
+        <div class="dashboard-stat">
+          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Total threads</span>
+          <strong data-count-total>0</strong>
+          <small>Across your workspaces</small>
+        </div>
       </section>
       <p class="dashboard-scope" data-dashboard-scope></p>
-      <div class="dashboard-toolbar">
-        <div class="dashboard-filters">
-          <button type="button" data-filter="current" class="is-active">Current</button>
-          <button type="button" data-filter="running">Running</button>
-          <button type="button" data-filter="recent">Recent</button>
-          <button type="button" data-filter="loaded">Loaded</button>
+      <div class="dashboard-section-header">
+        <div class="dashboard-section-title">
+          <h2>Thread list</h2>
+          <p data-visible-summary>0 threads in this view</p>
         </div>
-        <label class="dashboard-search">${iconSVG('search')}<input type="search" placeholder="Search loaded tasks" data-dashboard-search /></label>
+        <div class="dashboard-toolbar">
+          <div class="dashboard-filters" aria-label="Filter threads">
+            <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
+            <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
+            <button type="button" data-filter="pinned">Pinned <span class="dashboard-filter-count" data-filter-count="pinned">0</span></button>
+          </div>
+          <label class="dashboard-search" aria-label="Search loaded threads">${iconSVG('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
+          <button type="button" class="dashboard-view-toggle" data-group-toggle aria-pressed="true">${iconSVG('project')}<span data-group-toggle-label>Grouped by project</span></button>
+        </div>
       </div>
-      <main class="dashboard-list" data-task-list></main>
+      <main class="dashboard-list" data-thread-list></main>
     </div>`;
   page.querySelectorAll('[data-filter]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -213,11 +268,15 @@ function createPage() {
     searchTerm = event.target.value;
     render();
   });
-  page.querySelector('[data-task-list]').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-open-task]');
+  page.querySelector('[data-group-toggle]').addEventListener('click', () => {
+    groupByProject = !groupByProject;
+    render();
+  });
+  page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-open-thread]');
     if (!button) return;
-    const task = tasks.find((item) => item.id === button.dataset.openTask);
-    if (task) openTask(task);
+    const thread = threads.find((item) => item.id === button.dataset.openThread);
+    if (thread) openThread(thread);
   });
   document.body.append(page);
 }
@@ -240,18 +299,18 @@ function closePage() {
 }
 
 function update(nextSnapshot) {
-  tasks = Array.isArray(nextSnapshot?.tasks) ? nextSnapshot.tasks : [];
-  totalTaskCount = Number.isFinite(nextSnapshot?.totalTaskCount)
-    ? Math.max(tasks.length, nextSnapshot.totalTaskCount)
-    : tasks.length;
-  const activeCount = tasks.filter((task) => activeStatuses.has(task.status)).length;
+  threads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
+  totalThreadCount = Number.isFinite(nextSnapshot?.totalThreadCount)
+    ? Math.max(threads.length, nextSnapshot.totalThreadCount)
+    : threads.length;
+  const activeCount = threads.filter((thread) => thread.status === 'running').length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) count.textContent = String(activeCount);
   const scope = document.querySelector('[data-dashboard-scope]');
   if (scope) {
-    scope.textContent = totalTaskCount > tasks.length
-      ? `Showing the ${tasks.length} most recently active tasks. Search and filters cover these loaded tasks.`
-      : `Showing all ${totalTaskCount} tasks.`;
+    scope.textContent = totalThreadCount > threads.length
+      ? `Showing the ${threads.length} most recently updated threads. Search and filters cover these loaded threads.`
+      : `Showing all ${totalThreadCount} threads.`;
   }
   render();
 }

@@ -61,7 +61,7 @@ struct DashboardControlView: View {
                     Text("Codex Dashboard")
                         .font(.system(size: 31, weight: .bold, design: .rounded))
                         .tracking(-1.2)
-                    Text("Active tasks, built into your local Codex app.")
+                    Text("Active threads, built into your local Codex app.")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
@@ -107,7 +107,7 @@ struct DashboardControlView: View {
                 .background(Color.red.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
             }
 
-            Text("The dashboard reads local Codex task metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")
+            Text("The dashboard reads local Codex thread metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -24,7 +24,7 @@ enum TestDatabaseFactory {
                 encoding: .utf8
             ) ?? "Unknown sqlite3 error"
             XCTFail("Could not create test database: \(message)")
-            throw TaskRepositoryError.queryFailed(databaseURL, message)
+            throw ThreadRepositoryError.queryFailed(databaseURL, message)
         }
         testCase.addTeardownBlock { try? FileManager.default.removeItem(at: databaseURL) }
         return databaseURL
@@ -36,7 +36,7 @@ enum TestDatabaseFactory {
         testCase: XCTestCase
     ) throws -> URL {
         let additionalRows = (0..<additionalThreadCount).map { index in
-            "INSERT INTO threads VALUES ('extra-\(index)', NULL, 'Extra task \(index)', "
+            "INSERT INTO threads VALUES ('extra-\(index)', NULL, 'Extra thread \(index)', "
                 + "'Extra preview', '/tmp/extra-\(index)', \(now - Int64(index + 1)), "
                 + "\(now - Int64(index + 1)), 0, NULL, 0, \((now - Int64(index + 1)) * 1000));"
         }.joined(separator: "\n")
@@ -59,11 +59,11 @@ enum TestDatabaseFactory {
             """,
             rows: """
             INSERT INTO threads VALUES
-              ('running', NULL, 'Running task', 'Running preview', '/tmp/running', \(now - 30), \(now - 300), 1, 'test-model', 0, \((now - 30) * 1000)),
-              ('recent', 'Renamed task', 'Old title', 'Recent preview', '/tmp/recent', \(now - 600), \(now - 900), 0, NULL, 0, \((now - 600) * 1000)),
-              ('idle', NULL, 'Idle task', 'Idle preview', '/tmp/idle', \(now - 7200), \(now - 9000), 0, NULL, 0, \((now - 7200) * 1000)),
-              ('empty', NULL, 'Empty task', '', '/tmp/empty', \(now), \(now), 0, NULL, 0, \(now * 1000)),
-              ('archived', NULL, 'Archived task', 'Archived preview', '/tmp/archived', \(now), \(now), 0, NULL, 1, \(now * 1000));
+              ('running', NULL, 'Running thread', 'Running preview', '/tmp/running', \(now - 30), \(now - 300), 1, 'test-model', 0, \((now - 30) * 1000)),
+              ('updated', 'Renamed thread', 'Old title', 'Updated preview', '/tmp/updated', \(now - 600), \(now - 900), 0, NULL, 0, \((now - 600) * 1000)),
+              ('idle', NULL, 'Idle thread', 'Idle preview', '/tmp/idle', \(now - 7200), \(now - 9000), 0, NULL, 0, \((now - 7200) * 1000)),
+              ('empty', NULL, 'Empty thread', '', '/tmp/empty', \(now), \(now), 0, NULL, 0, \(now * 1000)),
+              ('archived', NULL, 'Archived thread', 'Archived preview', '/tmp/archived', \(now), \(now), 0, NULL, 1, \(now * 1000));
             \(additionalRows)
             """,
             testCase: testCase
@@ -82,7 +82,7 @@ enum TestDatabaseFactory {
             rows: """
             INSERT INTO logs (ts, thread_id) VALUES
               (\(now - 2), 'running'),
-              (\(now - 90), 'recent'),
+              (\(now - 90), 'updated'),
               (\(now - 300), 'idle');
             """,
             testCase: testCase

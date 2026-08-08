@@ -42,11 +42,11 @@ final class DashboardController: ObservableObject {
     @Published private(set) var state: DashboardState = .checking
     @Published private(set) var isBusy = false
     @Published private(set) var dataWarning: String?
-    @Published private(set) var tasks: [DashboardTask] = []
-    @Published private(set) var totalTaskCount = 0
+    @Published private(set) var threads: [DashboardThread] = []
+    @Published private(set) var totalThreadCount = 0
 
     private let devTools = DevToolsClient()
-    private let taskRepository = CodexTaskRepository()
+    private let threadRepository = CodexThreadRepository()
     private var adapter: DashboardAdapter?
     private var shouldMaintainDashboard = true
     private var monitor: Task<Void, Never>?
@@ -72,9 +72,9 @@ final class DashboardController: ObservableObject {
         case .hostClosed:
             "Dashboard can launch it with the local bridge enabled."
         case .hostRunning:
-            "Restart it through Dashboard once to add the task view."
+            "Restart it through Dashboard once to add the thread view."
         case .connected:
-            "The local renderer is ready for the task dashboard."
+            "The local renderer is ready for the thread dashboard."
         case .enabled:
             activitySummary
         case .needsAttention:
@@ -122,13 +122,13 @@ final class DashboardController: ObservableObject {
 
     private func performRefresh() async {
         do {
-            let snapshot = try await taskRepository.loadSnapshot()
+            let snapshot = try await threadRepository.loadSnapshot()
             guard !Task.isCancelled else { return }
-            tasks = snapshot.tasks
-            totalTaskCount = snapshot.totalTaskCount
+            threads = snapshot.threads
+            totalThreadCount = snapshot.totalThreadCount
             dataWarning = snapshot.warning
         } catch {
-            dataWarning = "Task data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
+            dataWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
         }
 
         guard !Task.isCancelled, !isBusy else { return }
@@ -205,9 +205,9 @@ final class DashboardController: ObservableObject {
                 try await Task.sleep(for: .milliseconds(350))
             }
 
-            let snapshot = try await taskRepository.loadSnapshot()
-            tasks = snapshot.tasks
-            totalTaskCount = snapshot.totalTaskCount
+            let snapshot = try await threadRepository.loadSnapshot()
+            threads = snapshot.threads
+            totalThreadCount = snapshot.totalThreadCount
             dataWarning = snapshot.warning
             shouldMaintainDashboard = true
             try await synchronizeDashboard(with: targets, forceMount: true)
@@ -265,9 +265,8 @@ final class DashboardController: ObservableObject {
     }
 
     private var activitySummary: String {
-        let runningCount = tasks.count { $0.status == .running }
-        let recentCount = tasks.count { $0.status == .recent }
-        return "\(runningCount) running · \(recentCount) recently active"
+        let runningCount = threads.count { $0.status == .running }
+        return "\(runningCount) running · \(totalThreadCount) total threads"
     }
 
     private func synchronizeDashboard(
@@ -306,7 +305,7 @@ final class DashboardController: ObservableObject {
             }
         }
 
-        let payload = DashboardPayload(tasks: tasks, totalTaskCount: totalTaskCount)
+        let payload = DashboardPayload(threads: threads, totalThreadCount: totalThreadCount)
         if mountedDashboard || payload != lastDeliveredPayload || targetIDs != enabledTargetIDs {
             try await deliver(payload, to: targets)
             lastDeliveredPayload = payload
@@ -318,7 +317,7 @@ final class DashboardController: ObservableObject {
     private func deliver(_ payload: DashboardPayload, to targets: [DevToolsTarget]) async throws {
         let data = try JSONEncoder().encode(payload)
         guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("Task data could not be encoded for the renderer.")
+            throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")
         }
         let expression = """
         (() => {
@@ -331,7 +330,7 @@ final class DashboardController: ObservableObject {
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
                 throw DashboardError.enableFailed(
-                    "The dashboard was unavailable while task data was being delivered."
+                    "The dashboard was unavailable while thread data was being delivered."
                 )
             }
         }
