@@ -33,8 +33,10 @@ enum TestDatabaseFactory {
     static func makeStateDatabase(
         now: Int64,
         additionalThreadCount: Int = 0,
+        runningWorkspacePath: String = "/tmp/running",
         testCase: XCTestCase
     ) throws -> URL {
+        let escapedRunningWorkspacePath = runningWorkspacePath.replacingOccurrences(of: "'", with: "''")
         let additionalRows = (0..<additionalThreadCount).map { index in
             "INSERT INTO threads VALUES ('extra-\(index)', NULL, 'Extra thread \(index)', "
                 + "'Extra preview', '/tmp/extra-\(index)', \(now - Int64(index + 1)), "
@@ -59,7 +61,7 @@ enum TestDatabaseFactory {
             """,
             rows: """
             INSERT INTO threads VALUES
-              ('running', NULL, 'Running thread', 'Running preview', '/tmp/running', \(now - 30), \(now - 300), 1, 'test-model', 0, \((now - 30) * 1000)),
+              ('running', NULL, 'Running thread', 'Running preview', '\(escapedRunningWorkspacePath)', \(now - 30), \(now - 300), 1, 'test-model', 0, \((now - 30) * 1000)),
               ('updated', 'Renamed thread', 'Old title', 'Updated preview', '/tmp/updated', \(now - 600), \(now - 900), 0, NULL, 0, \((now - 600) * 1000)),
               ('idle', NULL, 'Idle thread', 'Idle preview', '/tmp/idle', \(now - 7200), \(now - 9000), 0, NULL, 0, \((now - 7200) * 1000)),
               ('empty', NULL, 'Empty thread', '', '/tmp/empty', \(now), \(now), 0, NULL, 0, \(now * 1000)),

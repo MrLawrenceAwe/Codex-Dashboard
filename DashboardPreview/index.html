@@ -15,13 +15,21 @@
   </head>
   <body>
     <div class="mock-app">
-      <aside class="mock-sidebar">
+      <aside class="mock-sidebar" role="navigation">
         <strong>Codex</strong>
-        <button data-app-action-sidebar-thread-id="local:thread-dashboard">Build threads dashboard</button>
-        <button data-app-action-sidebar-thread-id="local:thread-review">Review project for bugs</button>
+        <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread-dashboard">Build threads dashboard</button>
+        <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread-review">Review project for bugs</button>
       </aside>
       <main class="mock-main">Conversation surface</main>
     </div>
+    <script>
+      document.documentElement.dataset.mockHostNavigationCount = '0';
+      document.querySelector('.mock-sidebar').addEventListener('click', () => {
+        document.documentElement.dataset.mockHostNavigationCount = String(
+          Number(document.documentElement.dataset.mockHostNavigationCount) + 1,
+        );
+      }, true);
+    </script>
     <script src="./preview.js"></script>
   </body>
 </html>

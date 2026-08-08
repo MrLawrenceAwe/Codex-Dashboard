@@ -35,7 +35,9 @@ removes it.
 - Loopback-only Chromium DevTools connection.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local thread metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
-- Threads are ordered by their last update. The dashboard loads the latest 60 and reports the full thread total; search and filters apply to the loaded set.
+- Threads are ordered by their last update. The dashboard loads the latest 60; search and filters apply to the loaded set.
+- Threads can be viewed by collapsible project or as one list sorted by most recently updated.
+- Grouped projects show a quiet marker when their Git working tree has uncommitted changes.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
