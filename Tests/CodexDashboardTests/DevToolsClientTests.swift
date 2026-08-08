@@ -3,6 +3,12 @@ import XCTest
 @testable import CodexDashboard
 
 final class DevToolsClientTests: XCTestCase {
+    func testPackagedDashboardResourcesLoad() throws {
+        let adapter = try DashboardAdapter.load()
+        XCTAssertTrue(adapter.expression.contains("window.__codexDashboard"))
+        XCTAssertTrue(adapter.expression.contains("#codex-dashboard-page"))
+    }
+
     func testTargetDecoding() throws {
         let data = Data(#"[{"id":"page-1","type":"page","title":"Codex","url":"app://codex","webSocketDebuggerUrl":"ws://127.0.0.1/devtools/page/1"}]"#.utf8)
         let targets = try JSONDecoder().decode([DevToolsTarget].self, from: data)

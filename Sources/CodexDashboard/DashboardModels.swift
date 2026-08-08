@@ -26,5 +26,11 @@ struct DashboardTask: Codable, Identifiable, Sendable {
 
 struct TaskSnapshot: Sendable {
     let tasks: [DashboardTask]
+    let totalTaskCount: Int
     let warning: String?
+}
+
+struct DashboardPayload: Codable, Sendable {
+    let tasks: [DashboardTask]
+    let totalTaskCount: Int
 }

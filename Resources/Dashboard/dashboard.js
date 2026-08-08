@@ -13,6 +13,7 @@ const ids = {
 const activeStatuses = new Set(['running', 'recent']);
 const statusLabels = { running: 'Running', recent: 'Recent', idle: 'Idle' };
 let tasks = [];
+let totalTaskCount = 0;
 let statusFilter = 'current';
 let searchTerm = '';
 let mutationObserver;
@@ -56,7 +57,7 @@ function relativeTime(timestamp) {
 function filteredTasks() {
   const query = searchTerm.trim().toLowerCase();
   return tasks.filter((task) => {
-    const filterMatch = statusFilter === 'all'
+    const filterMatch = statusFilter === 'loaded'
       || (statusFilter === 'current' && activeStatuses.has(task.status))
       || task.status === statusFilter;
     const searchMatch = !query || `${task.title} ${task.preview} ${task.workspace}`.toLowerCase().includes(query);
@@ -89,7 +90,7 @@ function render() {
   const recent = tasks.filter((task) => task.status === 'recent').length;
   page.querySelector('[data-count-running]').textContent = String(running);
   page.querySelector('[data-count-recent]').textContent = String(recent);
-  page.querySelector('[data-count-total]').textContent = String(tasks.length);
+  page.querySelector('[data-count-total]').textContent = String(totalTaskCount);
   page.querySelectorAll('[data-filter]').forEach((button) => {
     button.classList.toggle('is-active', button.dataset.filter === statusFilter);
   });
@@ -182,14 +183,15 @@ function createPage() {
         <div><strong data-count-recent>0</strong><span>Recently active</span></div>
         <div><strong data-count-total>0</strong><span>Total tasks</span></div>
       </section>
+      <p class="dashboard-scope" data-dashboard-scope></p>
       <div class="dashboard-toolbar">
         <div class="dashboard-filters">
           <button type="button" data-filter="current" class="is-active">Current</button>
           <button type="button" data-filter="running">Running</button>
           <button type="button" data-filter="recent">Recent</button>
-          <button type="button" data-filter="all">All</button>
+          <button type="button" data-filter="loaded">Loaded</button>
         </div>
-        <label class="dashboard-search">${iconSVG('search')}<input type="search" placeholder="Search tasks" data-dashboard-search /></label>
+        <label class="dashboard-search">${iconSVG('search')}<input type="search" placeholder="Search loaded tasks" data-dashboard-search /></label>
       </div>
       <main class="dashboard-list" data-task-list></main>
     </div>`;
@@ -229,11 +231,20 @@ function closePage() {
   document.getElementById(ids.navButton)?.removeAttribute('aria-current');
 }
 
-function update(nextTasks) {
-  tasks = Array.isArray(nextTasks) ? nextTasks : [];
+function update(nextSnapshot) {
+  tasks = Array.isArray(nextSnapshot?.tasks) ? nextSnapshot.tasks : [];
+  totalTaskCount = Number.isFinite(nextSnapshot?.totalTaskCount)
+    ? Math.max(tasks.length, nextSnapshot.totalTaskCount)
+    : tasks.length;
   const activeCount = tasks.filter((task) => activeStatuses.has(task.status)).length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) count.textContent = String(activeCount);
+  const scope = document.querySelector('[data-dashboard-scope]');
+  if (scope) {
+    scope.textContent = totalTaskCount > tasks.length
+      ? `Showing the ${tasks.length} most recently active tasks. Search and filters cover these loaded tasks.`
+      : `Showing all ${totalTaskCount} tasks.`;
+  }
   render();
 }
 
