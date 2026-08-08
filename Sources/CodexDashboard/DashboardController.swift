@@ -43,6 +43,7 @@ final class DashboardController: ObservableObject {
     @Published private(set) var isBusy = false
     @Published private(set) var dataWarning: String?
     @Published private(set) var tasks: [DashboardTask] = []
+    @Published private(set) var totalTaskCount = 0
 
     private let devTools = DevToolsClient()
     private let taskRepository = CodexTaskRepository()
@@ -104,6 +105,7 @@ final class DashboardController: ObservableObject {
         do {
             let snapshot = try await taskRepository.loadSnapshot()
             tasks = snapshot.tasks
+            totalTaskCount = snapshot.totalTaskCount
             dataWarning = snapshot.warning
         } catch {
             dataWarning = "Task data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
@@ -291,7 +293,8 @@ final class DashboardController: ObservableObject {
     }
 
     private func deliverTasks(to targets: [DevToolsTarget]) async throws {
-        let data = try JSONEncoder().encode(tasks)
+        let payload = DashboardPayload(tasks: tasks, totalTaskCount: totalTaskCount)
+        let data = try JSONEncoder().encode(payload)
         guard let json = String(data: data, encoding: .utf8) else {
             throw DashboardError.enableFailed("Task data could not be encoded for the renderer.")
         }

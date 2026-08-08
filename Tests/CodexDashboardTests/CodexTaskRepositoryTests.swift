@@ -13,6 +13,7 @@ final class CodexTaskRepositoryTests: XCTestCase {
         ).loadSnapshot()
 
         XCTAssertNil(snapshot.warning)
+        XCTAssertEqual(snapshot.totalTaskCount, 3)
         XCTAssertEqual(snapshot.tasks.map(\.id), ["running", "recent", "idle"])
         XCTAssertEqual(snapshot.tasks.map(\.status), [.running, .recent, .idle])
         XCTAssertEqual(snapshot.tasks.first?.title, "Running task")
@@ -34,8 +35,29 @@ final class CodexTaskRepositoryTests: XCTestCase {
         )
         let snapshot = try await repository.loadSnapshot()
         XCTAssertEqual(snapshot.tasks.count, 3)
+        XCTAssertEqual(snapshot.totalTaskCount, 3)
         XCTAssertFalse(snapshot.tasks.contains { $0.status == .running })
         XCTAssertNotNil(snapshot.warning)
+    }
+
+    func testReportsFullCountWhenTaskRowsAreLimited() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
+            now: now,
+            additionalThreadCount: 60,
+            testCase: self
+        )
+        let activityDatabaseURL = try TestDatabaseFactory.makeActivityDatabase(
+            now: now,
+            testCase: self
+        )
+        let snapshot = try await CodexTaskRepository(
+            stateDatabaseURL: stateDatabaseURL,
+            activityDatabaseURL: activityDatabaseURL
+        ).loadSnapshot()
+
+        XCTAssertEqual(snapshot.tasks.count, 60)
+        XCTAssertEqual(snapshot.totalTaskCount, 63)
     }
 
     func testReportsMissingStateDatabase() async throws {

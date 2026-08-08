@@ -30,8 +30,18 @@ enum TestDatabaseFactory {
         return databaseURL
     }
 
-    static func makeStateDatabase(now: Int64, testCase: XCTestCase) throws -> URL {
-        try makeDatabase(
+    static func makeStateDatabase(
+        now: Int64,
+        additionalThreadCount: Int = 0,
+        testCase: XCTestCase
+    ) throws -> URL {
+        let additionalRows = (0..<additionalThreadCount).map { index in
+            "INSERT INTO threads VALUES ('extra-\(index)', NULL, 'Extra task \(index)', "
+                + "'Extra preview', '/tmp/extra-\(index)', \(now - Int64(index + 1)), "
+                + "\(now - Int64(index + 1)), 0, NULL, 0, \((now - Int64(index + 1)) * 1000));"
+        }.joined(separator: "\n")
+
+        return try makeDatabase(
             schema: """
             CREATE TABLE threads (
               id TEXT PRIMARY KEY,
@@ -54,6 +64,7 @@ enum TestDatabaseFactory {
               ('idle', NULL, 'Idle task', 'Idle preview', '/tmp/idle', \(now - 7200), \(now - 9000), 0, NULL, 0, \((now - 7200) * 1000)),
               ('empty', NULL, 'Empty task', '', '/tmp/empty', \(now), \(now), 0, NULL, 0, \(now * 1000)),
               ('archived', NULL, 'Archived task', 'Archived preview', '/tmp/archived', \(now), \(now), 0, NULL, 1, \(now * 1000));
+            \(additionalRows)
             """,
             testCase: testCase
         )

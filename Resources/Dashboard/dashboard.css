@@ -50,6 +50,7 @@
 #codex-dashboard-page .dashboard-stats div:last-child { border-right: 0; }
 #codex-dashboard-page .dashboard-stats strong { font-size: 25px; line-height: 1; }
 #codex-dashboard-page .dashboard-stats span { color: var(--db-muted); font-size: 12px; }
+#codex-dashboard-page .dashboard-scope { margin: -6px 2px 18px; color: var(--db-muted); font-size: 11px; }
 
 #codex-dashboard-page .dashboard-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 12px; }
 #codex-dashboard-page .dashboard-filters { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--db-line); border-radius: 12px; background: rgba(24,27,25,.65); }

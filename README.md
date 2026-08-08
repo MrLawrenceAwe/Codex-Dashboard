@@ -26,7 +26,7 @@ This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
    the main content pane while the rest of Codex navigation stays available.
 
 The controller must remain open to refresh task activity and restore the dashboard after renderer reloads. Use
-**Remove** to unload the injected UI immediately. A normal ChatGPT restart also
+**Disable Dashboard** to unload the injected UI immediately. A normal ChatGPT restart also
 removes it.
 
 ## Architecture
@@ -35,6 +35,7 @@ removes it.
 - Loopback-only Chromium DevTools connection.
 - Versioned dashboard resources under `Resources/Dashboard`.
 - Local task metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
+- The dashboard loads the 60 most recently active tasks and reports the full task total; search and filters apply to the loaded set.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.

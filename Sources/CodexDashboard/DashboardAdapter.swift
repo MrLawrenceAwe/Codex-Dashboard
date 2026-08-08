@@ -4,14 +4,15 @@ import Foundation
 struct DashboardAdapter: Sendable {
     let expression: String
 
-    static func load(bundle: Bundle = .main) throws -> DashboardAdapter {
+    static func load(bundle: Bundle? = nil) throws -> DashboardAdapter {
+        let resourceBundle = bundle ?? defaultResourceBundle
         guard
-            let scriptURL = bundle.url(
+            let scriptURL = resourceBundle.url(
                 forResource: "dashboard",
                 withExtension: "js",
                 subdirectory: "Dashboard"
             ),
-            let cssURL = bundle.url(
+            let cssURL = resourceBundle.url(
                 forResource: "dashboard",
                 withExtension: "css",
                 subdirectory: "Dashboard"
@@ -36,5 +37,16 @@ struct DashboardAdapter: Sendable {
         })()
         """
         return DashboardAdapter(expression: expression)
+    }
+
+    private static var defaultResourceBundle: Bundle {
+        if Bundle.main.url(
+            forResource: "dashboard",
+            withExtension: "js",
+            subdirectory: "Dashboard"
+        ) != nil {
+            return .main
+        }
+        return .module
     }
 }

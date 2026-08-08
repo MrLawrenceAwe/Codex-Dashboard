@@ -26,6 +26,7 @@ actor CodexTaskRepository {
         let updatedAt: Int64
         let isPinned: Int
         let model: String?
+        let totalCount: Int
     }
 
     private struct ThreadActivity: Decodable, Sendable {
@@ -52,7 +53,8 @@ actor CodexTaskRepository {
                cwd,
                updated_at AS updatedAt,
                is_pinned AS isPinned,
-               model
+               model,
+               COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
         ORDER BY recency_at_ms DESC
@@ -100,7 +102,11 @@ actor CodexTaskRepository {
                 status: status
             )
         }
-        return TaskSnapshot(tasks: tasks, warning: warning)
+        return TaskSnapshot(
+            tasks: tasks,
+            totalTaskCount: threads.first?.totalCount ?? 0,
+            warning: warning
+        )
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {

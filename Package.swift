@@ -10,7 +10,17 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CodexDashboard",
-            path: "Sources/CodexDashboard"
+            path: ".",
+            exclude: [
+                "App",
+                "DashboardPreview",
+                "README.md",
+                "release",
+                "Tests",
+                "install.sh",
+            ],
+            sources: ["Sources/CodexDashboard"],
+            resources: [.copy("Resources/Dashboard")]
         ),
         .testTarget(
             name: "CodexDashboardTests",
