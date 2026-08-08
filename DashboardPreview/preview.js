@@ -1,9 +1,9 @@
 Promise.all([
-  fetch('../Resources/Dashboard/dashboard.js').then((response) => response.text()),
-  fetch('../Resources/Dashboard/dashboard.css').then((response) => response.text()),
+  fetch('../Sources/CodexDashboard/Resources/Dashboard/dashboard.js').then((response) => response.text()),
+  fetch('../Sources/CodexDashboard/Resources/Dashboard/dashboard.css').then((response) => response.text()),
 ]).then(([script, stylesheet]) => {
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
-  window.__codexDashboard.update([
+  const tasks = [
     {
       id: 'thread-dashboard',
       title: 'Build tasks dashboard',
@@ -34,6 +34,7 @@ Promise.all([
       model: 'gpt-5.6-terra',
       status: 'idle',
     },
-  ]);
+  ];
+  window.__codexDashboard.update({ tasks, totalTaskCount: tasks.length });
   window.__codexDashboard.open();
 });

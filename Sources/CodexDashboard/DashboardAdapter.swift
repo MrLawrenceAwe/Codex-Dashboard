@@ -2,7 +2,18 @@ import CryptoKit
 import Foundation
 
 struct DashboardAdapter: Sendable {
+    let version: String
     let expression: String
+
+    var healthCheckExpression: String {
+        """
+        (() => Boolean(
+          window.__codexDashboard?.version === \(String(reflecting: version))
+            && typeof window.__codexDashboard?.update === 'function'
+            && window.__codexDashboard.ensureMounted?.()
+        ))()
+        """
+    }
 
     static func load(bundle: Bundle? = nil) throws -> DashboardAdapter {
         let resourceBundle = bundle ?? defaultResourceBundle
@@ -36,7 +47,7 @@ struct DashboardAdapter: Sendable {
           \(script)
         })()
         """
-        return DashboardAdapter(expression: expression)
+        return DashboardAdapter(version: version, expression: expression)
     }
 
     private static var defaultResourceBundle: Bundle {

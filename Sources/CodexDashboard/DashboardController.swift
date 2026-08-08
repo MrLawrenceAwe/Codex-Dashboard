@@ -49,9 +49,10 @@ final class DashboardController: ObservableObject {
     private let taskRepository = CodexTaskRepository()
     private var adapter: DashboardAdapter?
     private var shouldMaintainDashboard = true
-    private var enableGeneration = 0
-    private var activeEnableAttempts = 0
     private var monitor: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
+    private var enabledTargetIDs: Set<String> = []
+    private var lastDeliveredPayload: DashboardPayload?
 
     var statusTitle: String {
         switch state {
@@ -99,11 +100,30 @@ final class DashboardController: ObservableObject {
         }
     }
 
-    deinit { monitor?.cancel() }
+    deinit {
+        monitor?.cancel()
+        refreshTask?.cancel()
+    }
 
     func refresh() async {
+        guard !isBusy else { return }
+        if let refreshTask {
+            await refreshTask.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performRefresh()
+        }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func performRefresh() async {
         do {
             let snapshot = try await taskRepository.loadSnapshot()
+            guard !Task.isCancelled else { return }
             tasks = snapshot.tasks
             totalTaskCount = snapshot.totalTaskCount
             dataWarning = snapshot.warning
@@ -111,15 +131,20 @@ final class DashboardController: ObservableObject {
             dataWarning = "Task data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
         }
 
-        guard !isBusy else { return }
+        guard !Task.isCancelled, !isBusy else { return }
         let hostIsRunning = !NSRunningApplication.runningApplications(
             withBundleIdentifier: AppConfiguration.hostBundleIdentifier
         ).isEmpty
         let targets = await devTools.mainRendererTargets()
-        guard !isBusy else { return }
+        guard !Task.isCancelled, !isBusy else { return }
 
         if shouldMaintainDashboard, !targets.isEmpty {
-            await enableDashboard(showsProgress: false)
+            do {
+                try await synchronizeDashboard(with: targets)
+            } catch {
+                guard !Task.isCancelled, shouldMaintainDashboard else { return }
+                setFailure(error, hostConnected: true)
+            }
             return
         }
         if state.errorMessage != nil { return }
@@ -133,10 +158,12 @@ final class DashboardController: ObservableObject {
     func restartCodexAndEnableDashboard() async {
         guard !isBusy else { return }
         isBusy = true
-        enableGeneration &+= 1
         shouldMaintainDashboard = false
+        enabledTargetIDs = []
+        lastDeliveredPayload = nil
         state = .checking
         defer { isBusy = false }
+        await cancelRefresh()
 
         do {
             let executableURL = AppConfiguration.hostExecutableURL
@@ -168,63 +195,24 @@ final class DashboardController: ObservableObject {
             try process.run()
 
             let rendererDeadline = ContinuousClock.now + .seconds(18)
-            while await devTools.mainRendererTargets().isEmpty {
+            var targets: [DevToolsTarget] = []
+            while targets.isEmpty {
+                targets = await devTools.mainRendererTargets()
+                if !targets.isEmpty { break }
                 guard ContinuousClock.now < rendererDeadline else {
                     throw DashboardError.rendererTimedOut
                 }
                 try await Task.sleep(for: .milliseconds(350))
             }
 
-            enableGeneration &+= 1
+            let snapshot = try await taskRepository.loadSnapshot()
+            tasks = snapshot.tasks
+            totalTaskCount = snapshot.totalTaskCount
+            dataWarning = snapshot.warning
             shouldMaintainDashboard = true
-            await enableDashboard(showsProgress: false)
-            await refresh()
+            try await synchronizeDashboard(with: targets, forceMount: true)
         } catch {
             setFailure(error, hostConnected: false)
-        }
-    }
-
-    func enableDashboard(showsProgress: Bool = true) async {
-        guard !isBusy || !showsProgress else { return }
-        guard shouldMaintainDashboard else { return }
-        let generation = enableGeneration
-        activeEnableAttempts += 1
-        defer { activeEnableAttempts -= 1 }
-        if showsProgress { isBusy = true }
-        defer { if showsProgress { isBusy = false } }
-
-        do {
-            guard let adapter else { throw DashboardError.missingResources }
-            let targets = await devTools.mainRendererTargets()
-            guard generation == enableGeneration, shouldMaintainDashboard else { return }
-            guard !targets.isEmpty else { throw DashboardError.rendererTimedOut }
-            var enabledRendererCount = 0
-            for target in targets {
-                guard generation == enableGeneration, shouldMaintainDashboard else { return }
-                do {
-                    if try await devTools.evaluateBoolean(
-                        adapter.expression,
-                        in: target,
-                        bypassContentSecurityPolicy: true
-                    ) {
-                        enabledRendererCount += 1
-                    }
-                    try await restoreContentSecurityPolicy(in: target)
-                } catch {
-                    try? await restoreContentSecurityPolicy(in: target)
-                    throw error
-                }
-            }
-            guard generation == enableGeneration, shouldMaintainDashboard else { return }
-            guard enabledRendererCount > 0 else {
-                throw DashboardError.enableFailed("The adapter did not mount in the Codex renderer.")
-            }
-            try await deliverTasks(to: targets)
-            guard generation == enableGeneration, shouldMaintainDashboard else { return }
-            state = .enabled
-        } catch {
-            guard generation == enableGeneration, shouldMaintainDashboard else { return }
-            setFailure(error, hostConnected: true)
         }
     }
 
@@ -232,15 +220,13 @@ final class DashboardController: ObservableObject {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
-        enableGeneration &+= 1
         shouldMaintainDashboard = false
-
-        while activeEnableAttempts > 0 {
-            try? await Task.sleep(for: .milliseconds(20))
-        }
+        await cancelRefresh()
 
         let targets = await devTools.mainRendererTargets()
         guard !targets.isEmpty else {
+            enabledTargetIDs = []
+            lastDeliveredPayload = nil
             state = .hostClosed
             return
         }
@@ -257,14 +243,10 @@ final class DashboardController: ObservableObject {
                 }
             }
             disablementConfirmed = true
-            for target in targets {
-                try await restoreContentSecurityPolicy(in: target)
-            }
+            enabledTargetIDs = []
+            lastDeliveredPayload = nil
             state = .connected
         } catch {
-            for target in targets {
-                try? await restoreContentSecurityPolicy(in: target)
-            }
             state = .needsAttention(
                 message: error.localizedDescription,
                 hostConnected: true,
@@ -288,12 +270,52 @@ final class DashboardController: ObservableObject {
         return "\(runningCount) running · \(recentCount) recently active"
     }
 
-    private func restoreContentSecurityPolicy(in target: DevToolsTarget) async throws {
-        try await devTools.setContentSecurityPolicyBypass(false, in: target)
+    private func synchronizeDashboard(
+        with targets: [DevToolsTarget],
+        forceMount: Bool = false
+    ) async throws {
+        guard let adapter else { throw DashboardError.missingResources }
+        let targetIDs = Set(targets.map(\.id))
+        var mountedDashboard = false
+
+        for target in targets {
+            try Task.checkCancellation()
+            guard shouldMaintainDashboard else { return }
+            let canCheckExistingDashboard = !forceMount && enabledTargetIDs.contains(target.id)
+            let isHealthy: Bool
+            if canCheckExistingDashboard {
+                isHealthy = (try? await devTools.evaluateBoolean(
+                    adapter.healthCheckExpression,
+                    in: target
+                )) == true
+            } else {
+                isHealthy = false
+            }
+            guard !Task.isCancelled, shouldMaintainDashboard else { return }
+            if !isHealthy {
+                guard try await devTools.evaluateBoolean(
+                    adapter.expression,
+                    in: target,
+                    bypassContentSecurityPolicy: true
+                ) else {
+                    throw DashboardError.enableFailed(
+                        "The adapter did not mount in the Codex renderer."
+                    )
+                }
+                mountedDashboard = true
+            }
+        }
+
+        let payload = DashboardPayload(tasks: tasks, totalTaskCount: totalTaskCount)
+        if mountedDashboard || payload != lastDeliveredPayload || targetIDs != enabledTargetIDs {
+            try await deliver(payload, to: targets)
+            lastDeliveredPayload = payload
+        }
+        enabledTargetIDs = targetIDs
+        state = .enabled
     }
 
-    private func deliverTasks(to targets: [DevToolsTarget]) async throws {
-        let payload = DashboardPayload(tasks: tasks, totalTaskCount: totalTaskCount)
+    private func deliver(_ payload: DashboardPayload, to targets: [DevToolsTarget]) async throws {
         let data = try JSONEncoder().encode(payload)
         guard let json = String(data: data, encoding: .utf8) else {
             throw DashboardError.enableFailed("Task data could not be encoded for the renderer.")
@@ -313,6 +335,13 @@ final class DashboardController: ObservableObject {
                 )
             }
         }
+    }
+
+    private func cancelRefresh() async {
+        let task = refreshTask
+        refreshTask = nil
+        task?.cancel()
+        await task?.value
     }
 
     private func setFailure(_ error: Error, hostConnected: Bool) {
