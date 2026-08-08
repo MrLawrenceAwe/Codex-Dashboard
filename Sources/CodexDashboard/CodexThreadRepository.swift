@@ -1,6 +1,6 @@
 import Foundation
 
-enum TaskRepositoryError: LocalizedError {
+enum ThreadRepositoryError: LocalizedError {
     case missingDatabase(URL)
     case queryFailed(URL, String)
     case invalidResponse(URL)
@@ -17,7 +17,7 @@ enum TaskRepositoryError: LocalizedError {
     }
 }
 
-actor CodexTaskRepository {
+actor CodexThreadRepository {
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
@@ -45,10 +45,10 @@ actor CodexTaskRepository {
         self.activityDatabaseURL = activityDatabaseURL
     }
 
-    func loadSnapshot() throws -> TaskSnapshot {
+    func loadSnapshot() throws -> ThreadSnapshot {
         let threadSQL = """
         SELECT id,
-               COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled task') AS title,
+               COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
                cwd,
                updated_at AS updatedAt,
@@ -57,7 +57,7 @@ actor CodexTaskRepository {
                COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
-        ORDER BY recency_at_ms DESC
+        ORDER BY updated_at DESC
         LIMIT 60;
         """
         let activitySQL = """
@@ -75,23 +75,21 @@ actor CodexTaskRepository {
             warning = nil
         } catch {
             activity = []
-            warning = "Task activity is temporarily unavailable. \(error.localizedDescription)"
+            warning = "Thread activity is temporarily unavailable. \(error.localizedDescription)"
         }
 
         let latestActivity = Dictionary(uniqueKeysWithValues: activity.map { ($0.threadId, $0.lastActivity) })
         let now = Int64(Date().timeIntervalSince1970)
-        let tasks = threads.map { thread in
+        let dashboardThreads = threads.map { thread in
             let lastLogTime = latestActivity[thread.id] ?? 0
-            let status: TaskActivityStatus
+            let status: ThreadActivityStatus
             if now - lastLogTime <= 12 {
                 status = .running
-            } else if now - thread.updatedAt <= 3_600 {
-                status = .recent
             } else {
                 status = .idle
             }
             let directoryName = URL(fileURLWithPath: thread.cwd).lastPathComponent
-            return DashboardTask(
+            return DashboardThread(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
@@ -102,16 +100,16 @@ actor CodexTaskRepository {
                 status: status
             )
         }
-        return TaskSnapshot(
-            tasks: tasks,
-            totalTaskCount: threads.first?.totalCount ?? 0,
+        return ThreadSnapshot(
+            threads: dashboardThreads,
+            totalThreadCount: threads.first?.totalCount ?? 0,
             warning: warning
         )
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
-            throw TaskRepositoryError.missingDatabase(databaseURL)
+            throw ThreadRepositoryError.missingDatabase(databaseURL)
         }
         let process = Process()
         let output = Pipe()
@@ -130,16 +128,16 @@ actor CodexTaskRepository {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let detail = message.flatMap { $0.isEmpty ? nil : $0 }
                     ?? "sqlite3 exited with status \(process.terminationStatus)"
-                throw TaskRepositoryError.queryFailed(databaseURL, detail)
+                throw ThreadRepositoryError.queryFailed(databaseURL, detail)
             }
             do {
                 return try JSONDecoder().decode(T.self, from: data)
             } catch {
-                throw TaskRepositoryError.invalidResponse(databaseURL)
+                throw ThreadRepositoryError.invalidResponse(databaseURL)
             }
         } catch {
-            if error is TaskRepositoryError { throw error }
-            throw TaskRepositoryError.queryFailed(databaseURL, error.localizedDescription)
+            if error is ThreadRepositoryError { throw error }
+            throw ThreadRepositoryError.queryFailed(databaseURL, error.localizedDescription)
         }
     }
 }

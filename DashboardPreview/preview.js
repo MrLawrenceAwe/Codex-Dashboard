@@ -3,11 +3,11 @@ Promise.all([
   fetch('../Sources/CodexDashboard/Resources/Dashboard/dashboard.css').then((response) => response.text()),
 ]).then(([script, stylesheet]) => {
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
-  const tasks = [
+  const threads = [
     {
       id: 'thread-dashboard',
-      title: 'Build tasks dashboard',
-      preview: 'Create an active-task dashboard embedded directly inside Codex.',
+      title: 'Build threads dashboard',
+      preview: 'Create an active-thread dashboard embedded directly inside Codex.',
       workspace: 'Codex Dashboard',
       updatedAt: Math.round(Date.now() / 1000) - 3,
       isPinned: true,
@@ -22,7 +22,7 @@ Promise.all([
       updatedAt: Math.round(Date.now() / 1000) - 780,
       isPinned: false,
       model: 'gpt-5.6-terra',
-      status: 'recent',
+      status: 'idle',
     },
     {
       id: 'thread-idle',
@@ -35,6 +35,6 @@ Promise.all([
       status: 'idle',
     },
   ];
-  window.__codexDashboard.update({ tasks, totalTaskCount: tasks.length });
+  window.__codexDashboard.update({ threads, totalThreadCount: threads.length });
   window.__codexDashboard.open();
 });

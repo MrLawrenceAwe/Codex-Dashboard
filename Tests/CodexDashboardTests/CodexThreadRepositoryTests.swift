@@ -2,24 +2,24 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class CodexTaskRepositoryTests: XCTestCase {
+final class CodexThreadRepositoryTests: XCTestCase {
     func testLoadsAndClassifiesThreads() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(now: now, testCase: self)
         let activityDatabaseURL = try TestDatabaseFactory.makeActivityDatabase(now: now, testCase: self)
-        let snapshot = try await CodexTaskRepository(
+        let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL,
             activityDatabaseURL: activityDatabaseURL
         ).loadSnapshot()
 
         XCTAssertNil(snapshot.warning)
-        XCTAssertEqual(snapshot.totalTaskCount, 3)
-        XCTAssertEqual(snapshot.tasks.map(\.id), ["running", "recent", "idle"])
-        XCTAssertEqual(snapshot.tasks.map(\.status), [.running, .recent, .idle])
-        XCTAssertEqual(snapshot.tasks.first?.title, "Running task")
-        XCTAssertEqual(snapshot.tasks.first?.workspace, "running")
-        XCTAssertTrue(snapshot.tasks.first?.isPinned == true)
-        XCTAssertEqual(snapshot.tasks[1].title, "Renamed task")
+        XCTAssertEqual(snapshot.totalThreadCount, 3)
+        XCTAssertEqual(snapshot.threads.map(\.id), ["running", "updated", "idle"])
+        XCTAssertEqual(snapshot.threads.map(\.status), [.running, .idle, .idle])
+        XCTAssertEqual(snapshot.threads.first?.title, "Running thread")
+        XCTAssertEqual(snapshot.threads.first?.workspace, "running")
+        XCTAssertTrue(snapshot.threads.first?.isPinned == true)
+        XCTAssertEqual(snapshot.threads[1].title, "Renamed thread")
     }
 
     func testStillLoadsThreadsWhenActivityDatabaseIsMissing() async throws {
@@ -29,18 +29,18 @@ final class CodexTaskRepositoryTests: XCTestCase {
         )
         let missingDatabaseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-missing-activity-\(UUID().uuidString).sqlite")
-        let repository = CodexTaskRepository(
+        let repository = CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL,
             activityDatabaseURL: missingDatabaseURL
         )
         let snapshot = try await repository.loadSnapshot()
-        XCTAssertEqual(snapshot.tasks.count, 3)
-        XCTAssertEqual(snapshot.totalTaskCount, 3)
-        XCTAssertFalse(snapshot.tasks.contains { $0.status == .running })
+        XCTAssertEqual(snapshot.threads.count, 3)
+        XCTAssertEqual(snapshot.totalThreadCount, 3)
+        XCTAssertFalse(snapshot.threads.contains { $0.status == .running })
         XCTAssertNotNil(snapshot.warning)
     }
 
-    func testReportsFullCountWhenTaskRowsAreLimited() async throws {
+    func testReportsFullCountWhenThreadRowsAreLimited() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
             now: now,
@@ -51,23 +51,23 @@ final class CodexTaskRepositoryTests: XCTestCase {
             now: now,
             testCase: self
         )
-        let snapshot = try await CodexTaskRepository(
+        let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL,
             activityDatabaseURL: activityDatabaseURL
         ).loadSnapshot()
 
-        XCTAssertEqual(snapshot.tasks.count, 60)
-        XCTAssertEqual(snapshot.totalTaskCount, 63)
+        XCTAssertEqual(snapshot.threads.count, 60)
+        XCTAssertEqual(snapshot.totalThreadCount, 63)
     }
 
     func testReportsMissingStateDatabase() async throws {
         let missingDatabaseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")
-        let repository = CodexTaskRepository(stateDatabaseURL: missingDatabaseURL)
+        let repository = CodexThreadRepository(stateDatabaseURL: missingDatabaseURL)
         do {
             _ = try await repository.loadSnapshot()
             XCTFail("Expected the missing state database to be reported")
-        } catch TaskRepositoryError.missingDatabase(let databaseURL) {
+        } catch ThreadRepositoryError.missingDatabase(let databaseURL) {
             XCTAssertEqual(databaseURL, missingDatabaseURL)
         }
     }
