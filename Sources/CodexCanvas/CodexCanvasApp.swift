@@ -45,6 +45,28 @@ private struct ThreadActivity: Decodable, Sendable {
     let lastActivity: Int64
 }
 
+struct TaskSnapshot: Sendable {
+    let tasks: [DashboardTask]
+    let warning: String?
+}
+
+enum TaskStoreError: LocalizedError {
+    case missingDatabase(String)
+    case queryFailed(String, String)
+    case invalidResponse(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingDatabase(let database):
+            return "The Codex database is missing: \(database)"
+        case .queryFailed(let database, let message):
+            return "Could not read \(database): \(message)"
+        case .invalidResponse(let database):
+            return "Codex returned unreadable data from \(database)."
+        }
+    }
+}
+
 actor TaskStore {
     private let stateDatabase: String
     private let logsDatabase: String
@@ -57,7 +79,7 @@ actor TaskStore {
         self.logsDatabase = logsDatabase
     }
 
-    func load() -> [DashboardTask] {
+    func load() throws -> TaskSnapshot {
         let threadSQL = """
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled task') AS title,
@@ -79,14 +101,20 @@ actor TaskStore {
           AND ts >= CAST(strftime('%s','now') AS INTEGER) - 120
         GROUP BY thread_id;
         """
-        guard let threads: [StoredThread] = query(database: stateDatabase, sql: threadSQL) else {
-            return []
+        let threads: [StoredThread] = try query(database: stateDatabase, sql: threadSQL)
+        let activity: [ThreadActivity]
+        let warning: String?
+        do {
+            activity = try query(database: logsDatabase, sql: activitySQL)
+            warning = nil
+        } catch {
+            activity = []
+            warning = "Task activity is temporarily unavailable. \(error.localizedDescription)"
         }
-        let activity: [ThreadActivity] = query(database: logsDatabase, sql: activitySQL) ?? []
 
         let latestActivity = Dictionary(uniqueKeysWithValues: activity.map { ($0.threadId, $0.lastActivity) })
         let now = Int64(Date().timeIntervalSince1970)
-        return threads.map { thread in
+        let tasks = threads.map { thread in
             let lastLog = latestActivity[thread.id] ?? 0
             let status: String
             if now - lastLog <= 12 {
@@ -110,24 +138,39 @@ actor TaskStore {
                 status: status
             )
         }
+        return TaskSnapshot(tasks: tasks, warning: warning)
     }
 
-    private func query<T: Decodable>(database: String, sql: String) -> T? {
-        guard FileManager.default.fileExists(atPath: database) else { return nil }
+    private func query<T: Decodable>(database: String, sql: String) throws -> T {
+        guard FileManager.default.fileExists(atPath: database) else {
+            throw TaskStoreError.missingDatabase(database)
+        }
         let process = Process()
         let output = Pipe()
+        let errorOutput = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         process.arguments = ["-readonly", "-json", database, sql]
         process.standardOutput = output
-        process.standardError = Pipe()
+        process.standardError = errorOutput
         do {
             try process.run()
             let data = output.fileHandleForReading.readDataToEndOfFile()
+            let errorData = errorOutput.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            return try JSONDecoder().decode(T.self, from: data)
+            guard process.terminationStatus == 0 else {
+                let message = String(data: errorData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let detail = message.flatMap { $0.isEmpty ? nil : $0 }
+                    ?? "sqlite3 exited with status \(process.terminationStatus)"
+                throw TaskStoreError.queryFailed(database, detail)
+            }
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                throw TaskStoreError.invalidResponse(database)
+            }
         } catch {
-            return nil
+            if error is TaskStoreError { throw error }
+            throw TaskStoreError.queryFailed(database, error.localizedDescription)
         }
     }
 }
@@ -140,6 +183,7 @@ enum CanvasError: LocalizedError {
     case invalidDevToolsResponse
     case devToolsTimedOut
     case injectionFailed(String)
+    case removalFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -157,6 +201,8 @@ enum CanvasError: LocalizedError {
             return "The Codex renderer did not respond to the dashboard request."
         case .injectionFailed(let message):
             return "Dashboard injection failed: \(message)"
+        case .removalFailed(let message):
+            return "Dashboard removal failed: \(message)"
         }
     }
 }
@@ -325,12 +371,15 @@ final class CanvasModel: ObservableObject {
     @Published var statusTitle = "Checking Codex…"
     @Published var statusDetail = "Looking for the local ChatGPT application."
     @Published var lastError: String?
+    @Published var dataWarning: String?
     @Published var tasks: [DashboardTask] = []
 
     private let devTools = DevToolsClient()
     private let taskStore = TaskStore()
     private var adapter: CanvasAdapter?
     private var shouldMaintainInjection = true
+    private var injectionGeneration = 0
+    private var activeInjectionAttempts = 0
     private var monitor: Task<Void, Never>?
 
     init() {
@@ -350,15 +399,28 @@ final class CanvasModel: ObservableObject {
     deinit { monitor?.cancel() }
 
     func refresh() async {
-        tasks = await taskStore.load()
+        do {
+            let snapshot = try await taskStore.load()
+            tasks = snapshot.tasks
+            dataWarning = snapshot.warning
+        } catch {
+            dataWarning = "Task data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
+        }
+
+        guard !isBusy else { return }
         isRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: chatGPTBundleIdentifier).isEmpty
         let targets = await devTools.targets()
+        guard !isBusy else { return }
         isConnected = !targets.isEmpty
 
-        if shouldMaintainInjection, isConnected, !isBusy {
+        if shouldMaintainInjection, isConnected {
             await inject(showProgress: false)
             return
         }
+
+        // Keep an actionable lifecycle error visible until a user action or a
+        // successful maintenance attempt clears it.
+        if lastError != nil { return }
 
         if isInjected && isConnected {
             statusTitle = "Dashboard is live"
@@ -380,6 +442,8 @@ final class CanvasModel: ObservableObject {
     func restartAndConnect() async {
         guard !isBusy else { return }
         isBusy = true
+        injectionGeneration &+= 1
+        shouldMaintainInjection = false
         lastError = nil
         statusTitle = "Restarting Codex…"
         statusDetail = "Waiting for the application to close cleanly."
@@ -415,6 +479,7 @@ final class CanvasModel: ObservableObject {
                 try await Task.sleep(for: .milliseconds(350))
             }
 
+            injectionGeneration &+= 1
             shouldMaintainInjection = true
             await inject(showProgress: false)
             await refresh()
@@ -427,6 +492,10 @@ final class CanvasModel: ObservableObject {
 
     func inject(showProgress: Bool = true) async {
         guard !isBusy || !showProgress else { return }
+        guard shouldMaintainInjection else { return }
+        let generation = injectionGeneration
+        activeInjectionAttempts += 1
+        defer { activeInjectionAttempts -= 1 }
         if showProgress { isBusy = true }
         defer { if showProgress { isBusy = false } }
         lastError = nil
@@ -434,21 +503,25 @@ final class CanvasModel: ObservableObject {
         do {
             guard let adapter else { throw CanvasError.missingResources }
             let targets = await devTools.targets()
+            guard generation == injectionGeneration, shouldMaintainInjection else { return }
             guard !targets.isEmpty else { throw CanvasError.rendererTimedOut }
             var applied = 0
             for target in targets {
+                guard generation == injectionGeneration, shouldMaintainInjection else { return }
                 if try await devTools.evaluate(adapter.expression, in: target) { applied += 1 }
             }
+            guard generation == injectionGeneration, shouldMaintainInjection else { return }
             isConnected = true
             isInjected = applied > 0
             guard isInjected else {
                 throw CanvasError.injectionFailed("The adapter did not mount in the Codex renderer.")
             }
-            shouldMaintainInjection = true
             await updateDashboard(targets: targets)
+            guard generation == injectionGeneration, shouldMaintainInjection else { return }
             statusTitle = "Dashboard is live"
             statusDetail = "\(tasks.filter { $0.status == "running" }.count) running · \(tasks.filter { $0.status == "recent" }.count) recently active"
         } catch {
+            guard generation == injectionGeneration, shouldMaintainInjection else { return }
             isInjected = false
             lastError = error.localizedDescription
             statusTitle = "Dashboard needs attention"
@@ -460,18 +533,42 @@ final class CanvasModel: ObservableObject {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
+        injectionGeneration &+= 1
         shouldMaintainInjection = false
         lastError = nil
-        let targets = await devTools.targets()
-        for target in targets {
-            _ = try? await devTools.evaluate(
-                "(() => { window.__codexDashboard?.destroy?.(); return true; })()",
-                in: target
-            )
+
+        while activeInjectionAttempts > 0 {
+            try? await Task.sleep(for: .milliseconds(20))
         }
-        isInjected = false
-        statusTitle = isConnected ? "Dashboard removed" : "Dashboard is disconnected"
-        statusDetail = "The ChatGPT application bundle remains unchanged."
+
+        let targets = await devTools.targets()
+        guard !targets.isEmpty else {
+            isConnected = false
+            isInjected = false
+            statusTitle = "Dashboard is disconnected"
+            statusDetail = "The ChatGPT application bundle remains unchanged."
+            return
+        }
+
+        do {
+            for target in targets {
+                let removed = try await devTools.evaluate(
+                    "(() => { window.__codexDashboard?.destroy?.(); return typeof window.__codexDashboard === 'undefined'; })()",
+                    in: target
+                )
+                guard removed else {
+                    throw CanvasError.removalFailed("The renderer still reports an active dashboard.")
+                }
+            }
+            isInjected = false
+            statusTitle = "Dashboard removed"
+            statusDetail = "The ChatGPT application bundle remains unchanged."
+        } catch {
+            isInjected = true
+            lastError = error.localizedDescription
+            statusTitle = "Dashboard needs attention"
+            statusDetail = "Automatic maintenance is off, but removal could not be confirmed."
+        }
     }
 
     func openCanvas() async {
@@ -585,13 +682,16 @@ struct ContentView: View {
             }
             .controlSize(.large)
 
-            if let error = model.lastError {
-                Text(error)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+            if model.lastError != nil || model.dataWarning != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let error = model.lastError { Text(error) }
+                    if let warning = model.dataWarning { Text(warning) }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
             }
 
             Text("The dashboard reads local Codex task metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")

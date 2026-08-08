@@ -1,7 +1,6 @@
 const existing = window.__codexDashboard;
 if (existing?.version === CANVAS_VERSION) {
-  existing.ensureMounted();
-  return true;
+  return existing.ensureMounted();
 }
 existing?.destroy?.();
 window.__codexCanvas?.destroy?.();
@@ -272,7 +271,11 @@ function ensureMounted() {
   }
   if (!maintenanceTimer) maintenanceTimer = window.setInterval(ensureMounted, 1500);
   document.addEventListener('click', handleHostNavigation, true);
-  return true;
+  return Boolean(
+    document.getElementById(ids.style)
+      && document.getElementById(ids.page)
+      && document.getElementById(ids.navigation)
+  );
 }
 
 function destroy() {
