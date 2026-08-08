@@ -287,13 +287,27 @@ actor DevToolsClient {
             && target.webSocketDebuggerUrl != nil
     }
 
-    func evaluate(_ expression: String, in target: DevToolsTarget) async throws -> Bool {
+    func evaluate(
+        _ expression: String,
+        in target: DevToolsTarget,
+        bypassCSP: Bool = false
+    ) async throws -> Bool {
         try await withDevToolsTimeout(.seconds(4)) { [self] in
-            try await evaluateWithoutTimeout(expression, in: target)
+            try await evaluateWithoutTimeout(expression, in: target, bypassCSP: bypassCSP)
         }
     }
 
-    private func evaluateWithoutTimeout(_ expression: String, in target: DevToolsTarget) async throws -> Bool {
+    func setBypassCSP(_ enabled: Bool, in target: DevToolsTarget) async throws {
+        try await withDevToolsTimeout(.seconds(4)) { [self] in
+            try await setBypassCSPWithoutTimeout(enabled, in: target)
+        }
+    }
+
+    private func evaluateWithoutTimeout(
+        _ expression: String,
+        in target: DevToolsTarget,
+        bypassCSP: Bool
+    ) async throws -> Bool {
         guard
             let address = target.webSocketDebuggerUrl,
             let webSocketURL = URL(string: address)
@@ -307,11 +321,13 @@ actor DevToolsClient {
 
         return try await withTaskCancellationHandler {
             try await send(["id": 1, "method": "Page.enable"], through: task)
-            try await send([
-                "id": 2,
-                "method": "Page.setBypassCSP",
-                "params": ["enabled": true],
-            ], through: task)
+            if bypassCSP {
+                try await send([
+                    "id": 2,
+                    "method": "Page.setBypassCSP",
+                    "params": ["enabled": true],
+                ], through: task)
+            }
             try await send([
                 "id": 3,
                 "method": "Runtime.evaluate",
@@ -347,6 +363,51 @@ actor DevToolsClient {
                     throw CanvasError.invalidDevToolsResponse
                 }
                 return value
+            }
+        } onCancel: {
+            task.cancel(with: .goingAway, reason: nil)
+        }
+    }
+
+    private func setBypassCSPWithoutTimeout(_ enabled: Bool, in target: DevToolsTarget) async throws {
+        guard
+            let address = target.webSocketDebuggerUrl,
+            let webSocketURL = URL(string: address)
+        else {
+            throw CanvasError.invalidDevToolsResponse
+        }
+
+        let task = session.webSocketTask(with: webSocketURL)
+        task.resume()
+        defer { task.cancel(with: .normalClosure, reason: nil) }
+
+        try await withTaskCancellationHandler {
+            try await send([
+                "id": 1,
+                "method": "Page.setBypassCSP",
+                "params": ["enabled": enabled],
+            ], through: task)
+
+            while true {
+                let message = try await task.receive()
+                let data: Data
+                switch message {
+                case .data(let value): data = value
+                case .string(let value): data = Data(value.utf8)
+                @unknown default: continue
+                }
+                guard
+                    let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    payload["id"] as? Int == 1
+                else { continue }
+
+                if let error = payload["error"] as? [String: Any] {
+                    throw CanvasError.injectionFailed(error["message"] as? String ?? "Unknown DevTools error")
+                }
+                guard payload["result"] != nil else {
+                    throw CanvasError.invalidDevToolsResponse
+                }
+                return
             }
         } onCancel: {
             task.cancel(with: .goingAway, reason: nil)
@@ -508,7 +569,15 @@ final class CanvasModel: ObservableObject {
             var applied = 0
             for target in targets {
                 guard generation == injectionGeneration, shouldMaintainInjection else { return }
-                if try await devTools.evaluate(adapter.expression, in: target) { applied += 1 }
+                do {
+                    if try await devTools.evaluate(adapter.expression, in: target, bypassCSP: true) {
+                        applied += 1
+                    }
+                    try await devTools.setBypassCSP(false, in: target)
+                } catch {
+                    try? await devTools.setBypassCSP(false, in: target)
+                    throw error
+                }
             }
             guard generation == injectionGeneration, shouldMaintainInjection else { return }
             isConnected = true
@@ -516,7 +585,7 @@ final class CanvasModel: ObservableObject {
             guard isInjected else {
                 throw CanvasError.injectionFailed("The adapter did not mount in the Codex renderer.")
             }
-            await updateDashboard(targets: targets)
+            try await updateDashboard(targets: targets)
             guard generation == injectionGeneration, shouldMaintainInjection else { return }
             statusTitle = "Dashboard is live"
             statusDetail = "\(tasks.filter { $0.status == "running" }.count) running · \(tasks.filter { $0.status == "recent" }.count) recently active"
@@ -550,6 +619,7 @@ final class CanvasModel: ObservableObject {
             return
         }
 
+        var removalConfirmed = false
         do {
             for target in targets {
                 let removed = try await devTools.evaluate(
@@ -560,14 +630,23 @@ final class CanvasModel: ObservableObject {
                     throw CanvasError.removalFailed("The renderer still reports an active dashboard.")
                 }
             }
+            removalConfirmed = true
             isInjected = false
+            for target in targets {
+                try await devTools.setBypassCSP(false, in: target)
+            }
             statusTitle = "Dashboard removed"
             statusDetail = "The ChatGPT application bundle remains unchanged."
         } catch {
-            isInjected = true
+            for target in targets {
+                try? await devTools.setBypassCSP(false, in: target)
+            }
+            isInjected = !removalConfirmed
             lastError = error.localizedDescription
             statusTitle = "Dashboard needs attention"
-            statusDetail = "Automatic maintenance is off, but removal could not be confirmed."
+            statusDetail = removalConfirmed
+                ? "Dashboard was removed, but renderer security state could not be confirmed."
+                : "Automatic maintenance is off, but removal could not be confirmed."
         }
     }
 
@@ -581,12 +660,23 @@ final class CanvasModel: ObservableObject {
         }
     }
 
-    private func updateDashboard(targets: [DevToolsTarget]) async {
-        guard let data = try? JSONEncoder().encode(tasks),
-              let json = String(data: data, encoding: .utf8) else { return }
-        let expression = "(() => { window.__codexDashboard?.update?.(\(json)); return true; })()"
+    private func updateDashboard(targets: [DevToolsTarget]) async throws {
+        let data = try JSONEncoder().encode(tasks)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw CanvasError.injectionFailed("Task data could not be encoded for the renderer.")
+        }
+        let expression = """
+        (() => {
+          const dashboard = window.__codexDashboard;
+          if (typeof dashboard?.update !== 'function') return false;
+          dashboard.update(\(json));
+          return true;
+        })()
+        """
         for target in targets {
-            _ = try? await devTools.evaluate(expression, in: target)
+            guard try await devTools.evaluate(expression, in: target) else {
+                throw CanvasError.injectionFailed("The dashboard was unavailable while task data was being delivered.")
+            }
         }
     }
 }
