@@ -18,7 +18,7 @@ let statusFilter = 'current';
 let searchTerm = '';
 let mutationObserver;
 let resizeObserver;
-let maintenanceTimer;
+let observedSidebar;
 let isOpen = false;
 
 function handleHostNavigation(event) {
@@ -139,6 +139,14 @@ function syncContentInset() {
   const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
   const width = sidebar ? Math.max(0, sidebar.getBoundingClientRect().right) : 0;
   document.documentElement.style.setProperty('--codex-dashboard-content-left', `${Math.round(width)}px`);
+}
+
+function observeSidebar() {
+  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
+  if (!resizeObserver || sidebar === observedSidebar) return;
+  resizeObserver.disconnect();
+  if (sidebar) resizeObserver.observe(sidebar);
+  observedSidebar = sidebar;
 }
 
 function createNavigation() {
@@ -268,15 +276,15 @@ function ensureMounted() {
       if (restoredPage) createPage();
       if (!document.getElementById(ids.navButton)) createNavigation();
       if (isOpen && restoredPage) openPage();
+      observeSidebar();
+      syncContentInset();
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
   if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(syncContentInset);
-    const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
-    if (sidebar) resizeObserver.observe(sidebar);
+    observeSidebar();
   }
-  if (!maintenanceTimer) maintenanceTimer = window.setInterval(ensureMounted, 1500);
   document.addEventListener('click', handleHostNavigation, true);
   return Boolean(
     document.getElementById(ids.style)
@@ -289,10 +297,9 @@ function destroy() {
   isOpen = false;
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
-  if (maintenanceTimer) window.clearInterval(maintenanceTimer);
   mutationObserver = undefined;
   resizeObserver = undefined;
-  maintenanceTimer = undefined;
+  observedSidebar = undefined;
   document.removeEventListener('click', handleHostNavigation, true);
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');

@@ -33,7 +33,7 @@ removes it.
 
 - Native SwiftUI control panel; no browser controller or Node runtime.
 - Loopback-only Chromium DevTools connection.
-- Versioned dashboard resources under `Resources/Dashboard`.
+- Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local task metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
 - The dashboard loads the 60 most recently active tasks and reports the full task total; search and filters apply to the loaded set.
 - No modification of `/Applications/ChatGPT.app` or its code signature.

@@ -7,13 +7,13 @@ struct DevToolsTarget: Decodable, Identifiable, Sendable {
     let webSocketDebuggerUrl: String?
 }
 
-enum TaskActivityStatus: String, Codable, Sendable {
+enum TaskActivityStatus: String, Codable, Equatable, Sendable {
     case running
     case recent
     case idle
 }
 
-struct DashboardTask: Codable, Identifiable, Sendable {
+struct DashboardTask: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let preview: String
@@ -30,7 +30,7 @@ struct TaskSnapshot: Sendable {
     let warning: String?
 }
 
-struct DashboardPayload: Codable, Sendable {
+struct DashboardPayload: Codable, Equatable, Sendable {
     let tasks: [DashboardTask]
     let totalTaskCount: Int
 }

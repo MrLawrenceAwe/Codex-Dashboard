@@ -7,6 +7,18 @@ final class DevToolsClientTests: XCTestCase {
         let adapter = try DashboardAdapter.load()
         XCTAssertTrue(adapter.expression.contains("window.__codexDashboard"))
         XCTAssertTrue(adapter.expression.contains("#codex-dashboard-page"))
+        XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
+    }
+
+    func testPreviewUsesDashboardPayloadContract() throws {
+        let previewURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("DashboardPreview/preview.js")
+        let preview = try String(contentsOf: previewURL, encoding: .utf8)
+        XCTAssertTrue(preview.contains("update({ tasks, totalTaskCount:"))
+        XCTAssertFalse(preview.contains("update(["))
     }
 
     func testTargetDecoding() throws {
