@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodexCanvas",
+    name: "CodexDashboard",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "CodexCanvas", targets: ["CodexCanvas"]),
+        .executable(name: "CodexDashboard", targets: ["CodexDashboard"]),
     ],
     targets: [
         .executableTarget(
-            name: "CodexCanvas",
-            path: "Sources/CodexCanvas"
+            name: "CodexDashboard",
+            path: "Sources/CodexDashboard"
         ),
         .testTarget(
-            name: "CodexCanvasTests",
-            dependencies: ["CodexCanvas"],
-            path: "Tests/CodexCanvasTests"
+            name: "CodexDashboardTests",
+            dependencies: ["CodexDashboard"],
+            path: "Tests/CodexDashboardTests"
         ),
     ]
 )

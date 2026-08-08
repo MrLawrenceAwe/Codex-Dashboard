@@ -11,15 +11,15 @@ safety contract.
 Run:
 
 ```sh
-./build.sh
+./install.sh
 ```
 
 This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
-`/Users/lawrenceawe/Applications`.
+`$HOME/Applications`.
 
 ## Use
 
-1. Open **Codex Dashboard** from `/Users/lawrenceawe/Applications`.
+1. Open **Codex Dashboard** from `$HOME/Applications`.
 2. Finish any active response in ChatGPT.
 3. Select **Restart Codex & Enable Dashboard**.
 4. Select **Dashboard** directly in the Codex sidebar. The dashboard opens in
@@ -33,12 +33,12 @@ removes it.
 
 - Native SwiftUI control panel; no browser controller or Node runtime.
 - Loopback-only Chromium DevTools connection.
-- Versioned adapter resources under `Resources/Adapter`.
+- Versioned dashboard resources under `Resources/Dashboard`.
 - Local task metadata from `state_5.sqlite` and live activity from `logs_2.sqlite`.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Host selectors are isolated in `canvas.js` for maintenance after Codex UI updates.
+- Host selectors are isolated in `dashboard.js` for maintenance after Codex UI updates.
 
 This is an unofficial personal integration. ChatGPT updates can require adapter
 maintenance.

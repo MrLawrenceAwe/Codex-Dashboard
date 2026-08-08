@@ -4,18 +4,18 @@ set -euo pipefail
 PROJECT_ROOT="${0:A:h}"
 BUILD_ROOT="$PROJECT_ROOT/.build"
 APP_BUNDLE="$PROJECT_ROOT/release/Codex Dashboard.app"
-INSTALL_ROOT="${INSTALL_ROOT:-/Users/lawrenceawe/Applications}"
+INSTALL_ROOT="${INSTALL_ROOT:-$HOME/Applications}"
 INSTALLED_APP="$INSTALL_ROOT/Codex Dashboard.app"
 
 cd "$PROJECT_ROOT"
 swift build -c release
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Adapter"
-cp "$BUILD_ROOT/release/CodexCanvas" "$APP_BUNDLE/Contents/MacOS/CodexCanvas"
+mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Dashboard"
+cp "$BUILD_ROOT/release/CodexDashboard" "$APP_BUNDLE/Contents/MacOS/CodexDashboard"
 cp "$PROJECT_ROOT/App/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
-cp "$PROJECT_ROOT/Resources/Adapter/canvas.js" "$APP_BUNDLE/Contents/Resources/Adapter/canvas.js"
-cp "$PROJECT_ROOT/Resources/Adapter/canvas.css" "$APP_BUNDLE/Contents/Resources/Adapter/canvas.css"
+cp "$PROJECT_ROOT/Resources/Dashboard/dashboard.js" "$APP_BUNDLE/Contents/Resources/Dashboard/dashboard.js"
+cp "$PROJECT_ROOT/Resources/Dashboard/dashboard.css" "$APP_BUNDLE/Contents/Resources/Dashboard/dashboard.css"
 codesign --force --deep --sign - "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 

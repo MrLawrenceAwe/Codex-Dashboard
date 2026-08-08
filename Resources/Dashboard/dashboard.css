@@ -1,7 +1,6 @@
 #codex-dashboard-navigation,
 #codex-dashboard-page {
   --db-bg: #0e100f;
-  --db-panel: #171a18;
   --db-panel-hover: #1d211e;
   --db-line: rgba(255, 255, 255, .1);
   --db-text: #f3f4ef;
@@ -79,8 +78,6 @@
 #codex-dashboard-page .dashboard-task-actions svg { width: 14px; height: 14px; }
 #codex-dashboard-page .dashboard-empty { display: grid; place-items: center; min-height: 220px; border: 1px dashed var(--db-line); border-radius: 16px; color: var(--db-muted); }
 #codex-dashboard-page .dashboard-empty strong { color: var(--db-text); }
-#codex-dashboard-page .dashboard-feedback { min-height: 22px; padding-top: 10px; color: var(--db-amber); font-size: 11px; }
-
 @media (max-width: 760px) {
   #codex-dashboard-page .dashboard-shell { width: min(100% - 28px, 640px); padding-top: 30px; }
   #codex-dashboard-page .dashboard-stats { grid-template-columns: 1fr; }
