@@ -21,24 +21,72 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Review code';
               document.querySelector('[name="section"]').value = 'Code review';
-              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.';
+              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.\n\nReturn only actionable findings.';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              const savedPromptName = document.querySelector('[data-prompt-use] strong').textContent;
+              const savedPromptButton = document.querySelector('[data-prompt-use]');
+              const savedPromptName = savedPromptButton.querySelector('strong').textContent;
+              const savedPromptID = savedPromptButton.dataset.promptUse;
               document.querySelector('[data-prompt-use]').click();
               const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
               document.querySelector('textarea[placeholder="Do anything"]').remove();
               const contentEditable = document.querySelector('[contenteditable="true"]');
-              contentEditable.addEventListener('input', (event) => {
-                if (event.data) contentEditable.textContent += event.data;
-              });
+              contentEditable.classList.add('ProseMirror');
+              contentEditable.textContent = 'Existing content';
+              let pasteCount = 0;
+              class FakeSlice {
+                constructor(content) { this.content = content; }
+              }
+              const transaction = {
+                replaceSelection(slice) {
+                  this.slice = slice;
+                  return this;
+                },
+                scrollIntoView() { return this; },
+              };
+              const editorView = {
+                dom: contentEditable,
+                focus: () => contentEditable.focus(),
+                state: {
+                  schema: {
+                    text: (text) => ({ text }),
+                    nodes: {
+                      paragraph: { create: (_, child) => ({ text: child?.text || '' }) },
+                      doc: { create: (_, paragraphs) => ({ content: paragraphs }) },
+                    },
+                  },
+                  doc: { slice: () => new FakeSlice([]) },
+                  tr: transaction,
+                },
+                dispatch: ({ slice }) => {
+                  pasteCount += 1;
+                  contentEditable.textContent += `\n${slice.content.map((paragraph) => paragraph.text).join('\n')}`;
+                },
+              };
+              contentEditable.parentElement.__reactFiber$test = {
+                pendingProps: {},
+                return: {
+                  pendingProps: { composerController: { view: editorView } },
+                  return: null,
+                },
+              };
               launcher.click();
               document.querySelector('[data-prompt-use]').click();
+              const insertedContent = contentEditable.textContent;
+              const foreignDialog = document.createElement('div');
+              foreignDialog.id = 'codex-dashboard-prompt-library-dialog';
+              foreignDialog.innerHTML = `<button data-prompt-use="${savedPromptID}">Foreign prompt</button>`;
+              document.body.append(foreignDialog);
+              foreignDialog.querySelector('button').click();
+              const foreignDialogIgnored = contentEditable.textContent === insertedContent;
+              foreignDialog.remove();
               return {
                 launcherLabel: launcher.textContent.trim(),
                 savedPromptName,
                 textareaValue,
                 contentEditableValue: document.querySelector('[contenteditable="true"]').textContent,
-                closedAfterInsertion: !document.getElementById('codex-dashboard-prompt-dialog'),
+                pasteCount,
+                foreignDialogIgnored,
+                closedAfterInsertion: !document.getElementById('codex-dashboard-prompt-library-dialog'),
               };
             })()
             """
@@ -46,8 +94,16 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values["launcherLabel"] as? String, "Prompts")
         XCTAssertEqual(values["savedPromptName"] as? String, "Review code")
-        XCTAssertEqual(values["textareaValue"] as? String, "Review this code for correctness issues.")
-        XCTAssertEqual(values["contentEditableValue"] as? String, "Review this code for correctness issues.")
+        XCTAssertEqual(
+            values["textareaValue"] as? String,
+            "Review this code for correctness issues.\n\nReturn only actionable findings."
+        )
+        XCTAssertEqual(
+            values["contentEditableValue"] as? String,
+            "Existing content\n\nReview this code for correctness issues.\n\nReturn only actionable findings."
+        )
+        XCTAssertEqual(values["pasteCount"] as? Int, 1)
+        XCTAssertEqual(values["foreignDialogIgnored"] as? Bool, true)
         XCTAssertEqual(values["closedAfterInsertion"] as? Bool, true)
     }
 
@@ -259,7 +315,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
                 key: 'Escape', bubbles: true, cancelable: true,
               }));
-              const escapeClosedFromOutside = !document.getElementById('codex-dashboard-prompt-dialog');
+              const escapeClosedFromOutside = !document.getElementById('codex-dashboard-prompt-library-dialog');
 
               launcher.click();
               document.querySelector('[data-prompt-new]').click();

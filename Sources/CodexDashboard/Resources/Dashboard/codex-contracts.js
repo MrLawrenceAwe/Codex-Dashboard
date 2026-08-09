@@ -59,14 +59,14 @@ const codexContracts = (() => {
     return readStates;
   }
 
-  function composer(promptDialogID = 'codex-dashboard-prompt-dialog') {
+  function composer(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     return composerSelectors.flatMap((selector) => [...document.querySelectorAll(selector)])
       .find((element) => (
         !element.closest(`#${promptDialogID}`) && element.getClientRects().length > 0
       ));
   }
 
-  function composerAddButton(promptDialogID = 'codex-dashboard-prompt-dialog') {
+  function composerAddButton(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     const activeComposer = composer(promptDialogID);
     if (!activeComposer) return null;
     const candidates = composerAddButtonSelectors
@@ -79,6 +79,25 @@ const codexContracts = (() => {
       const nearbyButton = candidates.find((button) => container.contains(button));
       if (nearbyButton) return nearbyButton;
       container = container.parentElement;
+    }
+    return null;
+  }
+
+  function composerEditorView(composerElement) {
+    const host = composerElement?.parentElement;
+    const fiberKey = host && Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? host[fiberKey] : null;
+    while (fiber) {
+      const props = fiber.pendingProps || fiber.memoizedProps;
+      const view = props?.composerController?.view;
+      if (
+        view?.dom === composerElement
+          && typeof view.focus === 'function'
+          && typeof view.dispatch === 'function'
+          && typeof view.state?.tr?.replaceSelection === 'function'
+          && typeof view.state?.schema?.nodes?.paragraph?.create === 'function'
+      ) return view;
+      fiber = fiber.return;
     }
     return null;
   }
@@ -142,6 +161,7 @@ const codexContracts = (() => {
     threadReadStates,
     composer,
     composerAddButton,
+    composerEditorView,
     sidePanelToggle,
     environmentToggle,
     commitOrPushButton,

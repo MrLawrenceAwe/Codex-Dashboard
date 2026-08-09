@@ -1,4 +1,6 @@
 const promptLibrary = (() => {
+  const dialogOwner = Symbol('codex-dashboard.prompt-dialog-owner');
+  const insertionGuard = Symbol.for('codex-dashboard.prompt-insertion-guard');
   let dialogState = { mode: 'list' };
   let returnFocusElement;
 
@@ -20,6 +22,7 @@ const promptLibrary = (() => {
 
 function createDialogElement() {
   const dialog = document.createElement('div');
+  dialog[dialogOwner] = true;
   dialog.id = dashboardDOM.elementIDs.promptDialog;
   dialog.innerHTML = `
     <div class="dashboard-prompt-backdrop" data-prompt-close></div>
@@ -255,8 +258,17 @@ function handlePromptClick(target) {
   } else if (target.closest('[data-prompt-use]')) {
     const id = target.closest('[data-prompt-use]').dataset.promptUse;
     const prompt = promptStore.prompts.find((item) => item.id === id);
+    const now = performance.now();
+    const previousInsertion = window[insertionGuard];
+    if (
+      previousInsertion?.promptID === id
+        && now - previousInsertion.timestamp < 500
+    ) return;
+    window[insertionGuard] = { promptID: id, timestamp: now };
     if (prompt && composerAdapter.insert(prompt.content)) {
       close({ restoreFocus: false });
+    } else {
+      delete window[insertionGuard];
     }
   }
 }
@@ -272,7 +284,7 @@ function handlePromptInteraction(event) {
     return;
   }
   const dialog = target?.closest(`#${dashboardDOM.elementIDs.promptDialog}`);
-  if (!dialog) return;
+  if (!dialog || dialog[dialogOwner] !== true) return;
   if (promptReordering.handle(event, target, dialog, persistLibrary, renderDialog)) return;
   if (event.type === 'keydown') handlePromptKeyboard(event, dialog);
   else if (event.type === 'submit') handlePromptSubmit(event, target);

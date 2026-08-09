@@ -58,10 +58,12 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "composer",
             title: "Composer integration",
-            expression: contractExpression("Boolean(codexContracts.composer())"),
+            expression: contractExpression(
+                "(() => { const composer = codexContracts.composer(); return Boolean(composer && (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement || codexContracts.composerEditorView(composer))); })()"
+            ),
             failureStatus: .warning,
-            compatibleDetail: "A supported Codex composer is available for saved-prompt insertion.",
-            failureDetail: "No supported composer is currently mounted.",
+            compatibleDetail: "A supported Codex composer and insertion contract are available for saved prompts.",
+            failureDetail: "No supported composer insertion contract is currently mounted.",
             in: target
         ))
 

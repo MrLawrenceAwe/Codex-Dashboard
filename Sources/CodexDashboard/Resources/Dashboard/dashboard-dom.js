@@ -9,7 +9,7 @@ const dashboardDOM = {
     style: 'codex-dashboard-style',
     navButton: 'codex-dashboard-navigation',
     page: 'codex-dashboard-page',
-    promptDialog: 'codex-dashboard-prompt-dialog',
+    promptDialog: 'codex-dashboard-prompt-library-dialog',
   },
 
   escapeHTML(value) {
