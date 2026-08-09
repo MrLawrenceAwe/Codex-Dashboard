@@ -20,7 +20,6 @@ enum ThreadRepositoryError: LocalizedError {
 actor CodexThreadRepository {
     private struct RolloutActivity: Sendable {
         let status: ThreadActivityStatus
-        let responseSequence: UInt64
     }
 
     private struct CachedGitStatus: Sendable {
@@ -89,7 +88,6 @@ actor CodexThreadRepository {
                 isPinned: thread.isPinned != 0,
                 model: thread.model,
                 status: activity.status,
-                responseSequence: activity.responseSequence,
                 gitStatus: gitStatuses[thread.cwd] ?? .notRepository
             )
         }
@@ -106,7 +104,7 @@ actor CodexThreadRepository {
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return RolloutActivity(status: .idle, responseSequence: 0)
+            return RolloutActivity(status: .idle)
         }
         if let cached = rolloutActivityCache[path],
            cached.size == size,
@@ -135,15 +133,14 @@ actor CodexThreadRepository {
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return RolloutActivity(status: .idle, responseSequence: 0)
+            return RolloutActivity(status: .idle)
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return RolloutActivity(status: .idle, responseSequence: 0)
+            return RolloutActivity(status: .idle)
         }
         var laterOverlap = Data()
         var lastEvent: LifecycleEvent?
-        var responseSequence: UInt64?
 
         while cursor > 0 {
             let bytesToRead = min(chunkSize, cursor)
@@ -162,21 +159,14 @@ actor CodexThreadRepository {
                 if lastEvent == nil {
                     lastEvent = matches.max { $0.1 < $1.1 }?.0
                 }
-                if responseSequence == nil,
-                   let completion = matches.first(where: { $0.0 == .completed }) {
-                    responseSequence = cursor + UInt64(data.distance(from: data.startIndex, to: completion.1))
-                }
-                if lastEvent != nil, responseSequence != nil { break }
+                if lastEvent != nil { break }
 
                 laterOverlap = Data(data.prefix(overlapSize))
             } catch {
                 break
             }
         }
-        return RolloutActivity(
-            status: lastEvent == .started ? .running : .idle,
-            responseSequence: responseSequence ?? 0
-        )
+        return RolloutActivity(status: lastEvent == .started ? .running : .idle)
     }
 
     private func workspaceGitStatus(at path: String) -> WorkspaceGitStatus {

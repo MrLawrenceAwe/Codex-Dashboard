@@ -28,7 +28,6 @@ struct DashboardThread: Codable, Equatable, Identifiable, Sendable {
     let isPinned: Bool
     let model: String?
     let status: ThreadActivityStatus
-    let responseSequence: UInt64
     let gitStatus: WorkspaceGitStatus
 }
 

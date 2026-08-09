@@ -17,16 +17,21 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertTrue(adapter.expression.contains("page.parentElement !== pageHost"))
         XCTAssertTrue(adapter.expression.contains("type: 'navigate-to-route'"))
         XCTAssertTrue(adapter.expression.contains("path: `/local/${encodeURIComponent(thread.id)}`"))
-        XCTAssertTrue(adapter.expression.contains("codex-dashboard-thread-read-state-v2"))
-        XCTAssertTrue(adapter.expression.contains("Number(thread.responseSequence || 0)"))
+        XCTAssertTrue(adapter.expression.contains("function syncUnreadFromSidebar()"))
+        XCTAssertTrue(adapter.expression.contains("typeof props?.isUnread === 'boolean'"))
+        XCTAssertTrue(adapter.expression.contains("props.conversationId"))
+        XCTAssertTrue(adapter.expression.contains("unreadThreadIDs.has(thread.id)"))
+        XCTAssertFalse(adapter.expression.contains("codex-dashboard-thread-read-state"))
+        XCTAssertFalse(adapter.expression.contains("responseSequence"))
         XCTAssertTrue(adapter.expression.contains("aria-label=\"Unread response\""))
         XCTAssertTrue(adapter.expression.contains("const unreadCount = threads.filter(isThreadUnread).length"))
         XCTAssertTrue(adapter.expression.contains("data-filter=\"unread\""))
         XCTAssertTrue(adapter.expression.contains("statusFilter === 'unread' && isThreadUnread(thread)"))
         XCTAssertTrue(adapter.expression.contains("data-filter-count=\"unread\""))
-        XCTAssertTrue(adapter.expression.contains("event.type === 'click' && event.button === 0"))
         XCTAssertTrue(adapter.expression.contains("data-navigation-running"))
         XCTAssertTrue(adapter.expression.contains("spinner.hidden = !hasRunningThreads"))
+        XCTAssertTrue(adapter.expression.contains("count.hidden = unreadCount === 0"))
+        XCTAssertTrue(adapter.expression.contains("dashboard-nav-count[hidden]"))
         XCTAssertTrue(adapter.expression.contains("class=\"dashboard-running-spinner\""))
         XCTAssertTrue(adapter.expression.contains("dashboard-project-summary"))
         XCTAssertTrue(adapter.expression.contains("runningSummary.hidden = running === 0"))
@@ -34,11 +39,6 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertFalse(adapter.expression.contains("dashboard-stat-indicator"))
         XCTAssertFalse(adapter.expression.contains("count.textContent = String(activeCount)"))
         XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
-        let openThreadBody = try XCTUnwrap(
-            adapter.expression.components(separatedBy: "function openThread(thread) {").last?
-                .components(separatedBy: "function threadMarkup").first
-        )
-        XCTAssertFalse(openThreadBody.contains("markThreadRead(thread)"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
 

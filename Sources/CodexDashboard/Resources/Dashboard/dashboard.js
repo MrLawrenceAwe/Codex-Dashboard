@@ -19,67 +19,38 @@ let mutationObserver;
 let resizeObserver;
 let observedSidebar;
 let isOpen = false;
-const readStateKey = 'codex-dashboard-thread-read-state-v2';
-let readState = loadReadState();
+let unreadThreadIDs = new Set();
 
-function loadReadState() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(readStateKey) || 'null');
-    if (stored?.initialized === true && stored.seen && typeof stored.seen === 'object') {
-      return stored;
+function sidebarUnreadState(row) {
+  const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
+  let fiber = fiberKey ? row[fiberKey] : null;
+  while (fiber) {
+    const props = fiber.memoizedProps || fiber.pendingProps;
+    if (
+      typeof props?.conversationId === 'string'
+      && typeof props?.isUnread === 'boolean'
+    ) {
+      return { id: props.conversationId, unread: props.isUnread };
     }
-  } catch {
-    // Treat unavailable or invalid renderer storage as a fresh read state.
+    fiber = fiber.return;
   }
-  return { initialized: false, seen: {} };
+  return null;
 }
 
-function persistReadState() {
-  try {
-    localStorage.setItem(readStateKey, JSON.stringify(readState));
-  } catch {
-    // The indicator can remain session-only when renderer storage is unavailable.
-  }
-}
-
-function initializeReadState(nextThreads) {
-  if (readState.initialized) return;
-  nextThreads.forEach((thread) => {
-    readState.seen[thread.id] = Number(thread.responseSequence || 0);
+function syncUnreadFromSidebar() {
+  const nextUnreadThreadIDs = new Set();
+  document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
+    const state = sidebarUnreadState(row);
+    if (state?.unread) nextUnreadThreadIDs.add(state.id);
   });
-  readState.initialized = true;
-  persistReadState();
+  const changed = nextUnreadThreadIDs.size !== unreadThreadIDs.size
+    || [...nextUnreadThreadIDs].some((id) => !unreadThreadIDs.has(id));
+  unreadThreadIDs = nextUnreadThreadIDs;
+  return changed;
 }
 
 function isThreadUnread(thread) {
-  return thread.status !== 'running'
-    && Number(thread.responseSequence || 0) > Number(readState.seen[thread.id] || 0);
-}
-
-function markThreadRead(thread, shouldRender = true) {
-  if (!thread) return;
-  const previousSequence = Number(readState.seen[thread.id] || 0);
-  const responseSequence = Number(thread.responseSequence || 0);
-  if (previousSequence >= responseSequence) return;
-  readState.seen[thread.id] = Math.max(
-    previousSequence,
-    responseSequence,
-  );
-  persistReadState();
-  if (shouldRender) render();
-}
-
-function markSelectedThreadRead(nextThreads) {
-  if (isOpen) return;
-  const selected = document.querySelector(
-    '[data-app-action-sidebar-thread-id][aria-current="page"]',
-  );
-  const selectedKey = selected?.getAttribute('data-app-action-sidebar-thread-id') || '';
-  if (!selectedKey.startsWith('local:')) return;
-  markThreadRead(
-    nextThreads.find((thread) => `local:${thread.id}` === selectedKey),
-    false,
-  );
+  return unreadThreadIDs.has(thread.id);
 }
 
 function handleHostNavigation(event) {
@@ -89,13 +60,6 @@ function handleHostNavigation(event) {
     event.stopPropagation();
     if (event.type === 'click') openPage();
     return;
-  }
-  const hostThread = target?.closest('[data-app-action-sidebar-thread-id]');
-  const hostThreadKey = hostThread?.getAttribute('data-app-action-sidebar-thread-id') || '';
-  // Pointer and mouse-down events can be cancelled, used to drag, or open a
-  // context menu. Only acknowledge a thread after its primary click.
-  if (event.type === 'click' && event.button === 0 && hostThreadKey.startsWith('local:')) {
-    markThreadRead(threads.find((thread) => `local:${thread.id}` === hostThreadKey));
   }
   if (event.type !== 'click' || !isOpen) return;
   if (target?.closest('aside') && !target.closest(`#${ids.navButton}`)) closePage();
@@ -149,13 +113,10 @@ function openThread(thread) {
   );
   closePage();
   if (target) {
-    // The captured host-navigation handler marks the thread read only once a
-    // real sidebar destination receives the click.
     target.click();
     return;
   }
-  // A missing sidebar destination uses Codex's route bridge. The next payload
-  // marks the thread read after Codex exposes it as the selected destination.
+  // A missing sidebar destination uses Codex's route bridge.
   window.dispatchEvent(new MessageEvent('message', {
     data: {
       type: 'navigate-to-route',
@@ -316,7 +277,7 @@ function createNavigation() {
     </div>
     <div class="dashboard-nav-status">
       <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="Threads running" title="Threads running" hidden></span>
-      <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads">0</strong>
+      <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads" hidden>0</strong>
     </div>`;
   if (reference.insertAfter) reference.element.after(button);
   else reference.element.parentElement.insertBefore(button, reference.element);
@@ -417,6 +378,7 @@ function updateNavigationStatus() {
   const count = document.querySelector('[data-navigation-count]');
   if (count) {
     count.textContent = String(unreadCount);
+    count.hidden = unreadCount === 0;
     count.setAttribute(
       'aria-label',
       `${unreadCount} unread ${unreadCount === 1 ? 'thread' : 'threads'}`,
@@ -428,9 +390,8 @@ function updateNavigationStatus() {
 
 function update(nextSnapshot) {
   const nextThreads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
-  initializeReadState(nextThreads);
   threads = nextThreads;
-  markSelectedThreadRead(threads);
+  syncUnreadFromSidebar();
   render();
 }
 
@@ -458,6 +419,7 @@ function ensureMounted() {
       syncPageHost();
       observeSidebar();
       syncContentInset();
+      if (syncUnreadFromSidebar()) render();
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }

@@ -24,8 +24,6 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.totalThreadCount, 3)
         XCTAssertEqual(snapshot.threads.map(\.id), ["running", "updated", "idle"])
         XCTAssertEqual(snapshot.threads.map(\.status), [.running, .idle, .idle])
-        XCTAssertGreaterThan(snapshot.threads[0].responseSequence, 0)
-        XCTAssertGreaterThan(snapshot.threads[1].responseSequence, 0)
         XCTAssertEqual(snapshot.threads.first?.title, "Running thread")
         XCTAssertEqual(snapshot.threads.first?.workspace, "running")
         XCTAssertEqual(snapshot.threads.first?.workspacePath, "/tmp/running")
@@ -73,30 +71,18 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.threads.first?.status, .running)
     }
 
-    func testAbortedTurnIsIdleAndDoesNotAdvanceCompletedResponse() async throws {
+    func testAbortedTurnIsIdle() async throws {
         let now = Int64(Date().timeIntervalSince1970)
-        let completedDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: now,
-            runningLifecycleEvents: ["task_complete"],
-            testCase: self
-        )
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
             now: now,
             runningLifecycleEvents: ["task_complete", "task_started", "turn_aborted"],
             testCase: self
         )
-        let completedSnapshot = try await CodexThreadRepository(
-            stateDatabaseURL: completedDatabaseURL
-        ).loadSnapshot()
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
         ).loadSnapshot()
 
         XCTAssertEqual(snapshot.threads.first?.status, .idle)
-        XCTAssertEqual(
-            snapshot.threads.first?.responseSequence,
-            completedSnapshot.threads.first?.responseSequence
-        )
     }
 
     func testReportsFullCountWhenThreadRowsAreLimited() async throws {
