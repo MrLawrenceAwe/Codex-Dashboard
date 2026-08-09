@@ -18,28 +18,24 @@ enum ThreadRepositoryError: LocalizedError {
 }
 
 actor CodexThreadRepository {
-    private struct RolloutActivity: Sendable {
-        let status: ThreadActivityStatus
-    }
-
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
         let preview: String
-        let cwd: String
-        let updatedAt: Int64
-        let isPinned: Int
+        let workspacePath: String
+        let updatedAtUnixSeconds: Int64
+        let pinnedValue: Int
         let model: String?
         let totalCount: Int
         let rolloutPath: String
     }
 
     private let stateDatabaseURL: URL
-    private var rolloutActivityCache: [String: (size: UInt64, modifiedAt: Date, activity: RolloutActivity)] = [:]
+    private var activityCache: [String: (size: UInt64, modifiedAt: Date, activity: ThreadActivity)] = [:]
     private let subprocessTimeout: TimeInterval
 
     init(
-        stateDatabaseURL: URL = AppConfiguration.stateDatabaseURL,
+        stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL,
         subprocessTimeout: TimeInterval = 3
     ) {
         self.stateDatabaseURL = stateDatabaseURL
@@ -53,9 +49,9 @@ actor CodexThreadRepository {
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
-               cwd,
-               updated_at AS updatedAt,
-               is_pinned AS isPinned,
+               cwd AS workspacePath,
+               updated_at AS updatedAtUnixSeconds,
+               is_pinned AS pinnedValue,
                model,
                rollout_path AS rolloutPath,
                COUNT(*) OVER () AS totalCount
@@ -66,19 +62,18 @@ actor CodexThreadRepository {
         """
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
-            let directoryName = URL(fileURLWithPath: thread.cwd).lastPathComponent
-            let activity = rolloutActivity(at: thread.rolloutPath)
+            let directoryName = URL(fileURLWithPath: thread.workspacePath).lastPathComponent
             return DashboardThread(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                workspace: directoryName.isEmpty ? thread.cwd : directoryName,
-                workspacePath: thread.cwd,
-                updatedAt: thread.updatedAt,
-                isPinned: thread.isPinned != 0,
+                workspace: directoryName.isEmpty ? thread.workspacePath : directoryName,
+                workspacePath: thread.workspacePath,
+                updatedAtUnixSeconds: thread.updatedAtUnixSeconds,
+                isPinned: thread.pinnedValue != 0,
                 model: thread.model,
-                status: activity.status,
-                gitStatus: gitStatuses[thread.cwd] ?? .notRepository
+                activity: activityStatus(at: thread.rolloutPath),
+                gitStatus: gitStatuses[thread.workspacePath] ?? .notRepository
             )
         }
         return ThreadSnapshot(
@@ -87,71 +82,49 @@ actor CodexThreadRepository {
         )
     }
 
-    func loadGitStatuses(
-        at workspacePaths: Set<String>
-    ) async -> [String: WorkspaceGitStatus] {
-        let timeout = subprocessTimeout
-        return await withTaskGroup(
-            of: (String, WorkspaceGitStatus).self,
-            returning: [String: WorkspaceGitStatus].self
-        ) { group in
-            for path in workspacePaths {
-                group.addTask {
-                    (path, Self.workspaceGitStatus(at: path, timeout: timeout))
-                }
-            }
-            var statuses: [String: WorkspaceGitStatus] = [:]
-            for await (path, status) in group {
-                statuses[path] = status
-            }
-            return statuses
-        }
-    }
-
-    private func rolloutActivity(at path: String) -> RolloutActivity {
+    private func activityStatus(at path: String) -> ThreadActivity {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return RolloutActivity(status: .idle)
+            return .idle
         }
-        if let cached = rolloutActivityCache[path],
+        if let cached = activityCache[path],
            cached.size == size,
            cached.modifiedAt == modifiedAt {
             return cached.activity
         }
 
-        let activity = lifecycleActivity(in: fileURL)
-        rolloutActivityCache[path] = (size, modifiedAt, activity)
+        let activity = latestActivity(in: fileURL)
+        activityCache[path] = (size, modifiedAt, activity)
         return activity
     }
 
-    private enum LifecycleEvent {
+    private enum ActivityEvent {
         case started
-        case completed
-        case aborted
+        case ended
     }
 
-    private func lifecycleActivity(in fileURL: URL) -> RolloutActivity {
-        let markers: [(event: LifecycleEvent, data: Data)] = [
+    private func latestActivity(in fileURL: URL) -> ThreadActivity {
+        let markers: [(event: ActivityEvent, data: Data)] = [
             (.started, Data(#""type":"task_started""#.utf8)),
-            (.completed, Data(#""type":"task_complete""#.utf8)),
-            (.aborted, Data(#""type":"turn_aborted""#.utf8)),
+            (.ended, Data(#""type":"task_complete""#.utf8)),
+            (.ended, Data(#""type":"turn_aborted""#.utf8)),
         ]
         let overlapSize = (markers.map(\.data.count).max() ?? 1) - 1
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return RolloutActivity(status: .idle)
+            return .idle
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return RolloutActivity(status: .idle)
+            return .idle
         }
         var laterOverlap = Data()
-        var lastEvent: LifecycleEvent?
+        var lastEvent: ActivityEvent?
 
         while cursor > 0 {
             let bytesToRead = min(chunkSize, cursor)
@@ -161,7 +134,7 @@ actor CodexThreadRepository {
                 guard var data = try handle.read(upToCount: Int(bytesToRead)) else { break }
                 data.append(laterOverlap)
 
-                let matches = markers.compactMap { marker -> (LifecycleEvent, Data.Index)? in
+                let matches = markers.compactMap { marker -> (ActivityEvent, Data.Index)? in
                     guard let range = data.range(of: marker.data, options: .backwards) else {
                         return nil
                     }
@@ -177,31 +150,7 @@ actor CodexThreadRepository {
                 break
             }
         }
-        return RolloutActivity(status: lastEvent == .started ? .running : .idle)
-    }
-
-    nonisolated private static func workspaceGitStatus(
-        at path: String,
-        timeout: TimeInterval
-    ) -> WorkspaceGitStatus {
-        let status: WorkspaceGitStatus
-        do {
-            let result = try Subprocess.run(
-                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-                arguments: ["-C", path, "status", "--porcelain=v1", "--untracked-files=normal"],
-                timeout: timeout
-            )
-            if result.terminationStatus != 0 {
-                status = .notRepository
-            } else if result.standardOutput.isEmpty {
-                status = .clean
-            } else {
-                status = .modified
-            }
-        } catch {
-            status = .notRepository
-        }
-        return status
+        return lastEvent == .started ? .running : .idle
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {

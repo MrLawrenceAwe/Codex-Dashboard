@@ -1,10 +1,8 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS controller for an active-thread dashboard
-inside the Codex experience in ChatGPT. It follows the useful part of Attune's
-architecture—a normal app relaunch with a loopback-only DevTools bridge—while
-keeping functional UI extensions separate from Attune's deliberately CSS-only
-safety contract.
+Codex Dashboard is a native macOS controller that adds a recent-thread dashboard
+to the local Codex app. It relaunches Codex with a loopback-only DevTools bridge
+and injects a removable dashboard into the main renderer.
 
 ## Install
 
@@ -20,20 +18,20 @@ This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
 ## Use
 
 1. Open **Codex Dashboard** from `$HOME/Applications`.
-2. Finish any active response in ChatGPT.
-3. Select **Restart Codex & Enable Dashboard**.
+2. Finish any active response in Codex.
+3. Select **Restart & Enable Dashboard**.
 4. Select **Dashboard** directly in the Codex sidebar. The dashboard opens in
    the main content pane while the rest of Codex navigation stays available.
 
 The controller must remain open to refresh thread activity and restore the dashboard after renderer reloads. Use
-**Disable Dashboard** to unload the injected UI immediately. A normal ChatGPT restart also
+**Disable Dashboard** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 
 ## Architecture
 
-- Native SwiftUI control panel; no browser controller or Node runtime.
+- Native SwiftUI control panel; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
-- Loopback-only Chromium DevTools connection.
+- Loopback-only Chromium DevTools bridge managed by `CodexHostSession`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files.
 - Activity snapshots run on a fixed two-second cadence; Git status enrichment refreshes independently every ten seconds.
@@ -44,7 +42,7 @@ removes it.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Host selectors are isolated in `dashboard.js` for maintenance after Codex UI updates.
+- Codex UI selectors are isolated in `dashboard.js` for maintenance after app updates.
 
-This is an unofficial personal integration. ChatGPT updates can require adapter
-maintenance.
+This is an unofficial personal integration. Codex updates can require dashboard
+injection maintenance.

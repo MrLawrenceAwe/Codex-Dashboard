@@ -1,5 +1,36 @@
 import Foundation
 
+func withDevToolsTimeout<T: Sendable>(
+    _ duration: Duration,
+    operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask(operation: operation)
+        group.addTask {
+            try await Task.sleep(for: duration)
+            throw DashboardError.devToolsTimedOut
+        }
+
+        guard let result = try await group.next() else {
+            throw DashboardError.invalidDevToolsResponse
+        }
+        group.cancelAll()
+        return result
+    }
+}
+
+struct DevToolsTarget: Decodable, Identifiable, Sendable {
+    let id: String
+    let type: String
+    let url: String?
+    let webSocketURL: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, url
+        case webSocketURL = "webSocketDebuggerUrl"
+    }
+}
+
 actor DevToolsClient {
     private let session: URLSession
 
@@ -12,7 +43,7 @@ actor DevToolsClient {
 
     func mainRendererTargets() async -> [DevToolsTarget] {
         guard let endpoint = URL(
-            string: "http://\(AppConfiguration.devToolsHost):\(AppConfiguration.devToolsPort)/json/list"
+            string: "http://\(CodexConfiguration.devToolsAddress):\(CodexConfiguration.devToolsPort)/json/list"
         ) else { return [] }
         var request = URLRequest(url: endpoint)
         request.timeoutInterval = 1
@@ -29,7 +60,7 @@ actor DevToolsClient {
     nonisolated static func isMainRenderer(_ target: DevToolsTarget) -> Bool {
         target.type == "page"
             && target.url == "app://-/index.html"
-            && target.webSocketDebuggerUrl != nil
+            && target.webSocketURL != nil
     }
 
     func evaluateBoolean(
@@ -83,7 +114,7 @@ actor DevToolsClient {
                 throw error
             }
             if response["exceptionDetails"] != nil {
-                throw DashboardError.enableFailed("The adapter raised an exception in the renderer.")
+                throw DashboardError.enableFailed("The dashboard injection raised an exception in the renderer.")
             }
             guard
                 let remoteResult = response["result"] as? [String: Any],
@@ -113,7 +144,7 @@ actor DevToolsClient {
         operation: (URLSessionWebSocketTask) async throws -> T
     ) async throws -> T {
         guard
-            let address = target.webSocketDebuggerUrl,
+            let address = target.webSocketURL,
             let webSocketURL = URL(string: address)
         else {
             throw DashboardError.invalidDevToolsResponse

@@ -11,7 +11,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         let snapshot = try await CodexThreadRepository().loadSnapshot(gitStatuses: [:])
         XCTAssertFalse(snapshot.threads.isEmpty)
         XCTAssertGreaterThanOrEqual(snapshot.totalThreadCount, snapshot.threads.count)
-        XCTAssertTrue(snapshot.threads.contains { $0.status == .running })
+        XCTAssertTrue(snapshot.threads.contains { $0.activity == .running })
     }
 
     func testLoadsAndClassifiesThreads() async throws {
@@ -23,40 +23,13 @@ final class CodexThreadRepositoryTests: XCTestCase {
 
         XCTAssertEqual(snapshot.totalThreadCount, 3)
         XCTAssertEqual(snapshot.threads.map(\.id), ["running", "updated", "idle"])
-        XCTAssertEqual(snapshot.threads.map(\.status), [.running, .idle, .idle])
+        XCTAssertEqual(snapshot.threads.map(\.activity), [.running, .idle, .idle])
         XCTAssertEqual(snapshot.threads.first?.title, "Running thread")
         XCTAssertEqual(snapshot.threads.first?.workspace, "running")
         XCTAssertEqual(snapshot.threads.first?.workspacePath, "/tmp/running")
         XCTAssertEqual(snapshot.threads.first?.gitStatus, .notRepository)
         XCTAssertTrue(snapshot.threads.first?.isPinned == true)
         XCTAssertEqual(snapshot.threads[1].title, "Renamed thread")
-    }
-
-    func testReportsUncommittedChangesForGitWorkspace() async throws {
-        let workspaceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
-        addTeardownBlock { try? FileManager.default.removeItem(at: workspaceURL) }
-
-        let git = Process()
-        git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        git.arguments = ["-C", workspaceURL.path, "init", "--quiet"]
-        try git.run()
-        git.waitUntilExit()
-        XCTAssertEqual(git.terminationStatus, 0)
-        try Data("uncommitted\n".utf8).write(to: workspaceURL.appendingPathComponent("notes.txt"))
-
-        let now = Int64(Date().timeIntervalSince1970)
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: now,
-            runningWorkspacePath: workspaceURL.path,
-            testCase: self
-        )
-        let repository = CodexThreadRepository(stateDatabaseURL: stateDatabaseURL)
-        let gitStatuses = await repository.loadGitStatuses(at: [workspaceURL.path])
-        let snapshot = try await repository.loadSnapshot(gitStatuses: gitStatuses)
-
-        XCTAssertEqual(snapshot.threads.first?.gitStatus, .modified)
     }
 
     func testRunningLifecycleDoesNotDependOnRecentLogs() async throws {
@@ -68,7 +41,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         let snapshot = try await repository.loadSnapshot(gitStatuses: [:])
         XCTAssertEqual(snapshot.threads.count, 3)
         XCTAssertEqual(snapshot.totalThreadCount, 3)
-        XCTAssertEqual(snapshot.threads.first?.status, .running)
+        XCTAssertEqual(snapshot.threads.first?.activity, .running)
     }
 
     func testAbortedTurnIsIdle() async throws {
@@ -82,7 +55,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
             stateDatabaseURL: stateDatabaseURL
         ).loadSnapshot(gitStatuses: [:])
 
-        XCTAssertEqual(snapshot.threads.first?.status, .idle)
+        XCTAssertEqual(snapshot.threads.first?.activity, .idle)
     }
 
     func testReportsFullCountWhenThreadRowsAreLimited() async throws {

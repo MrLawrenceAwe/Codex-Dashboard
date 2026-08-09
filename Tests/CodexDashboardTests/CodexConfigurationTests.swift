@@ -2,14 +2,14 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class AppConfigurationTests: XCTestCase {
-    func testHostLaunchTargetsApplicationBundleThroughLaunchServices() {
+final class CodexConfigurationTests: XCTestCase {
+    func testCodexLaunchConfiguration() {
         XCTAssertEqual(
-            AppConfiguration.hostApplicationURL.path,
+            CodexConfiguration.applicationURL.path,
             "/Applications/ChatGPT.app"
         )
         XCTAssertEqual(
-            AppConfiguration.hostLaunchArguments,
+            CodexConfiguration.launchArguments,
             [
                 "--remote-debugging-address=127.0.0.1",
                 "--remote-debugging-port=47832",

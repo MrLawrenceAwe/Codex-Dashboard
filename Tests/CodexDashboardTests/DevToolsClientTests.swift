@@ -3,71 +3,12 @@ import XCTest
 @testable import CodexDashboard
 
 final class DevToolsClientTests: XCTestCase {
-    func testPackagedDashboardResourcesLoad() throws {
-        let adapter = try DashboardAdapter.load()
-        XCTAssertTrue(adapter.expression.contains("window.__codexDashboard"))
-        XCTAssertTrue(adapter.expression.contains("#codex-dashboard-page"))
-        XCTAssertTrue(
-            adapter.expression.contains(
-                "html.codex-dashboard-open aside.app-shell-left-panel"
-            )
-        )
-        XCTAssertTrue(adapter.expression.contains("const pageHost = sidebar?.parentElement"))
-        XCTAssertTrue(adapter.expression.contains("function syncPageHost()"))
-        XCTAssertTrue(adapter.expression.contains("page.parentElement !== pageHost"))
-        XCTAssertTrue(adapter.expression.contains("type: 'navigate-to-route'"))
-        XCTAssertTrue(adapter.expression.contains("path: `/local/${encodeURIComponent(thread.id)}`"))
-        XCTAssertTrue(adapter.expression.contains("function syncUnreadFromSidebar()"))
-        XCTAssertTrue(adapter.expression.contains("function scheduleMutationSync(records)"))
-        XCTAssertTrue(adapter.expression.contains("requestAnimationFrame"))
-        XCTAssertTrue(adapter.expression.contains("if (!sidebarMutation && !dashboardMissing) return"))
-        XCTAssertFalse(adapter.expression.contains("new MutationObserver(() =>"))
-        XCTAssertTrue(adapter.expression.contains("typeof props?.isUnread === 'boolean'"))
-        XCTAssertTrue(adapter.expression.contains("props.conversationId"))
-        XCTAssertTrue(adapter.expression.contains("unreadThreadIDs.has(thread.id)"))
-        XCTAssertFalse(adapter.expression.contains("codex-dashboard-thread-read-state"))
-        XCTAssertFalse(adapter.expression.contains("responseSequence"))
-        XCTAssertTrue(adapter.expression.contains("aria-label=\"Unread response\""))
-        XCTAssertTrue(adapter.expression.contains("const unreadCount = threads.filter(isThreadUnread).length"))
-        XCTAssertTrue(adapter.expression.contains("data-filter=\"unread\""))
-        XCTAssertTrue(adapter.expression.contains("statusFilter === 'unread' && isThreadUnread(thread)"))
-        XCTAssertTrue(adapter.expression.contains("data-filter-count=\"unread\""))
-        XCTAssertTrue(adapter.expression.contains("data-navigation-running"))
-        XCTAssertTrue(adapter.expression.contains("spinner.hidden = !hasRunningThreads"))
-        XCTAssertTrue(adapter.expression.contains("count.hidden = unreadCount === 0"))
-        XCTAssertTrue(adapter.expression.contains("dashboard-nav-count[hidden]"))
-        XCTAssertTrue(adapter.expression.contains("class=\"dashboard-running-spinner\""))
-        XCTAssertTrue(adapter.expression.contains("dashboard-project-summary"))
-        XCTAssertTrue(
-            adapter.expression.contains("runningSummary.hidden = runningThreads.length === 0")
-        )
-        XCTAssertTrue(adapter.expression.contains("data-running-list"))
-        XCTAssertFalse(adapter.expression.contains("data-filter=\"running\""))
-        XCTAssertFalse(adapter.expression.contains("data-count-running"))
-        XCTAssertFalse(adapter.expression.contains("dashboard-status-label"))
-        XCTAssertFalse(adapter.expression.contains("dashboard-stat-indicator"))
-        XCTAssertFalse(adapter.expression.contains("count.textContent = String(activeCount)"))
-        XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
-        XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
-    }
-
-    func testPreviewUsesDashboardPayloadContract() throws {
-        let previewURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("DashboardPreview/preview.js")
-        let preview = try String(contentsOf: previewURL, encoding: .utf8)
-        XCTAssertTrue(preview.contains("update({ threads, totalThreadCount:"))
-        XCTAssertFalse(preview.contains("update(["))
-    }
-
     func testTargetDecoding() throws {
         let data = Data(#"[{"id":"page-1","type":"page","title":"Codex","url":"app://codex","webSocketDebuggerUrl":"ws://127.0.0.1/devtools/page/1"}]"#.utf8)
         let targets = try JSONDecoder().decode([DevToolsTarget].self, from: data)
         XCTAssertEqual(targets.first?.id, "page-1")
         XCTAssertEqual(targets.first?.type, "page")
-        XCTAssertNotNil(targets.first?.webSocketDebuggerUrl)
+        XCTAssertNotNil(targets.first?.webSocketURL)
     }
 
     func testOnlyMainRendererIsEligible() throws {

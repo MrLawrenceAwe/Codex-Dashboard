@@ -1,8 +1,8 @@
 import Foundation
 
 enum DashboardError: LocalizedError {
-    case missingHostApplication
-    case hostQuitTimedOut
+    case missingCodexApplication
+    case codexQuitTimedOut
     case rendererTimedOut
     case missingResources
     case invalidDevToolsResponse
@@ -13,9 +13,9 @@ enum DashboardError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingHostApplication:
-            return "The Codex host application was not found in /Applications."
-        case .hostQuitTimedOut:
+        case .missingCodexApplication:
+            return "The Codex app was not found in /Applications."
+        case .codexQuitTimedOut:
             return "Codex did not close. Finish any open prompt and quit it manually, then try again."
         case .rendererTimedOut:
             return "Codex reopened, but its local renderer did not become available."
@@ -32,24 +32,5 @@ enum DashboardError: LocalizedError {
         case .disableFailed(let message):
             return "Dashboard disablement failed: \(message)"
         }
-    }
-}
-
-func withDevToolsTimeout<T: Sendable>(
-    _ duration: Duration,
-    operation: @escaping @Sendable () async throws -> T
-) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        group.addTask(operation: operation)
-        group.addTask {
-            try await Task.sleep(for: duration)
-            throw DashboardError.devToolsTimedOut
-        }
-
-        guard let result = try await group.next() else {
-            throw DashboardError.invalidDevToolsResponse
-        }
-        group.cancelAll()
-        return result
     }
 }
