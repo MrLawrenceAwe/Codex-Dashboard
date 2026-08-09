@@ -130,6 +130,7 @@ function threadListHTML(visibleThreads) {
   return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
     const isCollapsed = collapsedProjects.has(projectPath);
     const projectListID = `dashboard-project-${index}`;
+    const runningCount = projectThreads.filter((thread) => thread.activity === 'running').length;
     return `
     <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${escapeHTML(project)} project">
       <header class="dashboard-project-heading">
@@ -141,7 +142,7 @@ function threadListHTML(visibleThreads) {
             ${projectThreads.some((thread) => thread.gitWorkingTreeStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconSvg('gitChanges')}<span>Uncommitted</span></span>` : ''}
           </span>
           <span class="dashboard-project-summary">
-            ${projectThreads.some((thread) => thread.activity === 'running') ? '<span class="dashboard-running-spinner" role="status" aria-label="Thread running" title="Thread running"></span>' : ''}
+            ${runningCount > 0 ? `<span class="dashboard-running-spinner has-count" role="status" aria-label="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}" title="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}"><span aria-hidden="true">${runningCount}</span></span>` : ''}
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
           </span>
         </button>
@@ -159,6 +160,13 @@ function renderDashboard() {
   const unread = threads.filter(isThreadUnread).length;
   const runningSummary = page.querySelector('[data-running-summary]');
   if (runningSummary) runningSummary.hidden = runningThreads.length === 0;
+  const runningCount = page.querySelector('[data-running-count]');
+  if (runningCount) {
+    runningCount.textContent = String(runningThreads.length);
+    const runningLabel = `${runningThreads.length} running ${runningThreads.length === 1 ? 'thread' : 'threads'}`;
+    runningCount.parentElement?.setAttribute('aria-label', runningLabel);
+    runningCount.parentElement?.setAttribute('title', runningLabel);
+  }
   const runningList = page.querySelector('[data-running-list]');
   if (runningList) runningList.innerHTML = runningThreads
     .map((thread) => threadHTML(thread, true))
@@ -261,7 +269,7 @@ function mountNavigationButton() {
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
     <div class="dashboard-nav-status">
-      <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="Threads running" title="Threads running" hidden></span>
+      <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running threads" title="0 running threads" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
       <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads" hidden>0</strong>
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
@@ -281,7 +289,7 @@ function mountDashboardPage() {
       </header>
       <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
         <div class="dashboard-running-heading">
-          <span class="dashboard-running-spinner" role="status" aria-label="Running threads" title="Running threads"></span>
+          <span class="dashboard-running-spinner has-count" role="status" aria-label="0 running threads" title="0 running threads"><span data-running-count aria-hidden="true">0</span></span>
           <h2>Running</h2>
         </div>
         <div class="dashboard-running-list" data-running-list></div>
@@ -360,7 +368,7 @@ function closePage() {
 
 function updateNavigationStatus() {
   const unreadCount = threads.filter(isThreadUnread).length;
-  const hasRunningThreads = threads.some((thread) => thread.activity === 'running');
+  const runningCount = threads.filter((thread) => thread.activity === 'running').length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) {
     count.textContent = String(unreadCount);
@@ -371,7 +379,14 @@ function updateNavigationStatus() {
     );
   }
   const spinner = document.querySelector('[data-navigation-running]');
-  if (spinner) spinner.hidden = !hasRunningThreads;
+  if (spinner) {
+    const runningLabel = `${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}`;
+    spinner.hidden = runningCount === 0;
+    spinner.setAttribute('aria-label', runningLabel);
+    spinner.setAttribute('title', runningLabel);
+    const spinnerCount = spinner.querySelector('[data-navigation-running-count]');
+    if (spinnerCount) spinnerCount.textContent = String(runningCount);
+  }
 }
 
 function applySnapshot(nextSnapshot) {

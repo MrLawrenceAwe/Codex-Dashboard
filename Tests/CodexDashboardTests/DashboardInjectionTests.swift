@@ -217,6 +217,98 @@ final class DashboardInjectionTests: XCTestCase {
         XCTAssertEqual(values[1] as? String, "1")
     }
 
+    func testRunningSpinnersShowGlobalAndProjectCounts() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+        try await waitUntilLoaded(webView)
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let threads = [
+            DashboardThread(
+                id: "project-a-running-one",
+                title: "First running thread",
+                preview: "Running",
+                workspaceName: "Project A",
+                workspacePath: "/tmp/project-a",
+                recencyTimestamp: 4,
+                isPinned: false,
+                model: nil,
+                activity: .running,
+                gitWorkingTreeStatus: .clean
+            ),
+            DashboardThread(
+                id: "project-a-running-two",
+                title: "Second running thread",
+                preview: "Running",
+                workspaceName: "Project A",
+                workspacePath: "/tmp/project-a",
+                recencyTimestamp: 3,
+                isPinned: false,
+                model: nil,
+                activity: .running,
+                gitWorkingTreeStatus: .clean
+            ),
+            DashboardThread(
+                id: "project-a-idle",
+                title: "Idle thread",
+                preview: "Idle",
+                workspaceName: "Project A",
+                workspacePath: "/tmp/project-a",
+                recencyTimestamp: 2,
+                isPinned: false,
+                model: nil,
+                activity: .idle,
+                gitWorkingTreeStatus: .clean
+            ),
+            DashboardThread(
+                id: "project-b-running",
+                title: "Other running thread",
+                preview: "Running",
+                workspaceName: "Project B",
+                workspacePath: "/tmp/project-b",
+                recencyTimestamp: 1,
+                isPinned: false,
+                model: nil,
+                activity: .running,
+                gitWorkingTreeStatus: .clean
+            ),
+        ]
+        let payloadData = try JSONEncoder().encode(DashboardPayload(threads: threads))
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              return [
+                document.querySelector('[data-running-count]').textContent,
+                document.querySelector('[data-navigation-running-count]').textContent,
+                document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
+                [...document.querySelectorAll('.dashboard-project-summary .dashboard-running-spinner')]
+                  .map((spinner) => spinner.textContent),
+                [...document.querySelectorAll('.dashboard-project-summary .dashboard-running-spinner')]
+                  .map((spinner) => spinner.getAttribute('aria-label')),
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "3")
+        XCTAssertEqual(values[1] as? String, "3")
+        XCTAssertEqual(values[2] as? String, "3 running threads")
+        XCTAssertEqual(values[3] as? [String], ["2", "1"])
+        XCTAssertEqual(values[4] as? [String], ["2 running threads", "1 running thread"])
+    }
+
     func testSavedPromptsCanBeCreatedAndInsertedIntoComposer() async throws {
         let webView = WKWebView()
         webView.loadHTMLString(
@@ -243,6 +335,10 @@ final class DashboardInjectionTests: XCTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
+              const composer = document.querySelector('textarea[placeholder="Do anything"]');
+              composer.addEventListener('input', (event) => {
+                if (event.data) composer.value += event.data;
+              });
               const promptMenuItem = document.querySelector('[data-codex-prompt-menu-item]');
               promptMenuItem.dispatchEvent(new PointerEvent('pointerenter'));
               const promptTookHighlight = promptMenuItem.classList.contains('opacity-100')
