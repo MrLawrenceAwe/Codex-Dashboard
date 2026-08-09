@@ -1,4 +1,21 @@
 const composerAdapter = (() => {
+  function insertIntoEditor(view, content, separateFromExistingContent) {
+    const schema = view.state.schema;
+    const lines = `${separateFromExistingContent ? '\n' : ''}${content}`.split('\n');
+    const paragraphs = lines.map((line) => schema.nodes.paragraph.create(
+      null,
+      line ? schema.text(line) : null,
+    ));
+    const fragment = schema.nodes.doc.create(null, paragraphs).content;
+    const Slice = view.state.doc.slice(0, 0).constructor;
+    const transaction = view.state.tr
+      .replaceSelection(new Slice(fragment, 0, 0))
+      .scrollIntoView();
+    view.focus();
+    view.dispatch(transaction);
+    return true;
+  }
+
   function insert(content) {
     const composer = codexContracts.composer(dashboardDOM.elementIDs.promptDialog);
     if (!composer) return false;
@@ -19,6 +36,12 @@ const composerAdapter = (() => {
       return true;
     }
     const selection = window.getSelection();
+    const needsSeparator = Boolean(composer.textContent && !/\s$/.test(composer.textContent));
+    const insertedContent = `${needsSeparator ? '\n\n' : ''}${content}`;
+    const editorView = codexContracts.composerEditorView(composer);
+    if (editorView) {
+      return insertIntoEditor(editorView, content, needsSeparator);
+    }
     if (!selection?.rangeCount || !composer.contains(selection.anchorNode)) {
       const range = document.createRange();
       range.selectNodeContents(composer);
@@ -26,8 +49,7 @@ const composerAdapter = (() => {
       selection?.removeAllRanges();
       selection?.addRange(range);
     }
-    const needsSeparator = Boolean(composer.textContent && !/\s$/.test(composer.textContent));
-    const insertion = document.createTextNode(`${needsSeparator ? '\n\n' : ''}${content}`);
+    const insertion = document.createTextNode(insertedContent);
     const range = selection?.getRangeAt(0);
     if (!range) return false;
     range.deleteContents();
