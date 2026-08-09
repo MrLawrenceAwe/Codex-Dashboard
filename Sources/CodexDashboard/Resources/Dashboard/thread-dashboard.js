@@ -21,6 +21,7 @@ let mutationFrame;
 let unreadSyncTimer;
 let pendingSidebarMutation = false;
 let dashboardIsOpen = false;
+let dashboardNeedsRender = true;
 let unreadThreadIDs = new Set();
 let handoffError = '';
 
@@ -47,7 +48,7 @@ function syncUnreadFromSidebar() {
 }
 
 function refreshUnreadFromSidebar() {
-  if (syncUnreadFromSidebar()) renderDashboard();
+  if (syncUnreadFromSidebar()) requestDashboardRender();
 }
 
 function unreadSyncDelay() {
@@ -154,6 +155,7 @@ function renderDashboard() {
   updateSidebarStatus(state);
   const page = document.getElementById(dashboardDOM.elementIDs.page);
   if (!page) return;
+  dashboardNeedsRender = false;
   const loadedSummary = page.querySelector('[data-loaded-summary]');
   if (loadedSummary) {
     const isPartial = totalThreadCount > threads.length;
@@ -215,6 +217,15 @@ function renderDashboard() {
   list.innerHTML = threadMarkup.list(visibleThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread });
 }
 
+function requestDashboardRender() {
+  if (dashboardIsOpen) {
+    renderDashboard();
+    return;
+  }
+  dashboardNeedsRender = true;
+  updateSidebarStatus(deriveDashboardState());
+}
+
 function syncContentInset() {
   const sidebar = codexHost.sidebar();
   const width = sidebar ? Math.max(0, sidebar.getBoundingClientRect().right) : 0;
@@ -260,7 +271,7 @@ function scheduleMutationSync(records) {
     if (dashboardIsOpen && restoredPage) openPage();
     attachPageToCodexContent();
     observeSidebar();
-    if (shouldSyncUnread && syncUnreadFromSidebar()) renderDashboard();
+    if (shouldSyncUnread && syncUnreadFromSidebar()) requestDashboardRender();
   });
 }
 
@@ -289,6 +300,7 @@ function mountNavigationButton() {
 }
 
 function mountDashboardPage() {
+  dashboardNeedsRender = true;
   const page = document.createElement('section');
   page.id = dashboardDOM.elementIDs.page;
   page.setAttribute('aria-label', 'Codex Thread Dashboard');
@@ -387,7 +399,8 @@ function openPage() {
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
   document.getElementById(dashboardDOM.elementIDs.navButton)?.setAttribute('aria-current', 'page');
-  renderDashboard();
+  if (dashboardNeedsRender) renderDashboard();
+  else updateSidebarStatus(deriveDashboardState());
   scheduleUnreadSync();
 }
 
@@ -439,7 +452,7 @@ function applySnapshot(nextSnapshot) {
     nextThreads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
   syncUnreadFromSidebar();
-  renderDashboard();
+  requestDashboardRender();
 }
 
 function ensureMounted() {
@@ -494,6 +507,7 @@ function destroy() {
   mutationFrame = undefined;
   unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
+  dashboardNeedsRender = true;
   observedSidebar = undefined;
   promptLibrary.unmount();
   navigationEventTypes.forEach((type) => {

@@ -28,6 +28,7 @@ protocol DashboardRuntime: AnyObject {
 final class LiveDashboardRuntime: DashboardRuntime {
     private let codex: CodexAppController
     private let renderer: DashboardRenderer
+    private var lastObservedCodexLaunchDate: Date?
 
     init(
         codex: CodexAppController = CodexAppController(),
@@ -42,10 +43,14 @@ final class LiveDashboardRuntime: DashboardRuntime {
     var maintainsDashboard: Bool { renderer.maintainsDashboard }
 
     func rendererTargets() async -> [DevToolsTarget] {
-        await renderer.targets()
+        let launchDate = codex.launchDate
+        let processChanged = launchDate != lastObservedCodexLaunchDate
+        lastObservedCodexLaunchDate = launchDate
+        return await renderer.targets(forceRefresh: processChanged || !codex.isRunning)
     }
 
     func prepareForRestart() {
+        lastObservedCodexLaunchDate = nil
         renderer.prepareForRestart()
     }
 

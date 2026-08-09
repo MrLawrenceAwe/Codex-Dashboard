@@ -141,6 +141,28 @@ private actor RendererPollingDevTools: DevToolsServing {
     }
 }
 
+private actor FailingRendererDevTools: DevToolsServing {
+    private let staleTarget: DevToolsTarget
+    private let freshTarget: DevToolsTarget
+    private var targetRequestCount = 0
+
+    init(staleTarget: DevToolsTarget, freshTarget: DevToolsTarget) {
+        self.staleTarget = staleTarget
+        self.freshTarget = freshTarget
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] {
+        targetRequestCount += 1
+        return targetRequestCount == 1 ? [staleTarget] : [freshTarget]
+    }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) throws -> Bool {
+        throw DashboardError.invalidDevToolsResponse
+    }
+
+    func requests() -> Int { targetRequestCount }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
@@ -364,5 +386,40 @@ final class DashboardRendererTests: XCTestCase {
         let refreshedCounts = await devTools.counts()
         XCTAssertEqual(refreshedCounts.targets, 2)
         XCTAssertEqual(refreshedCounts.evaluations, 3)
+    }
+
+    func testFailedSynchronizationInvalidatesCachedTargets() async throws {
+        let staleTarget = DevToolsTarget(
+            id: "stale",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/stale"
+        )
+        let freshTarget = DevToolsTarget(
+            id: "fresh",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/fresh"
+        )
+        let devTools = FailingRendererDevTools(staleTarget: staleTarget, freshTarget: freshTarget)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+        )
+
+        let initialTargets = await renderer.targets()
+        do {
+            try await renderer.synchronize(
+                DashboardSnapshot(threads: []),
+                on: initialTargets,
+                forceRemount: true
+            )
+            XCTFail("Expected synchronization to fail")
+        } catch DashboardError.invalidDevToolsResponse { }
+
+        let refreshedTargets = await renderer.targets()
+        XCTAssertEqual(refreshedTargets.map(\.id), ["fresh"])
+        let requests = await devTools.requests()
+        XCTAssertEqual(requests, 2)
     }
 }

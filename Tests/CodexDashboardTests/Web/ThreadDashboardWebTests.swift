@@ -5,6 +5,45 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "deferred-thread", isUnread: true),
+        ])
+
+        let closedState = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              return [
+                document.querySelectorAll('[data-thread-list] .dashboard-thread').length,
+                document.querySelector('[data-navigation-count]').textContent,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let closedValues = try XCTUnwrap(closedState)
+        XCTAssertEqual(closedValues[0] as? Int, 0)
+        XCTAssertEqual(closedValues[1] as? String, "1")
+
+        let openedThreadID = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.open();
+              return document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId;
+            })()
+            """
+        ) as? String
+        XCTAssertEqual(openedThreadID, "deferred-thread")
+    }
+
     func testRestoresAndSavesDashboardPreferences() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-preferences-\(UUID().uuidString)", isDirectory: true)
@@ -403,6 +442,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
               return [
                 document.querySelector('[data-running-count]').textContent,
                 document.querySelector('[data-navigation-running-count]').textContent,
