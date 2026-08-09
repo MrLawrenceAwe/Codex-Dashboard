@@ -75,7 +75,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             additionalThreadCount: 60,
             testCase: self
         )
-        let update = try Subprocess.run(
+        let update = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [
                 stateDatabaseURL.path,

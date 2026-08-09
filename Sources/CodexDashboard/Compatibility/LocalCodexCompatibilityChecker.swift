@@ -29,9 +29,9 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
     func checkLocalContracts() async -> [CompatibilityCheck] {
         [
             checkApplication(),
-            checkThreadDatabase(),
+            await checkThreadDatabase(),
             checkUnreadState(),
-            checkRolloutEvents(),
+            await checkRolloutEvents(),
         ]
     }
 
@@ -59,7 +59,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
         )
     }
 
-    private func checkThreadDatabase() -> CompatibilityCheck {
+    private func checkThreadDatabase() async -> CompatibilityCheck {
         guard FileManager.default.fileExists(atPath: stateDatabaseURL.path) else {
             return check(
                 "thread-database", "Thread catalog", .incompatible,
@@ -67,7 +67,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             )
         }
         do {
-            let result = try Subprocess.run(
+            let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
                 arguments: ["-readonly", "-json", stateDatabaseURL.path, "PRAGMA table_info(threads);"],
                 timeout: subprocessTimeout
@@ -121,7 +121,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
         }
     }
 
-    private func checkRolloutEvents() -> CompatibilityCheck {
+    private func checkRolloutEvents() async -> CompatibilityCheck {
         guard FileManager.default.fileExists(atPath: stateDatabaseURL.path) else {
             return check(
                 "rollout-events", "Activity events", .unavailable,
@@ -129,7 +129,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             )
         }
         do {
-            let result = try Subprocess.run(
+            let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
                 arguments: [
                     "-readonly", "-noheader", stateDatabaseURL.path,

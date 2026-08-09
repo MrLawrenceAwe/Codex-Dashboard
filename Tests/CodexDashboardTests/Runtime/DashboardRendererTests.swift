@@ -117,6 +117,30 @@ private actor BackupCountingDevTools: DevToolsServing {
     }
 }
 
+private actor RendererPollingDevTools: DevToolsServing {
+    private let target: DevToolsTarget
+    private var targetRequestCount = 0
+    private var booleanEvaluationCount = 0
+
+    init(target: DevToolsTarget) {
+        self.target = target
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] {
+        targetRequestCount += 1
+        return [target]
+    }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool {
+        booleanEvaluationCount += 1
+        return true
+    }
+
+    func counts() -> (targets: Int, evaluations: Int) {
+        (targetRequestCount, booleanEvaluationCount)
+    }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
@@ -307,5 +331,38 @@ final class DashboardRendererTests: XCTestCase {
 
         let backupReadCount = await devTools.backupReadCount()
         XCTAssertEqual(backupReadCount, 1)
+    }
+
+    func testUnchangedSynchronizationThrottlesTargetAndHealthChecks() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = RendererPollingDevTools(target: target)
+        var currentDate = Date(timeIntervalSince1970: 1_000)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount"),
+            healthCheckInterval: 30,
+            now: { currentDate }
+        )
+        let snapshot = DashboardSnapshot(threads: [])
+
+        let firstTargets = await renderer.targets()
+        try await renderer.synchronize(snapshot, on: firstTargets, forceRemount: true)
+        let cachedTargets = await renderer.targets()
+        try await renderer.synchronize(snapshot, on: cachedTargets)
+        let cachedCounts = await devTools.counts()
+        XCTAssertEqual(cachedCounts.targets, 1)
+        XCTAssertEqual(cachedCounts.evaluations, 2)
+
+        currentDate.addTimeInterval(31)
+        let refreshedTargets = await renderer.targets()
+        try await renderer.synchronize(snapshot, on: refreshedTargets)
+        let refreshedCounts = await devTools.counts()
+        XCTAssertEqual(refreshedCounts.targets, 2)
+        XCTAssertEqual(refreshedCounts.evaluations, 3)
     }
 }

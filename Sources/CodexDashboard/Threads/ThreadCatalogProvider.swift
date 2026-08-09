@@ -73,7 +73,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         ORDER BY recency_at_ms DESC
         LIMIT 60;
         """
-        let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
+        let threads: [StoredThread] = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let threadActivity = rolloutActivityReader.load(
@@ -106,12 +106,12 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         )
     }
 
-    private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {
+    private func query<T: Decodable>(databaseURL: URL, sql: String) async throws -> T {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
             throw ThreadCatalogError.missingDatabase(databaseURL)
         }
         do {
-            let result = try Subprocess.run(
+            let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
                 arguments: ["-readonly", "-json", databaseURL.path, sql],
                 timeout: subprocessTimeout

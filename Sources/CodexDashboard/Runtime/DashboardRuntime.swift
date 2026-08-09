@@ -53,7 +53,7 @@ final class LiveDashboardRuntime: DashboardRuntime {
         try await codex.restart()
         let deadline = ContinuousClock.now + .seconds(18)
         while true {
-            let targets = await renderer.targets()
+            let targets = await renderer.targets(forceRefresh: true)
             if !targets.isEmpty { return targets }
             guard ContinuousClock.now < deadline else {
                 throw DashboardError.rendererTimedOut

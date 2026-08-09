@@ -13,6 +13,11 @@ final class DashboardRenderer {
     private var synchronizationInProgress = false
     private var queuedSynchronizations: [CheckedContinuation<Void, Never>] = []
     private var lastPromptBackupCheck: Date?
+    private var lastHealthCheckByTargetID: [String: Date] = [:]
+    private var cachedTargets: [DevToolsTarget] = []
+    private var lastTargetRefresh: Date?
+    private let healthCheckInterval: TimeInterval
+    private let now: () -> Date
 
     private static let promptBackupCheckInterval: TimeInterval = 30
 
@@ -21,19 +26,34 @@ final class DashboardRenderer {
     init(
         devTools: any DevToolsServing = DevToolsClient(),
         injectionPayload: DashboardInjectionPayload? = nil,
-        promptBackupStore: PromptBackupStore? = nil
+        promptBackupStore: PromptBackupStore? = nil,
+        healthCheckInterval: TimeInterval = 30,
+        now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionPayload.load()
         self.promptBackupStore = promptBackupStore
+        self.healthCheckInterval = healthCheckInterval
+        self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
             devTools: devTools,
             contractSource: try DashboardInjectionPayload.loadRendererContractSource()
         )
     }
 
-    func targets() async -> [DevToolsTarget] {
-        await devTools.mainRendererTargets()
+    func targets(forceRefresh: Bool = false) async -> [DevToolsTarget] {
+        if
+            !forceRefresh,
+            !cachedTargets.isEmpty,
+            let lastTargetRefresh,
+            now().timeIntervalSince(lastTargetRefresh) < healthCheckInterval
+        {
+            return cachedTargets
+        }
+        let targets = await devTools.mainRendererTargets()
+        cachedTargets = targets
+        lastTargetRefresh = now()
+        return targets
     }
 
     func prepareForRestart() {
@@ -53,6 +73,7 @@ final class DashboardRenderer {
         try Task.checkCancellation()
 
         let targetIDs = Set(targets.map(\.id))
+        let snapshotChanged = snapshot != lastSnapshot || targetIDs != mountedTargetIDs
         var mountedDashboard = false
 
         for target in targets {
@@ -60,11 +81,14 @@ final class DashboardRenderer {
             guard maintainsDashboard else { return }
             let canCheckHealth = !forceRemount && mountedTargetIDs.contains(target.id)
             let isHealthy: Bool
-            if canCheckHealth {
+            if canCheckHealth && !snapshotChanged && !healthCheckIsDue(for: target.id) {
+                isHealthy = true
+            } else if canCheckHealth {
                 isHealthy = (try? await devTools.evaluateBoolean(
                     injectionPayload.healthCheckExpression,
                     in: target
                 )) == true
+                lastHealthCheckByTargetID[target.id] = now()
             } else {
                 isHealthy = false
             }
@@ -78,16 +102,18 @@ final class DashboardRenderer {
                 }
                 guard !Task.isCancelled, maintainsDashboard else { return }
                 mountedDashboard = true
+                lastHealthCheckByTargetID[target.id] = now()
             }
         }
 
         guard !Task.isCancelled, maintainsDashboard else { return }
-        if mountedDashboard || snapshot != lastSnapshot || targetIDs != mountedTargetIDs {
+        if mountedDashboard || snapshotChanged {
             try await deliver(snapshot, to: targets)
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
         mountedTargetIDs = targetIDs
+        lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
         if shouldBackUpPromptLibrary(afterMounting: mountedDashboard) {
             await backUpPromptLibrary(from: targets.first)
         }
@@ -99,7 +125,7 @@ final class DashboardRenderer {
         await waitForSynchronizationsToFinish()
 
         do {
-            let targets = await targets()
+            let targets = await targets(forceRefresh: true)
             guard !targets.isEmpty else {
                 clearMountState()
                 return false
@@ -123,7 +149,7 @@ final class DashboardRenderer {
     }
 
     func open() async {
-        for target in await targets() {
+        for target in await targets(forceRefresh: true) {
             _ = try? await devTools.evaluateBoolean(
                 "(() => { window.__codexDashboard?.open?.(); return true; })()",
                 in: target
@@ -161,6 +187,14 @@ final class DashboardRenderer {
         mountedTargetIDs = []
         lastSnapshot = nil
         lastPromptBackupCheck = nil
+        lastHealthCheckByTargetID = [:]
+        cachedTargets = []
+        lastTargetRefresh = nil
+    }
+
+    private func healthCheckIsDue(for targetID: String) -> Bool {
+        guard let lastHealthCheck = lastHealthCheckByTargetID[targetID] else { return true }
+        return now().timeIntervalSince(lastHealthCheck) >= healthCheckInterval
     }
 
     private func shouldBackUpPromptLibrary(afterMounting mountedDashboard: Bool) -> Bool {

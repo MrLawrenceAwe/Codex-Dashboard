@@ -3,8 +3,8 @@ import XCTest
 @testable import CodexDashboard
 
 final class SubprocessTests: XCTestCase {
-    func testCapturesOutput() throws {
-        let result = try Subprocess.run(
+    func testCapturesOutput() async throws {
+        let result = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/bin/echo"),
             arguments: ["dashboard"],
             timeout: 1
@@ -15,15 +15,16 @@ final class SubprocessTests: XCTestCase {
         XCTAssertTrue(result.standardError.isEmpty)
     }
 
-    func testTerminatesTimedOutProcess() throws {
+    func testTerminatesTimedOutProcess() async throws {
         let startedAt = Date()
-        XCTAssertThrowsError(
-            try Subprocess.run(
+        do {
+            _ = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/bin/sleep"),
                 arguments: ["5"],
                 timeout: 0.05
             )
-        ) { error in
+            XCTFail("Expected the process to time out")
+        } catch {
             guard case SubprocessError.timedOut = error else {
                 return XCTFail("Expected a timeout, got \(error)")
             }
