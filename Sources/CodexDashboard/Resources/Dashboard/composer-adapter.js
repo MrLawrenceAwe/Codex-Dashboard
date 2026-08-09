@@ -27,7 +27,17 @@ const composerAdapter = (() => {
       selection?.addRange(range);
     }
     const needsSeparator = Boolean(composer.textContent && !/\s$/.test(composer.textContent));
-    return document.execCommand('insertText', false, `${needsSeparator ? '\n\n' : ''}${content}`);
+    const insertion = document.createTextNode(`${needsSeparator ? '\n\n' : ''}${content}`);
+    const range = selection?.getRangeAt(0);
+    if (!range) return false;
+    range.deleteContents();
+    range.insertNode(insertion);
+    range.setStartAfter(insertion);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    composer.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
   }
 
   return { insert };
