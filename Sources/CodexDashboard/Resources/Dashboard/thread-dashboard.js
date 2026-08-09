@@ -1,4 +1,7 @@
-const promptEventTypes = ['pointerdown', 'mousedown', 'click', 'keydown', 'submit'];
+const promptEventTypes = [
+  'pointerdown', 'mousedown', 'click', 'keydown', 'submit',
+  'dragstart', 'dragover', 'dragleave', 'drop', 'dragend',
+];
 const navigationEventTypes = ['pointerdown', 'mousedown', 'click'];
 
 let threads = [];

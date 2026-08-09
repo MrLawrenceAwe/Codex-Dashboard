@@ -1,6 +1,15 @@
+const promptSectionStorageKey = 'codex-dashboard.collapsed-prompt-sections';
+const savedPromptSectionsStorageKey = 'codex-dashboard.prompt-sections';
 let savedPrompts = loadSavedPrompts();
+let savedPromptSections = loadSavedPromptSections();
 let promptMenuSyncQueued = false;
 let promptEditorState = { mode: 'list' };
+let draggedPromptID;
+let collapsedPromptSections = loadCollapsedPromptSections();
+
+function normalizePromptSection(value) {
+  return String(value || '').trim() || 'General';
+}
 
 function loadSavedPrompts() {
   try {
@@ -10,9 +19,62 @@ function loadSavedPrompts() {
       prompt && typeof prompt.id === 'string'
         && typeof prompt.name === 'string'
         && typeof prompt.content === 'string'
-    ));
+    )).map((prompt) => ({
+      ...prompt,
+      section: normalizePromptSection(prompt.section),
+    }));
   } catch (_) {
     return [];
+  }
+}
+
+function loadCollapsedPromptSections() {
+  try {
+    const value = JSON.parse(localStorage.getItem(promptSectionStorageKey) || '[]');
+    return new Set(Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function loadSavedPromptSections() {
+  let storedSections = [];
+  try {
+    const value = JSON.parse(localStorage.getItem(savedPromptSectionsStorageKey) || '[]');
+    if (Array.isArray(value)) storedSections = value.filter((item) => typeof item === 'string');
+  } catch (_) {
+    // Existing prompt sections still seed the list if section storage is unavailable.
+  }
+  return [...new Set([
+    ...storedSections.map(normalizePromptSection),
+    ...savedPrompts.map((prompt) => normalizePromptSection(prompt.section)),
+  ])];
+}
+
+function persistSavedPromptSections() {
+  try {
+    localStorage.setItem(savedPromptSectionsStorageKey, JSON.stringify(savedPromptSections));
+  } catch (_) {
+    // Section editing remains usable for the current renderer session if storage is unavailable.
+  }
+}
+
+function ensureSavedPromptSection(section) {
+  const normalizedSection = normalizePromptSection(section);
+  const existingSection = savedPromptSections.find(
+    (item) => item.localeCompare(normalizedSection, undefined, { sensitivity: 'accent' }) === 0,
+  );
+  if (existingSection) return existingSection;
+  savedPromptSections = [...savedPromptSections, normalizedSection];
+  persistSavedPromptSections();
+  return normalizedSection;
+}
+
+function persistCollapsedPromptSections() {
+  try {
+    localStorage.setItem(promptSectionStorageKey, JSON.stringify([...collapsedPromptSections]));
+  } catch (_) {
+    // Section state remains usable for the current renderer session if storage is unavailable.
   }
 }
 
@@ -147,13 +209,28 @@ function renderPromptLibrary() {
   const dialog = document.getElementById(elementIDs.promptDialog);
   const content = dialog?.querySelector('[data-prompt-content]');
   if (!content) return;
+  if (promptEditorState.mode === 'createSection') {
+    content.innerHTML = `
+      <form class="dashboard-prompt-form" data-prompt-section-form>
+        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" placeholder="e.g. Code review" required /></label>
+        <div class="dashboard-prompt-form-actions">
+          <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
+          <button type="submit" class="dashboard-prompt-primary">Create section</button>
+        </div>
+      </form>`;
+    content.querySelector('[name="sectionName"]')?.focus();
+    return;
+  }
   if (promptEditorState.mode !== 'list') {
     const prompt = promptEditorState.mode === 'edit'
       ? savedPrompts.find((item) => item.id === promptEditorState.promptID)
       : undefined;
+    const sectionNames = [...savedPromptSections]
+      .sort((left, right) => left.localeCompare(right));
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${escapeHTML(prompt?.name || '')}" required /></label>
+        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${escapeHTML(normalizePromptSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
@@ -163,8 +240,9 @@ function renderPromptLibrary() {
     content.querySelector('[name="name"]')?.focus();
     return;
   }
-  const rows = savedPrompts.map((prompt) => `
-    <article class="dashboard-prompt-row">
+  const renderPromptRows = (prompts) => prompts.map((prompt) => `
+    <article class="dashboard-prompt-row" data-prompt-row-id="${escapeHTML(prompt.id)}" draggable="true">
+      <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
       <button type="button" class="dashboard-prompt-use" data-prompt-use="${escapeHTML(prompt.id)}">
         <strong>${escapeHTML(prompt.name)}</strong>
         <span>${escapeHTML(prompt.content)}</span>
@@ -174,12 +252,39 @@ function renderPromptLibrary() {
         <button type="button" data-prompt-delete="${escapeHTML(prompt.id)}" aria-label="Delete ${escapeHTML(prompt.name)}">Delete</button>
       </div>
     </article>`).join('');
+  const groupedPrompts = new Map();
+  savedPromptSections.forEach((section) => groupedPrompts.set(section, []));
+  savedPrompts.forEach((prompt) => {
+    const section = normalizePromptSection(prompt.section);
+    if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
+    groupedPrompts.get(section).push(prompt);
+  });
+  const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
+    if (left === 'General') return -1;
+    if (right === 'General') return 1;
+    return left.localeCompare(right);
+  });
+  const sections = orderedSections.map(([section, prompts], index) => {
+    const collapsed = collapsedPromptSections.has(section);
+    const sectionBodyID = `dashboard-prompt-section-${index}`;
+    return `
+      <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${escapeHTML(section)}">
+        <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
+          <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${escapeHTML(section)}</strong></span>
+          <span class="dashboard-prompt-section-count">${prompts.length}</span>
+        </button>
+        <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(prompts)}</div>
+      </section>`;
+  }).join('');
   content.innerHTML = `
     <div class="dashboard-prompt-list">
-      ${rows || '<div class="dashboard-prompt-empty"><strong>No saved prompts yet</strong><span>Save instructions you use often, then insert them into a chat in one click.</span></div>'}
+      ${sections || '<div class="dashboard-prompt-empty"><strong>No saved prompts yet</strong><span>Save instructions you use often, then insert them into a chat in one click.</span></div>'}
     </div>
-    <button type="button" class="dashboard-prompt-new" data-prompt-new>+ New prompt</button>`;
-  content.querySelector('[data-prompt-use], [data-prompt-new]')?.focus();
+    <div class="dashboard-prompt-create-actions">
+      <button type="button" class="dashboard-prompt-new" data-prompt-new>+ New prompt</button>
+      <button type="button" class="dashboard-prompt-new" data-prompt-new-section>+ New section</button>
+    </div>`;
+  content.querySelector('[data-prompt-use], [data-prompt-new], [data-prompt-new-section]')?.focus();
 }
 
 function openPromptLibrary() {
@@ -246,20 +351,126 @@ function savePrompt(form) {
   const name = String(values.get('name') || '').trim();
   const content = String(values.get('content') || '').trim();
   if (!name || !content) return;
+  const section = ensureSavedPromptSection(values.get('section'));
   if (promptEditorState.mode === 'edit') {
     savedPrompts = savedPrompts.map((prompt) => (
-      prompt.id === promptEditorState.promptID ? { ...prompt, name, content } : prompt
+      prompt.id === promptEditorState.promptID ? { ...prompt, name, section, content } : prompt
     ));
   } else {
     savedPrompts = [...savedPrompts, {
       id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
       name,
+      section,
       content,
     }];
   }
   persistSavedPrompts();
   promptEditorState = { mode: 'list' };
   renderPromptLibrary();
+}
+
+function savePromptSection(form) {
+  const values = new FormData(form);
+  const name = String(values.get('sectionName') || '').trim();
+  if (!name) return;
+  const section = ensureSavedPromptSection(name);
+  collapsedPromptSections.delete(section);
+  persistCollapsedPromptSections();
+  promptEditorState = { mode: 'list' };
+  renderPromptLibrary();
+  [...document.querySelectorAll('[data-prompt-section-toggle]')]
+    .find((button) => button.dataset.promptSectionToggle === section)?.focus();
+}
+
+function clearPromptDropIndicators(dialog) {
+  dialog?.querySelectorAll('.is-drop-before, .is-drop-after, .is-drop-target').forEach((element) => {
+    element.classList.remove('is-drop-before', 'is-drop-after', 'is-drop-target');
+  });
+}
+
+function promptDropDestination(target) {
+  const row = target?.closest('[data-prompt-row-id]');
+  const sectionElement = target?.closest('[data-prompt-section]');
+  return sectionElement ? {
+    row,
+    section: sectionElement.dataset.promptSection,
+    sectionElement,
+  } : null;
+}
+
+function movePromptFromDrop(destination, dropAfter) {
+  const movingPrompt = savedPrompts.find((prompt) => prompt.id === draggedPromptID);
+  if (!movingPrompt || !destination?.section) return false;
+  if (destination.row?.dataset.promptRowId === draggedPromptID) return false;
+
+  const remainingPrompts = savedPrompts.filter((prompt) => prompt.id !== draggedPromptID);
+  const movedPrompt = { ...movingPrompt, section: normalizePromptSection(destination.section) };
+  const targetPromptID = destination.row?.dataset.promptRowId;
+  let insertionIndex;
+  if (targetPromptID) {
+    insertionIndex = remainingPrompts.findIndex((prompt) => prompt.id === targetPromptID);
+    if (insertionIndex < 0) insertionIndex = remainingPrompts.length;
+    else if (dropAfter) insertionIndex += 1;
+  } else {
+    insertionIndex = remainingPrompts.reduce((lastIndex, prompt, index) => (
+      normalizePromptSection(prompt.section) === movedPrompt.section ? index + 1 : lastIndex
+    ), remainingPrompts.length);
+  }
+  remainingPrompts.splice(insertionIndex, 0, movedPrompt);
+  savedPrompts = remainingPrompts;
+  persistSavedPrompts();
+  return true;
+}
+
+function handlePromptDrag(event, target, dialog) {
+  if (event.type === 'dragstart') {
+    const row = target?.closest('[data-prompt-row-id]');
+    if (!row) return false;
+    draggedPromptID = row.dataset.promptRowId;
+    row.classList.add('is-dragging');
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', draggedPromptID);
+    }
+    return true;
+  }
+  if (!draggedPromptID) return false;
+  if (event.type === 'dragend') {
+    clearPromptDropIndicators(dialog);
+    dialog?.querySelector('.is-dragging')?.classList.remove('is-dragging');
+    draggedPromptID = undefined;
+    return true;
+  }
+  const destination = promptDropDestination(target);
+  if (!destination) return false;
+  if (event.type === 'dragover') {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    clearPromptDropIndicators(dialog);
+    if (destination.row && destination.row.dataset.promptRowId !== draggedPromptID) {
+      const dropAfter = event.clientY > destination.row.getBoundingClientRect().top
+        + destination.row.getBoundingClientRect().height / 2;
+      destination.row.classList.add(dropAfter ? 'is-drop-after' : 'is-drop-before');
+    } else {
+      destination.sectionElement.classList.add('is-drop-target');
+    }
+    return true;
+  }
+  if (event.type === 'dragleave') return true;
+  if (event.type === 'drop') {
+    event.preventDefault();
+    const dropAfter = Boolean(
+      destination.row
+        && event.clientY > destination.row.getBoundingClientRect().top
+          + destination.row.getBoundingClientRect().height / 2
+    );
+    const moved = movePromptFromDrop(destination, dropAfter);
+    draggedPromptID = undefined;
+    if (moved) renderPromptLibrary();
+    else clearPromptDropIndicators(dialog);
+    return true;
+  }
+  return false;
 }
 
 function handlePromptInteraction(event) {
@@ -275,19 +486,38 @@ function handlePromptInteraction(event) {
   }
   const dialog = target?.closest(`#${elementIDs.promptDialog}`);
   if (!dialog) return;
+  if (handlePromptDrag(event, target, dialog)) return;
   if (event.type === 'keydown' && event.key === 'Escape') {
     event.preventDefault();
     closePromptLibrary();
     return;
   }
-  if (event.type === 'submit' && target.matches('[data-prompt-form]')) {
-    event.preventDefault();
-    savePrompt(target);
-    return;
+  if (event.type === 'submit') {
+    if (target.matches('[data-prompt-form]')) {
+      event.preventDefault();
+      savePrompt(target);
+      return;
+    }
+    if (target.matches('[data-prompt-section-form]')) {
+      event.preventDefault();
+      savePromptSection(target);
+      return;
+    }
   }
   if (event.type !== 'click') return;
   if (target.closest('[data-prompt-close]')) closePromptLibrary();
-  else if (target.closest('[data-prompt-new]')) {
+  else if (target.closest('[data-prompt-section-toggle]')) {
+    const section = target.closest('[data-prompt-section-toggle]').dataset.promptSectionToggle;
+    if (collapsedPromptSections.has(section)) collapsedPromptSections.delete(section);
+    else collapsedPromptSections.add(section);
+    persistCollapsedPromptSections();
+    renderPromptLibrary();
+    [...document.querySelectorAll('[data-prompt-section-toggle]')]
+      .find((button) => button.dataset.promptSectionToggle === section)?.focus();
+  } else if (target.closest('[data-prompt-new-section]')) {
+    promptEditorState = { mode: 'createSection' };
+    renderPromptLibrary();
+  } else if (target.closest('[data-prompt-new]')) {
     promptEditorState = { mode: 'create' };
     renderPromptLibrary();
   } else if (target.closest('[data-prompt-cancel]')) {
@@ -315,4 +545,3 @@ function handlePromptInteraction(event) {
     if (prompt && insertPromptIntoComposer(prompt.content)) closePromptLibrary();
   }
 }
-
