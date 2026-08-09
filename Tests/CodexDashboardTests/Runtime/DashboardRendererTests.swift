@@ -60,6 +60,44 @@ private actor SuspendedMountDevTools: DevToolsServing {
     }
 }
 
+private actor OrderedSnapshotDevTools: DevToolsServing {
+    private let target: DevToolsTarget
+    private var oldSnapshotContinuation: CheckedContinuation<Void, Never>?
+    private var completedSnapshots: [String] = []
+
+    init(target: DevToolsTarget) {
+        self.target = target
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] { [target] }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async -> Bool {
+        guard expression.contains("applySnapshot") else { return true }
+        if expression.contains("Old snapshot") {
+            await withCheckedContinuation { continuation in
+                oldSnapshotContinuation = continuation
+            }
+            completedSnapshots.append("old")
+        } else if expression.contains("New snapshot") {
+            completedSnapshots.append("new")
+        }
+        return true
+    }
+
+    func oldSnapshotHasStarted() -> Bool {
+        oldSnapshotContinuation != nil
+    }
+
+    func resumeOldSnapshot() {
+        oldSnapshotContinuation?.resume()
+        oldSnapshotContinuation = nil
+    }
+
+    func completedSnapshotOrder() -> [String] {
+        completedSnapshots
+    }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
@@ -190,5 +228,40 @@ final class DashboardRendererTests: XCTestCase {
         XCTAssertEqual(expressions.first, "mount")
         XCTAssertTrue(expressions.last?.contains("destroy") == true)
         XCTAssertFalse(renderer.maintainsDashboard)
+    }
+
+    func testConcurrentSynchronizationsDeliverSnapshotsInRequestOrder() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = OrderedSnapshotDevTools(target: target)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+        )
+        let oldSnapshot = DashboardSnapshot(threads: [.fixture(title: "Old snapshot")])
+        let newSnapshot = DashboardSnapshot(threads: [.fixture(title: "New snapshot")])
+
+        let oldSynchronization = Task { @MainActor in
+            try await renderer.synchronize(oldSnapshot, on: [target], forceRemount: true)
+        }
+        while !(await devTools.oldSnapshotHasStarted()) {
+            await Task.yield()
+        }
+        let newSynchronization = Task { @MainActor in
+            try await renderer.synchronize(newSnapshot, on: [target])
+        }
+        await Task.yield()
+
+        let orderWhileOldSnapshotIsSuspended = await devTools.completedSnapshotOrder()
+        XCTAssertEqual(orderWhileOldSnapshotIsSuspended, [])
+        await devTools.resumeOldSnapshot()
+        try await oldSynchronization.value
+        try await newSynchronization.value
+        let completedOrder = await devTools.completedSnapshotOrder()
+        XCTAssertEqual(completedOrder, ["old", "new"])
     }
 }

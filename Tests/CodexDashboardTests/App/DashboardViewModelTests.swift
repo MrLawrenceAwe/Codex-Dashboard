@@ -27,6 +27,12 @@ private struct StubUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
+private struct FailingViewModelUnreadIDProvider: UnreadThreadIDProviding {
+    func loadUnreadThreadIDs() async throws -> Set<String> {
+        throw UnreadThreadIDError.invalidState(URL(fileURLWithPath: "/tmp/global-state.json"))
+    }
+}
+
 private actor MutableUnreadIDProvider: UnreadThreadIDProviding {
     private var unreadThreadIDs: Set<String> = []
 
@@ -156,6 +162,23 @@ final class DashboardViewModelTests: XCTestCase {
         try await waitUntil { viewModel.threads.first?.isUnread == true }
 
         XCTAssertTrue(viewModel.threads.first?.isUnread == true)
+    }
+
+    func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
+        let thread = ThreadSummary.fixture(id: "thread-1")
+        let viewModel = DashboardViewModel(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadIDProvider: FailingViewModelUnreadIDProvider(),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await viewModel.synchronizeDashboard()
+
+        XCTAssertEqual(viewModel.threads.map(\.id), [thread.id])
+        XCTAssertTrue(viewModel.threadDataWarning?.contains("Unread state could not be refreshed") == true)
     }
 
     func testCancelledSynchronizationCannotClearNewSynchronizationTask() async throws {
