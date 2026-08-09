@@ -183,6 +183,82 @@ final class DashboardInjectionTests: XCTestCase {
         XCTAssertEqual(values[1] as? String, "1")
     }
 
+    func testSavedPromptsCanBeCreatedAndInsertedIntoComposer() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>
+                <div data-composer-overlay-floating-ui="true" aria-label="Add">
+                  <button role="menuitem" data-list-navigation-item="true" class="opacity-75 bg-token-list-hover-background opacity-100"><span>Record a skill</span></button>
+                </div>
+                <textarea placeholder="Do anything"></textarea>
+                <div contenteditable="true" role="textbox"></div>
+              </main>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+        try await waitUntilLoaded(webView)
+
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const promptMenuItem = document.querySelector('[data-codex-prompt-menu-item]');
+              promptMenuItem.dispatchEvent(new PointerEvent('pointerenter'));
+              const promptTookHighlight = promptMenuItem.classList.contains('opacity-100')
+                && promptMenuItem.classList.contains('bg-token-list-hover-background')
+                && !document.querySelector('[data-list-navigation-item]:not([data-codex-prompt-menu-item])').classList.contains('opacity-100');
+              promptMenuItem.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true,
+                cancelable: true,
+              }));
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Review code';
+              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const savedPromptName = document.querySelector('[data-prompt-use] strong').textContent;
+              document.querySelector('[data-prompt-use]').click();
+              const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
+              document.querySelector('textarea[placeholder="Do anything"]').remove();
+              promptMenuItem.click();
+              document.querySelector('[data-prompt-use]').click();
+              return [
+                promptMenuItem.textContent.trim(),
+                savedPromptName,
+                textareaValue,
+                !document.getElementById('codex-dashboard-prompt-dialog'),
+                promptMenuItem.parentElement.getAttribute('data-composer-overlay-floating-ui'),
+                document.querySelector('[contenteditable="true"]').textContent,
+                promptTookHighlight,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "Prompts")
+        XCTAssertEqual(values[1] as? String, "Review code")
+        XCTAssertEqual(values[2] as? String, "Review this code for correctness issues.")
+        XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertEqual(values[4] as? String, "true")
+        XCTAssertEqual(values[5] as? String, "Review this code for correctness issues.")
+        XCTAssertEqual(values[6] as? Bool, true)
+
+        let removedOnDestroy = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.destroy();
+              return !document.querySelector('[data-codex-prompt-menu-item]');
+            })()
+            """
+        ) as? Bool
+        XCTAssertEqual(removedOnDestroy, true)
+    }
+
     private func waitUntilLoaded(_ webView: WKWebView) async throws {
         let deadline = ContinuousClock.now + .seconds(3)
         while webView.isLoading {
