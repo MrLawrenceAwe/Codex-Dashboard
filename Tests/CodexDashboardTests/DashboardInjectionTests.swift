@@ -227,14 +227,25 @@ final class DashboardInjectionTests: XCTestCase {
               document.querySelector('textarea[placeholder="Do anything"]').remove();
               promptMenuItem.click();
               document.querySelector('[data-prompt-use]').click();
+              const promptLibraryClosedAfterInsertion = !document.getElementById('codex-dashboard-prompt-dialog');
+              promptMenuItem.click();
+              const deleteButton = document.querySelector('[data-prompt-delete]');
+              deleteButton.click();
+              const promptSurvivedFirstDeleteClick = Boolean(document.querySelector('[data-prompt-use]'));
+              const deleteRequiresConfirmation = deleteButton.textContent === 'Confirm delete';
+              deleteButton.click();
+              const promptWasDeleted = !document.querySelector('[data-prompt-use]');
               return [
                 promptMenuItem.textContent.trim(),
                 savedPromptName,
                 textareaValue,
-                !document.getElementById('codex-dashboard-prompt-dialog'),
+                promptLibraryClosedAfterInsertion,
                 promptMenuItem.parentElement.getAttribute('data-composer-overlay-floating-ui'),
                 document.querySelector('[contenteditable="true"]').textContent,
                 promptTookHighlight,
+                promptSurvivedFirstDeleteClick,
+                deleteRequiresConfirmation,
+                promptWasDeleted,
               ];
             })()
             """
@@ -247,6 +258,9 @@ final class DashboardInjectionTests: XCTestCase {
         XCTAssertEqual(values[4] as? String, "true")
         XCTAssertEqual(values[5] as? String, "Review this code for correctness issues.")
         XCTAssertEqual(values[6] as? Bool, true)
+        XCTAssertEqual(values[7] as? Bool, true)
+        XCTAssertEqual(values[8] as? Bool, true)
+        XCTAssertEqual(values[9] as? Bool, true)
 
         let removedOnDestroy = try await webView.evaluateJavaScript(
             """
