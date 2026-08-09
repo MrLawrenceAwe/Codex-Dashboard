@@ -19,7 +19,7 @@ let mutationObserver;
 let resizeObserver;
 let observedSidebar;
 let isOpen = false;
-const readStateKey = 'codex-dashboard-thread-read-state-v1';
+const readStateKey = 'codex-dashboard-thread-read-state-v2';
 let readState = loadReadState();
 
 function loadReadState() {
@@ -45,7 +45,7 @@ function persistReadState() {
 function initializeReadState(nextThreads) {
   if (readState.initialized) return;
   nextThreads.forEach((thread) => {
-    readState.seen[thread.id] = Number(thread.updatedAt || 0);
+    readState.seen[thread.id] = Number(thread.responseSequence || 0);
   });
   readState.initialized = true;
   persistReadState();
@@ -53,17 +53,17 @@ function initializeReadState(nextThreads) {
 
 function isThreadUnread(thread) {
   return thread.status !== 'running'
-    && Number(thread.updatedAt || 0) > Number(readState.seen[thread.id] || 0);
+    && Number(thread.responseSequence || 0) > Number(readState.seen[thread.id] || 0);
 }
 
 function markThreadRead(thread, shouldRender = true) {
   if (!thread) return;
-  const previousTimestamp = Number(readState.seen[thread.id] || 0);
-  const updatedTimestamp = Number(thread.updatedAt || 0);
-  if (previousTimestamp >= updatedTimestamp) return;
+  const previousSequence = Number(readState.seen[thread.id] || 0);
+  const responseSequence = Number(thread.responseSequence || 0);
+  if (previousSequence >= responseSequence) return;
   readState.seen[thread.id] = Math.max(
-    previousTimestamp,
-    updatedTimestamp,
+    previousSequence,
+    responseSequence,
   );
   persistReadState();
   if (shouldRender) render();
@@ -92,7 +92,9 @@ function handleHostNavigation(event) {
   }
   const hostThread = target?.closest('[data-app-action-sidebar-thread-id]');
   const hostThreadKey = hostThread?.getAttribute('data-app-action-sidebar-thread-id') || '';
-  if (hostThreadKey.startsWith('local:')) {
+  // Pointer and mouse-down events can be cancelled, used to drag, or open a
+  // context menu. Only acknowledge a thread after its primary click.
+  if (event.type === 'click' && event.button === 0 && hostThreadKey.startsWith('local:')) {
     markThreadRead(threads.find((thread) => `local:${thread.id}` === hostThreadKey));
   }
   if (event.type !== 'click' || !isOpen) return;
@@ -133,6 +135,7 @@ function filteredThreads() {
   const query = searchTerm.trim().toLowerCase();
   return threads.filter((thread) => {
     const filterMatch = statusFilter === 'all'
+      || (statusFilter === 'unread' && isThreadUnread(thread))
       || (statusFilter === 'running' && thread.status === 'running');
     const searchMatch = !query || `${thread.title} ${thread.preview} ${thread.workspace} ${thread.workspacePath}`.toLowerCase().includes(query);
     return filterMatch && searchMatch;
@@ -229,6 +232,7 @@ function render() {
   const page = document.getElementById(ids.page);
   if (!page) return;
   const running = threads.filter((thread) => thread.status === 'running').length;
+  const unread = threads.filter(isThreadUnread).length;
   page.querySelector('[data-count-running]').textContent = String(running);
   const runningSummary = page.querySelector('[data-running-summary]');
   if (runningSummary) runningSummary.hidden = running === 0;
@@ -239,6 +243,7 @@ function render() {
   });
   const filterCounts = {
     all: threads.length,
+    unread,
     running,
   };
   page.querySelectorAll('[data-filter-count]').forEach((count) => {
@@ -254,7 +259,10 @@ function render() {
   page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'}`;
   const list = page.querySelector('[data-thread-list]');
   if (!visibleThreads.length) {
-    list.innerHTML = `<div class="dashboard-empty"><strong>No threads found</strong></div>`;
+    const emptyMessage = statusFilter === 'unread' && !searchTerm.trim()
+      ? 'You’re all caught up'
+      : 'No threads found';
+    list.innerHTML = `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`;
     return;
   }
   list.innerHTML = listMarkup(visibleThreads);
@@ -338,6 +346,7 @@ function createPage() {
         <div class="dashboard-toolbar">
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
+            <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
             <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
           </div>
           <div class="dashboard-view-options" aria-label="View threads">

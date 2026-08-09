@@ -18,6 +18,11 @@ enum ThreadRepositoryError: LocalizedError {
 }
 
 actor CodexThreadRepository {
+    private struct RolloutActivity: Sendable {
+        let status: ThreadActivityStatus
+        let responseSequence: UInt64
+    }
+
     private struct CachedGitStatus: Sendable {
         let value: WorkspaceGitStatus
         let checkedAt: Date
@@ -37,7 +42,7 @@ actor CodexThreadRepository {
 
     private let stateDatabaseURL: URL
     private var gitStatusCache: [String: CachedGitStatus] = [:]
-    private var rolloutStatusCache: [String: (size: UInt64, modifiedAt: Date, status: ThreadActivityStatus)] = [:]
+    private var rolloutActivityCache: [String: (size: UInt64, modifiedAt: Date, activity: RolloutActivity)] = [:]
     private let gitStatusCacheLifetime: TimeInterval = 10
     private let subprocessTimeout: TimeInterval
 
@@ -73,6 +78,7 @@ actor CodexThreadRepository {
         }
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.cwd).lastPathComponent
+            let activity = rolloutActivity(at: thread.rolloutPath)
             return DashboardThread(
                 id: thread.id,
                 title: thread.title,
@@ -82,7 +88,8 @@ actor CodexThreadRepository {
                 updatedAt: thread.updatedAt,
                 isPinned: thread.isPinned != 0,
                 model: thread.model,
-                status: rolloutStatus(at: thread.rolloutPath),
+                status: activity.status,
+                responseSequence: activity.responseSequence,
                 gitStatus: gitStatuses[thread.cwd] ?? .notRepository
             )
         }
@@ -92,66 +99,84 @@ actor CodexThreadRepository {
         )
     }
 
-    private func rolloutStatus(at path: String) -> ThreadActivityStatus {
+    private func rolloutActivity(at path: String) -> RolloutActivity {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return .idle
+            return RolloutActivity(status: .idle, responseSequence: 0)
         }
-        if let cached = rolloutStatusCache[path],
+        if let cached = rolloutActivityCache[path],
            cached.size == size,
            cached.modifiedAt == modifiedAt {
-            return cached.status
+            return cached.activity
         }
 
-        let status = lastLifecycleEvent(in: fileURL) == .started
-            ? ThreadActivityStatus.running
-            : ThreadActivityStatus.idle
-        rolloutStatusCache[path] = (size, modifiedAt, status)
-        return status
+        let activity = lifecycleActivity(in: fileURL)
+        rolloutActivityCache[path] = (size, modifiedAt, activity)
+        return activity
     }
 
     private enum LifecycleEvent {
         case started
         case completed
+        case aborted
     }
 
-    private func lastLifecycleEvent(in fileURL: URL) -> LifecycleEvent? {
-        let startedMarker = Data(#""type":"task_started""#.utf8)
-        let completedMarker = Data(#""type":"task_complete""#.utf8)
-        let overlapSize = max(startedMarker.count, completedMarker.count) - 1
+    private func lifecycleActivity(in fileURL: URL) -> RolloutActivity {
+        let markers: [(event: LifecycleEvent, data: Data)] = [
+            (.started, Data(#""type":"task_started""#.utf8)),
+            (.completed, Data(#""type":"task_complete""#.utf8)),
+            (.aborted, Data(#""type":"turn_aborted""#.utf8)),
+        ]
+        let overlapSize = (markers.map(\.data.count).max() ?? 1) - 1
         let chunkSize: UInt64 = 64 * 1_024
 
-        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
+            return RolloutActivity(status: .idle, responseSequence: 0)
+        }
         defer { try? handle.close() }
-        guard var cursor = try? handle.seekToEnd() else { return nil }
+        guard var cursor = try? handle.seekToEnd() else {
+            return RolloutActivity(status: .idle, responseSequence: 0)
+        }
         var laterOverlap = Data()
+        var lastEvent: LifecycleEvent?
+        var responseSequence: UInt64?
 
         while cursor > 0 {
             let bytesToRead = min(chunkSize, cursor)
             cursor -= bytesToRead
             do {
                 try handle.seek(toOffset: cursor)
-                guard var data = try handle.read(upToCount: Int(bytesToRead)) else { return nil }
+                guard var data = try handle.read(upToCount: Int(bytesToRead)) else { break }
                 data.append(laterOverlap)
 
-                let startedRange = data.range(of: startedMarker, options: .backwards)
-                let completedRange = data.range(of: completedMarker, options: .backwards)
-                if let startedRange, let completedRange {
-                    return startedRange.lowerBound > completedRange.lowerBound ? .started : .completed
+                let matches = markers.compactMap { marker -> (LifecycleEvent, Data.Index)? in
+                    guard let range = data.range(of: marker.data, options: .backwards) else {
+                        return nil
+                    }
+                    return (marker.event, range.lowerBound)
                 }
-                if startedRange != nil { return .started }
-                if completedRange != nil { return .completed }
+                if lastEvent == nil {
+                    lastEvent = matches.max { $0.1 < $1.1 }?.0
+                }
+                if responseSequence == nil,
+                   let completion = matches.first(where: { $0.0 == .completed }) {
+                    responseSequence = cursor + UInt64(data.distance(from: data.startIndex, to: completion.1))
+                }
+                if lastEvent != nil, responseSequence != nil { break }
 
                 laterOverlap = Data(data.prefix(overlapSize))
             } catch {
-                return nil
+                break
             }
         }
-        return nil
+        return RolloutActivity(
+            status: lastEvent == .started ? .running : .idle,
+            responseSequence: responseSequence ?? 0
+        )
     }
 
     private func workspaceGitStatus(at path: String) -> WorkspaceGitStatus {

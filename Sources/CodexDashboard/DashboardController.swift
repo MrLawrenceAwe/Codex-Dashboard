@@ -167,8 +167,8 @@ final class DashboardController: ObservableObject {
         var hostConnected = false
 
         do {
-            let executableURL = AppConfiguration.hostExecutableURL
-            guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+            let applicationURL = AppConfiguration.hostApplicationURL
+            guard FileManager.default.fileExists(atPath: applicationURL.path) else {
                 throw DashboardError.missingHostApplication
             }
             let applications = NSRunningApplication.runningApplications(
@@ -186,14 +186,13 @@ final class DashboardController: ObservableObject {
                 try await Task.sleep(for: .milliseconds(250))
             }
 
-            let process = Process()
-            process.executableURL = executableURL
-            process.arguments = [
-                "--remote-debugging-address=\(AppConfiguration.devToolsHost)",
-                "--remote-debugging-port=\(AppConfiguration.devToolsPort)",
-                "--remote-allow-origins=http://localhost",
-            ]
-            try process.run()
+            let launchConfiguration = NSWorkspace.OpenConfiguration()
+            launchConfiguration.arguments = AppConfiguration.hostLaunchArguments
+            launchConfiguration.activates = true
+            _ = try await NSWorkspace.shared.openApplication(
+                at: applicationURL,
+                configuration: launchConfiguration
+            )
 
             let rendererDeadline = ContinuousClock.now + .seconds(18)
             var targets: [DevToolsTarget] = []
