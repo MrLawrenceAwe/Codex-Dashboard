@@ -5,7 +5,7 @@ protocol WorkingTreeStatusProviding: Sendable {
 }
 
 actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    static let defaultStatusCacheLifetime: TimeInterval = 10
+    static let defaultStatusCacheLifetime: TimeInterval = 0
     static let defaultResolutionCacheLifetime: TimeInterval = 10
 
     private struct CachedStatus {

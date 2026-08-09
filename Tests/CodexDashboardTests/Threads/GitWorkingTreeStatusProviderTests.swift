@@ -3,9 +3,31 @@ import XCTest
 @testable import CodexDashboard
 
 final class GitWorkingTreeStatusProviderTests: XCTestCase {
-    func testDefaultCacheLifetimesDoNotExceedForegroundPollingInterval() {
-        XCTAssertLessThanOrEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 10)
+    func testDefaultStatusCacheDoesNotDelayWorkingTreeUpdates() {
+        XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 0)
         XCTAssertLessThanOrEqual(GitWorkingTreeStatusProvider.defaultResolutionCacheLifetime, 10)
+    }
+
+    func testDefaultProviderImmediatelyObservesCleanWorkingTree() async throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectURL.path, "init", "--quiet"],
+            timeout: 3
+        )
+        let changedFileURL = projectURL.appendingPathComponent("notes.txt")
+        try Data("uncommitted\n".utf8).write(to: changedFileURL)
+        let provider = GitWorkingTreeStatusProvider()
+
+        let changed = await provider.loadStatuses(for: [projectURL.path])
+        try FileManager.default.removeItem(at: changedFileURL)
+        let clean = await provider.loadStatuses(for: [projectURL.path])
+
+        XCTAssertEqual(changed[projectURL.path], .hasChanges)
+        XCTAssertEqual(clean[projectURL.path], .clean)
     }
 
     func testReportsUncommittedChanges() async throws {
