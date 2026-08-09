@@ -65,54 +65,31 @@ actor DevToolsClient {
 
     func evaluateBoolean(
         _ expression: String,
-        in target: DevToolsTarget,
-        bypassContentSecurityPolicy: Bool = false
+        in target: DevToolsTarget
     ) async throws -> Bool {
         try await withDevToolsTimeout(.seconds(4)) { [self] in
             try await evaluateBooleanWithoutTimeout(
                 expression,
-                in: target,
-                bypassContentSecurityPolicy: bypassContentSecurityPolicy
+                in: target
             )
         }
     }
 
     private func evaluateBooleanWithoutTimeout(
         _ expression: String,
-        in target: DevToolsTarget,
-        bypassContentSecurityPolicy: Bool
+        in target: DevToolsTarget
     ) async throws -> Bool {
         try await withConnection(to: target) { task in
-            if bypassContentSecurityPolicy {
-                _ = try await command(id: 1, method: "Page.enable", through: task)
-                _ = try await command(
-                    id: 2,
-                    method: "Page.setBypassCSP",
-                    params: ["enabled": true],
-                    through: task
-                )
-            }
-            let response: [String: Any]
-            do {
-                response = try await command(
-                    id: 3,
-                    method: "Runtime.evaluate",
-                    params: [
-                        "expression": expression,
-                        "returnByValue": true,
-                        "awaitPromise": true,
-                    ],
-                    through: task
-                )
-                if bypassContentSecurityPolicy {
-                    try await setContentSecurityPolicyBypass(false, commandID: 4, through: task)
-                }
-            } catch {
-                if bypassContentSecurityPolicy {
-                    try? await setContentSecurityPolicyBypass(false, commandID: 4, through: task)
-                }
-                throw error
-            }
+            let response = try await command(
+                id: 1,
+                method: "Runtime.evaluate",
+                params: [
+                    "expression": expression,
+                    "returnByValue": true,
+                    "awaitPromise": true,
+                ],
+                through: task
+            )
             if response["exceptionDetails"] != nil {
                 throw DashboardError.enableFailed("The dashboard injection raised an exception in the renderer.")
             }
@@ -124,19 +101,6 @@ actor DevToolsClient {
             }
             return value
         }
-    }
-
-    private func setContentSecurityPolicyBypass(
-        _ enabled: Bool,
-        commandID: Int,
-        through task: URLSessionWebSocketTask
-    ) async throws {
-        _ = try await command(
-            id: commandID,
-            method: "Page.setBypassCSP",
-            params: ["enabled": enabled],
-            through: task
-        )
     }
 
     private func withConnection<T>(

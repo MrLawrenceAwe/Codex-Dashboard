@@ -7,6 +7,7 @@ enum TestDatabaseFactory {
     private static func makeRollout(
         lifecycleEvents: [String],
         finalResponseAtUnixSeconds: Int64,
+        compactionAtUnixSeconds: Int64? = nil,
         finalResponseMessageSize: Int = 4,
         testCase: XCTestCase
     ) throws -> URL {
@@ -31,7 +32,19 @@ enum TestDatabaseFactory {
             ])
             return String(decoding: data, as: UTF8.self)
         }
-        let lines = [String(decoding: finalResponse, as: UTF8.self)] + lifecycleLines
+        var lines = [String(decoding: finalResponse, as: UTF8.self)] + lifecycleLines
+        if let compactionAtUnixSeconds {
+            let compactionTimestamp = ISO8601DateFormatter().string(
+                from: Date(timeIntervalSince1970: TimeInterval(compactionAtUnixSeconds))
+            )
+            let historicalFinalResponse = try JSONSerialization.jsonObject(with: finalResponse)
+            let compaction = try JSONSerialization.data(withJSONObject: [
+                "timestamp": compactionTimestamp,
+                "type": "compacted",
+                "replacement_history": [historicalFinalResponse],
+            ])
+            lines.append(String(decoding: compaction, as: UTF8.self))
+        }
         try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: rolloutURL)
         testCase.addTeardownBlock { try? FileManager.default.removeItem(at: rolloutURL) }
         return rolloutURL
@@ -69,12 +82,14 @@ enum TestDatabaseFactory {
         runningWorkspacePath: String = "/tmp/running",
         runningLifecycleEvents: [String] = ["task_complete", "task_started"],
         runningFinalResponseAtUnixSeconds: Int64? = nil,
+        runningCompactionAtUnixSeconds: Int64? = nil,
         runningFinalResponseMessageSize: Int = 4,
         testCase: XCTestCase
     ) throws -> URL {
         let runningRollout = try makeRollout(
             lifecycleEvents: runningLifecycleEvents,
             finalResponseAtUnixSeconds: runningFinalResponseAtUnixSeconds ?? now - 300,
+            compactionAtUnixSeconds: runningCompactionAtUnixSeconds,
             finalResponseMessageSize: runningFinalResponseMessageSize,
             testCase: testCase
         )

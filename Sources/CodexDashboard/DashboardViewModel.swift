@@ -209,7 +209,6 @@ final class DashboardViewModel: ObservableObject {
             }
             return
         }
-        if sessionState.errorMessage != nil { return }
         sessionState = !targets.isEmpty
             ? .bridgeConnected
             : (appIsRunning ? .appRunning : .appClosed)

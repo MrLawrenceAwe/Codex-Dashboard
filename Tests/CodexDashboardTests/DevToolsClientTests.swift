@@ -40,6 +40,19 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertTrue(result)
     }
 
+    func testLiveDashboardInjectionWithoutCSPBypassWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with a page target on port 47832.")
+        }
+        let client = DevToolsClient()
+        let targets = await client.mainRendererTargets()
+        let target = try XCTUnwrap(targets.first)
+        let injection = try DashboardInjection.load()
+        let mounted = try await client.evaluateBoolean(injection.mountExpression, in: target)
+
+        XCTAssertTrue(mounted)
+    }
+
     func testTimeoutCancelsSlowOperation() async throws {
         do {
             _ = try await withDevToolsTimeout(.milliseconds(10)) {
