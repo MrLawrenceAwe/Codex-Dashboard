@@ -10,7 +10,6 @@ Promise.all([
       workspace: 'Codex Dashboard',
       workspacePath: '/Users/lawrenceawe/Codex Dashboard',
       updatedAt: Math.round(Date.now() / 1000) - 3,
-      responseSequence: 2,
       isPinned: true,
       model: 'gpt-5.6-sol',
       status: 'running',
@@ -23,7 +22,6 @@ Promise.all([
       workspace: 'voice-tiktok-scroller',
       workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
       updatedAt: Math.round(Date.now() / 1000) - 780,
-      responseSequence: 1,
       isPinned: false,
       model: 'gpt-5.6-terra',
       status: 'idle',
@@ -36,21 +34,12 @@ Promise.all([
       workspace: 'voice-tiktok-scroller',
       workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
       updatedAt: Math.round(Date.now() / 1000) - 86400,
-      responseSequence: 1,
       isPinned: false,
       model: 'gpt-5.6-terra',
       status: 'idle',
       gitStatus: 'clean',
     },
   ];
-  window.localStorage.setItem('codex-dashboard-thread-read-state-v1', JSON.stringify({
-    initialized: true,
-    seen: {
-      'thread-dashboard': threads[0].updatedAt,
-      'thread-review': threads[1].updatedAt - 60,
-      'thread-idle': threads[2].updatedAt,
-    },
-  }));
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
   window.__codexDashboard.update({ threads, totalThreadCount: threads.length });
   window.__codexDashboard.open();
