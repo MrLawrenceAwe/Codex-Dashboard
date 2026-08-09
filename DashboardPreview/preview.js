@@ -2,7 +2,6 @@ Promise.all([
   fetch('../Sources/CodexDashboard/Resources/Dashboard/dashboard.js').then((response) => response.text()),
   fetch('../Sources/CodexDashboard/Resources/Dashboard/dashboard.css').then((response) => response.text()),
 ]).then(([script, stylesheet]) => {
-  new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
   const threads = [
     {
       id: 'thread-dashboard',
@@ -41,6 +40,15 @@ Promise.all([
       gitStatus: 'clean',
     },
   ];
+  window.localStorage.setItem('codex-dashboard-thread-read-state-v1', JSON.stringify({
+    initialized: true,
+    seen: {
+      'thread-dashboard': threads[0].updatedAt,
+      'thread-review': threads[1].updatedAt - 60,
+      'thread-idle': threads[2].updatedAt,
+    },
+  }));
+  new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
   window.__codexDashboard.update({ threads, totalThreadCount: threads.length });
   window.__codexDashboard.open();
 });

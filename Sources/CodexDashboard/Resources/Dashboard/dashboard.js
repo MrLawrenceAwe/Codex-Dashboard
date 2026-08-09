@@ -19,6 +19,68 @@ let mutationObserver;
 let resizeObserver;
 let observedSidebar;
 let isOpen = false;
+const readStateKey = 'codex-dashboard-thread-read-state-v1';
+let readState = loadReadState();
+
+function loadReadState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(readStateKey) || 'null');
+    if (stored?.initialized === true && stored.seen && typeof stored.seen === 'object') {
+      return stored;
+    }
+  } catch {
+    // Treat unavailable or invalid renderer storage as a fresh read state.
+  }
+  return { initialized: false, seen: {} };
+}
+
+function persistReadState() {
+  try {
+    localStorage.setItem(readStateKey, JSON.stringify(readState));
+  } catch {
+    // The indicator can remain session-only when renderer storage is unavailable.
+  }
+}
+
+function initializeReadState(nextThreads) {
+  if (readState.initialized) return;
+  nextThreads.forEach((thread) => {
+    readState.seen[thread.id] = Number(thread.updatedAt || 0);
+  });
+  readState.initialized = true;
+  persistReadState();
+}
+
+function isThreadUnread(thread) {
+  return thread.status !== 'running'
+    && Number(thread.updatedAt || 0) > Number(readState.seen[thread.id] || 0);
+}
+
+function markThreadRead(thread, shouldRender = true) {
+  if (!thread) return;
+  const previousTimestamp = Number(readState.seen[thread.id] || 0);
+  const updatedTimestamp = Number(thread.updatedAt || 0);
+  if (previousTimestamp >= updatedTimestamp) return;
+  readState.seen[thread.id] = Math.max(
+    previousTimestamp,
+    updatedTimestamp,
+  );
+  persistReadState();
+  if (shouldRender) render();
+}
+
+function markSelectedThreadRead(nextThreads) {
+  if (isOpen) return;
+  const selected = document.querySelector(
+    '[data-app-action-sidebar-thread-id][aria-current="page"]',
+  );
+  const selectedKey = selected?.getAttribute('data-app-action-sidebar-thread-id') || '';
+  if (!selectedKey.startsWith('local:')) return;
+  markThreadRead(
+    nextThreads.find((thread) => `local:${thread.id}` === selectedKey),
+    false,
+  );
+}
 
 function handleHostNavigation(event) {
   const target = event.target instanceof Element ? event.target : null;
@@ -27,6 +89,11 @@ function handleHostNavigation(event) {
     event.stopPropagation();
     if (event.type === 'click') openPage();
     return;
+  }
+  const hostThread = target?.closest('[data-app-action-sidebar-thread-id]');
+  const hostThreadKey = hostThread?.getAttribute('data-app-action-sidebar-thread-id') || '';
+  if (hostThreadKey.startsWith('local:')) {
+    markThreadRead(threads.find((thread) => `local:${thread.id}` === hostThreadKey));
   }
   if (event.type !== 'click' || !isOpen) return;
   if (target?.closest('aside') && !target.closest(`#${ids.navButton}`)) closePage();
@@ -77,6 +144,7 @@ function openThread(thread) {
   const target = document.querySelector(
     `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
   );
+  markThreadRead(thread);
   closePage();
   if (target) {
     target.click();
@@ -92,11 +160,13 @@ function openThread(thread) {
 }
 
 function threadMarkup(thread, showProject = false) {
+  const unread = isThreadUnread(thread);
   return `
-    <article class="dashboard-thread" data-status="${escapeHTML(thread.status)}" data-thread-id="${escapeHTML(thread.id)}">
+    <article class="dashboard-thread" data-status="${escapeHTML(thread.status)}" data-unread="${String(unread)}" data-thread-id="${escapeHTML(thread.id)}">
       <div class="dashboard-status-dot" title="${escapeHTML(thread.status)}"></div>
       <div class="dashboard-thread-copy">
         <div class="dashboard-thread-title-row">
+          ${unread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
           <h2>${escapeHTML(thread.title)}</h2>
           ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconSVG('pin')}</span>` : ''}
         </div>
@@ -207,6 +277,13 @@ function observeSidebar() {
   observedSidebar = sidebar;
 }
 
+function syncPageHost() {
+  const page = document.getElementById(ids.page);
+  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
+  const pageHost = sidebar?.parentElement;
+  if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
+}
+
 function createNavigation() {
   const reference = findSidebarReference();
   if (!reference?.element?.parentElement) return false;
@@ -313,7 +390,10 @@ function closePage() {
 }
 
 function update(nextSnapshot) {
-  threads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
+  const nextThreads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
+  initializeReadState(nextThreads);
+  threads = nextThreads;
+  markSelectedThreadRead(threads);
   const activeCount = threads.filter((thread) => thread.status === 'running').length;
   const count = document.querySelector('[data-navigation-count]');
   if (count) count.textContent = String(activeCount);
@@ -331,6 +411,7 @@ function ensureMounted() {
   const pageWasMissing = !document.getElementById(ids.page);
   if (pageWasMissing) createPage();
   if (!document.getElementById(ids.navButton)) createNavigation();
+  syncPageHost();
   syncContentInset();
   if (isOpen && pageWasMissing) openPage();
 
@@ -340,6 +421,7 @@ function ensureMounted() {
       if (restoredPage) createPage();
       if (!document.getElementById(ids.navButton)) createNavigation();
       if (isOpen && restoredPage) openPage();
+      syncPageHost();
       observeSidebar();
       syncContentInset();
     });

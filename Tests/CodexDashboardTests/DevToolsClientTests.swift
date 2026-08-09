@@ -13,8 +13,12 @@ final class DevToolsClientTests: XCTestCase {
             )
         )
         XCTAssertTrue(adapter.expression.contains("const pageHost = sidebar?.parentElement"))
+        XCTAssertTrue(adapter.expression.contains("function syncPageHost()"))
+        XCTAssertTrue(adapter.expression.contains("page.parentElement !== pageHost"))
         XCTAssertTrue(adapter.expression.contains("type: 'navigate-to-route'"))
         XCTAssertTrue(adapter.expression.contains("path: `/local/${encodeURIComponent(thread.id)}`"))
+        XCTAssertTrue(adapter.expression.contains("codex-dashboard-thread-read-state-v1"))
+        XCTAssertTrue(adapter.expression.contains("aria-label=\"Unread response\""))
         XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
