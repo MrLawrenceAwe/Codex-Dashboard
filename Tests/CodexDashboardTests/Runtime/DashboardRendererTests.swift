@@ -23,6 +23,43 @@ private actor StubRendererDevTools: DevToolsServing {
     }
 }
 
+private actor SuspendedMountDevTools: DevToolsServing {
+    private let target: DevToolsTarget
+    private var mountContinuation: CheckedContinuation<Void, Never>?
+    private var evaluatedExpressions: [String] = []
+
+    init(target: DevToolsTarget) {
+        self.target = target
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] {
+        [target]
+    }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async -> Bool {
+        evaluatedExpressions.append(expression)
+        if expression == "mount" {
+            await withCheckedContinuation { continuation in
+                mountContinuation = continuation
+            }
+        }
+        return true
+    }
+
+    func mountHasStarted() -> Bool {
+        mountContinuation != nil
+    }
+
+    func resumeMount() {
+        mountContinuation?.resume()
+        mountContinuation = nil
+    }
+
+    func expressions() -> [String] {
+        evaluatedExpressions
+    }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
@@ -116,6 +153,42 @@ final class DashboardRendererTests: XCTestCase {
         await devTools.setEvaluationResult(true)
         let disabled = try await renderer.disable()
         XCTAssertTrue(disabled)
+        XCTAssertFalse(renderer.maintainsDashboard)
+    }
+
+    func testDisableWaitsForInFlightSynchronizationBeforeDestroyingDashboard() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = SuspendedMountDevTools(target: target)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+        )
+        let synchronization = Task { @MainActor in
+            try await renderer.synchronize(
+                DashboardSnapshot(threads: []),
+                on: [target],
+                forceRemount: true
+            )
+        }
+        while !(await devTools.mountHasStarted()) {
+            await Task.yield()
+        }
+
+        let disable = Task { @MainActor in try await renderer.disable() }
+        await Task.yield()
+        await devTools.resumeMount()
+
+        try await synchronization.value
+        let disabled = try await disable.value
+        XCTAssertTrue(disabled)
+        let expressions = await devTools.expressions()
+        XCTAssertEqual(expressions.first, "mount")
+        XCTAssertTrue(expressions.last?.contains("destroy") == true)
         XCTAssertFalse(renderer.maintainsDashboard)
     }
 }

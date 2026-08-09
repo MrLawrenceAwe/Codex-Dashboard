@@ -84,6 +84,11 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 && document.querySelector('[data-prompt-section="Code review"] .dashboard-prompt-section-count').textContent === '2'
                 && [...document.querySelectorAll('[data-prompt-section="Code review"] [data-prompt-use] strong')]
                   .map((element) => element.textContent).join(',') === 'Review code,Explain code';
+              const reviewRow = [...document.querySelectorAll('[data-prompt-row-id]')]
+                .find((row) => row.textContent.includes('Review code'));
+              dispatchDrag(reviewRow, 'dragstart');
+              dispatchDrag(reviewRow, 'drop');
+              const selfDropClearedDraggingStyle = !reviewRow.classList.contains('is-dragging');
               const savedPromptName = document.querySelector('[data-prompt-use] strong').textContent;
               document.querySelector('[data-prompt-use]').click();
               const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
@@ -114,6 +119,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 sectionToggle.textContent.includes('Code review'),
                 dragMovedPromptAcrossSections,
                 emptySectionWasCreated,
+                selfDropClearedDraggingStyle,
               ];
             })()
             """
@@ -133,6 +139,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[11] as? Bool, true)
         XCTAssertEqual(values[12] as? Bool, true)
         XCTAssertEqual(values[13] as? Bool, true)
+        XCTAssertEqual(values[14] as? Bool, true)
 
         let removedOnDestroy = try await webView.evaluateJavaScript(
             """
