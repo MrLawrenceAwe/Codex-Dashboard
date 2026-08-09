@@ -43,9 +43,14 @@ actor ThreadSnapshotService {
             codexLaunchDate: codexLaunchDate
         )
         hasLoadedSnapshot = true
+        let threads = catalog.threads.map { source in
+            var thread = source
+            thread.workingTreeStatus = workingTreeStatuses[thread.projectPath] ?? .notRepository
+            return thread
+        }
         return ThreadSnapshotLoad(
             catalog: ThreadCatalog(
-                threads: applyingUnreadState(to: catalog.threads),
+                threads: applyingUnreadState(to: threads),
                 totalThreadCount: catalog.totalThreadCount
             ),
             unreadStateWarning: unreadStateWarning
