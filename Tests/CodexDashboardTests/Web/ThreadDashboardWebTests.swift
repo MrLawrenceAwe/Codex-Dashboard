@@ -5,6 +5,34 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "stable")])
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
+              window.__codexDashboard.applySnapshot(\(payload));
+            })()
+            """
+        )
+
+        try await Task.sleep(for: .milliseconds(50))
+        let retained = try await webView.evaluateJavaScript(
+            "window.__stableThreadElement === document.querySelector('[data-thread-id=\"stable\"]')"
+        ) as? Bool
+        XCTAssertEqual(retained, true)
+    }
+
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

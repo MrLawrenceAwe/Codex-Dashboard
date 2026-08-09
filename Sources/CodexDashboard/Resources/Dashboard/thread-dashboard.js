@@ -19,11 +19,13 @@ let resizeObserver;
 let observedSidebar;
 let mutationFrame;
 let unreadSyncTimer;
+let renderFrame;
 let pendingSidebarMutation = false;
 let dashboardIsOpen = false;
 let dashboardNeedsRender = true;
 let unreadThreadIDs = new Set();
 let handoffError = '';
+const renderedMarkup = new WeakMap();
 
 function saveDashboardPreferences() {
   try {
@@ -52,8 +54,8 @@ function refreshUnreadFromSidebar() {
 }
 
 function unreadSyncDelay() {
-  if (document.visibilityState === 'hidden') return 5000;
-  return dashboardIsOpen ? 500 : 1500;
+  if (document.visibilityState === 'hidden') return 30000;
+  return dashboardIsOpen ? 3000 : 10000;
 }
 
 function scheduleUnreadSync(delay = unreadSyncDelay()) {
@@ -179,13 +181,13 @@ function renderDashboard() {
     runningCount.parentElement?.setAttribute('title', runningLabel);
   }
   const runningList = page.querySelector('[data-running-list]');
-  if (runningList) runningList.innerHTML = state.runningThreads
+  if (runningList) updateMarkup(runningList, state.runningThreads
     .map((thread) => threadMarkup.thread(thread, {
       showProject: true,
       isUnread: isThreadUnread(thread),
       compact: true,
     }))
-    .join('');
+    .join(''));
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === filterMode;
     button.classList.toggle('is-active', isActive);
@@ -211,15 +213,32 @@ function renderDashboard() {
     const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
       ? 'You’re all caught up'
       : 'No threads found';
-    list.innerHTML = `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`;
+    updateMarkup(list, `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`);
     return;
   }
-  list.innerHTML = threadMarkup.list(visibleThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread });
+  updateMarkup(
+    list,
+    threadMarkup.list(visibleThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread }),
+  );
+}
+
+function updateMarkup(element, markup) {
+  if (renderedMarkup.get(element) === markup) return;
+  element.innerHTML = markup;
+  renderedMarkup.set(element, markup);
+}
+
+function scheduleDashboardRender() {
+  if (renderFrame !== undefined) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = undefined;
+    renderDashboard();
+  });
 }
 
 function requestDashboardRender() {
   if (dashboardIsOpen) {
-    renderDashboard();
+    scheduleDashboardRender();
     return;
   }
   dashboardNeedsRender = true;
@@ -254,7 +273,7 @@ function mutationTouchesSidebar(record) {
 }
 
 function scheduleMutationSync(records) {
-  promptLauncher.scheduleSync();
+  if (promptLauncher.mutationsCouldAffectLauncher(records)) promptLauncher.scheduleSync();
   const sidebarMutation = records.some(mutationTouchesSidebar);
   const dashboardMissing = !document.getElementById(dashboardDOM.elementIDs.page)
     || !document.getElementById(dashboardDOM.elementIDs.navButton);
@@ -350,7 +369,7 @@ function mountDashboardPage() {
   });
   page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
     searchTerm = event.target.value;
-    renderDashboard();
+    scheduleDashboardRender();
   });
   page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
     const projectCommit = event.target.closest('[data-project-commit]');
@@ -401,7 +420,7 @@ function openPage() {
   document.getElementById(dashboardDOM.elementIDs.navButton)?.setAttribute('aria-current', 'page');
   if (dashboardNeedsRender) renderDashboard();
   else updateSidebarStatus(deriveDashboardState());
-  scheduleUnreadSync();
+  scheduleUnreadSync(1500);
 }
 
 function closePage() {
@@ -452,6 +471,7 @@ function applySnapshot(nextSnapshot) {
     nextThreads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
   syncUnreadFromSidebar();
+  scheduleUnreadSync(1500);
   requestDashboardRender();
 }
 
@@ -501,10 +521,12 @@ function destroy() {
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
   if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
+  if (renderFrame !== undefined) cancelAnimationFrame(renderFrame);
   if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
   mutationObserver = undefined;
   resizeObserver = undefined;
   mutationFrame = undefined;
+  renderFrame = undefined;
   unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
   dashboardNeedsRender = true;
