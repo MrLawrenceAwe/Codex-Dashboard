@@ -86,18 +86,7 @@ private final class StubDashboardRuntime: DashboardRuntime {
 @MainActor
 final class DashboardViewModelTests: XCTestCase {
     func testRefreshUsesInjectedDependenciesWithoutStartingPolling() async {
-        let thread = ThreadSummary(
-            id: "thread-1",
-            title: "Injected thread",
-            preview: "Preview",
-            projectName: "Project",
-            projectPath: "/tmp/project",
-            sortTimestamp: 1,
-            isPinned: false,
-            model: nil,
-            runState: .idle,
-            gitStatus: .clean
-        )
+        let thread = ThreadSummary.fixture(id: "thread-1", title: "Injected thread")
         let viewModel = DashboardViewModel(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 4)
@@ -117,18 +106,7 @@ final class DashboardViewModelTests: XCTestCase {
     }
 
     func testUnreadPollingUpdatesThreadWithinBoundedInterval() async throws {
-        let thread = ThreadSummary(
-            id: "thread-1",
-            title: "Thread",
-            preview: "Preview",
-            projectName: "Project",
-            projectPath: "/tmp/project",
-            sortTimestamp: 1,
-            isPinned: false,
-            model: nil,
-            runState: .idle,
-            gitStatus: .clean
-        )
+        let thread = ThreadSummary.fixture(id: "thread-1")
         let unreadIDProvider = MutableUnreadIDProvider()
         let viewModel = DashboardViewModel(
             catalogProvider: StubCatalogProvider(
@@ -173,18 +151,6 @@ final class DashboardViewModelTests: XCTestCase {
         await catalogProvider.resumeNext()
         await coalescedRefresh.value
         viewModel.stopRefreshing()
-    }
-
-    private func waitUntil(
-        timeout: Duration = .seconds(2),
-        condition: @escaping @MainActor () -> Bool
-    ) async throws {
-        let clock = ContinuousClock()
-        let deadline = clock.now + timeout
-        while !condition(), clock.now < deadline {
-            try await Task.sleep(for: .milliseconds(25))
-        }
-        XCTAssertTrue(condition())
     }
 
     private func waitUntil(

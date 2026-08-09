@@ -69,19 +69,15 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         ])
 
         let threads = [
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "thread-read",
                 title: "Read thread",
                 preview: "Already read",
                 projectName: "Project",
                 projectPath: "/tmp/project",
-                sortTimestamp: 2,
-                isPinned: false,
-                model: nil,
-                runState: .idle,
-                gitStatus: .clean
+                sortTimestamp: 2
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "thread-unread",
                 title: "Unread thread",
                 preview: "Needs attention",
@@ -94,8 +90,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 gitStatus: .hasChanges
             ),
         ]
-        let payloadData = try JSONEncoder().encode(RendererSnapshot(threads: threads))
-        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
         let result = try await webView.evaluateJavaScript(
             """
             (() => {

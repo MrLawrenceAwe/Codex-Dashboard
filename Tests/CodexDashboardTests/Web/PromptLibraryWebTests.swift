@@ -6,8 +6,8 @@ import XCTest
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     func testSavedPromptsCanBeCreatedAndInsertedIntoComposer() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html:
             """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
@@ -21,13 +21,9 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               </main>
             </body></html>
             """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
-
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -150,8 +146,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPromptLibraryCreatesEmptySectionsAndScrollsLongLists() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html:
             """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
@@ -164,13 +160,9 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               </main>
             </body></html>
             """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
-
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -202,9 +194,100 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? Bool, true)
     }
 
+    func testPromptSectionSurvivesAfterItsLastPromptIsDeleted() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main><div data-composer-overlay-floating-ui="true"><button><span>Record a skill</span></button></div></main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Temporary';
+              document.querySelector('[name="section"]').value = 'Keep me';
+              document.querySelector('[name="content"]').value = 'Temporary prompt';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              document.querySelector('[data-prompt-delete]').click();
+              document.querySelector('[data-prompt-delete-confirm]').click();
+              window.__codexDashboard.destroy();
+            })()
+            """
+        )
+
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let sectionSurvived = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-menu-item]').click();
+              return Boolean(document.querySelector('[data-prompt-section="Keep me"]'));
+            })()
+            """
+        ) as? Bool
+
+        XCTAssertEqual(sectionSurvived, true)
+    }
+
+    func testLegacyPromptStorageMigratesWithoutDataLoss() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main><div data-composer-overlay-floating-ui="true"><button><span>Record a skill</span></button></div></main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.destroy();
+              localStorage.removeItem('codex-dashboard.prompt-library');
+              localStorage.setItem('codex-dashboard.saved-prompts', JSON.stringify([{
+                id: 'legacy-prompt',
+                name: 'Legacy prompt',
+                content: 'Preserve me',
+                section: 'Legacy section',
+              }]));
+              localStorage.setItem('codex-dashboard.prompt-sections', JSON.stringify(['Empty legacy section']));
+            })()
+            """
+        )
+
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let migrated = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-menu-item]').click();
+              const state = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              return [
+                document.querySelector('[data-prompt-use] strong').textContent,
+                Boolean(document.querySelector('[data-prompt-section="Empty legacy section"]')),
+                state.prompts.length,
+                state.sections.length,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(migrated)
+        XCTAssertEqual(values[0] as? String, "Legacy prompt")
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Int, 1)
+        XCTAssertEqual(values[3] as? Int, 2)
+    }
+
     func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html:
             """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
@@ -217,12 +300,9 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               </main>
             </body></html>
             """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
 
         let result = try await webView.evaluateJavaScript(
             """

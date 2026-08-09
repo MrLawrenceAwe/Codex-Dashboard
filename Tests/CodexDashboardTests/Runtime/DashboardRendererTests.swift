@@ -25,6 +25,19 @@ private actor StubRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testPreparingForRestartRestoresMaintenance() throws {
+        let renderer = try DashboardRenderer(
+            devTools: StubRendererDevTools(targets: []),
+            injection: DashboardInjection(version: "test", mountExpression: "true")
+        )
+        renderer.stopMaintaining()
+        XCTAssertFalse(renderer.maintainsDashboard)
+
+        renderer.prepareForRestart()
+
+        XCTAssertTrue(renderer.maintainsDashboard)
+    }
+
     func testFailedDisableKeepsDashboardMaintenanceEnabled() async throws {
         let target = DevToolsTarget(
             id: "main",

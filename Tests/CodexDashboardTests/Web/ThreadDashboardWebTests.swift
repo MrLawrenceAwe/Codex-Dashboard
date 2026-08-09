@@ -6,34 +6,21 @@ import XCTest
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
               <main>Conversation surface</main>
             </body></html>
             """,
-            baseURL: nil
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        var thread = ThreadSummary(
+        let thread = ThreadSummary.fixture(
             id: "off-sidebar-unread",
             title: "Off-sidebar unread",
             preview: "Not mounted in the sidebar",
-            projectName: "Project",
-            projectPath: "/tmp/project",
-            sortTimestamp: 1,
-            isPinned: false,
-            model: nil,
-            runState: .idle,
-            gitStatus: .clean
+            isUnread: true
         )
-        thread.isUnread = true
-        let payloadData = try JSONEncoder().encode(RendererSnapshot(threads: [thread]))
-        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [thread])
 
         let result = try await webView.evaluateJavaScript(
             """
@@ -53,8 +40,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testUnreadFallbackDetectsSilentReactStateChange() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -64,25 +50,9 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               <main>Conversation surface</main>
             </body></html>
             """,
-            baseURL: nil
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let thread = ThreadSummary(
-            id: "thread-one",
-            title: "Thread",
-            preview: "Preview",
-            projectName: "Project",
-            projectPath: "/tmp/project",
-            sortTimestamp: 1,
-            isPinned: false,
-            model: nil,
-            runState: .idle,
-            gitStatus: .clean
-        )
-        let payloadData = try JSONEncoder().encode(RendererSnapshot(threads: [thread]))
-        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let thread = ThreadSummary.fixture(id: "thread-one")
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [thread])
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -109,59 +79,42 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testChangedProjectsFilterIncludesEveryThreadFromChangedProjects() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"></aside><main>Conversation surface</main>
             </body></html>
             """,
-            baseURL: nil
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let threads = [
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "changed-project-thread-one",
                 title: "First changed project thread",
                 preview: "First",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
                 sortTimestamp: 3,
-                isPinned: false,
-                model: nil,
-                runState: .idle,
                 gitStatus: .hasChanges
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "changed-project-thread-two",
                 title: "Second changed project thread",
                 preview: "Second",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
-                sortTimestamp: 2,
-                isPinned: false,
-                model: nil,
-                runState: .idle,
-                gitStatus: .clean
+                sortTimestamp: 2
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "clean-project-thread",
                 title: "Clean project thread",
                 preview: "Clean",
                 projectName: "Clean Project",
                 projectPath: "/tmp/clean-project",
-                sortTimestamp: 1,
-                isPinned: false,
-                model: nil,
-                runState: .idle,
-                gitStatus: .clean
+                sortTimestamp: 1
             ),
         ]
-        let payloadData = try JSONEncoder().encode(RendererSnapshot(threads: threads))
-        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
 
         let result = try await webView.evaluateJavaScript(
             """
@@ -186,8 +139,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testRunningSpinnersShowGlobalAndProjectCounts() async throws {
-        let webView = WKWebView()
-        webView.loadHTMLString(
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
@@ -195,63 +147,48 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               <main>Conversation surface</main>
             </body></html>
             """,
-            baseURL: nil
         )
-        try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjection.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let threads = [
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "project-a-running-one",
                 title: "First running thread",
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
                 sortTimestamp: 4,
-                isPinned: false,
-                model: nil,
                 runState: .running,
                 gitStatus: .clean
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "project-a-running-two",
                 title: "Second running thread",
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
                 sortTimestamp: 3,
-                isPinned: false,
-                model: nil,
                 runState: .running,
                 gitStatus: .clean
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "project-a-idle",
                 title: "Idle thread",
                 preview: "Idle",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                sortTimestamp: 2,
-                isPinned: false,
-                model: nil,
-                runState: .idle,
-                gitStatus: .clean
+                sortTimestamp: 2
             ),
-            ThreadSummary(
+            ThreadSummary.fixture(
                 id: "project-b-running",
                 title: "Other running thread",
                 preview: "Running",
                 projectName: "Project B",
                 projectPath: "/tmp/project-b",
                 sortTimestamp: 1,
-                isPinned: false,
-                model: nil,
                 runState: .running,
                 gitStatus: .clean
             ),
         ]
-        let payloadData = try JSONEncoder().encode(RendererSnapshot(threads: threads))
-        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
 
         let result = try await webView.evaluateJavaScript(
             """

@@ -48,10 +48,6 @@ final class DashboardRuntimeCoordinator: DashboardRuntime {
         renderer.prepareForRestart()
     }
 
-    func stopMaintainingDashboard() {
-        renderer.stopMaintaining()
-    }
-
     func restartCodex() async throws -> [DevToolsTarget] {
         try await codex.restart()
         let deadline = ContinuousClock.now + .seconds(18)
