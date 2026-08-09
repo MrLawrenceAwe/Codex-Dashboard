@@ -1,6 +1,10 @@
 import Foundation
 
-struct WorkspaceGitStatusLoader: Sendable {
+protocol WorkspaceGitStatusLoading: Sendable {
+    func load(at workspacePaths: Set<String>) async -> [String: WorkspaceGitStatus]
+}
+
+struct WorkspaceGitStatusLoader: WorkspaceGitStatusLoading, Sendable {
     private let subprocessTimeout: TimeInterval
 
     init(subprocessTimeout: TimeInterval = 3) {

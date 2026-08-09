@@ -14,15 +14,16 @@ private struct StatusCard: View {
     }
 
     var body: some View {
+        let status = viewModel.statusPresentation
         HStack(alignment: .top, spacing: 10) {
             Circle()
                 .fill(statusColor)
                 .frame(width: 7, height: 7)
                 .padding(.top, 5)
             VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.statusTitle)
+                Text(status.title)
                     .font(.system(size: 13, weight: .medium))
-                Text(viewModel.statusDetail)
+                Text(status.detail)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -111,5 +112,7 @@ struct DashboardControlPanel: View {
         }
         .padding(24)
         .frame(width: 620, height: 370, alignment: .topLeading)
+        .onAppear { viewModel.startRefreshing() }
+        .onDisappear { viewModel.stopRefreshing() }
     }
 }

@@ -10,6 +10,66 @@ const elementIDs = {
   page: 'codex-dashboard-page',
 };
 
+const host = {
+  sidebar() {
+    return document.querySelector('aside.app-shell-left-panel, aside');
+  },
+
+  pageHost() {
+    return this.sidebar()?.parentElement || document.body;
+  },
+
+  navigationInsertionPoint() {
+    const navigation = document.querySelector('nav, [role="navigation"]');
+    if (!navigation) return null;
+    const buttons = [...navigation.querySelectorAll('button')];
+    const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
+    const newChatRow = newChat?.closest('.sidebar-item');
+    if (newChatRow?.parentElement) return { element: newChatRow, insertAfter: true };
+    const fallbackButton = buttons.find((button) => button.textContent.trim() === 'Pull requests')
+      || buttons.find((button) => button.classList.contains('sidebar-item'));
+    return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
+  },
+
+  unreadThreadIDs() {
+    const unreadIDs = new Set();
+    document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
+      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
+      let fiber = fiberKey ? row[fiberKey] : null;
+      while (fiber) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        if (
+          typeof props?.conversationId === 'string'
+          && typeof props?.isUnread === 'boolean'
+        ) {
+          if (props.isUnread) unreadIDs.add(props.conversationId);
+          break;
+        }
+        fiber = fiber.return;
+      }
+    });
+    return unreadIDs;
+  },
+
+  navigateToThread(thread) {
+    const threadKey = `local:${thread.id}`;
+    const sidebarThreadButton = document.querySelector(
+      `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
+    );
+    if (sidebarThreadButton) {
+      sidebarThreadButton.click();
+      return;
+    }
+    window.dispatchEvent(new MessageEvent('message', {
+      data: {
+        type: 'navigate-to-route',
+        path: `/local/${encodeURIComponent(thread.id)}`,
+      },
+      source: null,
+    }));
+  },
+};
+
 let threads = [];
 let readFilter = 'all';
 let searchTerm = '';
@@ -23,28 +83,8 @@ let pendingSidebarMutation = false;
 let isOpen = false;
 let unreadThreadIDs = new Set();
 
-function sidebarUnreadState(row) {
-  const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-  let fiber = fiberKey ? row[fiberKey] : null;
-  while (fiber) {
-    const props = fiber.memoizedProps || fiber.pendingProps;
-    if (
-      typeof props?.conversationId === 'string'
-      && typeof props?.isUnread === 'boolean'
-    ) {
-      return { id: props.conversationId, unread: props.isUnread };
-    }
-    fiber = fiber.return;
-  }
-  return null;
-}
-
 function syncUnreadFromSidebar() {
-  const nextUnreadThreadIDs = new Set();
-  document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
-    const state = sidebarUnreadState(row);
-    if (state?.unread) nextUnreadThreadIDs.add(state.id);
-  });
+  const nextUnreadThreadIDs = host.unreadThreadIDs();
   const changed = nextUnreadThreadIDs.size !== unreadThreadIDs.size
     || [...nextUnreadThreadIDs].some((id) => !unreadThreadIDs.has(id));
   unreadThreadIDs = nextUnreadThreadIDs;
@@ -108,23 +148,8 @@ function getVisibleThreads() {
 }
 
 function openThread(thread) {
-  const threadKey = `local:${thread.id}`;
-  const sidebarThreadButton = document.querySelector(
-    `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
-  );
   closePage();
-  if (sidebarThreadButton) {
-    sidebarThreadButton.click();
-    return;
-  }
-  // A missing sidebar destination uses Codex's route bridge.
-  window.dispatchEvent(new MessageEvent('message', {
-    data: {
-      type: 'navigate-to-route',
-      path: `/local/${encodeURIComponent(thread.id)}`,
-    },
-    source: null,
-  }));
+  host.navigateToThread(thread);
 }
 
 function renderThreadHTML(thread, showProject = false) {
@@ -232,26 +257,14 @@ function render() {
   list.innerHTML = renderThreadListHTML(visibleThreads);
 }
 
-function findNavigationInsertionPoint() {
-  const navigation = document.querySelector('nav, [role="navigation"]');
-  if (!navigation) return null;
-  const buttons = [...navigation.querySelectorAll('button')];
-  const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
-  const newChatRow = newChat?.closest('.sidebar-item');
-  if (newChatRow?.parentElement) return { element: newChatRow, insertAfter: true };
-  const fallbackButton = buttons.find((button) => button.textContent.trim() === 'Pull requests')
-    || buttons.find((button) => button.classList.contains('sidebar-item'));
-  return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
-}
-
 function syncContentInset() {
-  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
+  const sidebar = host.sidebar();
   const width = sidebar ? Math.max(0, sidebar.getBoundingClientRect().right) : 0;
   document.documentElement.style.setProperty('--codex-dashboard-content-left', `${Math.round(width)}px`);
 }
 
 function observeSidebar() {
-  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
+  const sidebar = host.sidebar();
   if (!resizeObserver || sidebar === observedSidebar) return;
   resizeObserver.disconnect();
   if (sidebar) resizeObserver.observe(sidebar);
@@ -260,8 +273,7 @@ function observeSidebar() {
 
 function syncPageHost() {
   const page = document.getElementById(elementIDs.page);
-  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
-  const pageHost = sidebar?.parentElement;
+  const pageHost = host.pageHost();
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
 }
 
@@ -294,7 +306,7 @@ function scheduleMutationSync(records) {
 }
 
 function createNavigation() {
-  const insertionPoint = findNavigationInsertionPoint();
+  const insertionPoint = host.navigationInsertionPoint();
   if (!insertionPoint?.element?.parentElement) return false;
   const button = document.createElement('button');
   button.id = elementIDs.navButton;
@@ -378,9 +390,7 @@ function createPage() {
     openThreadFromEvent(event);
   });
   page.querySelector('[data-running-list]').addEventListener('click', openThreadFromEvent);
-  const sidebar = document.querySelector('aside.app-shell-left-panel, aside');
-  const pageHost = sidebar?.parentElement || document.body;
-  pageHost.append(page);
+  host.pageHost().append(page);
 }
 
 function openThreadFromEvent(event) {
