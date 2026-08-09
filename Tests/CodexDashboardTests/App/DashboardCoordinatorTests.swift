@@ -190,6 +190,11 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
+    func testWorkingTreePollingScheduleClearsChangeIndicatorsPromptly() {
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(2))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(10))
+    }
+
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let coordinator = DashboardCoordinator(
