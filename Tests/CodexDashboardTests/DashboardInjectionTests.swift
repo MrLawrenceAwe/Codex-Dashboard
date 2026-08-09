@@ -32,6 +32,42 @@ final class DashboardInjectionTests: XCTestCase {
         let healthy = try await webView.evaluateJavaScript(injection.healthCheckExpression) as? Bool
         XCTAssertEqual(healthy, true)
 
+        let dashboardStyles = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const styles = getComputedStyle(document.getElementById('codex-dashboard-page'));
+              return [styles.backgroundColor, styles.color, styles.getPropertyValue('--dashboard-bg').trim()];
+            })()
+            """
+        ) as? [String]
+        XCTAssertEqual(dashboardStyles, ["rgb(33, 33, 33)", "rgb(236, 236, 236)", "#212121"])
+
+        let themedDashboardStyles = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const root = document.documentElement.style;
+              const readStyles = () => {
+                const page = getComputedStyle(document.getElementById('codex-dashboard-page'));
+                const navigation = getComputedStyle(document.getElementById('codex-dashboard-navigation'));
+                const navigationCopy = getComputedStyle(document.querySelector('.dashboard-nav-copy'));
+                return [page.backgroundColor, page.color, navigationCopy.color, navigation.color];
+              };
+              root.setProperty('--color-background-surface', '#ffffff');
+              root.setProperty('--color-text-foreground', '#1a1c1f');
+              const light = readStyles();
+              root.setProperty('--color-background-surface', '#212121');
+              root.setProperty('--color-text-foreground', '#ececec');
+              document.getElementById('codex-dashboard-navigation').style.color = '#ececec';
+              const dark = readStyles();
+              return [light, dark];
+            })()
+            """
+        ) as? [[String]]
+        XCTAssertEqual(themedDashboardStyles, [
+            ["rgb(255, 255, 255)", "rgb(26, 28, 31)", "rgba(0, 0, 0, 0.847)", "rgba(0, 0, 0, 0.847)"],
+            ["rgb(33, 33, 33)", "rgb(236, 236, 236)", "rgb(236, 236, 236)", "rgb(236, 236, 236)"],
+        ])
+
         let threads = [
             DashboardThread(
                 id: "thread-read",

@@ -34,8 +34,8 @@ private struct StatusCard: View {
                 .font(.system(size: 11, weight: .medium))
         }
         .padding(13)
-        .background(.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(.white.opacity(0.07)))
+        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
     }
 }
 
@@ -47,7 +47,7 @@ struct DashboardControlPanel: View {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(.white.opacity(0.07))
+                        .fill(Color.primary.opacity(0.07))
                     Text("D")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -78,7 +78,7 @@ struct DashboardControlPanel: View {
                         .frame(height: 34)
                         .frame(maxWidth: .infinity)
                         .background(
-                            .white.opacity(0.10),
+                            Color.primary.opacity(0.10),
                             in: RoundedRectangle(cornerRadius: 7)
                         )
                 }

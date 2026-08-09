@@ -21,7 +21,6 @@ struct CodexDashboardApp: App {
     var body: some Scene {
         WindowGroup {
             DashboardControlPanel()
-                .preferredColorScheme(.dark)
         }
         .windowResizability(.contentSize)
         .commands {
