@@ -1,9 +1,9 @@
 import CryptoKit
 import Foundation
 
-struct DashboardAdapter: Sendable {
+struct DashboardInjection: Sendable {
     let version: String
-    let expression: String
+    let mountExpression: String
 
     var healthCheckExpression: String {
         """
@@ -15,7 +15,7 @@ struct DashboardAdapter: Sendable {
         """
     }
 
-    static func load(bundle: Bundle? = nil) throws -> DashboardAdapter {
+    static func load(bundle: Bundle? = nil) throws -> DashboardInjection {
         let resourceBundle = bundle ?? defaultResourceBundle
         guard
             let scriptURL = resourceBundle.url(
@@ -40,14 +40,14 @@ struct DashboardAdapter: Sendable {
         guard let encodedCSS = String(data: cssData, encoding: .utf8) else {
             throw DashboardError.missingResources
         }
-        let expression = """
+        let mountExpression = """
         (() => {
           const DASHBOARD_VERSION = \(String(reflecting: version));
           const DASHBOARD_CSS = \(encodedCSS);
           \(script)
         })()
         """
-        return DashboardAdapter(version: version, expression: expression)
+        return DashboardInjection(version: version, mountExpression: mountExpression)
     }
 
     private static var defaultResourceBundle: Bundle {

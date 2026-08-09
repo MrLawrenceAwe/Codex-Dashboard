@@ -9,10 +9,10 @@ Promise.all([
       preview: 'Create an active-thread dashboard embedded directly inside Codex.',
       workspace: 'Codex Dashboard',
       workspacePath: '/Users/lawrenceawe/Codex Dashboard',
-      updatedAt: Math.round(Date.now() / 1000) - 3,
+      updatedAtUnixSeconds: Math.round(Date.now() / 1000) - 3,
       isPinned: true,
       model: 'gpt-5.6-sol',
-      status: 'running',
+      activity: 'running',
       gitStatus: 'modified',
     },
     {
@@ -21,10 +21,10 @@ Promise.all([
       preview: 'Inspect the project for correctness problems and produce actionable findings.',
       workspace: 'voice-tiktok-scroller',
       workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      updatedAt: Math.round(Date.now() / 1000) - 780,
+      updatedAtUnixSeconds: Math.round(Date.now() / 1000) - 780,
       isPinned: false,
       model: 'gpt-5.6-terra',
-      status: 'idle',
+      activity: 'idle',
       gitStatus: 'clean',
     },
     {
@@ -33,14 +33,14 @@ Promise.all([
       preview: 'Improve recognition of the spoken back command.',
       workspace: 'voice-tiktok-scroller',
       workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      updatedAt: Math.round(Date.now() / 1000) - 86400,
+      updatedAtUnixSeconds: Math.round(Date.now() / 1000) - 86400,
       isPinned: false,
       model: 'gpt-5.6-terra',
-      status: 'idle',
+      activity: 'idle',
       gitStatus: 'clean',
     },
   ];
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
-  window.__codexDashboard.update({ threads, totalThreadCount: threads.length });
+  window.__codexDashboard.update({ threads });
   window.__codexDashboard.open();
 });

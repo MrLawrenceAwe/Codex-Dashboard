@@ -1,13 +1,13 @@
 import SwiftUI
 
-struct StatusCard: View {
-    @ObservedObject var controller: DashboardController
+private struct StatusCard: View {
+    @ObservedObject var viewModel: DashboardViewModel
 
     private var statusColor: Color {
-        if controller.state.dashboardIsEnabled {
+        if viewModel.sessionState.dashboardIsMounted {
             return Color(red: 0.45, green: 0.94, blue: 0.61)
         }
-        if controller.state != .hostClosed {
+        if viewModel.sessionState != .appClosed {
             return Color(red: 0.96, green: 0.77, blue: 0.42)
         }
         return .secondary
@@ -20,15 +20,15 @@ struct StatusCard: View {
                 .frame(width: 7, height: 7)
                 .padding(.top, 5)
             VStack(alignment: .leading, spacing: 4) {
-                Text(controller.statusTitle)
+                Text(viewModel.statusTitle)
                     .font(.system(size: 13, weight: .medium))
-                Text(controller.statusDetail)
+                Text(viewModel.statusDetail)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            Button("Refresh") { Task { await controller.refresh() } }
+            Button("Refresh") { Task { await viewModel.refresh() } }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11, weight: .medium))
         }
@@ -38,8 +38,8 @@ struct StatusCard: View {
     }
 }
 
-struct DashboardControlView: View {
-    @StateObject private var controller = DashboardController()
+struct DashboardControlPanel: View {
+    @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -53,25 +53,25 @@ struct DashboardControlView: View {
                 }
                 .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Local UI layer")
+                    Text("Thread dashboard controller")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                     Text("Codex Dashboard")
                         .font(.system(size: 24, weight: .semibold))
                         .tracking(-0.5)
-                    Text("Active threads, built into your local Codex app.")
+                    Text("Recent threads, built into your local Codex app.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
             }
 
-            StatusCard(controller: controller)
+            StatusCard(viewModel: viewModel)
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await controller.restartCodexAndEnableDashboard() }
+                    Task { await viewModel.restartAndEnableDashboard() }
                 } label: {
-                    Text("Restart Codex & Enable Dashboard")
+                    Text("Restart & Enable Dashboard")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 15)
                         .frame(height: 34)
@@ -82,26 +82,26 @@ struct DashboardControlView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .disabled(controller.isBusy)
+                .disabled(viewModel.isPerformingAction)
 
-                Button("Open Dashboard") { Task { await controller.openDashboard() } }
-                    .disabled(!controller.state.dashboardIsEnabled || controller.isBusy)
+                Button("Open Dashboard") { Task { await viewModel.openDashboard() } }
+                    .disabled(!viewModel.sessionState.dashboardIsMounted || viewModel.isPerformingAction)
 
-                Button("Disable Dashboard") { Task { await controller.disableDashboard() } }
-                    .disabled(!controller.state.hostIsConnected || controller.isBusy)
+                Button("Disable Dashboard") { Task { await viewModel.disableDashboard() } }
+                    .disabled(!viewModel.sessionState.bridgeIsConnected || viewModel.isPerformingAction)
             }
             .controlSize(.large)
 
-            if controller.state.errorMessage != nil || controller.dataWarning != nil {
+            if viewModel.sessionState.errorMessage != nil || viewModel.dataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let error = controller.state.errorMessage { Text(error) }
-                    if let warning = controller.dataWarning { Text(warning) }
+                    if let error = viewModel.sessionState.errorMessage { Text(error) }
+                    if let warning = viewModel.dataWarning { Text(warning) }
                 }
                 .font(.system(size: 12))
                 .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
 
             Text("The dashboard reads local Codex thread metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")

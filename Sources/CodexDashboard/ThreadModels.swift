@@ -1,13 +1,6 @@
 import Foundation
 
-struct DevToolsTarget: Decodable, Identifiable, Sendable {
-    let id: String
-    let type: String
-    let url: String?
-    let webSocketDebuggerUrl: String?
-}
-
-enum ThreadActivityStatus: String, Codable, Equatable, Sendable {
+enum ThreadActivity: String, Codable, Equatable, Sendable {
     case running
     case idle
 }
@@ -24,10 +17,10 @@ struct DashboardThread: Codable, Equatable, Identifiable, Sendable {
     let preview: String
     let workspace: String
     let workspacePath: String
-    let updatedAt: Int64
+    let updatedAtUnixSeconds: Int64
     let isPinned: Bool
     let model: String?
-    let status: ThreadActivityStatus
+    let activity: ThreadActivity
     let gitStatus: WorkspaceGitStatus
 }
 
@@ -38,5 +31,4 @@ struct ThreadSnapshot: Sendable {
 
 struct DashboardPayload: Codable, Equatable, Sendable {
     let threads: [DashboardThread]
-    let totalThreadCount: Int
 }
