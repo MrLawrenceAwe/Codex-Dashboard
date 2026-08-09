@@ -39,6 +39,7 @@ removes it.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter mirror Codex's own sidebar read state.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the Uncommitted filter isolates those projects.
+- The composer’s **Add** menu includes a local **Prompts** library. Saved prompts can be created, edited, deleted, and inserted into the current chat without leaving Codex.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
