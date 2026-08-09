@@ -138,7 +138,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "1")
     }
 
-    func testRunningSpinnersShowGlobalAndProjectCounts() async throws {
+    func testRunningThreadsUseCompactSummaryAndAreNotDuplicatedInMainList() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -198,10 +198,10 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 document.querySelector('[data-running-count]').textContent,
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
-                [...document.querySelectorAll('.dashboard-project-summary .dashboard-running-spinner')]
-                  .map((spinner) => spinner.textContent),
-                [...document.querySelectorAll('.dashboard-project-summary .dashboard-running-spinner')]
-                  .map((spinner) => spinner.getAttribute('aria-label')),
+                document.querySelectorAll('[data-running-list] .dashboard-thread.is-compact').length,
+                [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                  .map((thread) => thread.dataset.threadId),
+                document.querySelector('[data-running-list] .dashboard-thread p') === null,
               ];
             })()
             """
@@ -210,8 +210,53 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[0] as? String, "3")
         XCTAssertEqual(values[1] as? String, "3")
         XCTAssertEqual(values[2] as? String, "3 running threads")
-        XCTAssertEqual(values[3] as? [String], ["2", "1"])
-        XCTAssertEqual(values[4] as? [String], ["2 running threads", "1 running thread"])
+        XCTAssertEqual(values[3] as? Int, 3)
+        XCTAssertEqual(values[4] as? [String], ["project-a-idle"])
+        XCTAssertEqual(values[5] as? Bool, true)
+    }
+
+    func testThreadRowOpensFromPointerOrKeyboardTarget() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread-one">Thread</button>
+              </aside>
+              <main>Conversation surface</main>
+              <script>
+                document.documentElement.dataset.openCount = '0';
+                document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', () => {
+                  document.documentElement.dataset.openCount = String(
+                    Number(document.documentElement.dataset.openCount) + 1
+                  );
+                });
+              </script>
+            </body></html>
+            """,
+        )
+        let thread = ThreadSummary.fixture(id: "thread-one", title: "Keyboard target")
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [thread])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const row = document.querySelector('[data-thread-list] .dashboard-thread');
+              const contract = [row.getAttribute('role'), row.getAttribute('tabindex'), row.getAttribute('aria-label')];
+              row.click();
+              window.__codexDashboard.open();
+              document.querySelector('[data-thread-list] .dashboard-thread')
+                .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+              return [contract, document.documentElement.dataset.openCount];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["button", "0", "Open thread: Keyboard target"])
+        XCTAssertEqual(values[1] as? String, "2")
     }
 
 }

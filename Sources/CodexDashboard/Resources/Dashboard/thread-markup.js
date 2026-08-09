@@ -22,26 +22,26 @@ const threadMarkup = (() => {
     return `${Math.floor(hours / 24)}d ago`;
   }
 
-  function thread(thread, { showProject = false, isUnread = false } = {}) {
+  function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
+    const openLabel = `Open thread: ${thread.title}`;
     return `
-      <article class="dashboard-thread" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}">
-        <div class="dashboard-status-dot" title="${dashboardDOM.escapeHTML(thread.runState)}"></div>
+      <article class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}" role="button" tabindex="0" aria-label="${dashboardDOM.escapeHTML(openLabel)}">
         <div class="dashboard-thread-copy">
           <div class="dashboard-thread-title-row">
             ${isUnread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
             <h2>${dashboardDOM.escapeHTML(thread.title)}</h2>
             ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${icon('pin')}</span>` : ''}
           </div>
-          <p>${dashboardDOM.escapeHTML(thread.preview || 'No preview available')}</p>
+          ${compact ? '' : `<p>${dashboardDOM.escapeHTML(thread.preview || 'No preview available')}</p>`}
           <div class="dashboard-meta">
             ${showProject ? `<span>${dashboardDOM.escapeHTML(thread.projectName)}</span>` : ''}
             <span>${formatRelativeTime(thread.recencyTimestamp)}</span>
-            ${thread.model ? `<span>${dashboardDOM.escapeHTML(thread.model)}</span>` : ''}
+            ${!compact && thread.model ? `<span>${dashboardDOM.escapeHTML(thread.model)}</span>` : ''}
           </div>
         </div>
         <div class="dashboard-thread-actions">
-          ${thread.runState === 'running' ? '<span class="dashboard-running-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
-          <button type="button" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}">Open ${icon('arrow')}</button>
+          ${thread.runState === 'running' ? '<span class="dashboard-run-label" role="status">Running</span>' : ''}
+          <span class="dashboard-open-affordance" aria-hidden="true">Open ${icon('arrow')}</span>
         </div>
       </article>`;
   }
@@ -64,7 +64,6 @@ const threadMarkup = (() => {
     return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjects.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
-      const runningCount = projectThreads.filter((item) => item.runState === 'running').length;
       return `
       <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${dashboardDOM.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
@@ -72,11 +71,13 @@ const threadMarkup = (() => {
             <span class="dashboard-project-title">
               <span class="dashboard-project-chevron">${icon('chevron')}</span>
               <span class="dashboard-project-icon">${icon('project')}</span>
-              <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project)}</span>
-              ${projectThreads.some((item) => item.workingTreeStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${icon('gitChanges')}<span>Uncommitted</span></span>` : ''}
+              <span class="dashboard-project-copy">
+                <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project)}</span>
+                <span class="dashboard-project-path">${dashboardDOM.escapeHTML(projectPath)}</span>
+              </span>
+              ${projectThreads.some((item) => item.workingTreeStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${icon('gitChanges')}<span>Changed</span></span>` : ''}
             </span>
             <span class="dashboard-project-summary">
-              ${runningCount > 0 ? `<span class="dashboard-running-spinner has-count" role="status" aria-label="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}" title="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}"><span aria-hidden="true">${runningCount}</span></span>` : ''}
               <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
             </span>
           </button>

@@ -103,8 +103,10 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
-              const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');
-              visibleThreads[0].querySelector('[data-open-thread]').click();
+              const visibleThreads = document.querySelectorAll(
+                '[data-thread-list] .dashboard-thread, [data-running-list] .dashboard-thread'
+              );
+              visibleThreads[0].click();
               return [
                 Boolean(document.getElementById('codex-dashboard-navigation')),
                 visibleThreads.length,
