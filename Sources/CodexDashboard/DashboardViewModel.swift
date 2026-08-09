@@ -113,7 +113,7 @@ final class DashboardViewModel: ObservableObject {
     func restartAndEnableDashboard() async {
         guard !isPerformingAction, let hostSession else { return }
         isPerformingAction = true
-        hostSession.stopMaintainingDashboard()
+        hostSession.prepareForRestart()
         sessionState = .checking
         defer { isPerformingAction = false }
         await cancelRefresh()
@@ -123,7 +123,6 @@ final class DashboardViewModel: ObservableObject {
             let targets = try await hostSession.restartApplication()
             bridgeConnected = true
             try await refreshThreadSnapshot()
-            hostSession.resumeMaintainingDashboard()
             try await hostSession.mountDashboard(
                 with: DashboardPayload(threads: threads),
                 on: targets,
@@ -217,7 +216,10 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func refreshThreadSnapshot() async throws {
-        let snapshot = try await threadRepository.loadSnapshot(gitStatuses: gitStatuses)
+        let snapshot = try await threadRepository.loadSnapshot(
+            gitStatuses: gitStatuses,
+            activeApplicationLaunchDate: hostSession?.applicationLaunchDate
+        )
         guard !Task.isCancelled else { return }
         threads = snapshot.threads
         totalThreadCount = snapshot.totalThreadCount

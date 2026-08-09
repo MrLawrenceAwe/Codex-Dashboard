@@ -33,7 +33,7 @@ removes it.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools bridge managed by `CodexHostSession`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
-- Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files.
+- Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run on a fixed two-second cadence; Git status enrichment refreshes independently every ten seconds.
 - Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The dashboard loads the latest 60; search and filters apply to the loaded set.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
