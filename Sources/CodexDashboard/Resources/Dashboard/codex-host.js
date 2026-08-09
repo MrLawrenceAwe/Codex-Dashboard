@@ -23,6 +23,10 @@ const codexHost = {
     return codexContracts.threadReadStates();
   },
 
+  canSelectThread(thread) {
+    return Boolean(codexContracts.threadRow(thread.id));
+  },
+
   navigateToThread(thread) {
     const sidebarThreadButton = codexContracts.threadRow(thread.id);
     if (sidebarThreadButton) {
@@ -36,5 +40,41 @@ const codexHost = {
       },
       source: null,
     }));
+  },
+
+  async openCommitOrPush(thread) {
+    const waitFor = async (value, timeout = 3000) => {
+      const deadline = performance.now() + timeout;
+      while (performance.now() < deadline) {
+        const result = value();
+        if (result) return result;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return null;
+    };
+
+    this.navigateToThread(thread);
+    const selected = await waitFor(() => codexContracts.isThreadSelected(thread.id), 5000);
+    if (!selected) return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    if (await codexContracts.dispatchCommand('git.commit')) return true;
+
+    let commitButton = await waitFor(() => codexContracts.commitOrPushButton(), 250);
+    if (!commitButton) {
+      let environmentToggle = codexContracts.environmentToggle();
+      if (!environmentToggle) {
+        codexContracts.sidePanelToggle()?.click();
+        environmentToggle = await waitFor(() => codexContracts.environmentToggle());
+      }
+      if (!environmentToggle) return false;
+      if (environmentToggle.getAttribute('aria-expanded') !== 'true') {
+        environmentToggle.click();
+      }
+      commitButton = await waitFor(() => codexContracts.commitOrPushButton());
+    }
+    if (!commitButton || commitButton.disabled) return false;
+    commitButton.click();
+    return true;
   },
 };

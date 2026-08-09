@@ -76,6 +76,17 @@ struct RendererCompatibilityChecker {
             failureDetail: "The Prompts control is not mounted beside the composer Add button.",
             in: target
         ))
+        checks.append(await inspect(
+            id: "commit-push-handoff",
+            title: "Commit or push handoff",
+            expression: contractExpression(
+                "codexContracts.canDispatchCommand().then((available) => Boolean(available || codexContracts.commitOrPushButton() || codexContracts.sidePanelToggle()))"
+            ),
+            failureStatus: .warning,
+            compatibleDetail: "Codex exposes its native Git command or project side panel for Commit or push handoff.",
+            failureDetail: "The native Codex Git command and project side-panel controls were not found.",
+            in: target
+        ))
         return checks
     }
 

@@ -14,6 +14,12 @@ const codexContracts = (() => {
     'button[data-testid="composer-attachment-button"]',
   ];
 
+  function isVisible(element) {
+    if (!element || element.getClientRects().length === 0) return false;
+    const style = getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
   function sidebar() {
     return document.querySelector('aside.app-shell-left-panel, aside');
   }
@@ -30,6 +36,10 @@ const codexContracts = (() => {
     return document.querySelector(
       `[data-app-action-sidebar-thread-id="${CSS.escape(`local:${threadID}`)}"]`,
     );
+  }
+
+  function isThreadSelected(threadID) {
+    return threadRow(threadID)?.getAttribute('aria-current') === 'page';
   }
 
   function threadReadStates() {
@@ -73,13 +83,70 @@ const codexContracts = (() => {
     return null;
   }
 
+  function sidePanelToggle() {
+    return [...document.querySelectorAll('button[aria-label="Toggle side panel"]')]
+      .find(isVisible) || null;
+  }
+
+  function environmentToggle() {
+    return [...document.querySelectorAll('button')].find((button) => (
+      isVisible(button)
+        && button.textContent.trim() === 'Environment'
+        && button.hasAttribute('aria-expanded')
+    )) || null;
+  }
+
+  function commitOrPushButton() {
+    return [...document.querySelectorAll('button[data-slot="thread-summary-panel-item-button"]')]
+      .find((button) => isVisible(button) && button.textContent.trim() === 'Commit or push') || null;
+  }
+
+  function commandModuleURL() {
+    return document.querySelector(
+      'link[rel="modulepreload"][href*="/assets/app-initial-"][href$=".js"]',
+    )?.href || null;
+  }
+
+  async function commandDispatcher() {
+    let dispatcher = window.__codexDashboardCommandDispatcher;
+    if (typeof dispatcher !== 'function') {
+      const moduleURL = commandModuleURL();
+      if (!moduleURL) return null;
+      try {
+        const appModule = await import(moduleURL);
+        dispatcher = Object.values(appModule).find((candidate) => (
+          typeof candidate === 'function' && candidate.name === 'xM' && candidate.length === 3
+        )) || appModule.k8;
+      } catch (_) {
+        return null;
+      }
+    }
+    return typeof dispatcher === 'function' ? dispatcher : null;
+  }
+
+  async function canDispatchCommand() {
+    return Boolean(await commandDispatcher());
+  }
+
+  async function dispatchCommand(commandID) {
+    const dispatcher = await commandDispatcher();
+    return dispatcher?.(commandID, 'codex_dashboard') === true;
+  }
+
   return {
     sidebar,
     navigation,
     threadRows,
     threadRow,
+    isThreadSelected,
     threadReadStates,
     composer,
     composerAddButton,
+    sidePanelToggle,
+    environmentToggle,
+    commitOrPushButton,
+    commandModuleURL,
+    canDispatchCommand,
+    dispatchCommand,
   };
 })();
