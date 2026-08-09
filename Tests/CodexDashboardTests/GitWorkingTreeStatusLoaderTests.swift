@@ -37,4 +37,15 @@ final class GitWorkingTreeStatusLoaderTests: XCTestCase {
         let statuses = await GitWorkingTreeStatusLoader().load(at: [directory.path])
         XCTAssertEqual(statuses[directory.path], .notRepository)
     }
+
+    func testChecksEveryPathAcrossConcurrencyBatches() async {
+        let paths = Set((0..<14).map { index in
+            "/tmp/codex-dashboard-missing-\(index)-\(UUID().uuidString)"
+        })
+
+        let statuses = await GitWorkingTreeStatusLoader().load(at: paths)
+
+        XCTAssertEqual(statuses.count, paths.count)
+        XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })
+    }
 }

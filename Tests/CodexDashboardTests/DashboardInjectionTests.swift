@@ -197,7 +197,7 @@ final class DashboardInjectionTests: XCTestCase {
               </main>
             </body></html>
             """,
-            baseURL: nil
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
         )
         try await waitUntilLoaded(webView)
         _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
@@ -336,7 +336,7 @@ final class DashboardInjectionTests: XCTestCase {
               </main>
             </body></html>
             """,
-            baseURL: nil
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
         )
         try await waitUntilLoaded(webView)
         _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
@@ -371,6 +371,73 @@ final class DashboardInjectionTests: XCTestCase {
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? String, "auto")
         XCTAssertEqual(values[3] as? String, "0")
+        XCTAssertEqual(values[4] as? Bool, true)
+    }
+
+    func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>
+                <div data-composer-overlay-floating-ui="true" aria-label="Add">
+                  <button data-list-navigation-item="true"><span>Record a skill</span></button>
+                </div>
+                <textarea placeholder="Do anything"></textarea>
+              </main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
+        )
+        try await waitUntilLoaded(webView)
+        _ = try? await webView.evaluateJavaScript("try { localStorage.clear(); true } catch (_) { false }")
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
+              menuItem.focus();
+              menuItem.click();
+              const lastButton = document.querySelector('[data-prompt-new-section]');
+              lastButton.focus();
+              lastButton.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Tab', bubbles: true, cancelable: true,
+              }));
+              const tabWrapped = document.activeElement.matches('[data-prompt-close]');
+
+              document.querySelector('textarea[placeholder="Do anything"]').focus();
+              document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape', bubbles: true, cancelable: true,
+              }));
+              const escapeClosedFromOutside = !document.getElementById('codex-dashboard-prompt-dialog');
+
+              menuItem.click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Unsaved prompt';
+              document.querySelector('[name="content"]').value = 'This must not appear as saved.';
+              const originalSetItem = Storage.prototype.setItem;
+              Storage.prototype.setItem = function setItem() { throw new Error('storage unavailable'); };
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              Storage.prototype.setItem = originalSetItem;
+              return [
+                tabWrapped,
+                escapeClosedFromOutside,
+                Boolean(document.querySelector('[data-prompt-form]')),
+                !document.querySelector('[data-prompt-storage-error]').hidden,
+                !document.querySelector('[data-prompt-use]'),
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertEqual(values[4] as? Bool, true)
     }
 

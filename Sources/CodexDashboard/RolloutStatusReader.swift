@@ -20,7 +20,14 @@ struct RolloutStatusReader {
         let payload: Payload?
     }
 
-    private var cache: [String: (size: UInt64, modifiedAt: Date, status: RolloutStatus)] = [:]
+    private struct CacheEntry {
+        let size: UInt64
+        let modifiedAt: Date
+        let endsWithNewline: Bool
+        let status: RolloutStatus
+    }
+
+    private var cache: [String: CacheEntry] = [:]
 
     mutating func load(
         at path: String,
@@ -38,10 +45,30 @@ struct RolloutStatusReader {
         let status: RolloutStatus
         if let cached = cache[path], cached.size == size, cached.modifiedAt == modifiedAt {
             status = cached.status
+        } else if
+            let cached = cache[path],
+            cached.size < size,
+            cached.endsWithNewline
+        {
+            let appendedStatus = read(
+                in: fileURL,
+                lowerBound: cached.size,
+                fallbackActivity: cached.status.activity
+            )
+            status = RolloutStatus(
+                activity: appendedStatus.activity,
+                lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
+                    ?? cached.status.lastFinalResponseAtUnixSeconds
+            )
         } else {
             status = read(in: fileURL)
-            cache[path] = (size, modifiedAt, status)
         }
+        cache[path] = CacheEntry(
+            size: size,
+            modifiedAt: modifiedAt,
+            endsWithNewline: fileEndsWithNewline(fileURL, size: size),
+            status: status
+        )
 
         guard let activeApplicationLaunchDate, modifiedAt >= activeApplicationLaunchDate else {
             return RolloutStatus(
@@ -52,7 +79,11 @@ struct RolloutStatusReader {
         return status
     }
 
-    private func read(in fileURL: URL) -> RolloutStatus {
+    private func read(
+        in fileURL: URL,
+        lowerBound: UInt64 = 0,
+        fallbackActivity: ThreadActivity = .idle
+    ) -> RolloutStatus {
         let markers: [(event: ActivityEvent, data: Data)] = [
             (.started, Data(#""type":"task_started""#.utf8)),
             (.ended, Data(#""type":"task_complete""#.utf8)),
@@ -73,8 +104,8 @@ struct RolloutStatusReader {
         var lastEvent: ActivityEvent?
         var lastFinalResponseAtUnixSeconds: Int64?
 
-        while cursor > 0 {
-            let bytesToRead = min(chunkSize, cursor)
+        while cursor > lowerBound {
+            let bytesToRead = min(chunkSize, cursor - lowerBound)
             cursor -= bytesToRead
             do {
                 try handle.seek(toOffset: cursor)
@@ -97,7 +128,7 @@ struct RolloutStatusReader {
                 }
                 if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
 
-                if cursor == 0 {
+                if cursor == lowerBound {
                     inspect(
                         data[..<lineEnd],
                         markers: markers,
@@ -114,9 +145,23 @@ struct RolloutStatusReader {
             }
         }
         return RolloutStatus(
-            activity: lastEvent == .started ? .running : .idle,
+            activity: lastEvent.map { $0 == .started ? .running : .idle }
+                ?? fallbackActivity,
             lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
         )
+    }
+
+    private func fileEndsWithNewline(_ fileURL: URL, size: UInt64) -> Bool {
+        guard size > 0, let handle = try? FileHandle(forReadingFrom: fileURL) else {
+            return false
+        }
+        defer { try? handle.close() }
+        do {
+            try handle.seek(toOffset: size - 1)
+            return try handle.read(upToCount: 1)?.first == UInt8(ascii: "\n")
+        } catch {
+            return false
+        }
     }
 
     private func inspect(

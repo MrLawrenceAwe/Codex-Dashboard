@@ -6,6 +6,7 @@ let promptMenuSyncQueued = false;
 let promptEditorState = { mode: 'list' };
 let draggedPromptID;
 let collapsedPromptSections = loadCollapsedPromptSections();
+let promptDialogReturnFocus;
 
 function normalizePromptSection(value) {
   return String(value || '').trim() || 'General';
@@ -51,38 +52,45 @@ function loadSavedPromptSections() {
   ])];
 }
 
-function persistSavedPromptSections() {
+function showPromptStorageError() {
+  const error = document.querySelector('[data-prompt-storage-error]');
+  if (error) error.hidden = false;
+}
+
+function persistSavedPromptSections(sections = savedPromptSections) {
   try {
-    localStorage.setItem(savedPromptSectionsStorageKey, JSON.stringify(savedPromptSections));
+    localStorage.setItem(savedPromptSectionsStorageKey, JSON.stringify(sections));
+    return true;
   } catch (_) {
-    // Section editing remains usable for the current renderer session if storage is unavailable.
+    showPromptStorageError();
+    return false;
   }
 }
 
-function ensureSavedPromptSection(section) {
+function resolveSavedPromptSection(section) {
   const normalizedSection = normalizePromptSection(section);
   const existingSection = savedPromptSections.find(
     (item) => item.localeCompare(normalizedSection, undefined, { sensitivity: 'accent' }) === 0,
   );
-  if (existingSection) return existingSection;
-  savedPromptSections = [...savedPromptSections, normalizedSection];
-  persistSavedPromptSections();
-  return normalizedSection;
+  return existingSection || normalizedSection;
 }
 
-function persistCollapsedPromptSections() {
+function persistCollapsedPromptSections(sections = collapsedPromptSections) {
   try {
-    localStorage.setItem(promptSectionStorageKey, JSON.stringify([...collapsedPromptSections]));
+    localStorage.setItem(promptSectionStorageKey, JSON.stringify([...sections]));
+    return true;
   } catch (_) {
-    // Section state remains usable for the current renderer session if storage is unavailable.
+    return false;
   }
 }
 
-function persistSavedPrompts() {
+function persistSavedPrompts(prompts = savedPrompts) {
   try {
-    localStorage.setItem(promptStorageKey, JSON.stringify(savedPrompts));
+    localStorage.setItem(promptStorageKey, JSON.stringify(prompts));
+    return true;
   } catch (_) {
-    // Prompt editing remains usable for the current renderer session if storage is unavailable.
+    showPromptStorageError();
+    return false;
   }
 }
 
@@ -200,6 +208,7 @@ function createPromptDialog() {
         </div>
         <button type="button" class="dashboard-prompt-icon-button" data-prompt-close aria-label="Close prompts">×</button>
       </header>
+      <p class="dashboard-prompt-storage-error" data-prompt-storage-error role="alert" hidden>Could not save this prompt change. Reloading Codex will restore the last successfully saved version.</p>
       <div data-prompt-content></div>
     </section>`;
   return dialog;
@@ -289,15 +298,21 @@ function renderPromptLibrary() {
 
 function openPromptLibrary() {
   document.getElementById(elementIDs.promptDialog)?.remove();
+  promptDialogReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : undefined;
   promptEditorState = { mode: 'list' };
   const dialog = createPromptDialog();
   document.body.append(dialog);
   renderPromptLibrary();
 }
 
-function closePromptLibrary() {
+function closePromptLibrary({ restoreFocus = true } = {}) {
   promptEditorState = { mode: 'list' };
   document.getElementById(elementIDs.promptDialog)?.remove();
+  const returnFocus = promptDialogReturnFocus;
+  promptDialogReturnFocus = undefined;
+  if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
 }
 
 function findComposer() {
@@ -351,20 +366,25 @@ function savePrompt(form) {
   const name = String(values.get('name') || '').trim();
   const content = String(values.get('content') || '').trim();
   if (!name || !content) return;
-  const section = ensureSavedPromptSection(values.get('section'));
+  const section = resolveSavedPromptSection(values.get('section'));
+  let nextPrompts;
   if (promptEditorState.mode === 'edit') {
-    savedPrompts = savedPrompts.map((prompt) => (
+    nextPrompts = savedPrompts.map((prompt) => (
       prompt.id === promptEditorState.promptID ? { ...prompt, name, section, content } : prompt
     ));
   } else {
-    savedPrompts = [...savedPrompts, {
+    nextPrompts = [...savedPrompts, {
       id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
       name,
       section,
       content,
     }];
   }
-  persistSavedPrompts();
+  if (!persistSavedPrompts(nextPrompts)) return;
+  savedPrompts = nextPrompts;
+  if (!savedPromptSections.includes(section)) {
+    savedPromptSections = [...savedPromptSections, section];
+  }
   promptEditorState = { mode: 'list' };
   renderPromptLibrary();
 }
@@ -373,9 +393,16 @@ function savePromptSection(form) {
   const values = new FormData(form);
   const name = String(values.get('sectionName') || '').trim();
   if (!name) return;
-  const section = ensureSavedPromptSection(name);
-  collapsedPromptSections.delete(section);
-  persistCollapsedPromptSections();
+  const section = resolveSavedPromptSection(name);
+  const nextSections = savedPromptSections.includes(section)
+    ? savedPromptSections
+    : [...savedPromptSections, section];
+  if (!persistSavedPromptSections(nextSections)) return;
+  savedPromptSections = nextSections;
+  const nextCollapsedSections = new Set(collapsedPromptSections);
+  nextCollapsedSections.delete(section);
+  persistCollapsedPromptSections(nextCollapsedSections);
+  collapsedPromptSections = nextCollapsedSections;
   promptEditorState = { mode: 'list' };
   renderPromptLibrary();
   [...document.querySelectorAll('[data-prompt-section-toggle]')]
@@ -417,8 +444,8 @@ function movePromptFromDrop(destination, dropAfter) {
     ), remainingPrompts.length);
   }
   remainingPrompts.splice(insertionIndex, 0, movedPrompt);
+  if (!persistSavedPrompts(remainingPrompts)) return false;
   savedPrompts = remainingPrompts;
-  persistSavedPrompts();
   return true;
 }
 
@@ -484,12 +511,31 @@ function handlePromptInteraction(event) {
     openPromptLibrary();
     return;
   }
+  if (
+    event.type === 'keydown'
+      && event.key === 'Escape'
+      && document.getElementById(elementIDs.promptDialog)
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closePromptLibrary();
+    return;
+  }
   const dialog = target?.closest(`#${elementIDs.promptDialog}`);
   if (!dialog) return;
   if (handlePromptDrag(event, target, dialog)) return;
-  if (event.type === 'keydown' && event.key === 'Escape') {
-    event.preventDefault();
-    closePromptLibrary();
+  if (event.type === 'keydown' && event.key === 'Tab') {
+    const focusable = [...dialog.querySelectorAll('button, input, textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter((element) => !element.disabled && element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (first && last && event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (first && last && !event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
     return;
   }
   if (event.type === 'submit') {
@@ -531,8 +577,9 @@ function handlePromptInteraction(event) {
     renderPromptLibrary();
   } else if (target.closest('[data-prompt-delete-confirm]')) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
-    savedPrompts = savedPrompts.filter((prompt) => prompt.id !== id);
-    persistSavedPrompts();
+    const nextPrompts = savedPrompts.filter((prompt) => prompt.id !== id);
+    if (!persistSavedPrompts(nextPrompts)) return;
+    savedPrompts = nextPrompts;
     renderPromptLibrary();
   } else if (target.closest('[data-prompt-delete]')) {
     const button = target.closest('[data-prompt-delete]');
@@ -542,6 +589,8 @@ function handlePromptInteraction(event) {
   } else if (target.closest('[data-prompt-use]')) {
     const id = target.closest('[data-prompt-use]').dataset.promptUse;
     const prompt = savedPrompts.find((item) => item.id === id);
-    if (prompt && insertPromptIntoComposer(prompt.content)) closePromptLibrary();
+    if (prompt && insertPromptIntoComposer(prompt.content)) {
+      closePromptLibrary({ restoreFocus: false });
+    }
   }
 }
