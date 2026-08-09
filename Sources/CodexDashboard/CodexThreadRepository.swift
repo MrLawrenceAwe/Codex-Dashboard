@@ -141,7 +141,6 @@ actor CodexThreadRepository {
         ]
         let finalResponseMarker = Data(#""phase":"final_answer""#.utf8)
         let timestampMarker = Data(#""timestamp":""#.utf8)
-        let overlapSize = max(markers.map(\.data.count).max() ?? 1, finalResponseMarker.count) - 1
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
@@ -151,7 +150,7 @@ actor CodexThreadRepository {
         guard var cursor = try? handle.seekToEnd() else {
             return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
-        var laterOverlap = Data()
+        var laterLineFragment = Data()
         var lastEvent: ActivityEvent?
         var lastFinalResponseAtUnixSeconds: Int64?
 
@@ -161,38 +160,36 @@ actor CodexThreadRepository {
             do {
                 try handle.seek(toOffset: cursor)
                 guard var data = try handle.read(upToCount: Int(bytesToRead)) else { break }
-                data.append(laterOverlap)
+                data.append(laterLineFragment)
 
-                let matches = markers.compactMap { marker -> (ActivityEvent, Data.Index)? in
-                    guard let range = data.range(of: marker.data, options: .backwards) else {
-                        return nil
-                    }
-                    return (marker.event, range.lowerBound)
-                }
-                if lastEvent == nil {
-                    lastEvent = matches.max { $0.1 < $1.1 }?.0
-                }
-                if lastFinalResponseAtUnixSeconds == nil,
-                   let finalRange = data.range(of: finalResponseMarker, options: .backwards) {
-                    let lineStart = data[..<finalRange.lowerBound].lastIndex(of: UInt8(ascii: "\n"))
-                        .map { data.index(after: $0) } ?? data.startIndex
-                    let lineEnd = data[finalRange.upperBound...].firstIndex(of: UInt8(ascii: "\n"))
-                        ?? data.endIndex
-                    guard let timestampRange = data[lineStart..<lineEnd].range(of: timestampMarker)
-                    else {
-                        laterOverlap = Data(data.prefix(overlapSize))
-                        continue
-                    }
-                    let valueStart = timestampRange.upperBound
-                    if let valueEnd = data[valueStart...].firstIndex(of: UInt8(ascii: "\"")),
-                       let timestamp = String(data: data[valueStart..<valueEnd], encoding: .utf8),
-                       let date = ISO8601DateFormatter().date(from: timestamp) {
-                        lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
-                    }
+                var lineEnd = data.endIndex
+                while let newline = data[..<lineEnd].lastIndex(of: UInt8(ascii: "\n")) {
+                    let lineStart = data.index(after: newline)
+                    inspectRolloutLine(
+                        data[lineStart..<lineEnd],
+                        markers: markers,
+                        finalResponseMarker: finalResponseMarker,
+                        timestampMarker: timestampMarker,
+                        lastEvent: &lastEvent,
+                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
+                    )
+                    lineEnd = newline
+                    if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
                 }
                 if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
 
-                laterOverlap = Data(data.prefix(overlapSize))
+                if cursor == 0 {
+                    inspectRolloutLine(
+                        data[..<lineEnd],
+                        markers: markers,
+                        finalResponseMarker: finalResponseMarker,
+                        timestampMarker: timestampMarker,
+                        lastEvent: &lastEvent,
+                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
+                    )
+                } else {
+                    laterLineFragment = Data(data[..<lineEnd])
+                }
             } catch {
                 break
             }
@@ -201,6 +198,39 @@ actor CodexThreadRepository {
             activity: lastEvent == .started ? .running : .idle,
             lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
         )
+    }
+
+    private func inspectRolloutLine(
+        _ line: Data.SubSequence,
+        markers: [(event: ActivityEvent, data: Data)],
+        finalResponseMarker: Data,
+        timestampMarker: Data,
+        lastEvent: inout ActivityEvent?,
+        lastFinalResponseAtUnixSeconds: inout Int64?
+    ) {
+        if lastEvent == nil {
+            let matches = markers.compactMap { marker -> (ActivityEvent, Data.Index)? in
+                guard let range = line.range(of: marker.data, options: .backwards) else {
+                    return nil
+                }
+                return (marker.event, range.lowerBound)
+            }
+            lastEvent = matches.max { $0.1 < $1.1 }?.0
+        }
+
+        guard
+            lastFinalResponseAtUnixSeconds == nil,
+            line.range(of: finalResponseMarker) != nil,
+            let timestampRange = line.range(of: timestampMarker)
+        else { return }
+
+        let valueStart = timestampRange.upperBound
+        guard
+            let valueEnd = line[valueStart...].firstIndex(of: UInt8(ascii: "\"")),
+            let timestamp = String(data: line[valueStart..<valueEnd], encoding: .utf8),
+            let date = ISO8601DateFormatter().date(from: timestamp)
+        else { return }
+        lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {

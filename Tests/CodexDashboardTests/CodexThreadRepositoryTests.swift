@@ -80,6 +80,24 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 1_200)
     }
 
+    func testReadsFinalResponseTimestampAcrossChunkBoundaries() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
+            now: now,
+            runningFinalResponseAtUnixSeconds: now - 90,
+            runningFinalResponseMessageSize: 128 * 1_024,
+            testCase: self
+        )
+        let snapshot = try await CodexThreadRepository(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
+
+        XCTAssertEqual(
+            snapshot.threads.first { $0.id == "running" }?.updatedAtUnixSeconds,
+            now - 90
+        )
+    }
+
     func testAbortedTurnIsIdle() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
