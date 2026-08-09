@@ -52,10 +52,11 @@ enum TestDatabaseFactory {
         now: Int64,
         additionalThreadCount: Int = 0,
         runningWorkspacePath: String = "/tmp/running",
+        runningLifecycleEvents: [String] = ["task_complete", "task_started"],
         testCase: XCTestCase
     ) throws -> URL {
         let runningRollout = try makeRollout(
-            lifecycleEvents: ["task_complete", "task_started"],
+            lifecycleEvents: runningLifecycleEvents,
             testCase: testCase
         )
         let completedRollout = try makeRollout(

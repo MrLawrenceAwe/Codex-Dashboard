@@ -38,7 +38,7 @@ removes it.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files.
 - Threads are ordered by their last update. The dashboard loads the latest 60; search and filters apply to the loaded set.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
-- Completed responses receive an unread dot until their thread is opened from the dashboard or Codex sidebar.
+- Completed responses receive an unread dot until their thread is opened from the dashboard or Codex sidebar, and the Unread filter collects them in one view.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
