@@ -86,7 +86,6 @@ function renderDialog() {
       </button>
       <div class="dashboard-prompt-row-actions">
         <button type="button" data-prompt-edit="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Edit ${dashboardDOM.escapeHTML(prompt.name)}">Edit</button>
-        <button type="button" data-prompt-duplicate="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Duplicate ${dashboardDOM.escapeHTML(prompt.name)}">Duplicate</button>
         <button type="button" data-prompt-delete="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Delete ${dashboardDOM.escapeHTML(prompt.name)}">Delete</button>
       </div>
     </article>`).join('');
@@ -302,20 +301,6 @@ function handlePromptClick(target) {
       mode: 'edit',
       promptID: target.closest('[data-prompt-edit]').dataset.promptEdit,
     };
-    renderDialog();
-  } else if (target.closest('[data-prompt-duplicate]')) {
-    const source = promptStore.prompts.find((item) => item.id === target.closest('[data-prompt-duplicate]').dataset.promptDuplicate);
-    if (!source) return;
-    const duplicate = {
-      ...source,
-      id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
-      name: `${source.name} copy`,
-    };
-    const sourceIndex = promptStore.prompts.indexOf(source);
-    const nextPrompts = [...promptStore.prompts];
-    nextPrompts.splice(sourceIndex + 1, 0, duplicate);
-    if (!persistLibrary(nextPrompts, promptStore.sections)) return;
-    promptStore.prompts = nextPrompts;
     renderDialog();
   } else if (target.closest('[data-prompt-export]')) {
     exportLibrary();
