@@ -13,9 +13,8 @@ swift build -c release
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Dashboard"
 cp "$BUILD_ROOT/release/CodexDashboard" "$APP_BUNDLE/Contents/MacOS/CodexDashboard"
-cp "$PROJECT_ROOT/App/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
-cp "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard/dashboard.js" "$APP_BUNDLE/Contents/Resources/Dashboard/dashboard.js"
-cp "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard/dashboard.css" "$APP_BUNDLE/Contents/Resources/Dashboard/dashboard.css"
+cp "$PROJECT_ROOT/Packaging/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+ditto "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard" "$APP_BUNDLE/Contents/Resources/Dashboard"
 codesign --force --deep --sign - "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 

@@ -1,88 +1,70 @@
 import Foundation
 
-enum DashboardSessionState: Equatable {
+enum DashboardConnectionState: Equatable {
     case checking
     case appClosed
     case appRunning
-    case bridgeConnected
+    case rendererAvailable
     case dashboardMounted
-    case needsAttention(message: String, bridgeConnected: Bool, dashboardMounted: Bool)
 
-    var bridgeIsConnected: Bool {
-        switch self {
-        case .bridgeConnected, .dashboardMounted:
-            return true
-        case .needsAttention(_, let bridgeConnected, _):
-            return bridgeConnected
-        default:
-            return false
-        }
+    var rendererIsAvailable: Bool {
+        self == .rendererAvailable || self == .dashboardMounted
     }
 
     var dashboardIsMounted: Bool {
-        switch self {
-        case .dashboardMounted:
-            return true
-        case .needsAttention(_, _, let dashboardMounted):
-            return dashboardMounted
-        default:
-            return false
-        }
-    }
-
-    var errorMessage: String? {
-        guard case .needsAttention(let message, _, _) = self else { return nil }
-        return message
+        self == .dashboardMounted
     }
 }
 
 @MainActor
 final class DashboardViewModel: ObservableObject {
-    @Published private(set) var sessionState: DashboardSessionState = .checking
+    @Published private(set) var connectionState: DashboardConnectionState = .checking
+    @Published private(set) var sessionError: String?
     @Published private(set) var isPerformingAction = false
     @Published private(set) var dataWarning: String?
     @Published private(set) var threads: [DashboardThread] = []
-    @Published private(set) var totalThreadCount = 0
+    @Published private(set) var availableThreadCount = 0
 
     private let threadRepository: any ThreadSnapshotLoading
-    private let gitStatusLoader: any WorkspaceGitStatusLoading
-    private var hostSession: (any DashboardHosting)?
+    private let gitStatusLoader: any GitWorkingTreeStatusLoading
+    private var dashboardHost: (any DashboardHost)?
     private var threadRefreshLoopTask: Task<Void, Never>?
     private var gitRefreshLoopTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-    private var gitStatuses: [String: WorkspaceGitStatus] = [:]
+    private var gitWorkingTreeStatuses: [String: GitWorkingTreeStatus] = [:]
 
     var statusPresentation: (title: String, detail: String) {
-        switch sessionState {
+        if sessionError != nil {
+            return ("Dashboard needs attention", "Review the message below and try again.")
+        }
+        return switch connectionState {
         case .checking:
             ("Checking Codex…", "Looking for the local Codex app.")
         case .appClosed:
             ("Codex is closed", "The dashboard can relaunch it with local debugging enabled.")
         case .appRunning:
             (
-                "Codex is running without the dashboard bridge",
+                "Codex is running without the dashboard connection",
                 "Restart it through this controller once to enable the thread dashboard."
             )
-        case .bridgeConnected:
-            ("Dashboard bridge is connected", "The local renderer is ready for the thread dashboard.")
+        case .rendererAvailable:
+            ("Dashboard connection is available", "The local renderer is ready for the thread dashboard.")
         case .dashboardMounted:
             ("Dashboard is live", activitySummary)
-        case .needsAttention:
-            ("Dashboard needs attention", "Review the message below and try again.")
         }
     }
 
     init(
         threadRepository: any ThreadSnapshotLoading = CodexThreadRepository(),
-        gitStatusLoader: any WorkspaceGitStatusLoading = WorkspaceGitStatusLoader(),
-        hostSessionFactory: () throws -> any DashboardHosting = { try CodexHostSession() }
+        gitStatusLoader: any GitWorkingTreeStatusLoading = GitWorkingTreeStatusLoader(),
+        dashboardHostFactory: () throws -> any DashboardHost = { try CodexDashboardHost() }
     ) {
         self.threadRepository = threadRepository
         self.gitStatusLoader = gitStatusLoader
         do {
-            hostSession = try hostSessionFactory()
+            dashboardHost = try dashboardHostFactory()
         } catch {
-            setFailure(error, bridgeConnected: false)
+            setFailure(error, lastKnownState: .appClosed)
         }
     }
 
@@ -122,53 +104,54 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func restartAndEnableDashboard() async {
-        guard !isPerformingAction, let hostSession else { return }
+        guard !isPerformingAction, let dashboardHost else { return }
         isPerformingAction = true
-        hostSession.prepareForRestart()
-        sessionState = .checking
+        dashboardHost.prepareForRestart()
+        connectionState = .checking
+        sessionError = nil
         defer { isPerformingAction = false }
         await cancelRefresh()
-        var bridgeConnected = false
+        var rendererAvailable = false
 
         do {
-            let targets = try await hostSession.restartApplication()
-            bridgeConnected = true
+            let targets = try await dashboardHost.restartApplication()
+            rendererAvailable = true
             try await refreshThreadSnapshot()
-            try await hostSession.mountDashboard(
+            try await dashboardHost.mountDashboard(
                 with: DashboardPayload(threads: threads),
                 on: targets,
                 force: true
             )
-            sessionState = .dashboardMounted
+            connectionState = .dashboardMounted
         } catch {
-            setFailure(error, bridgeConnected: bridgeConnected)
+            setFailure(
+                error,
+                lastKnownState: rendererAvailable ? .rendererAvailable : .appClosed
+            )
         }
     }
 
     func disableDashboard() async {
-        guard !isPerformingAction, let hostSession else { return }
+        guard !isPerformingAction, let dashboardHost else { return }
         isPerformingAction = true
         defer { isPerformingAction = false }
         await cancelRefresh()
 
         do {
-            switch try await hostSession.disableDashboard() {
+            switch try await dashboardHost.disableDashboard() {
             case .applicationClosed:
-                sessionState = .appClosed
-            case .bridgeConnected:
-                sessionState = .bridgeConnected
+                connectionState = .appClosed
+            case .rendererAvailable:
+                connectionState = .rendererAvailable
             }
+            sessionError = nil
         } catch {
-            sessionState = .needsAttention(
-                message: error.localizedDescription,
-                bridgeConnected: true,
-                dashboardMounted: true
-            )
+            setFailure(error, lastKnownState: .dashboardMounted)
         }
     }
 
     func openDashboard() async {
-        await hostSession?.openDashboard()
+        await dashboardHost?.openDashboard()
     }
 
     private func startRefreshLoops() {
@@ -200,40 +183,42 @@ final class DashboardViewModel: ObservableObject {
         guard
             !Task.isCancelled,
             !isPerformingAction,
-            let hostSession
+            let dashboardHost
         else { return }
 
-        let appIsRunning = hostSession.applicationIsRunning
-        let targets = await hostSession.mainRendererTargets()
+        let appIsRunning = dashboardHost.applicationIsRunning
+        let targets = await dashboardHost.mainRendererTargets()
         guard !Task.isCancelled, !isPerformingAction else { return }
 
-        if hostSession.keepsDashboardMounted, !targets.isEmpty {
+        if dashboardHost.keepsDashboardMounted, !targets.isEmpty {
             do {
-                try await hostSession.mountDashboard(
+                try await dashboardHost.mountDashboard(
                     with: DashboardPayload(threads: threads),
                     on: targets,
                     force: false
                 )
-                sessionState = .dashboardMounted
+                connectionState = .dashboardMounted
+                sessionError = nil
             } catch {
-                guard !Task.isCancelled, hostSession.keepsDashboardMounted else { return }
-                setFailure(error, bridgeConnected: true)
+                guard !Task.isCancelled, dashboardHost.keepsDashboardMounted else { return }
+                setFailure(error, lastKnownState: .rendererAvailable)
             }
             return
         }
-        sessionState = !targets.isEmpty
-            ? .bridgeConnected
+        connectionState = !targets.isEmpty
+            ? .rendererAvailable
             : (appIsRunning ? .appRunning : .appClosed)
+        sessionError = nil
     }
 
     private func refreshThreadSnapshot() async throws {
         let snapshot = try await threadRepository.loadSnapshot(
-            gitStatuses: gitStatuses,
-            activeApplicationLaunchDate: hostSession?.applicationLaunchDate
+            gitWorkingTreeStatuses: gitWorkingTreeStatuses,
+            activeApplicationLaunchDate: dashboardHost?.applicationLaunchDate
         )
         guard !Task.isCancelled else { return }
         threads = snapshot.threads
-        totalThreadCount = snapshot.totalThreadCount
+        availableThreadCount = snapshot.availableThreadCount
         dataWarning = nil
     }
 
@@ -242,14 +227,14 @@ final class DashboardViewModel: ObservableObject {
         if threads.isEmpty { await refresh() }
         let workspacePaths = Set(threads.map(\.workspacePath))
         guard !workspacePaths.isEmpty, !Task.isCancelled else { return }
-        gitStatuses = await gitStatusLoader.load(at: workspacePaths)
+        gitWorkingTreeStatuses = await gitStatusLoader.load(at: workspacePaths)
         guard !Task.isCancelled else { return }
         await refresh()
     }
 
     private var activitySummary: String {
         let runningCount = threads.count { $0.activity == .running }
-        return "\(runningCount) running · \(totalThreadCount) total threads"
+        return "\(runningCount) running · \(availableThreadCount) available threads"
     }
 
     private func cancelRefresh() async {
@@ -259,11 +244,8 @@ final class DashboardViewModel: ObservableObject {
         await task?.value
     }
 
-    private func setFailure(_ error: Error, bridgeConnected: Bool) {
-        sessionState = .needsAttention(
-            message: error.localizedDescription,
-            bridgeConnected: bridgeConnected,
-            dashboardMounted: false
-        )
+    private func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
+        connectionState = lastKnownState
+        sessionError = error.localizedDescription
     }
 }

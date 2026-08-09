@@ -38,25 +38,25 @@ final class DashboardInjectionTests: XCTestCase {
                 id: "thread-read",
                 title: "Read thread",
                 preview: "Already read",
-                workspace: "Project",
+                workspaceName: "Project",
                 workspacePath: "/tmp/project",
-                updatedAtUnixSeconds: 2,
+                recencyTimestamp: 2,
                 isPinned: false,
                 model: nil,
                 activity: .idle,
-                gitStatus: .clean
+                gitWorkingTreeStatus: .clean
             ),
             DashboardThread(
                 id: "thread-unread",
                 title: "Unread thread",
                 preview: "Needs attention",
-                workspace: "Project",
+                workspaceName: "Project",
                 workspacePath: "/tmp/project",
-                updatedAtUnixSeconds: 1,
+                recencyTimestamp: 1,
                 isPinned: true,
                 model: "test-model",
                 activity: .running,
-                gitStatus: .modified
+                gitWorkingTreeStatus: .hasChanges
             ),
         ]
         let payloadData = try JSONEncoder().encode(DashboardPayload(threads: threads))
@@ -70,7 +70,7 @@ final class DashboardInjectionTests: XCTestCase {
                 return: null,
               };
               unreadRow.addEventListener('click', () => { window.__openedThreadID = 'thread-unread'; });
-              window.__codexDashboard.update(\(payload));
+              window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
               const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');
@@ -105,7 +105,7 @@ final class DashboardInjectionTests: XCTestCase {
         XCTAssertEqual(destroyed, true)
     }
 
-    func testUncommittedFilterIncludesEveryThreadFromModifiedProjects() async throws {
+    func testUncommittedFilterIncludesEveryThreadFromProjectsWithChanges() async throws {
         let webView = WKWebView()
         webView.loadHTMLString(
             """
@@ -122,40 +122,40 @@ final class DashboardInjectionTests: XCTestCase {
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let threads = [
             DashboardThread(
-                id: "modified-project-thread-one",
-                title: "First modified project thread",
+                id: "changed-project-thread-one",
+                title: "First changed project thread",
                 preview: "First",
-                workspace: "Modified Project",
-                workspacePath: "/tmp/modified-project",
-                updatedAtUnixSeconds: 3,
+                workspaceName: "Changed Project",
+                workspacePath: "/tmp/changed-project",
+                recencyTimestamp: 3,
                 isPinned: false,
                 model: nil,
                 activity: .idle,
-                gitStatus: .modified
+                gitWorkingTreeStatus: .hasChanges
             ),
             DashboardThread(
-                id: "modified-project-thread-two",
-                title: "Second modified project thread",
+                id: "changed-project-thread-two",
+                title: "Second changed project thread",
                 preview: "Second",
-                workspace: "Modified Project",
-                workspacePath: "/tmp/modified-project",
-                updatedAtUnixSeconds: 2,
+                workspaceName: "Changed Project",
+                workspacePath: "/tmp/changed-project",
+                recencyTimestamp: 2,
                 isPinned: false,
                 model: nil,
                 activity: .idle,
-                gitStatus: .clean
+                gitWorkingTreeStatus: .clean
             ),
             DashboardThread(
                 id: "clean-project-thread",
                 title: "Clean project thread",
                 preview: "Clean",
-                workspace: "Clean Project",
+                workspaceName: "Clean Project",
                 workspacePath: "/tmp/clean-project",
-                updatedAtUnixSeconds: 1,
+                recencyTimestamp: 1,
                 isPinned: false,
                 model: nil,
                 activity: .idle,
-                gitStatus: .clean
+                gitWorkingTreeStatus: .clean
             ),
         ]
         let payloadData = try JSONEncoder().encode(DashboardPayload(threads: threads))
@@ -164,7 +164,7 @@ final class DashboardInjectionTests: XCTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.update(\(payload));
+              window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
               document.querySelector('[data-filter="uncommitted"]').click();
               return [
@@ -177,8 +177,8 @@ final class DashboardInjectionTests: XCTestCase {
         ) as? [Any]
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [String], [
-            "modified-project-thread-one",
-            "modified-project-thread-two",
+            "changed-project-thread-one",
+            "changed-project-thread-two",
         ])
         XCTAssertEqual(values[1] as? String, "1")
     }

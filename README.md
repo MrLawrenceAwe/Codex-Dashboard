@@ -1,7 +1,7 @@
 # Codex Dashboard
 
 Codex Dashboard is a native macOS controller that adds a recent-thread dashboard
-to the local Codex app. It relaunches Codex with a loopback-only DevTools bridge
+to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
 ## Install
@@ -31,7 +31,7 @@ removes it.
 
 - Native SwiftUI control panel; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
-- Loopback-only Chromium DevTools bridge managed by `CodexHostSession`.
+- Loopback-only Chromium DevTools connection managed by `CodexDashboardHost`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run on a fixed two-second cadence; Git status enrichment refreshes independently every ten seconds.
@@ -43,7 +43,7 @@ removes it.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Codex UI selectors are isolated in `dashboard.js` for maintenance after app updates.
+- Codex UI selectors are isolated in `codex-ui.js`; thread and prompt behavior live in separate resources.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.

@@ -2,7 +2,7 @@ import Foundation
 
 protocol ThreadSnapshotLoading: Sendable {
     func loadSnapshot(
-        gitStatuses: [String: WorkspaceGitStatus],
+        gitWorkingTreeStatuses: [String: GitWorkingTreeStatus],
         activeApplicationLaunchDate: Date?
     ) async throws -> ThreadSnapshot
 }
@@ -50,7 +50,7 @@ actor CodexThreadRepository: ThreadSnapshotLoading {
     }
 
     func loadSnapshot(
-        gitStatuses: [String: WorkspaceGitStatus],
+        gitWorkingTreeStatuses: [String: GitWorkingTreeStatus],
         activeApplicationLaunchDate: Date?
     ) async throws -> ThreadSnapshot {
         let threadSQL = """
@@ -79,24 +79,24 @@ actor CodexThreadRepository: ThreadSnapshotLoading {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                workspace: directoryName.isEmpty ? thread.workspacePath : directoryName,
+                workspaceName: directoryName.isEmpty ? thread.workspacePath : directoryName,
                 workspacePath: thread.workspacePath,
-                updatedAtUnixSeconds: rolloutStatus.lastFinalResponseAtUnixSeconds
+                recencyTimestamp: rolloutStatus.lastFinalResponseAtUnixSeconds
                     ?? thread.createdAtUnixSeconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 activity: rolloutStatus.activity,
-                gitStatus: gitStatuses[thread.workspacePath] ?? .notRepository
+                gitWorkingTreeStatus: gitWorkingTreeStatuses[thread.workspacePath] ?? .notRepository
             )
         }.sorted { left, right in
-            if left.updatedAtUnixSeconds == right.updatedAtUnixSeconds {
+            if left.recencyTimestamp == right.recencyTimestamp {
                 return left.id < right.id
             }
-            return left.updatedAtUnixSeconds > right.updatedAtUnixSeconds
+            return left.recencyTimestamp > right.recencyTimestamp
         }
         return ThreadSnapshot(
             threads: dashboardThreads,
-            totalThreadCount: threads.first?.totalCount ?? 0
+            availableThreadCount: threads.first?.totalCount ?? 0
         )
     }
 

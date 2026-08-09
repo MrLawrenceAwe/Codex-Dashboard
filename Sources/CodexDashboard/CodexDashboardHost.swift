@@ -3,11 +3,11 @@ import Foundation
 
 enum DashboardDisableResult {
     case applicationClosed
-    case bridgeConnected
+    case rendererAvailable
 }
 
 @MainActor
-protocol DashboardHosting: AnyObject {
+protocol DashboardHost: AnyObject {
     var applicationIsRunning: Bool { get }
     var applicationLaunchDate: Date? { get }
     var keepsDashboardMounted: Bool { get }
@@ -25,7 +25,7 @@ protocol DashboardHosting: AnyObject {
 }
 
 @MainActor
-final class CodexHostSession: DashboardHosting {
+final class CodexDashboardHost: DashboardHost {
     private let devTools = DevToolsClient()
     private let injection: DashboardInjection
     private var shouldKeepDashboardMounted = true
@@ -164,7 +164,7 @@ final class CodexHostSession: DashboardHosting {
                 throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
             }
         }
-        return .bridgeConnected
+        return .rendererAvailable
     }
 
     func openDashboard() async {
@@ -184,8 +184,8 @@ final class CodexHostSession: DashboardHosting {
         let expression = """
         (() => {
           const dashboard = window.__codexDashboard;
-          if (typeof dashboard?.update !== 'function') return false;
-          dashboard.update(\(json));
+          if (typeof dashboard?.applySnapshot !== 'function') return false;
+          dashboard.applySnapshot(\(json));
           return true;
         })()
         """

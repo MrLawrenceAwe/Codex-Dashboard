@@ -9,11 +9,11 @@ final class CodexThreadRepositoryTests: XCTestCase {
         }
 
         let snapshot = try await CodexThreadRepository().loadSnapshot(
-            gitStatuses: [:],
+            gitWorkingTreeStatuses: [:],
             activeApplicationLaunchDate: .distantPast
         )
         XCTAssertFalse(snapshot.threads.isEmpty)
-        XCTAssertGreaterThanOrEqual(snapshot.totalThreadCount, snapshot.threads.count)
+        XCTAssertGreaterThanOrEqual(snapshot.availableThreadCount, snapshot.threads.count)
         XCTAssertTrue(snapshot.threads.contains { $0.activity == .running })
     }
 
@@ -22,19 +22,19 @@ final class CodexThreadRepositoryTests: XCTestCase {
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(now: now, testCase: self)
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
+        ).loadSnapshot(gitWorkingTreeStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
-        XCTAssertEqual(snapshot.totalThreadCount, 3)
+        XCTAssertEqual(snapshot.availableThreadCount, 3)
         XCTAssertEqual(snapshot.threads.map(\.id), ["running", "updated", "idle"])
         XCTAssertEqual(snapshot.threads.map(\.activity), [.running, .idle, .idle])
         XCTAssertEqual(snapshot.threads.first?.title, "Running thread")
-        XCTAssertEqual(snapshot.threads.first?.workspace, "running")
+        XCTAssertEqual(snapshot.threads.first?.workspaceName, "running")
         XCTAssertEqual(snapshot.threads.first?.workspacePath, "/tmp/running")
-        XCTAssertEqual(snapshot.threads.first?.updatedAtUnixSeconds, now - 300)
-        XCTAssertEqual(snapshot.threads.first?.gitStatus, .notRepository)
+        XCTAssertEqual(snapshot.threads.first?.recencyTimestamp, now - 300)
+        XCTAssertEqual(snapshot.threads.first?.gitWorkingTreeStatus, .notRepository)
         XCTAssertTrue(snapshot.threads.first?.isPinned == true)
         XCTAssertEqual(snapshot.threads[1].title, "Renamed thread")
-        XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 600)
+        XCTAssertEqual(snapshot.threads[1].recencyTimestamp, now - 600)
     }
 
     func testOrdersThreadsByFinalResponseInsteadOfDatabaseActivity() async throws {
@@ -46,11 +46,11 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
+        ).loadSnapshot(gitWorkingTreeStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.threads.map(\.id), ["updated", "running", "idle"])
         XCTAssertEqual(snapshot.threads[1].activity, .running)
-        XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 1_200)
+        XCTAssertEqual(snapshot.threads[1].recencyTimestamp, now - 1_200)
     }
 
     func testReportsFullCountWhenThreadRowsAreLimited() async throws {
@@ -62,10 +62,10 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
+        ).loadSnapshot(gitWorkingTreeStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.threads.count, 60)
-        XCTAssertEqual(snapshot.totalThreadCount, 63)
+        XCTAssertEqual(snapshot.availableThreadCount, 63)
     }
 
     func testReportsMissingStateDatabase() async throws {
@@ -74,7 +74,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         let repository = CodexThreadRepository(stateDatabaseURL: missingDatabaseURL)
         do {
             _ = try await repository.loadSnapshot(
-                gitStatuses: [:],
+                gitWorkingTreeStatuses: [:],
                 activeApplicationLaunchDate: .distantPast
             )
             XCTFail("Expected the missing state database to be reported")
