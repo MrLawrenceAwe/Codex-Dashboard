@@ -311,7 +311,6 @@ function createPage() {
             <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
           </div>
           <div class="dashboard-view-options" aria-label="View threads">
-            <span class="dashboard-control-label">View</span>
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
             <button type="button" data-view="updated" aria-pressed="false">Last updated</button>
           </div>
