@@ -2,6 +2,20 @@ import AppKit
 import Foundation
 import UserNotifications
 
+extension Notification.Name {
+    static let codexDashboardOpenCompletedThread = Notification.Name(
+        "CodexDashboardOpenCompletedThread"
+    )
+}
+
+enum CompletionNotificationPayload {
+    static let threadIDKey = "thread-id"
+
+    static func threadID(from userInfo: [AnyHashable: Any]) -> String? {
+        userInfo[threadIDKey] as? String
+    }
+}
+
 @MainActor
 protocol ThreadCompletionNotifying: AnyObject {
     func requestAuthorization()
@@ -81,7 +95,7 @@ final class MacThreadCompletionNotifier: NSObject, ThreadCompletionNotifying,
         content.subtitle = thread.title
         content.body = Self.notificationBody(for: thread)
         content.sound = .default
-        content.userInfo = ["thread-id": thread.id]
+        content.userInfo = [CompletionNotificationPayload.threadIDKey: thread.id]
 
         let request = UNNotificationRequest(
             identifier: "codex-complete-\(thread.id)-\(UUID().uuidString)",
@@ -120,20 +134,28 @@ final class MacThreadCompletionNotifier: NSObject, ThreadCompletionNotifying,
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
+        let completedThreadID = CompletionNotificationPayload.threadID(
+            from: response.notification.request.content.userInfo
+        )
         await MainActor.run {
             let bundleIdentifier = "com.openai.codex"
             if let running = NSRunningApplication.runningApplications(
                 withBundleIdentifier: bundleIdentifier
             ).first {
                 running.activate(options: [.activateAllWindows])
-                return
-            }
-            guard let applicationURL = NSWorkspace.shared.urlForApplication(
+            } else if let applicationURL = NSWorkspace.shared.urlForApplication(
                 withBundleIdentifier: bundleIdentifier
-            ) else { return }
-            NSWorkspace.shared.openApplication(
-                at: applicationURL,
-                configuration: NSWorkspace.OpenConfiguration()
+            ) {
+                NSWorkspace.shared.openApplication(
+                    at: applicationURL,
+                    configuration: NSWorkspace.OpenConfiguration()
+                )
+            }
+            guard let completedThreadID else { return }
+            NotificationCenter.default.post(
+                name: .codexDashboardOpenCompletedThread,
+                object: nil,
+                userInfo: [CompletionNotificationPayload.threadIDKey: completedThreadID]
             )
         }
     }

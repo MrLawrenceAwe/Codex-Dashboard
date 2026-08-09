@@ -52,7 +52,7 @@ removes it.
 - Prompt search, duplication, JSON import/export, `{{selection}}` and `{{clipboard}}` placeholders, and an automatic app-owned backup under `~/Library/Application Support/Codex Dashboard/` protect and speed up reusable prompt workflows.
 - Dashboard filter, grouping, and collapsed-project preferences persist across renderer reloads.
 - The menu-bar controller provides open, sync, restart, diagnostics, and launch-at-login actions after the main window is closed.
-- Independent native macOS completion notifications use both lifecycle transitions and unread-state changes, so short turns are still detected when Codex's own alerts are missed. They can be disabled from the controller or menu bar.
+- Independent native macOS completion notifications use both lifecycle transitions and unread-state changes, so short turns are still detected when Codex's own alerts are missed. Clicking one opens its completed thread, and notifications can be disabled from the controller or menu bar.
 - Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
 - Diagnostics show versions, refresh state, thread counts, renderer targets, warnings, and the prompt-backup location, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.

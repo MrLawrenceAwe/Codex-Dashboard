@@ -166,7 +166,7 @@ final class RendererDashboardSession {
             }
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
-                await promptBackup.restoreIfNeeded(in: target, using: devTools)
+                try await promptBackup.restoreIfNeeded(in: target, using: devTools)
                 guard try await devTools.evaluateBoolean(injectionPayload.mountExpression, in: target) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."
@@ -228,6 +228,25 @@ final class RendererDashboardSession {
                 "(() => { window.__codexDashboard?.open?.(); return true; })()",
                 in: target
             )
+        }
+    }
+
+    func openThread(_ threadID: String) async {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: threadID, options: .fragmentsAllowed),
+            let encodedThreadID = String(data: data, encoding: .utf8)
+        else { return }
+        let expression = """
+        (() => {
+          window.dispatchEvent(new MessageEvent('message', {
+            data: { type: 'navigate-to-route', path: `/local/${encodeURIComponent(\(encodedThreadID))}` },
+            source: null,
+          }));
+          return true;
+        })()
+        """
+        for target in await targets(forceRefresh: true) {
+            _ = try? await devTools.evaluateBoolean(expression, in: target)
         }
     }
 

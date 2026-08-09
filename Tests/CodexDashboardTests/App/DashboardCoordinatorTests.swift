@@ -86,6 +86,8 @@ private final class StubDashboardSession: DashboardSession {
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
     private let compatibilityChecks: [CompatibilityCheck]
+    private(set) var restartCallCount = 0
+    private(set) var openedThreadIDs: [String] = []
 
     init(compatibilityChecks: [CompatibilityCheck] = []) {
         self.compatibilityChecks = compatibilityChecks
@@ -93,7 +95,10 @@ private final class StubDashboardSession: DashboardSession {
 
     func rendererTargets() async -> [DevToolsTarget] { [] }
     func prepareForRestart() {}
-    func restartCodex() async throws -> [DevToolsTarget] { [] }
+    func restartCodex() async throws -> [DevToolsTarget] {
+        restartCallCount += 1
+        return []
+    }
     func synchronizeDashboard(
         with snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
@@ -101,11 +106,58 @@ private final class StubDashboardSession: DashboardSession {
     ) async throws {}
     func disableThreadDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
     func openThreadDashboard() async {}
+    func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
 }
 
 @MainActor
 final class DashboardCoordinatorTests: XCTestCase {
+    func testRestartDoesNotBypassBlockingCompatibilityReport() async {
+        let incompatible = CompatibilityCheck(
+            id: "sidebar-host",
+            title: "Sidebar integration",
+            status: .incompatible,
+            detail: "Missing sidebar"
+        )
+        let runtime = StubDashboardSession()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: [incompatible]),
+            runtimeFactory: { runtime }
+        )
+        await coordinator.checkCompatibility()
+
+        await coordinator.restartCodexAndEnableThreadDashboard()
+
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertTrue(coordinator.connectionError?.contains("incompatible") == true)
+    }
+
+    func testCompletionNotificationRoutesToItsThread() async throws {
+        let runtime = StubDashboardSession()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { runtime }
+        )
+
+        NotificationCenter.default.post(
+            name: .codexDashboardOpenCompletedThread,
+            object: nil,
+            userInfo: [CompletionNotificationPayload.threadIDKey: "completed-thread"]
+        )
+        try await waitUntil { runtime.openedThreadIDs == ["completed-thread"] }
+
+        XCTAssertEqual(runtime.openedThreadIDs, ["completed-thread"])
+        withExtendedLifetime(coordinator) {}
+    }
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let coordinator = DashboardCoordinator(
