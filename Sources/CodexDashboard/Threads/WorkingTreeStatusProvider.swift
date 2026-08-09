@@ -5,6 +5,9 @@ protocol WorkingTreeStatusProviding: Sendable {
 }
 
 actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+    static let defaultStatusCacheLifetime: TimeInterval = 10
+    static let defaultResolutionCacheLifetime: TimeInterval = 10
+
     private struct CachedStatus {
         let value: WorkingTreeStatus
         let loadedAt: Date
@@ -30,8 +33,8 @@ actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     init(
         subprocessTimeout: TimeInterval = 3,
-        cacheLifetime: TimeInterval = 20,
-        resolutionCacheLifetime: TimeInterval = 60
+        cacheLifetime: TimeInterval = SystemWorkingTreeStatusProvider.defaultStatusCacheLifetime,
+        resolutionCacheLifetime: TimeInterval = SystemWorkingTreeStatusProvider.defaultResolutionCacheLifetime
     ) {
         self.subprocessTimeout = subprocessTimeout
         self.cacheLifetime = cacheLifetime

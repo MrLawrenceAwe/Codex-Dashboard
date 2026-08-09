@@ -164,7 +164,7 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.statusPresentation.title, "Codex is closed")
     }
 
-    func testUnreadPollingUpdatesThreadWithinBoundedInterval() async throws {
+    func testUnreadPollingUpdatesThread() async throws {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let unreadIDProvider = MutableUnreadIDProvider()
         let viewModel = DashboardViewModel(
@@ -183,6 +183,11 @@ final class DashboardViewModelTests: XCTestCase {
         try await waitUntil { viewModel.threads.first?.isUnread == true }
 
         XCTAssertTrue(viewModel.threads.first?.isUnread == true)
+    }
+
+    func testUnreadPollingScheduleMatchesDocumentedLatencyBounds() {
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .milliseconds(500))
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

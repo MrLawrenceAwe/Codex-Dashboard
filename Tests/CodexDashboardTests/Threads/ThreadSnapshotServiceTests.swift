@@ -33,7 +33,55 @@ private struct FailingUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
+private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
+    private var continuation: CheckedContinuation<ThreadCatalog, Never>?
+
+    func loadCatalog(
+        workingTreeStatuses: [String: WorkingTreeStatus],
+        codexLaunchDate: Date?
+    ) async -> ThreadCatalog {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func hasPendingLoad() -> Bool {
+        continuation != nil
+    }
+
+    func resume(with workingTreeStatus: WorkingTreeStatus) {
+        continuation?.resume(returning: ThreadCatalog(
+            threads: [.fixture(workingTreeStatus: workingTreeStatus)],
+            totalThreadCount: 1
+        ))
+        continuation = nil
+    }
+}
+
 final class ThreadSnapshotServiceTests: XCTestCase {
+    func testSnapshotReappliesGitStatusUpdatedWhileCatalogLoadIsSuspended() async throws {
+        let catalogProvider = SuspendedStatusCatalogProvider()
+        let service = ThreadSnapshotService(
+            catalogProvider: catalogProvider,
+            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            unreadIDProvider: EmptyUnreadIDProvider()
+        )
+        let snapshotTask = Task {
+            try await service.loadSnapshot(codexLaunchDate: nil)
+        }
+        while !(await catalogProvider.hasPendingLoad()) {
+            await Task.yield()
+        }
+
+        let sourceThreads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
+        let updatedThreads = await service.updateWorkingTreeStatuses(in: sourceThreads)
+        XCTAssertEqual(updatedThreads?.first?.workingTreeStatus, .hasChanges)
+        await catalogProvider.resume(with: .notRepository)
+
+        let snapshot = try await snapshotTask.value
+        XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
+    }
+
     func testWorkingTreeUpdateChangesCurrentThreadsWithoutReloadingCatalog() async throws {
         let catalogProvider = CountingCatalogProvider()
         let service = ThreadSnapshotService(

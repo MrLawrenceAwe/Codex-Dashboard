@@ -3,6 +3,11 @@ import XCTest
 @testable import CodexDashboard
 
 final class SystemWorkingTreeStatusProviderTests: XCTestCase {
+    func testDefaultCacheLifetimesDoNotExceedForegroundPollingInterval() {
+        XCTAssertLessThanOrEqual(SystemWorkingTreeStatusProvider.defaultStatusCacheLifetime, 10)
+        XCTAssertLessThanOrEqual(SystemWorkingTreeStatusProvider.defaultResolutionCacheLifetime, 10)
+    }
+
     func testReportsUncommittedChanges() async throws {
         let projectURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
