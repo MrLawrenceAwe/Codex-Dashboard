@@ -27,60 +27,56 @@ enum Subprocess {
         arguments: [String],
         timeout: TimeInterval
     ) async throws -> SubprocessOutput {
-        let fileManager = FileManager.default
-        let temporaryDirectory = fileManager.temporaryDirectory
-        let identifier = UUID().uuidString
-        let outputURL = temporaryDirectory.appendingPathComponent("codex-dashboard-\(identifier).stdout")
-        let errorURL = temporaryDirectory.appendingPathComponent("codex-dashboard-\(identifier).stderr")
-        guard
-            fileManager.createFile(atPath: outputURL.path, contents: nil),
-            fileManager.createFile(atPath: errorURL.path, contents: nil)
-        else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        defer {
-            try? fileManager.removeItem(at: outputURL)
-            try? fileManager.removeItem(at: errorURL)
-        }
-
-        let outputHandle = try FileHandle(forWritingTo: outputURL)
-        let errorHandle = try FileHandle(forWritingTo: errorURL)
-        defer {
-            try? outputHandle.close()
-            try? errorHandle.close()
-        }
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
 
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments
-        process.standardOutput = outputHandle
-        process.standardError = errorHandle
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
         let runningProcess = RunningSubprocess(process: process)
         try runningProcess.start()
-        let terminationStatus = try await withThrowingTaskGroup(
-            of: Int32.self,
-            returning: Int32.self
-        ) { group in
-            group.addTask { await runningProcess.waitForExit() }
-            group.addTask {
-                try await Task.sleep(for: .seconds(timeout))
-                throw SubprocessError.timedOut(executableURL)
+        try outputPipe.fileHandleForWriting.close()
+        try errorPipe.fileHandleForWriting.close()
+        let outputTask = Task.detached {
+            try outputPipe.fileHandleForReading.readToEnd() ?? Data()
+        }
+        let errorTask = Task.detached {
+            try errorPipe.fileHandleForReading.readToEnd() ?? Data()
+        }
+        let terminationStatus: Int32
+        do {
+            terminationStatus = try await withThrowingTaskGroup(
+                of: Int32.self,
+                returning: Int32.self
+            ) { group in
+                group.addTask { await runningProcess.waitForExit() }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(timeout))
+                    throw SubprocessError.timedOut(executableURL)
+                }
+                defer {
+                    group.cancelAll()
+                    if process.isRunning { runningProcess.terminate() }
+                }
+                guard let status = try await group.next() else {
+                    throw SubprocessError.missingTerminationStatus(executableURL)
+                }
+                return status
             }
-            defer {
-                group.cancelAll()
-                if process.isRunning { runningProcess.terminate() }
-            }
-            guard let status = try await group.next() else {
-                throw SubprocessError.missingTerminationStatus(executableURL)
-            }
-            return status
+        } catch {
+            runningProcess.terminate()
+            _ = try? await outputTask.value
+            _ = try? await errorTask.value
+            throw error
         }
 
-        try outputHandle.synchronize()
-        try errorHandle.synchronize()
+        let standardOutput = try await outputTask.value
+        let standardError = try await errorTask.value
         return SubprocessOutput(
-            standardOutput: try Data(contentsOf: outputURL),
-            standardError: try Data(contentsOf: errorURL),
+            standardOutput: standardOutput,
+            standardError: standardError,
             terminationStatus: terminationStatus
         )
     }

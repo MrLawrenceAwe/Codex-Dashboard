@@ -70,6 +70,23 @@ final class DashboardRenderer {
         defer { synchronizationFinished() }
         await acquireSynchronizationSlot()
         defer { releaseSynchronizationSlot() }
+        do {
+            try await performSynchronization(
+                snapshot,
+                on: targets,
+                forceRemount: forceRemount
+            )
+        } catch {
+            invalidateTargetCache()
+            throw error
+        }
+    }
+
+    private func performSynchronization(
+        _ snapshot: DashboardSnapshot,
+        on targets: [DevToolsTarget],
+        forceRemount: Bool
+    ) async throws {
         try Task.checkCancellation()
 
         let targetIDs = Set(targets.map(\.id))
@@ -188,6 +205,10 @@ final class DashboardRenderer {
         lastSnapshot = nil
         lastPromptBackupCheck = nil
         lastHealthCheckByTargetID = [:]
+        invalidateTargetCache()
+    }
+
+    private func invalidateTargetCache() {
         cachedTargets = []
         lastTargetRefresh = nil
     }

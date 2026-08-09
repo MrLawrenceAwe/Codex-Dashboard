@@ -79,4 +79,27 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
         XCTAssertEqual(refreshed[secondProjectURL.path], .hasChanges)
     }
+
+    func testTerminalRepositoryResolutionIsCachedUntilExpiry() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-resolution-cache-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let provider = SystemWorkingTreeStatusProvider(resolutionCacheLifetime: 60)
+
+        let initial = await provider.load(projectPaths: [directory.path])
+        XCTAssertEqual(initial[directory.path], .notRepository)
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", directory.path, "init", "--quiet"],
+            timeout: 3
+        )
+
+        let cached = await provider.load(projectPaths: [directory.path])
+        XCTAssertEqual(cached[directory.path], .notRepository)
+
+        let uncachedProvider = SystemWorkingTreeStatusProvider(resolutionCacheLifetime: 0)
+        let refreshed = await uncachedProvider.load(projectPaths: [directory.path])
+        XCTAssertEqual(refreshed[directory.path], .clean)
+    }
 }

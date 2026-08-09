@@ -10,6 +10,11 @@ actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         let loadedAt: Date
     }
 
+    private struct CachedResolution {
+        let value: RepositoryResolution
+        let loadedAt: Date
+    }
+
     private enum RepositoryResolution: Sendable {
         case repository(String)
         case terminal(WorkingTreeStatus)
@@ -19,21 +24,30 @@ actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     private let subprocessTimeout: TimeInterval
     private let cacheLifetime: TimeInterval
-    private var repositoryRootByProjectPath: [String: String] = [:]
+    private let resolutionCacheLifetime: TimeInterval
+    private var resolutionByProjectPath: [String: CachedResolution] = [:]
     private var statusByRepositoryRoot: [String: CachedStatus] = [:]
 
-    init(subprocessTimeout: TimeInterval = 3, cacheLifetime: TimeInterval = 20) {
+    init(
+        subprocessTimeout: TimeInterval = 3,
+        cacheLifetime: TimeInterval = 20,
+        resolutionCacheLifetime: TimeInterval = 60
+    ) {
         self.subprocessTimeout = subprocessTimeout
         self.cacheLifetime = cacheLifetime
+        self.resolutionCacheLifetime = resolutionCacheLifetime
     }
 
     func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
+        let now = Date()
         var resolutions: [String: RepositoryResolution] = [:]
         let unresolvedPaths = projectPaths.filter { path in
-            guard let root = repositoryRootByProjectPath[path] else { return true }
-            resolutions[path] = .repository(root)
+            guard let cached = resolutionByProjectPath[path],
+                  now.timeIntervalSince(cached.loadedAt) < resolutionCacheLifetime
+            else { return true }
+            resolutions[path] = cached.value
             return false
         }
         let timeout = subprocessTimeout
@@ -42,12 +56,9 @@ actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         }
         for (path, resolution) in resolved {
             resolutions[path] = resolution
-            if case .repository(let root) = resolution {
-                repositoryRootByProjectPath[path] = root
-            }
+            resolutionByProjectPath[path] = CachedResolution(value: resolution, loadedAt: now)
         }
 
-        let now = Date()
         let repositoryRoots = Set<String>(resolutions.values.compactMap { resolution in
             guard case .repository(let root) = resolution else { return nil }
             return root
