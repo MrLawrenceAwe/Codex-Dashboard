@@ -4,6 +4,8 @@ actor PromptBackupStore {
     static let shared = PromptBackupStore()
 
     private let backupURL: URL
+    private var cachedJSON: String?
+    private var hasLoadedCache = false
 
     init(fileManager: FileManager = .default) {
         let root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -16,18 +18,26 @@ actor PromptBackupStore {
     }
 
     func load() -> String? {
-        try? String(contentsOf: backupURL, encoding: .utf8)
+        if hasLoadedCache { return cachedJSON }
+        cachedJSON = try? String(contentsOf: backupURL, encoding: .utf8)
+        hasLoadedCache = true
+        return cachedJSON
     }
 
-    func save(_ json: String) throws {
+    @discardableResult
+    func save(_ json: String) throws -> Bool {
         guard let data = json.data(using: .utf8),
               (try JSONSerialization.jsonObject(with: data)) is [String: Any]
         else { throw DashboardError.invalidPromptLibrary }
+        guard load() != json else { return false }
         try FileManager.default.createDirectory(
             at: backupURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         try data.write(to: backupURL, options: .atomic)
+        cachedJSON = json
+        hasLoadedCache = true
+        return true
     }
 
     var path: String { backupURL.path }

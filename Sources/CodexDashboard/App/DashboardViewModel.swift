@@ -32,10 +32,14 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var lastErrorDate: Date?
     @Published private(set) var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
+    @Published private(set) var completionNotificationsEnabled: Bool
 
     private let threadSnapshots: ThreadSnapshotService
     private let compatibilityChecker: any LocalCompatibilityChecking
+    private let completionNotifier: any ThreadCompletionNotifying
+    private let userDefaults: UserDefaults
     private let pollingController = DashboardPollingController()
+    private var completionDetector = ThreadCompletionDetector()
     private var runtime: (any DashboardRuntime)?
     private var synchronizationTask: Task<Void, Never>?
     private var synchronizationID: UUID?
@@ -70,6 +74,8 @@ final class DashboardViewModel: ObservableObject {
         workingTreeStatusProvider: any WorkingTreeStatusProviding = SystemWorkingTreeStatusProvider(),
         unreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
+        completionNotifier: any ThreadCompletionNotifying = DisabledThreadCompletionNotifier(),
+        userDefaults: UserDefaults = .standard,
         runtimeFactory: () throws -> any DashboardRuntime = { try LiveDashboardRuntime() }
     ) {
         threadSnapshots = ThreadSnapshotService(
@@ -78,6 +84,11 @@ final class DashboardViewModel: ObservableObject {
             unreadIDProvider: unreadIDProvider
         )
         self.compatibilityChecker = compatibilityChecker
+        self.completionNotifier = completionNotifier
+        self.userDefaults = userDefaults
+        completionNotificationsEnabled = userDefaults.object(
+            forKey: "completionNotificationsEnabled"
+        ) as? Bool ?? true
         do {
             runtime = try runtimeFactory()
         } catch {
@@ -90,6 +101,9 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func startMonitoring() {
+        if completionNotificationsEnabled {
+            completionNotifier.requestAuthorization()
+        }
         let currentVersion = CodexConfiguration.installedVersion
         let previousVersion = UserDefaults.standard.string(forKey: "lastCheckedCodexVersion")
         compatibilityWasTriggeredByUpdate = previousVersion != nil
@@ -110,6 +124,14 @@ final class DashboardViewModel: ObservableObject {
             }
         }
         Task { await checkCompatibilityAfterVersionChange() }
+    }
+
+    func setCompletionNotificationsEnabled(_ enabled: Bool) {
+        completionNotificationsEnabled = enabled
+        userDefaults.set(enabled, forKey: "completionNotificationsEnabled")
+        if enabled {
+            completionNotifier.requestAuthorization()
+        }
     }
 
     func stopMonitoring() {
@@ -270,7 +292,7 @@ final class DashboardViewModel: ObservableObject {
     private func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshots.loadSnapshot(codexLaunchDate: runtime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        threads = snapshot.catalog.threads
+        setThreads(snapshot.catalog.threads)
         totalThreadCount = snapshot.catalog.totalThreadCount
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
@@ -287,11 +309,11 @@ final class DashboardViewModel: ObservableObject {
         refreshThreadDataWarning()
         guard let updatedThreads = refresh.threads else { return }
         let unreadByID = Dictionary(uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.isUnread) })
-        threads = threads.map { source in
+        setThreads(threads.map { source in
             var thread = source
             thread.isUnread = unreadByID[thread.id] ?? thread.isUnread
             return thread
-        }
+        })
         await publishSnapshotIfMaintained()
     }
 
@@ -304,12 +326,21 @@ final class DashboardViewModel: ObservableObject {
         let statusByID = Dictionary(
             uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.workingTreeStatus) }
         )
-        threads = threads.map { source in
+        setThreads(threads.map { source in
             var thread = source
             thread.workingTreeStatus = statusByID[thread.id] ?? thread.workingTreeStatus
             return thread
-        }
+        })
         await publishSnapshotIfMaintained()
+    }
+
+    private func setThreads(_ updatedThreads: [ThreadSummary]) {
+        let completedThreads = completionDetector.observe(updatedThreads)
+        threads = updatedThreads
+        guard completionNotificationsEnabled else { return }
+        for thread in completedThreads {
+            completionNotifier.postCompletion(for: thread)
+        }
     }
 
     private var connectionSummary: String {

@@ -6,17 +6,20 @@ import XCTest
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     func testRestoresAndSavesDashboardPreferences() async throws {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.loadHTMLString(
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-preferences-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let htmlURL = directory.appendingPathComponent("index.html")
+        try Data(
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button>New chat</button></aside><main>Conversation</main>
             </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
-        )
+            """.utf8
+        ).write(to: htmlURL)
+        let webView = WKWebView()
+        webView.loadFileURL(htmlURL, allowingReadAccessTo: directory)
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
         let preferencesStored = try await webView.evaluateJavaScript(
             "try { localStorage.setItem('codex-dashboard.thread-preferences', JSON.stringify({ filterMode: 'unread', viewMode: 'recent', collapsedProjects: ['/tmp/project'] })); true } catch (_) { false }"
@@ -101,6 +104,12 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread-one">Thread</button>
               </aside>
               <main>Conversation surface</main>
+              <script>
+                Object.defineProperty(document, 'visibilityState', {
+                  configurable: true,
+                  value: 'visible',
+                });
+              </script>
             </body></html>
             """,
         )
@@ -123,7 +132,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
         )
 
-        try await Task.sleep(for: .milliseconds(600))
+        try await Task.sleep(for: .milliseconds(1_700))
         let unreadCount = try await webView.evaluateJavaScript(
             #"document.querySelector('[data-filter-count="unread"]').textContent"#
         ) as? String

@@ -150,10 +150,10 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               let clearedTimerCount = 0;
-              const originalClearInterval = window.clearInterval;
-              window.clearInterval = (timer) => {
+              const originalClearTimeout = window.clearTimeout;
+              window.clearTimeout = (timer) => {
                 clearedTimerCount += 1;
-                originalClearInterval(timer);
+                originalClearTimeout(timer);
               };
               window.__codexDashboard.destroy();
               return [

@@ -12,6 +12,9 @@ final class DashboardRenderer {
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var queuedSynchronizations: [CheckedContinuation<Void, Never>] = []
+    private var lastPromptBackupCheck: Date?
+
+    private static let promptBackupCheckInterval: TimeInterval = 30
 
     private(set) var maintainsDashboard = true
 
@@ -85,7 +88,9 @@ final class DashboardRenderer {
             lastSnapshot = snapshot
         }
         mountedTargetIDs = targetIDs
-        await backUpPromptLibrary(from: targets.first)
+        if shouldBackUpPromptLibrary(afterMounting: mountedDashboard) {
+            await backUpPromptLibrary(from: targets.first)
+        }
     }
 
     func disable() async throws -> Bool {
@@ -155,6 +160,20 @@ final class DashboardRenderer {
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
+        lastPromptBackupCheck = nil
+    }
+
+    private func shouldBackUpPromptLibrary(afterMounting mountedDashboard: Bool) -> Bool {
+        let now = Date()
+        guard !mountedDashboard, let lastPromptBackupCheck else {
+            self.lastPromptBackupCheck = now
+            return true
+        }
+        guard now.timeIntervalSince(lastPromptBackupCheck) >= Self.promptBackupCheckInterval else {
+            return false
+        }
+        self.lastPromptBackupCheck = now
+        return true
     }
 
     private func restorePromptBackupIfNeeded(in target: DevToolsTarget) async {
@@ -182,7 +201,7 @@ final class DashboardRenderer {
                 in: target
               )
         else { return }
-        try? await promptBackupStore.save(json)
+        _ = try? await promptBackupStore.save(json)
     }
 
     private func synchronizationFinished() {

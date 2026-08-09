@@ -50,6 +50,24 @@ function refreshUnreadFromSidebar() {
   if (syncUnreadFromSidebar()) renderDashboard();
 }
 
+function unreadSyncDelay() {
+  if (document.visibilityState === 'hidden') return 5000;
+  return dashboardIsOpen ? 500 : 1500;
+}
+
+function scheduleUnreadSync(delay = unreadSyncDelay()) {
+  if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
+  unreadSyncTimer = window.setTimeout(() => {
+    unreadSyncTimer = undefined;
+    refreshUnreadFromSidebar();
+    scheduleUnreadSync();
+  }, delay);
+}
+
+function handleVisibilityChange() {
+  scheduleUnreadSync(document.visibilityState === 'hidden' ? unreadSyncDelay() : 0);
+}
+
 function isThreadUnread(thread) {
   return unreadThreadIDs.has(thread.id);
 }
@@ -370,6 +388,7 @@ function openPage() {
   document.documentElement.classList.add('codex-dashboard-open');
   document.getElementById(dashboardDOM.elementIDs.navButton)?.setAttribute('aria-current', 'page');
   renderDashboard();
+  scheduleUnreadSync();
 }
 
 function closePage() {
@@ -377,6 +396,7 @@ function closePage() {
   document.getElementById(dashboardDOM.elementIDs.page)?.classList.remove('is-open');
   document.documentElement.classList.remove('codex-dashboard-open');
   document.getElementById(dashboardDOM.elementIDs.navButton)?.removeAttribute('aria-current');
+  scheduleUnreadSync();
 }
 
 function updateSidebarStatus({ unreadCount, runningThreads, dirtyProjectPaths }) {
@@ -443,7 +463,7 @@ function ensureMounted() {
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
   if (unreadSyncTimer === undefined) {
-    unreadSyncTimer = window.setInterval(refreshUnreadFromSidebar, 250);
+    scheduleUnreadSync();
   }
   if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(syncContentInset);
@@ -455,6 +475,7 @@ function ensureMounted() {
   routeEventTypes.forEach((type) => {
     window.addEventListener(type, handleHostNavigation, true);
   });
+  document.addEventListener('visibilitychange', handleVisibilityChange);
   return Boolean(
     document.getElementById(dashboardDOM.elementIDs.style)
       && document.getElementById(dashboardDOM.elementIDs.page)
@@ -467,7 +488,7 @@ function destroy() {
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
   if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
-  if (unreadSyncTimer !== undefined) clearInterval(unreadSyncTimer);
+  if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
   mutationObserver = undefined;
   resizeObserver = undefined;
   mutationFrame = undefined;
@@ -481,6 +502,7 @@ function destroy() {
   routeEventTypes.forEach((type) => {
     window.removeEventListener(type, handleHostNavigation, true);
   });
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');
   Object.values(dashboardDOM.elementIDs).forEach((id) => document.getElementById(id)?.remove());
