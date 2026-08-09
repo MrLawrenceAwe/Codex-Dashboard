@@ -72,7 +72,7 @@ final class DashboardInjectionTests: XCTestCase {
               unreadRow.addEventListener('click', () => { window.__openedThreadID = 'thread-unread'; });
               window.__codexDashboard.update(\(payload));
               window.__codexDashboard.open();
-              document.querySelector('[data-read-filter="unread"]').click();
+              document.querySelector('[data-filter="unread"]').click();
               const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');
               visibleThreads[0].querySelector('[data-open-thread]').click();
               return [
@@ -103,6 +103,84 @@ final class DashboardInjectionTests: XCTestCase {
             """
         ) as? Bool
         XCTAssertEqual(destroyed, true)
+    }
+
+    func testUncommittedFilterIncludesEveryThreadFromModifiedProjects() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"></aside><main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+        try await waitUntilLoaded(webView)
+
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let threads = [
+            DashboardThread(
+                id: "modified-project-thread-one",
+                title: "First modified project thread",
+                preview: "First",
+                workspace: "Modified Project",
+                workspacePath: "/tmp/modified-project",
+                updatedAtUnixSeconds: 3,
+                isPinned: false,
+                model: nil,
+                activity: .idle,
+                gitStatus: .modified
+            ),
+            DashboardThread(
+                id: "modified-project-thread-two",
+                title: "Second modified project thread",
+                preview: "Second",
+                workspace: "Modified Project",
+                workspacePath: "/tmp/modified-project",
+                updatedAtUnixSeconds: 2,
+                isPinned: false,
+                model: nil,
+                activity: .idle,
+                gitStatus: .clean
+            ),
+            DashboardThread(
+                id: "clean-project-thread",
+                title: "Clean project thread",
+                preview: "Clean",
+                workspace: "Clean Project",
+                workspacePath: "/tmp/clean-project",
+                updatedAtUnixSeconds: 1,
+                isPinned: false,
+                model: nil,
+                activity: .idle,
+                gitStatus: .clean
+            ),
+        ]
+        let payloadData = try JSONEncoder().encode(DashboardPayload(threads: threads))
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.update(\(payload));
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="uncommitted"]').click();
+              return [
+                [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                  .map((thread) => thread.dataset.threadId),
+                document.querySelector('[data-filter-count="uncommitted"]').textContent,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], [
+            "modified-project-thread-one",
+            "modified-project-thread-two",
+        ])
+        XCTAssertEqual(values[1] as? String, "1")
     }
 
     private func waitUntilLoaded(_ webView: WKWebView) async throws {
