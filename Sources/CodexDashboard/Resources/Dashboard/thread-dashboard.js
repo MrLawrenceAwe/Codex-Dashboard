@@ -15,6 +15,7 @@ let unreadSyncTimer;
 let pendingSidebarMutation = false;
 let dashboardIsOpen = false;
 let unreadThreadIDs = new Set();
+let handoffError = '';
 
 function syncUnreadFromSidebar() {
   const readStates = codexHost.threadReadStates();
@@ -91,11 +92,33 @@ function openThread(thread) {
   codexHost.navigateToThread(thread);
 }
 
+async function openProjectCommitOrPush(projectPath) {
+  handoffError = '';
+  const candidates = threads
+    .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
+    .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0));
+  const thread = candidates.find((item) => codexHost.canSelectThread(item));
+  if (!thread) {
+    handoffError = 'No selectable idle thread is currently visible in Codex for this project.';
+    renderDashboard();
+    return;
+  }
+  closePage();
+  if (await codexHost.openCommitOrPush(thread)) return;
+  handoffError = 'Codex’s Commit or push control could not be opened. The renderer contract may have changed.';
+  openPage();
+}
+
 function renderDashboard() {
   const state = deriveDashboardState();
   updateSidebarStatus(state);
   const page = document.getElementById(dashboardDOM.elementIDs.page);
   if (!page) return;
+  const notice = page.querySelector('[data-dashboard-notice]');
+  if (notice) {
+    notice.textContent = handoffError;
+    notice.hidden = !handoffError;
+  }
   const runningSummary = page.querySelector('[data-running-summary]');
   if (runningSummary) runningSummary.hidden = state.runningThreads.length === 0;
   const runningCount = page.querySelector('[data-running-count]');
@@ -225,6 +248,7 @@ function mountDashboardPage() {
       <header class="dashboard-header">
         <h1>Thread Dashboard</h1>
       </header>
+      <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
       <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
         <div class="dashboard-running-heading">
           <span class="dashboard-running-spinner has-count" role="status" aria-label="0 running threads" title="0 running threads"><span data-running-count aria-hidden="true">0</span></span>
@@ -265,6 +289,12 @@ function mountDashboardPage() {
     renderDashboard();
   });
   page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
+    const projectCommit = event.target.closest('[data-project-commit]');
+    if (projectCommit) {
+      event.preventDefault();
+      void openProjectCommitOrPush(projectCommit.dataset.projectCommit);
+      return;
+    }
     const projectToggle = event.target.closest('[data-project-toggle]');
     if (projectToggle) {
       const projectPath = projectToggle.dataset.projectToggle;

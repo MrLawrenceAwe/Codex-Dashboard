@@ -64,6 +64,7 @@ const threadMarkup = (() => {
     return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjects.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
+      const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
       return `
       <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${dashboardDOM.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
@@ -75,12 +76,13 @@ const threadMarkup = (() => {
                 <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project)}</span>
                 <span class="dashboard-project-path">${dashboardDOM.escapeHTML(projectPath)}</span>
               </span>
-              ${projectThreads.some((item) => item.workingTreeStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${icon('gitChanges')}<span>Changed</span></span>` : ''}
-            </span>
-            <span class="dashboard-project-summary">
-              <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+              ${hasChanges ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${icon('gitChanges')}<span>Changed</span></span>` : ''}
             </span>
           </button>
+          <span class="dashboard-project-summary">
+            <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+            ${hasChanges ? `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>` : ''}
+          </span>
         </header>
         <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item) })).join('')}</div>
       </section>`;

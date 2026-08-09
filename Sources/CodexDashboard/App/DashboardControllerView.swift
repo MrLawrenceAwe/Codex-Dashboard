@@ -160,25 +160,40 @@ struct DashboardControllerView: View {
             CompatibilityCard(viewModel: viewModel)
 
             HStack(spacing: 10) {
-                Button {
-                    Task {
-                        if viewModel.connectionState.dashboardIsMounted {
-                            await viewModel.openThreadDashboard()
-                        } else {
-                            await viewModel.restartCodexAndEnableThreadDashboard()
-                        }
+                if viewModel.connectionState.dashboardIsMounted {
+                    Button {
+                        Task { await viewModel.openThreadDashboard() }
+                    } label: {
+                        Text("Open Dashboard")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 15)
+                            .frame(height: 36)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Color.white)
                     }
-                } label: {
-                    Text(viewModel.connectionState.dashboardIsMounted ? "Open Dashboard" : "Restart & Enable")
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 15)
-                        .frame(height: 36)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
-                        .foregroundStyle(Color.white)
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isPerformingAction)
+
+                    Button("Restart & Enable") {
+                        Task { await viewModel.restartCodexAndEnableThreadDashboard() }
+                    }
+                    .disabled(viewModel.isPerformingAction)
+                } else {
+                    Button {
+                        Task { await viewModel.restartCodexAndEnableThreadDashboard() }
+                    } label: {
+                        Text("Restart & Enable")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 15)
+                            .frame(height: 36)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Color.white)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isPerformingAction)
                 }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isPerformingAction)
 
                 if viewModel.connectionState.rendererIsAvailable {
                     Menu {

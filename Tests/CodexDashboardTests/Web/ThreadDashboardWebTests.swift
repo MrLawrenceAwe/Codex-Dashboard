@@ -138,6 +138,124 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "1")
     }
 
+    func testProjectCommitActionDispatchesCodexNativeGitCommand() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:running-thread">Running thread</button>
+              </aside>
+              <main>
+                <button type="button" aria-label="Toggle side panel">Side panel</button>
+              </main>
+              <script>
+                document.documentElement.dataset.selectedThread = '';
+                document.documentElement.dataset.command = '';
+                document.documentElement.dataset.sidePanelCount = '0';
+                window.__codexDashboardCommandDispatcher = (command, source) => {
+                  document.documentElement.dataset.command = `${command}:${source}`;
+                  return true;
+                };
+                document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
+                  row.addEventListener('click', () => {
+                    document.querySelectorAll('[data-app-action-sidebar-thread-id]')
+                      .forEach((candidate) => candidate.removeAttribute('aria-current'));
+                    row.setAttribute('aria-current', 'page');
+                    document.documentElement.dataset.selectedThread = row.dataset.appActionSidebarThreadId;
+                  });
+                });
+                document.querySelector('[aria-label="Toggle side panel"]').addEventListener('click', () => {
+                  document.documentElement.dataset.sidePanelCount = String(
+                    Number(document.documentElement.dataset.sidePanelCount) + 1
+                  );
+                  const environment = document.createElement('button');
+                  environment.type = 'button';
+                  environment.textContent = 'Environment';
+                  environment.setAttribute('aria-expanded', 'false');
+                  environment.addEventListener('click', () => {
+                    environment.setAttribute('aria-expanded', 'true');
+                    const commit = document.createElement('button');
+                    commit.type = 'button';
+                    commit.dataset.slot = 'thread-summary-panel-item-button';
+                    commit.textContent = 'Commit or push';
+                    document.body.append(commit);
+                  });
+                  document.body.append(environment);
+                });
+              </script>
+            </body></html>
+            """,
+        )
+        let threads = [
+            ThreadSummary.fixture(
+                id: "running-thread",
+                title: "Newer running thread",
+                projectPath: "/tmp/changed-project",
+                recencyTimestamp: 5,
+                runState: .running,
+                workingTreeStatus: .hasChanges
+            ),
+            ThreadSummary.fixture(
+                id: "off-sidebar-idle-thread",
+                title: "Newest idle thread not mounted in the sidebar",
+                projectPath: "/tmp/changed-project",
+                recencyTimestamp: 4,
+                workingTreeStatus: .hasChanges
+            ),
+            ThreadSummary.fixture(
+                id: "idle-thread",
+                title: "Older idle thread",
+                projectPath: "/tmp/changed-project",
+                recencyTimestamp: 2,
+                workingTreeStatus: .hasChanges
+            ),
+            ThreadSummary.fixture(
+                id: "clean-thread",
+                title: "Clean project thread",
+                projectPath: "/tmp/clean-project",
+                recencyTimestamp: 1,
+                workingTreeStatus: .clean
+            ),
+        ]
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+
+        let buttonCounts = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const buttons = [...document.querySelectorAll('[data-project-commit]')];
+              const result = [buttons.length, buttons[0]?.textContent.trim()];
+              buttons[0].click();
+              return result;
+            })()
+            """
+        ) as? [Any]
+        try await Task.sleep(for: .milliseconds(700))
+        let handoff = try await webView.evaluateJavaScript(
+            """
+            [
+              document.documentElement.dataset.selectedThread,
+              document.documentElement.dataset.command,
+              document.documentElement.dataset.sidePanelCount,
+              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+            ]
+            """
+        ) as? [Any]
+
+        let counts = try XCTUnwrap(buttonCounts)
+        XCTAssertEqual(counts[0] as? Int, 1)
+        XCTAssertEqual(counts[1] as? String, "Commit or push")
+        let values = try XCTUnwrap(handoff)
+        XCTAssertEqual(values[0] as? String, "local:idle-thread")
+        XCTAssertEqual(values[1] as? String, "git.commit:codex_dashboard")
+        XCTAssertEqual(values[2] as? String, "0")
+        XCTAssertEqual(values[3] as? Bool, false)
+    }
+
     func testRunningThreadsUseCompactSummaryAndAreNotDuplicatedInMainList() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
