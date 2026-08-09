@@ -22,8 +22,18 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertTrue(adapter.expression.contains("const unreadCount = threads.filter(isThreadUnread).length"))
         XCTAssertTrue(adapter.expression.contains("data-navigation-running"))
         XCTAssertTrue(adapter.expression.contains("spinner.hidden = !hasRunningThreads"))
+        XCTAssertTrue(adapter.expression.contains("class=\"dashboard-running-spinner\""))
+        XCTAssertTrue(adapter.expression.contains("dashboard-project-summary"))
+        XCTAssertTrue(adapter.expression.contains("runningSummary.hidden = running === 0"))
+        XCTAssertFalse(adapter.expression.contains("dashboard-status-label"))
+        XCTAssertFalse(adapter.expression.contains("dashboard-stat-indicator"))
         XCTAssertFalse(adapter.expression.contains("count.textContent = String(activeCount)"))
         XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
+        let openThreadBody = try XCTUnwrap(
+            adapter.expression.components(separatedBy: "function openThread(thread) {").last?
+                .components(separatedBy: "function threadMarkup").first
+        )
+        XCTAssertFalse(openThreadBody.contains("markThreadRead(thread)"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
 
