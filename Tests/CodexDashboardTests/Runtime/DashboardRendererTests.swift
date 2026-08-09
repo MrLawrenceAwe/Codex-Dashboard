@@ -25,6 +25,61 @@ private actor StubRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testLiveRendererCompatibilityWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with Codex on port 47832.")
+        }
+        let renderer = try DashboardRenderer(
+            devTools: DevToolsClient(),
+            injection: DashboardInjection(version: "test", mountExpression: "true")
+        )
+
+        let checks = await renderer.compatibilityChecks()
+
+        XCTAssertFalse(
+            checks.contains { $0.status == .incompatible },
+            checks.map { "\($0.title): \($0.detail)" }.joined(separator: "\n")
+        )
+    }
+
+    func testCompatibilityCheckExplainsUnavailableRenderer() async throws {
+        let renderer = try DashboardRenderer(
+            devTools: StubRendererDevTools(targets: []),
+            injection: DashboardInjection(version: "test", mountExpression: "true")
+        )
+
+        let checks = await renderer.compatibilityChecks()
+
+        XCTAssertEqual(checks.map(\.id), ["renderer"])
+        XCTAssertEqual(checks.first?.status, .unavailable)
+    }
+
+    func testCompatibilityCheckInspectsRendererCapabilities() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = StubRendererDevTools(targets: [target])
+        await devTools.setEvaluationResult(true)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injection: DashboardInjection(version: "test", mountExpression: "true")
+        )
+
+        let checks = await renderer.compatibilityChecks()
+
+        XCTAssertEqual(
+            checks.map(\.id),
+            [
+                "renderer", "sidebar-host", "thread-navigation", "sidebar-unread",
+                "composer", "prompt-menu",
+            ]
+        )
+        XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
+    }
+
     func testPreparingForRestartRestoresMaintenance() throws {
         let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),

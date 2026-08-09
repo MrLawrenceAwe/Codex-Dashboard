@@ -21,6 +21,7 @@ protocol DashboardRuntime: AnyObject {
     ) async throws
     func disableDashboard() async throws -> DashboardDisableOutcome
     func openDashboard() async
+    func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
 @MainActor
@@ -75,5 +76,9 @@ final class DashboardRuntimeCoordinator: DashboardRuntime {
 
     func openDashboard() async {
         await renderer.open()
+    }
+
+    func rendererCompatibilityChecks() async -> [CompatibilityCheck] {
+        await renderer.compatibilityChecks()
     }
 }

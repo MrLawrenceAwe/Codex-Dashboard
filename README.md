@@ -33,6 +33,7 @@ removes it.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools connection managed by `DashboardRuntimeCoordinator` and `DashboardRenderer`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
+- A read-only compatibility preflight reports storage, rollout-event, renderer, sidebar, unread-state, composer, and prompt-menu contract drift after Codex updates.
 - Swift source is grouped by application UI, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run on a fixed two-second cadence; unread state refreshes independently every 500 milliseconds, and Git status enrichment every ten seconds. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
