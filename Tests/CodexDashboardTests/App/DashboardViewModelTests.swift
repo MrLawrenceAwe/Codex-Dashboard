@@ -65,6 +65,14 @@ private actor SuspendedCatalogProvider: ThreadCatalogProviding {
     }
 }
 
+private struct StubCompatibilityChecker: CodexCompatibilityChecking {
+    let checks: [CompatibilityCheck]
+
+    func checkLocalContracts() async -> [CompatibilityCheck] {
+        checks
+    }
+}
+
 @MainActor
 private final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning = false
@@ -81,10 +89,34 @@ private final class StubDashboardRuntime: DashboardRuntime {
     ) async throws {}
     func disableDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
     func openDashboard() async {}
+    func rendererCompatibilityChecks() async -> [CompatibilityCheck] { [] }
 }
 
 @MainActor
 final class DashboardViewModelTests: XCTestCase {
+    func testCompatibilityPreflightPublishesCapabilityReport() async {
+        let expected = CompatibilityCheck(
+            id: "storage",
+            title: "Storage",
+            status: .compatible,
+            detail: "Healthy"
+        )
+        let viewModel = DashboardViewModel(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            gitStatusProvider: StubGitStatusProvider(),
+            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await viewModel.runCompatibilityPreflight()
+
+        XCTAssertEqual(viewModel.compatibilityReport?.checks, [expected])
+        XCTAssertFalse(viewModel.isCheckingCompatibility)
+    }
+
     func testRefreshUsesInjectedDependenciesWithoutStartingPolling() async {
         let thread = ThreadSummary.fixture(id: "thread-1", title: "Injected thread")
         let viewModel = DashboardViewModel(

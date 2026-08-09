@@ -39,6 +39,81 @@ private struct ConnectionStatusCard: View {
     }
 }
 
+private struct CompatibilityCard: View {
+    @ObservedObject var viewModel: DashboardViewModel
+
+    private func color(for status: CompatibilityStatus) -> Color {
+        switch status {
+        case .compatible: Color(red: 0.45, green: 0.94, blue: 0.61)
+        case .warning, .unavailable: Color(red: 0.96, green: 0.77, blue: 0.42)
+        case .incompatible: Color(red: 1.0, green: 0.42, blue: 0.42)
+        }
+    }
+
+    private func label(for status: CompatibilityStatus) -> String {
+        switch status {
+        case .compatible: "Compatible"
+        case .warning: "Warning"
+        case .incompatible: "Incompatible"
+        case .unavailable: "Not checked"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Codex update compatibility")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(viewModel.compatibilityReport?.summary ?? "Check private Codex contracts before or after an update.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(viewModel.isCheckingCompatibility ? "Checking…" : "Run Preflight") {
+                    Task { await viewModel.runCompatibilityPreflight() }
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 11, weight: .medium))
+                .disabled(viewModel.isCheckingCompatibility)
+            }
+
+            if let report = viewModel.compatibilityReport {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(report.checks) { check in
+                            HStack(alignment: .top, spacing: 8) {
+                                Circle()
+                                    .fill(color(for: check.status))
+                                    .frame(width: 6, height: 6)
+                                    .padding(.top, 4)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(check.title)
+                                            .font(.system(size: 11, weight: .medium))
+                                        Text(label(for: check.status))
+                                            .font(.system(size: 9, weight: .medium))
+                                            .foregroundStyle(color(for: check.status))
+                                    }
+                                    Text(check.detail)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .frame(height: 190)
+            }
+        }
+        .padding(13)
+        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
+    }
+}
+
 struct ControllerView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
@@ -67,6 +142,8 @@ struct ControllerView: View {
             }
 
             ConnectionStatusCard(viewModel: viewModel)
+
+            CompatibilityCard(viewModel: viewModel)
 
             HStack(spacing: 10) {
                 Button {
@@ -111,8 +188,11 @@ struct ControllerView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
-        .frame(width: 620, height: 370, alignment: .topLeading)
-        .onAppear { viewModel.startRefreshing() }
+        .frame(width: 620, height: 600, alignment: .topLeading)
+        .onAppear {
+            viewModel.startRefreshing()
+            Task { await viewModel.runCompatibilityPreflight() }
+        }
         .onDisappear { viewModel.stopRefreshing() }
     }
 }

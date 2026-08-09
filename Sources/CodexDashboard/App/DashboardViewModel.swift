@@ -24,8 +24,11 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var threadDataWarning: String?
     @Published private(set) var threads: [ThreadSummary] = []
     @Published private(set) var totalThreadCount = 0
+    @Published private(set) var compatibilityReport: CompatibilityReport?
+    @Published private(set) var isCheckingCompatibility = false
 
     private let threadService: ThreadDashboardService
+    private let compatibilityChecker: any CodexCompatibilityChecking
     private let refreshCoordinator = DashboardRefreshCoordinator()
     private var runtime: (any DashboardRuntime)?
     private var refreshTask: Task<Void, Never>?
@@ -56,6 +59,7 @@ final class DashboardViewModel: ObservableObject {
         catalogProvider: any ThreadCatalogProviding = CodexThreadCatalogProvider(),
         gitStatusProvider: any GitStatusProviding = SystemGitStatusProvider(),
         unreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
+        compatibilityChecker: any CodexCompatibilityChecking = SystemCodexCompatibilityChecker(),
         runtimeFactory: () throws -> any DashboardRuntime = { try DashboardRuntimeCoordinator() }
     ) {
         threadService = ThreadDashboardService(
@@ -63,6 +67,7 @@ final class DashboardViewModel: ObservableObject {
             gitStatusProvider: gitStatusProvider,
             unreadIDProvider: unreadIDProvider
         )
+        self.compatibilityChecker = compatibilityChecker
         do {
             runtime = try runtimeFactory()
         } catch {
@@ -158,6 +163,29 @@ final class DashboardViewModel: ObservableObject {
 
     func openDashboard() async {
         await runtime?.openDashboard()
+    }
+
+    func runCompatibilityPreflight() async {
+        guard !isCheckingCompatibility else { return }
+        isCheckingCompatibility = true
+        defer { isCheckingCompatibility = false }
+
+        async let localChecks = compatibilityChecker.checkLocalContracts()
+        let rendererChecks: [CompatibilityCheck]
+        if let runtime {
+            rendererChecks = await runtime.rendererCompatibilityChecks()
+        } else {
+            rendererChecks = [CompatibilityCheck(
+                id: "renderer",
+                title: "Renderer connection",
+                status: .unavailable,
+                detail: "The dashboard runtime is unavailable."
+            )]
+        }
+        compatibilityReport = CompatibilityReport(
+            checks: await localChecks + rendererChecks,
+            checkedAt: Date()
+        )
     }
 
     private func synchronizeRuntime() async {
