@@ -1,0 +1,24 @@
+const existing = window.__codexDashboard;
+if (existing?.version === DASHBOARD_VERSION) {
+  return existing.ensureMounted();
+}
+existing?.destroy?.();
+
+const dashboardDOM = {
+  elementIDs: {
+    style: 'codex-dashboard-style',
+    navButton: 'codex-dashboard-navigation',
+    page: 'codex-dashboard-page',
+    promptDialog: 'codex-dashboard-prompt-dialog',
+  },
+
+  escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+    })[character]);
+  },
+
+  textIs(element, value) {
+    return element?.textContent?.trim() === value;
+  },
+};

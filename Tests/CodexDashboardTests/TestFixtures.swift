@@ -9,12 +9,12 @@ extension ThreadSummary {
         preview: String = "Preview",
         projectName: String = "Project",
         projectPath: String = "/tmp/project",
-        sortTimestamp: Int64 = 1,
+        recencyTimestamp: Int64 = 1,
         isPinned: Bool = false,
         isUnread: Bool = false,
         model: String? = nil,
         runState: ThreadRunState = .idle,
-        gitStatus: GitStatus = .clean
+        workingTreeStatus: WorkingTreeStatus = .clean
     ) -> ThreadSummary {
         var thread = ThreadSummary(
             id: id,
@@ -22,11 +22,11 @@ extension ThreadSummary {
             preview: preview,
             projectName: projectName,
             projectPath: projectPath,
-            sortTimestamp: sortTimestamp,
+            recencyTimestamp: recencyTimestamp,
             isPinned: isPinned,
             model: model,
             runState: runState,
-            gitStatus: gitStatus
+            workingTreeStatus: workingTreeStatus
         )
         thread.isUnread = isUnread
         return thread

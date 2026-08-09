@@ -1,6 +1,6 @@
 const resourceRoot = '../Sources/CodexDashboard/Resources/Dashboard';
 
-fetch(`${resourceRoot}/resource-manifest.json`)
+fetch(`${resourceRoot}/injection-manifest.json`)
   .then((response) => response.json())
   .then(({ scripts: scriptNames, stylesheets: stylesheetNames }) => Promise.all([
     Promise.all(scriptNames.map((name) => fetch(`${resourceRoot}/${name}.js`).then((response) => response.text()))),
@@ -15,11 +15,11 @@ fetch(`${resourceRoot}/resource-manifest.json`)
       preview: 'Create an active-thread dashboard embedded directly inside Codex.',
       projectName: 'Codex Dashboard',
       projectPath: '/Users/lawrenceawe/Codex Dashboard',
-      sortTimestamp: Math.round(Date.now() / 1000) - 3,
+      recencyTimestamp: Math.round(Date.now() / 1000) - 3,
       isPinned: true,
       model: 'gpt-5.6-sol',
       runState: 'running',
-      gitStatus: 'hasChanges',
+      workingTreeStatus: 'hasChanges',
     },
     {
       id: 'thread-review',
@@ -27,11 +27,11 @@ fetch(`${resourceRoot}/resource-manifest.json`)
       preview: 'Inspect the project for correctness problems and produce actionable findings.',
       projectName: 'voice-tiktok-scroller',
       projectPath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      sortTimestamp: Math.round(Date.now() / 1000) - 780,
+      recencyTimestamp: Math.round(Date.now() / 1000) - 780,
       isPinned: false,
       model: 'gpt-5.6-terra',
       runState: 'idle',
-      gitStatus: 'clean',
+      workingTreeStatus: 'clean',
     },
     {
       id: 'thread-idle',
@@ -39,11 +39,11 @@ fetch(`${resourceRoot}/resource-manifest.json`)
       preview: 'Improve recognition of the spoken back command.',
       projectName: 'voice-tiktok-scroller',
       projectPath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      sortTimestamp: Math.round(Date.now() / 1000) - 86400,
+      recencyTimestamp: Math.round(Date.now() / 1000) - 86400,
       isPinned: false,
       model: 'gpt-5.6-terra',
       runState: 'idle',
-      gitStatus: 'clean',
+      workingTreeStatus: 'clean',
     },
   ];
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);

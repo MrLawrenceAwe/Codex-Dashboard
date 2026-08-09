@@ -1,3 +1,4 @@
+const threadDashboard = (() => {
 const navigationEventTypes = ['pointerdown', 'mousedown', 'click'];
 
 let threads = [];
@@ -15,7 +16,7 @@ let dashboardIsOpen = false;
 let unreadThreadIDs = new Set();
 
 function syncUnreadFromSidebar() {
-  const readStates = codexUI.threadReadStates();
+  const readStates = codexHost.threadReadStates();
   let changed = false;
   readStates.forEach((isUnread, id) => {
     if (isUnread === unreadThreadIDs.has(id)) return;
@@ -36,38 +37,14 @@ function isThreadUnread(thread) {
 
 function handleHostNavigation(event) {
   const eventTarget = event.target instanceof Element ? event.target : null;
-  if (eventTarget?.closest(`#${elementIDs.navButton}`)) {
+  if (eventTarget?.closest(`#${dashboardDOM.elementIDs.navButton}`)) {
     event.preventDefault();
     event.stopPropagation();
     if (event.type === 'click') openPage();
     return;
   }
   if (event.type !== 'click' || !dashboardIsOpen) return;
-  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${elementIDs.navButton}`)) closePage();
-}
-
-function iconMarkup(name) {
-  const paths = {
-    threads: '<path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
-    project: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5l2 2H19.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>',
-    arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
-    search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
-    pin: '<path d="m9 3 6 0-1 6 3 3v2H7v-2l3-3zM12 14v7"/>',
-    gitChanges: '<circle cx="6" cy="5" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M8 6h5a5 5 0 0 1 5 5v-3"/>',
-    chevron: '<path d="m9 18 6-6-6-6"/>',
-  };
-  return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
-}
-
-function formatRelativeTime(timestamp) {
-  const seconds = Math.max(0, Math.round(Date.now() / 1000 - Number(timestamp || 0)));
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${dashboardDOM.elementIDs.navButton}`)) closePage();
 }
 
 function deriveDashboardState() {
@@ -76,7 +53,7 @@ function deriveDashboardState() {
     unreadCount: threads.filter(isThreadUnread).length,
     changedProjectPaths: new Set(
       threads
-        .filter((thread) => thread.gitStatus === 'hasChanges')
+        .filter((thread) => thread.workingTreeStatus === 'hasChanges')
         .map((thread) => String(thread.projectPath).trim()),
     ),
   };
@@ -96,78 +73,13 @@ function filterThreads({ changedProjectPaths }) {
 
 function openThread(thread) {
   closePage();
-  codexUI.navigateToThread(thread);
-}
-
-function renderThreadMarkup(thread, showProject = false) {
-  const unread = isThreadUnread(thread);
-  return `
-    <article class="dashboard-thread" data-run-state="${escapeHTML(thread.runState)}" data-unread="${String(unread)}" data-thread-id="${escapeHTML(thread.id)}">
-      <div class="dashboard-status-dot" title="${escapeHTML(thread.runState)}"></div>
-      <div class="dashboard-thread-copy">
-        <div class="dashboard-thread-title-row">
-          ${unread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
-          <h2>${escapeHTML(thread.title)}</h2>
-          ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconMarkup('pin')}</span>` : ''}
-        </div>
-        <p>${escapeHTML(thread.preview || 'No preview available')}</p>
-        <div class="dashboard-meta">
-          ${showProject ? `<span>${escapeHTML(thread.projectName)}</span>` : ''}
-          <span>${formatRelativeTime(thread.sortTimestamp)}</span>
-          ${thread.model ? `<span>${escapeHTML(thread.model)}</span>` : ''}
-        </div>
-      </div>
-      <div class="dashboard-thread-actions">
-        ${thread.runState === 'running' ? '<span class="dashboard-running-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
-        <button type="button" data-open-thread="${escapeHTML(thread.id)}">Open ${iconMarkup('arrow')}</button>
-      </div>
-    </article>`;
-}
-
-function renderThreadListMarkup(visibleThreads) {
-  if (viewMode === 'recent') {
-    return [...visibleThreads]
-      .sort((left, right) => Number(right.sortTimestamp || 0) - Number(left.sortTimestamp || 0))
-      .map((thread) => renderThreadMarkup(thread, true))
-      .join('');
-  }
-  const groups = new Map();
-  visibleThreads.forEach((thread) => {
-    const projectPath = String(thread.projectPath).trim();
-    if (!groups.has(projectPath)) {
-      groups.set(projectPath, { path: projectPath, name: thread.projectName, threads: [] });
-    }
-    groups.get(projectPath).threads.push(thread);
-  });
-  return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
-    const isCollapsed = collapsedProjects.has(projectPath);
-    const projectListID = `dashboard-project-${index}`;
-    const runningCount = projectThreads.filter((thread) => thread.runState === 'running').length;
-    return `
-    <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${escapeHTML(project)} project">
-      <header class="dashboard-project-heading">
-        <button type="button" class="dashboard-project-toggle" data-project-toggle="${escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
-          <span class="dashboard-project-title">
-            <span class="dashboard-project-chevron">${iconMarkup('chevron')}</span>
-            <span class="dashboard-project-icon">${iconMarkup('project')}</span>
-            <span class="dashboard-project-name">${escapeHTML(project)}</span>
-            ${projectThreads.some((thread) => thread.gitStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconMarkup('gitChanges')}<span>Uncommitted</span></span>` : ''}
-          </span>
-          <span class="dashboard-project-summary">
-            ${runningCount > 0 ? `<span class="dashboard-running-spinner has-count" role="status" aria-label="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}" title="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}"><span aria-hidden="true">${runningCount}</span></span>` : ''}
-            <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
-          </span>
-        </button>
-      </header>
-      <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((thread) => renderThreadMarkup(thread)).join('')}</div>
-    </section>`;
-  }).join('');
+  codexHost.navigateToThread(thread);
 }
 
 function renderDashboard() {
   const state = deriveDashboardState();
   updateSidebarStatus(state);
-  const page = document.getElementById(elementIDs.page);
+  const page = document.getElementById(dashboardDOM.elementIDs.page);
   if (!page) return;
   const runningSummary = page.querySelector('[data-running-summary]');
   if (runningSummary) runningSummary.hidden = state.runningThreads.length === 0;
@@ -180,7 +92,7 @@ function renderDashboard() {
   }
   const runningList = page.querySelector('[data-running-list]');
   if (runningList) runningList.innerHTML = state.runningThreads
-    .map((thread) => renderThreadMarkup(thread, true))
+    .map((thread) => threadMarkup.thread(thread, { showProject: true, isUnread: isThreadUnread(thread) }))
     .join('');
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === filterMode;
@@ -210,17 +122,17 @@ function renderDashboard() {
     list.innerHTML = `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`;
     return;
   }
-  list.innerHTML = renderThreadListMarkup(visibleThreads);
+  list.innerHTML = threadMarkup.list(visibleThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread });
 }
 
 function syncContentInset() {
-  const sidebar = codexUI.sidebar();
+  const sidebar = codexHost.sidebar();
   const width = sidebar ? Math.max(0, sidebar.getBoundingClientRect().right) : 0;
   document.documentElement.style.setProperty('--codex-dashboard-content-left', `${Math.round(width)}px`);
 }
 
 function observeSidebar() {
-  const sidebar = codexUI.sidebar();
+  const sidebar = codexHost.sidebar();
   if (!resizeObserver || sidebar === observedSidebar) return;
   resizeObserver.disconnect();
   if (sidebar) resizeObserver.observe(sidebar);
@@ -228,8 +140,8 @@ function observeSidebar() {
 }
 
 function attachPageToCodexContent() {
-  const page = document.getElementById(elementIDs.page);
-  const pageHost = codexUI.pageHost();
+  const page = document.getElementById(dashboardDOM.elementIDs.page);
+  const pageHost = codexHost.pageHost();
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
 }
 
@@ -241,10 +153,10 @@ function mutationTouchesSidebar(record) {
 }
 
 function scheduleMutationSync(records) {
-  schedulePromptMenuSync();
+  promptMenu.scheduleSync();
   const sidebarMutation = records.some(mutationTouchesSidebar);
-  const dashboardMissing = !document.getElementById(elementIDs.page)
-    || !document.getElementById(elementIDs.navButton);
+  const dashboardMissing = !document.getElementById(dashboardDOM.elementIDs.page)
+    || !document.getElementById(dashboardDOM.elementIDs.navButton);
   if (!sidebarMutation && !dashboardMissing) return;
   if (sidebarMutation) pendingSidebarMutation = true;
   if (mutationFrame !== undefined) return;
@@ -252,9 +164,9 @@ function scheduleMutationSync(records) {
     mutationFrame = undefined;
     const shouldSyncUnread = pendingSidebarMutation;
     pendingSidebarMutation = false;
-    const restoredPage = !document.getElementById(elementIDs.page);
+    const restoredPage = !document.getElementById(dashboardDOM.elementIDs.page);
     if (restoredPage) mountDashboardPage();
-    if (!document.getElementById(elementIDs.navButton)) mountNavigationButton();
+    if (!document.getElementById(dashboardDOM.elementIDs.navButton)) mountNavigationButton();
     if (dashboardIsOpen && restoredPage) openPage();
     attachPageToCodexContent();
     observeSidebar();
@@ -263,17 +175,17 @@ function scheduleMutationSync(records) {
 }
 
 function mountNavigationButton() {
-  const insertionPoint = codexUI.navigationInsertionPoint();
+  const insertionPoint = codexHost.navigationInsertionPoint();
   if (!insertionPoint?.element?.parentElement) return false;
   const button = document.createElement('button');
-  button.id = elementIDs.navButton;
+  button.id = dashboardDOM.elementIDs.navButton;
   button.type = 'button';
   button.className = insertionPoint.element.className;
-  button.setAttribute('aria-label', 'Dashboard');
+  button.setAttribute('aria-label', 'Thread Dashboard');
   button.innerHTML = `
     <div class="dashboard-nav-copy">
-      <span class="dashboard-nav-icon">${iconMarkup('threads')}</span>
-      <span class="dashboard-nav-label">Dashboard</span>
+      <span class="dashboard-nav-icon">${threadMarkup.icon('threads')}</span>
+      <span class="dashboard-nav-label">Thread Dashboard</span>
     </div>
     <div class="dashboard-nav-status">
       <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running threads" title="0 running threads" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
@@ -287,12 +199,12 @@ function mountNavigationButton() {
 
 function mountDashboardPage() {
   const page = document.createElement('section');
-  page.id = elementIDs.page;
-  page.setAttribute('aria-label', 'Codex thread dashboard');
+  page.id = dashboardDOM.elementIDs.page;
+  page.setAttribute('aria-label', 'Codex Thread Dashboard');
   page.innerHTML = `
     <div class="dashboard-shell">
       <header class="dashboard-header">
-        <h1>Threads</h1>
+        <h1>Thread Dashboard</h1>
       </header>
       <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
         <div class="dashboard-running-heading">
@@ -312,7 +224,7 @@ function mountDashboardPage() {
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
             <button type="button" data-view="recent" aria-pressed="false">Recent</button>
           </div>
-          <label class="dashboard-search" aria-label="Search loaded threads">${iconMarkup('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
+          <label class="dashboard-search" aria-label="Search loaded threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
         </div>
       </div>
       <main class="dashboard-list" data-thread-list></main>
@@ -345,7 +257,7 @@ function mountDashboardPage() {
     openThreadFromEvent(event);
   });
   page.querySelector('[data-running-list]').addEventListener('click', openThreadFromEvent);
-  codexUI.pageHost().append(page);
+  codexHost.pageHost().append(page);
 }
 
 function openThreadFromEvent(event) {
@@ -357,20 +269,20 @@ function openThreadFromEvent(event) {
 }
 
 function openPage() {
-  const page = document.getElementById(elementIDs.page);
+  const page = document.getElementById(dashboardDOM.elementIDs.page);
   if (!page) return;
   dashboardIsOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
-  document.getElementById(elementIDs.navButton)?.setAttribute('aria-current', 'page');
+  document.getElementById(dashboardDOM.elementIDs.navButton)?.setAttribute('aria-current', 'page');
   renderDashboard();
 }
 
 function closePage() {
   dashboardIsOpen = false;
-  document.getElementById(elementIDs.page)?.classList.remove('is-open');
+  document.getElementById(dashboardDOM.elementIDs.page)?.classList.remove('is-open');
   document.documentElement.classList.remove('codex-dashboard-open');
-  document.getElementById(elementIDs.navButton)?.removeAttribute('aria-current');
+  document.getElementById(dashboardDOM.elementIDs.navButton)?.removeAttribute('aria-current');
 }
 
 function updateSidebarStatus({ unreadCount, runningThreads }) {
@@ -407,18 +319,18 @@ function applySnapshot(nextSnapshot) {
 
 function ensureMounted() {
   if (!document.body) return false;
-  if (!document.getElementById(elementIDs.style)) {
+  if (!document.getElementById(dashboardDOM.elementIDs.style)) {
     const style = document.createElement('style');
-    style.id = elementIDs.style;
+    style.id = dashboardDOM.elementIDs.style;
     style.textContent = DASHBOARD_CSS;
     document.head.append(style);
   }
-  const pageWasMissing = !document.getElementById(elementIDs.page);
+  const pageWasMissing = !document.getElementById(dashboardDOM.elementIDs.page);
   if (pageWasMissing) mountDashboardPage();
-  if (!document.getElementById(elementIDs.navButton)) mountNavigationButton();
+  if (!document.getElementById(dashboardDOM.elementIDs.navButton)) mountNavigationButton();
   attachPageToCodexContent();
   syncContentInset();
-  mountPromptLibrary();
+  promptLibrary.mount();
   if (dashboardIsOpen && pageWasMissing) openPage();
 
   if (!mutationObserver) {
@@ -436,9 +348,9 @@ function ensureMounted() {
     document.addEventListener(type, handleHostNavigation, true);
   });
   return Boolean(
-    document.getElementById(elementIDs.style)
-      && document.getElementById(elementIDs.page)
-      && document.getElementById(elementIDs.navButton)
+    document.getElementById(dashboardDOM.elementIDs.style)
+      && document.getElementById(dashboardDOM.elementIDs.page)
+      && document.getElementById(dashboardDOM.elementIDs.navButton)
   );
 }
 
@@ -454,21 +366,20 @@ function destroy() {
   unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
   observedSidebar = undefined;
-  unmountPromptLibrary();
+  promptLibrary.unmount();
   navigationEventTypes.forEach((type) => {
     document.removeEventListener(type, handleHostNavigation, true);
   });
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');
-  Object.values(elementIDs).forEach((id) => document.getElementById(id)?.remove());
+  Object.values(dashboardDOM.elementIDs).forEach((id) => document.getElementById(id)?.remove());
   delete window.__codexDashboard;
 }
 
-window.__codexDashboard = {
-  version: DASHBOARD_VERSION,
+return {
   ensureMounted,
   destroy,
   open: openPage,
   applySnapshot,
 };
-return ensureMounted();
+})();

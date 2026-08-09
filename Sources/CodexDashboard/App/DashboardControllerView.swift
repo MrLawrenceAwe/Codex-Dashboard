@@ -7,7 +7,7 @@ private struct ConnectionStatusCard: View {
         if viewModel.connectionState.dashboardIsMounted {
             return Color(red: 0.45, green: 0.94, blue: 0.61)
         }
-        if viewModel.connectionState != .appClosed {
+        if viewModel.connectionState != .codexClosed {
             return Color(red: 0.96, green: 0.77, blue: 0.42)
         }
         return .secondary
@@ -29,7 +29,7 @@ private struct ConnectionStatusCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            Button("Refresh") { Task { await viewModel.refresh() } }
+            Button("Sync Now") { Task { await viewModel.synchronizeDashboard() } }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11, weight: .medium))
         }
@@ -70,8 +70,8 @@ private struct CompatibilityCard: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(viewModel.isCheckingCompatibility ? "Checking…" : "Run Preflight") {
-                    Task { await viewModel.runCompatibilityPreflight() }
+                Button(viewModel.isCheckingCompatibility ? "Checking…" : "Check Compatibility") {
+                    Task { await viewModel.checkCompatibility() }
                 }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11, weight: .medium))
@@ -114,7 +114,7 @@ private struct CompatibilityCard: View {
     }
 }
 
-struct ControllerView: View {
+struct DashboardControllerView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
@@ -129,9 +129,6 @@ struct ControllerView: View {
                 }
                 .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Thread dashboard controller")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
                     Text("Codex Dashboard")
                         .font(.system(size: 24, weight: .semibold))
                         .tracking(-0.5)
@@ -147,9 +144,9 @@ struct ControllerView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await viewModel.restartCodexAndEnableDashboard() }
+                    Task { await viewModel.restartCodexAndEnableThreadDashboard() }
                 } label: {
-                    Text("Restart & Enable Dashboard")
+                    Text("Restart & Enable")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 15)
                         .frame(height: 34)
@@ -162,10 +159,10 @@ struct ControllerView: View {
                 .buttonStyle(.plain)
                 .disabled(viewModel.isPerformingAction)
 
-                Button("Open Dashboard") { Task { await viewModel.openDashboard() } }
+                Button("Open Thread Dashboard") { Task { await viewModel.openThreadDashboard() } }
                     .disabled(!viewModel.connectionState.dashboardIsMounted || viewModel.isPerformingAction)
 
-                Button("Disable Dashboard") { Task { await viewModel.disableDashboard() } }
+                Button("Disable Thread Dashboard") { Task { await viewModel.disableThreadDashboard() } }
                     .disabled(!viewModel.connectionState.rendererIsAvailable || viewModel.isPerformingAction)
             }
             .controlSize(.large)
@@ -182,7 +179,7 @@ struct ControllerView: View {
                 .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Text("The dashboard reads local Codex thread metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")
+            Text("The Thread Dashboard reads local Codex thread metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -190,9 +187,9 @@ struct ControllerView: View {
         .padding(24)
         .frame(width: 620, height: 600, alignment: .topLeading)
         .onAppear {
-            viewModel.startRefreshing()
-            Task { await viewModel.runCompatibilityPreflight() }
+            viewModel.startMonitoring()
+            Task { await viewModel.checkCompatibility() }
         }
-        .onDisappear { viewModel.stopRefreshing() }
+        .onDisappear { viewModel.stopMonitoring() }
     }
 }

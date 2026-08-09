@@ -26,7 +26,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             baseURL: nil
         )
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjection.load()
+        let injection = try DashboardInjectionPayload.load()
         let mounted = try await webView.evaluateJavaScript(injection.mountExpression) as? Bool
         XCTAssertEqual(mounted, true)
         let healthy = try await webView.evaluateJavaScript(injection.healthCheckExpression) as? Bool
@@ -75,7 +75,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 preview: "Already read",
                 projectName: "Project",
                 projectPath: "/tmp/project",
-                sortTimestamp: 2
+                recencyTimestamp: 2
             ),
             ThreadSummary.fixture(
                 id: "thread-unread",
@@ -83,11 +83,11 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 preview: "Needs attention",
                 projectName: "Project",
                 projectPath: "/tmp/project",
-                sortTimestamp: 1,
+                recencyTimestamp: 1,
                 isPinned: true,
                 model: "test-model",
                 runState: .running,
-                gitStatus: .hasChanges
+                workingTreeStatus: .hasChanges
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)

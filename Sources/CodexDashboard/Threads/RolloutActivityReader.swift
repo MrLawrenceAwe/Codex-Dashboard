@@ -1,11 +1,11 @@
 import Foundation
 
-struct RolloutStatus: Equatable, Sendable {
+struct ThreadActivity: Equatable, Sendable {
     let runState: ThreadRunState
     let lastFinalResponseAtUnixSeconds: Int64?
 }
 
-struct RolloutStatusReader {
+struct RolloutActivityReader {
     private enum RunEvent {
         case started
         case ended
@@ -24,7 +24,7 @@ struct RolloutStatusReader {
         let size: UInt64
         let modifiedAt: Date
         let endsWithNewline: Bool
-        let status: RolloutStatus
+        let status: ThreadActivity
     }
 
     private var cache: [String: CacheEntry] = [:]
@@ -32,17 +32,17 @@ struct RolloutStatusReader {
     mutating func load(
         at path: String,
         codexLaunchDate: Date?
-    ) -> RolloutStatus {
+    ) -> ThreadActivity {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return ThreadActivity(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
 
-        let status: RolloutStatus
+        let status: ThreadActivity
         if let cached = cache[path], cached.size == size, cached.modifiedAt == modifiedAt {
             status = cached.status
         } else if
@@ -55,7 +55,7 @@ struct RolloutStatusReader {
                 lowerBound: cached.size,
                 fallbackRunState: cached.status.runState
             )
-            status = RolloutStatus(
+            status = ThreadActivity(
                 runState: appendedStatus.runState,
                 lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
                     ?? cached.status.lastFinalResponseAtUnixSeconds
@@ -71,7 +71,7 @@ struct RolloutStatusReader {
         )
 
         guard let codexLaunchDate, modifiedAt >= codexLaunchDate else {
-            return RolloutStatus(
+            return ThreadActivity(
                 runState: .idle,
                 lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
             )
@@ -83,7 +83,7 @@ struct RolloutStatusReader {
         in fileURL: URL,
         lowerBound: UInt64 = 0,
         fallbackRunState: ThreadRunState = .idle
-    ) -> RolloutStatus {
+    ) -> ThreadActivity {
         let markers: [(event: RunEvent, data: Data)] = [
             (.started, Data(#""type":"task_started""#.utf8)),
             (.ended, Data(#""type":"task_complete""#.utf8)),
@@ -94,11 +94,11 @@ struct RolloutStatusReader {
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return ThreadActivity(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return ThreadActivity(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         var laterLineFragment = Data()
         var lastEvent: RunEvent?
@@ -144,7 +144,7 @@ struct RolloutStatusReader {
                 break
             }
         }
-        return RolloutStatus(
+        return ThreadActivity(
             runState: lastEvent.map { $0 == .started ? .running : .idle }
                 ?? fallbackRunState,
             lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds

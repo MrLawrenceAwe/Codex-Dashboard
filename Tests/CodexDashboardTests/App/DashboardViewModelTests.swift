@@ -6,15 +6,15 @@ private struct StubCatalogProvider: ThreadCatalogProviding {
     let catalog: ThreadCatalog
 
     func loadCatalog(
-        gitStatuses: [String: GitStatus],
+        workingTreeStatuses: [String: WorkingTreeStatus],
         codexLaunchDate: Date?
     ) async throws -> ThreadCatalog {
         catalog
     }
 }
 
-private struct StubGitStatusProvider: GitStatusProviding {
-    func load(projectPaths: Set<String>) async -> [String: GitStatus] {
+private struct StubWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         [:]
     }
 }
@@ -44,7 +44,7 @@ private actor SuspendedCatalogProvider: ThreadCatalogProviding {
     private(set) var requestCount = 0
 
     func loadCatalog(
-        gitStatuses: [String: GitStatus],
+        workingTreeStatuses: [String: WorkingTreeStatus],
         codexLaunchDate: Date?
     ) async -> ThreadCatalog {
         requestCount += 1
@@ -65,7 +65,7 @@ private actor SuspendedCatalogProvider: ThreadCatalogProviding {
     }
 }
 
-private struct StubCompatibilityChecker: CodexCompatibilityChecking {
+private struct StubCompatibilityChecker: LocalCompatibilityChecking {
     let checks: [CompatibilityCheck]
 
     func checkLocalContracts() async -> [CompatibilityCheck] {
@@ -83,18 +83,18 @@ private final class StubDashboardRuntime: DashboardRuntime {
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] { [] }
     func synchronizeDashboard(
-        with snapshot: RendererSnapshot,
+        with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws {}
-    func disableDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
-    func openDashboard() async {}
+    func disableThreadDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
+    func openThreadDashboard() async {}
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] { [] }
 }
 
 @MainActor
 final class DashboardViewModelTests: XCTestCase {
-    func testCompatibilityPreflightPublishesCapabilityReport() async {
+    func testCompatibilityCheckPublishesCapabilityReport() async {
         let expected = CompatibilityCheck(
             id: "storage",
             title: "Storage",
@@ -105,35 +105,35 @@ final class DashboardViewModelTests: XCTestCase {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            gitStatusProvider: StubGitStatusProvider(),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
             runtimeFactory: { StubDashboardRuntime() }
         )
 
-        await viewModel.runCompatibilityPreflight()
+        await viewModel.checkCompatibility()
 
         XCTAssertEqual(viewModel.compatibilityReport?.checks, [expected])
         XCTAssertFalse(viewModel.isCheckingCompatibility)
     }
 
-    func testRefreshUsesInjectedDependenciesWithoutStartingPolling() async {
+    func testSynchronizationUsesInjectedDependenciesWithoutStartingPolling() async {
         let thread = ThreadSummary.fixture(id: "thread-1", title: "Injected thread")
         let viewModel = DashboardViewModel(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 4)
             ),
-            gitStatusProvider: StubGitStatusProvider(),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
             runtimeFactory: { StubDashboardRuntime() }
         )
 
         XCTAssertEqual(viewModel.connectionState, .checking)
-        await viewModel.refresh()
+        await viewModel.synchronizeDashboard()
 
         XCTAssertTrue(viewModel.threads.first?.isUnread == true)
         XCTAssertEqual(viewModel.totalThreadCount, 4)
-        XCTAssertEqual(viewModel.connectionState, .appClosed)
+        XCTAssertEqual(viewModel.connectionState, .codexClosed)
         XCTAssertEqual(viewModel.statusPresentation.title, "Codex is closed")
     }
 
@@ -144,12 +144,12 @@ final class DashboardViewModelTests: XCTestCase {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            gitStatusProvider: StubGitStatusProvider(),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadIDProvider: unreadIDProvider,
             runtimeFactory: { StubDashboardRuntime() }
         )
-        viewModel.startRefreshing()
-        defer { viewModel.stopRefreshing() }
+        viewModel.startMonitoring()
+        defer { viewModel.stopMonitoring() }
 
         try await waitUntil { viewModel.threads.count == 1 }
         await unreadIDProvider.setUnreadThreadIDs([thread.id])
@@ -158,31 +158,31 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.threads.first?.isUnread == true)
     }
 
-    func testCancelledRefreshCannotClearNewRefreshTask() async throws {
+    func testCancelledSynchronizationCannotClearNewSynchronizationTask() async throws {
         let catalogProvider = SuspendedCatalogProvider()
         let viewModel = DashboardViewModel(
             catalogProvider: catalogProvider,
-            gitStatusProvider: StubGitStatusProvider(),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             runtimeFactory: { StubDashboardRuntime() }
         )
 
-        viewModel.startRefreshing()
+        viewModel.startMonitoring()
         try await waitUntil { await catalogProvider.count() == 1 }
-        viewModel.stopRefreshing()
-        viewModel.startRefreshing()
+        viewModel.stopMonitoring()
+        viewModel.startMonitoring()
         try await waitUntil { await catalogProvider.count() == 2 }
 
         await catalogProvider.resumeNext()
         try await Task.sleep(for: .milliseconds(50))
-        let coalescedRefresh = Task { @MainActor in await viewModel.refresh() }
+        let coalescedRefresh = Task { @MainActor in await viewModel.synchronizeDashboard() }
         try await Task.sleep(for: .milliseconds(50))
         let requestCount = await catalogProvider.count()
         XCTAssertEqual(requestCount, 2)
 
         await catalogProvider.resumeNext()
         await coalescedRefresh.value
-        viewModel.stopRefreshing()
+        viewModel.stopMonitoring()
     }
 
     private func waitUntil(

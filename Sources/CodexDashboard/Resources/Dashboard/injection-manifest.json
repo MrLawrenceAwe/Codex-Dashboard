@@ -1,0 +1,18 @@
+{
+  "scripts": [
+    "dashboard-dom",
+    "codex-host",
+    "prompt-store",
+    "composer-adapter",
+    "prompt-reordering",
+    "prompt-menu",
+    "prompt-dialog",
+    "thread-markup",
+    "thread-dashboard",
+    "dashboard-host"
+  ],
+  "stylesheets": [
+    "dashboard",
+    "prompt-library"
+  ]
+}

@@ -1,4 +1,4 @@
-const codexUI = {
+const codexHost = {
   sidebar() {
     return document.querySelector('aside.app-shell-left-panel, aside');
   },
