@@ -21,6 +21,7 @@ protocol DashboardSession: AnyObject {
     ) async throws
     func disableThreadDashboard() async throws -> DashboardDisableOutcome
     func openThreadDashboard() async
+    func openThread(_ threadID: String) async
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
@@ -81,6 +82,10 @@ final class LiveDashboardSession: DashboardSession {
 
     func openThreadDashboard() async {
         await renderer.open()
+    }
+
+    func openThread(_ threadID: String) async {
+        await renderer.openThread(threadID)
     }
 
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] {

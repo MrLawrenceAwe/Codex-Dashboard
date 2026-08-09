@@ -175,6 +175,29 @@ private actor FailingRendererDevTools: DevToolsServing {
 
 @MainActor
 final class RendererDashboardSessionTests: XCTestCase {
+    func testOpeningNotificationThreadDispatchesItsRoute() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = StubRendererDevTools(targets: [target])
+        await devTools.setEvaluationResult(true)
+        let renderer = try RendererDashboardSession(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+        )
+
+        await renderer.openThread("thread/with spaces")
+
+        let expressions = await devTools.expressions()
+        let expression = try XCTUnwrap(expressions.last)
+        XCTAssertTrue(expression.contains("navigate-to-route"))
+        XCTAssertTrue(expression.contains("encodeURIComponent"))
+        XCTAssertTrue(expression.contains("thread"))
+    }
+
     func testDashboardSnapshotPayloadOmitsNotificationOnlyAssistantMessage() throws {
         let snapshot = DashboardSnapshotPayload(threads: [
             .fixture(lastAssistantMessage: String(repeating: "private response", count: 10_000)),

@@ -1,6 +1,18 @@
 import AppKit
 import Foundation
 
+private final class NotificationObserverToken: @unchecked Sendable {
+    let observer: any NSObjectProtocol
+
+    init(_ observer: any NSObjectProtocol) {
+        self.observer = observer
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(observer)
+    }
+}
+
 enum DashboardConnectionState: Equatable {
     case checking
     case codexClosed
@@ -49,6 +61,7 @@ final class DashboardCoordinator: ObservableObject {
     private var catalogWarning: String?
     private var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
+    private var completionNotificationObserver: NotificationObserverToken?
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
@@ -99,6 +112,16 @@ final class DashboardCoordinator: ObservableObject {
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
+        completionNotificationObserver = NotificationObserverToken(NotificationCenter.default.addObserver(
+            forName: .codexDashboardOpenCompletedThread,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let threadID = CompletionNotificationPayload.threadID(from: notification.userInfo ?? [:]) else {
+                return
+            }
+            Task { @MainActor in await self?.runtime?.openThread(threadID) }
+        })
     }
 
     deinit {
@@ -171,6 +194,10 @@ final class DashboardCoordinator: ObservableObject {
 
     func restartCodexAndEnableThreadDashboard() async {
         guard !isPerformingAction, let runtime else { return }
+        guard compatibilityReport?.blockingCount ?? 0 == 0 else {
+            setConnectionError(Self.incompatibleContractMessage)
+            return
+        }
         isPerformingAction = true
         enrichmentGeneration += 1
         runtime.prepareForRestart()
@@ -269,7 +296,7 @@ final class DashboardCoordinator: ObservableObject {
         }
         if let compatibilityReport, compatibilityReport.blockingCount > 0 {
             setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady)
-            setConnectionError("The dashboard was not mounted because a required Codex contract is incompatible. Review Compatibility details.")
+            setConnectionError(Self.incompatibleContractMessage)
             return
         }
 
@@ -402,6 +429,9 @@ final class DashboardCoordinator: ObservableObject {
             connectionError = error
         }
     }
+
+    private static let incompatibleContractMessage =
+        "The dashboard was not mounted because a required Codex contract is incompatible. Review Compatibility details."
 
     func copyDiagnostics() {
         let diagnostics = DashboardDiagnostics(

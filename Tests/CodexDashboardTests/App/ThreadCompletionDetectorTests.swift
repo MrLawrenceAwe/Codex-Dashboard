@@ -3,6 +3,13 @@ import XCTest
 @testable import CodexDashboard
 
 final class ThreadCompletionDetectorTests: XCTestCase {
+    func testCompletionNotificationPayloadExtractsThreadID() {
+        XCTAssertEqual(
+            CompletionNotificationPayload.threadID(from: ["thread-id": "thread-42"]),
+            "thread-42"
+        )
+        XCTAssertNil(CompletionNotificationPayload.threadID(from: [:]))
+    }
     @MainActor
     func testNotificationBodyUsesAssistantResponseInsteadOfOpeningPrompt() {
         let thread = ThreadSummary.fixture(

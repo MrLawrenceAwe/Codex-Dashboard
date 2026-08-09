@@ -18,21 +18,41 @@ final class PromptLibraryBackupSynchronizer {
         lastCheck = nil
     }
 
-    func restoreIfNeeded(in target: DevToolsTarget, using devTools: any DevToolsServing) async {
+    func restoreIfNeeded(in target: DevToolsTarget, using devTools: any DevToolsServing) async throws {
         guard let store,
               let backup = await store.load(),
               let data = try? JSONSerialization.data(withJSONObject: backup, options: .fragmentsAllowed),
               let encodedBackup = String(data: data, encoding: .utf8)
         else { return }
-        let expression = """
+        let validationExpression = """
         (() => {
           const key = '\(Self.storageKey)';
-          if (localStorage.getItem(key)) return true;
+          try {
+            const library = JSON.parse(localStorage.getItem(key));
+            if (!library || typeof library !== 'object' || Array.isArray(library)) return false;
+            if (!Array.isArray(library.prompts) || !Array.isArray(library.sections)) return false;
+            if (!library.sections.every((section) => typeof section === 'string')) return false;
+            if (!library.prompts.every((prompt) => prompt && typeof prompt === 'object'
+              && typeof prompt.id === 'string' && typeof prompt.name === 'string'
+              && typeof prompt.content === 'string'
+              && (prompt.section === undefined || typeof prompt.section === 'string'))) return false;
+            return new Set(library.prompts.map((prompt) => prompt.id)).size === library.prompts.length;
+          } catch (_) {
+            return false;
+          }
+        })()
+        """
+        if try await devTools.evaluateBoolean(validationExpression, in: target) { return }
+        let restoreExpression = """
+        (() => {
+          const key = '\(Self.storageKey)';
           localStorage.setItem(key, \(encodedBackup));
           return true;
         })()
         """
-        _ = try? await devTools.evaluateBoolean(expression, in: target)
+        guard try await devTools.evaluateBoolean(restoreExpression, in: target) else {
+            throw DashboardError.enableFailed("The saved prompt library could not be restored safely.")
+        }
     }
 
     func backUpIfDue(
