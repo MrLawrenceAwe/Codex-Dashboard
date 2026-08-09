@@ -431,4 +431,66 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? Bool, true)
     }
 
+    func testInvalidPromptImportPreservesExistingLibrary() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Keep me';
+              document.querySelector('[name="content"]').value = 'Existing prompt';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              window.__promptLibraryBeforeInvalidImport = localStorage.getItem('codex-dashboard.prompt-library');
+              const input = document.querySelector('[data-prompt-import-file]');
+              const transfer = new DataTransfer();
+              transfer.items.add(new File(['{}'], 'unrelated.json', { type: 'application/json' }));
+              input.files = transfer.files;
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(25))
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              return [
+                localStorage.getItem('codex-dashboard.prompt-library') === window.__promptLibraryBeforeInvalidImport,
+                document.querySelectorAll('[data-prompt-use]').length,
+                document.querySelector('[data-prompt-storage-error]').textContent,
+                !document.querySelector('[data-prompt-storage-error]').hidden,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Int, 1)
+        XCTAssertTrue((values[2] as? String)?.contains("Could not import") == true)
+        XCTAssertEqual(values[3] as? Bool, true)
+    }
+
+    func testSelectionPlaceholderUsesTextareaSelectionCapturedBeforeDialogOpens() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const composer = document.querySelector('textarea[placeholder="Do anything"]');
+              composer.value = 'alpha beta gamma';
+              composer.focus();
+              composer.setSelectionRange(6, 10);
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Use selection';
+              document.querySelector('[name="content"]').value = 'Selected: {{selection}}';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              document.querySelector('[data-prompt-use]').click();
+              return composer.value;
+            })()
+            """
+        ) as? String
+
+        XCTAssertEqual(result, "alpha Selected: beta gamma")
+    }
+
 }

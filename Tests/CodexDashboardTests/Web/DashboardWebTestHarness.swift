@@ -6,12 +6,31 @@ import XCTest
 
 @MainActor
 enum DashboardWebTestHarness {
+    private static var activeWebViews: [WKWebView] = []
+
+    static func makeWebView() -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        activeWebViews.append(webView)
+        return webView
+    }
+
+    static func releaseWebViews() {
+        for webView in activeWebViews {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+        }
+        activeWebViews.removeAll()
+    }
+
     static func mountedWebView(
         html: String,
         baseURL: URL? = nil,
         clearLocalStorage: Bool = false
     ) async throws -> WKWebView {
-        let webView = WKWebView()
+        let webView = makeWebView()
         webView.loadHTMLString(html, baseURL: baseURL)
         try await waitUntilLoaded(webView)
         if clearLocalStorage {
@@ -62,36 +81,46 @@ enum DashboardWebTestHarness {
 
     static func waitUntilLoaded(_ webView: WKWebView) async throws {
         let deadline = ContinuousClock.now + .seconds(3)
-        while webView.isLoading {
-            guard ContinuousClock.now < deadline else {
-                throw DashboardError.invalidDevToolsResponse
+        while ContinuousClock.now < deadline {
+            if webView.estimatedProgress >= 1, !webView.isLoading {
+                let isReady = try? await webView.evaluateJavaScript(
+                    "document.readyState === 'complete' && document.body !== null"
+                ) as? Bool
+                if isReady == true { return }
             }
             try await Task.sleep(for: .milliseconds(20))
         }
+        throw DashboardError.invalidDevToolsResponse
     }
 }
 
+@MainActor
 class SerializedDashboardWebTestCase: XCTestCase {
-    private var lockFileDescriptor: Int32 = -1
+    // `swift test --parallel` runs test cases in worker processes. Keep the lock for the
+    // lifetime of each worker so WebKit process teardown cannot overlap the next worker.
+    nonisolated private static let processLockFileDescriptor: Int32 = {
+        let lockURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-web-tests.lock")
+        let descriptor = Darwin.open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0, flock(descriptor, LOCK_EX) == 0 else {
+            if descriptor >= 0 { Darwin.close(descriptor) }
+            return -1
+        }
+        return descriptor
+    }()
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        let lockURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("codex-dashboard-web-tests.lock")
-        lockFileDescriptor = Darwin.open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
-        guard lockFileDescriptor >= 0, flock(lockFileDescriptor, LOCK_EX) == 0 else {
-            if lockFileDescriptor >= 0 { Darwin.close(lockFileDescriptor) }
-            lockFileDescriptor = -1
+        guard Self.processLockFileDescriptor >= 0 else {
             throw CocoaError(.fileLocking)
         }
     }
 
-    override func tearDownWithError() throws {
-        if lockFileDescriptor >= 0 {
-            flock(lockFileDescriptor, LOCK_UN)
-            Darwin.close(lockFileDescriptor)
-            lockFileDescriptor = -1
-        }
-        try super.tearDownWithError()
+    override func tearDown() async throws {
+        DashboardWebTestHarness.releaseWebViews()
+        // WKWebView releases its auxiliary processes asynchronously after its final
+        // strong reference goes away. Drain that teardown before this worker exits.
+        try await Task.sleep(for: .milliseconds(500))
+        try await super.tearDown()
     }
 }

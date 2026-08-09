@@ -4,10 +4,14 @@ const promptLibrary = (() => {
   let dialogState = { mode: 'list' };
   let returnFocusElement;
   let promptSearchTerm = '';
+  let capturedSelectionText = '';
 
-  function showStorageError() {
+  function showStorageError(message) {
     const error = document.querySelector('[data-prompt-storage-error]');
-    if (error) error.hidden = false;
+    if (error) {
+      if (message) error.textContent = message;
+      error.hidden = false;
+    }
   }
 
   function persistLibrary(nextPrompts = promptStore.prompts, nextSections = promptStore.sections) {
@@ -131,6 +135,17 @@ function renderDialog() {
 }
 
 function open() {
+  const composer = codexContracts.composer(dashboardDOM.elementIDs.promptDialog);
+  if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
+    const start = composer.selectionStart ?? 0;
+    const end = composer.selectionEnd ?? start;
+    capturedSelectionText = composer.value.slice(start, end);
+  } else {
+    const selection = window.getSelection();
+    capturedSelectionText = selection?.rangeCount && composer?.contains(selection.anchorNode)
+      ? selection.toString()
+      : '';
+  }
   document.getElementById(dashboardDOM.elementIDs.promptDialog)?.remove();
   returnFocusElement = document.activeElement instanceof HTMLElement
     ? document.activeElement
@@ -158,6 +173,23 @@ function exportLibrary() {
 async function importLibrary(file) {
   try {
     const payload = JSON.parse(await file.text());
+    const validPrompts = Array.isArray(payload?.prompts) && payload.prompts.every((prompt) => (
+      prompt && typeof prompt === 'object'
+        && typeof prompt.id === 'string'
+        && typeof prompt.name === 'string'
+        && typeof prompt.content === 'string'
+        && (prompt.section === undefined || typeof prompt.section === 'string')
+    ));
+    const validSections = Array.isArray(payload?.sections)
+      && payload.sections.every((section) => typeof section === 'string');
+    const promptIDs = validPrompts ? payload.prompts.map((prompt) => prompt.id) : [];
+    if (
+      !payload || typeof payload !== 'object' || Array.isArray(payload)
+        || payload.version !== 1
+        || !validPrompts
+        || !validSections
+        || new Set(promptIDs).size !== promptIDs.length
+    ) throw new Error('invalid prompt library');
     const prompts = promptStore.normalizePrompts(payload?.prompts);
     const sections = promptStore.normalizeSections(payload?.sections, prompts);
     if (!persistLibrary(prompts, sections)) return;
@@ -166,14 +198,13 @@ async function importLibrary(file) {
     promptSearchTerm = '';
     renderDialog();
   } catch (_) {
-    showStorageError();
+    showStorageError('Could not import this file. Choose an unmodified Codex Dashboard prompt export.');
   }
 }
 
 function expandedPromptContent(content, clipboardText = '') {
-  const selectedText = window.getSelection()?.toString() || '';
   return content
-    .replaceAll('{{selection}}', selectedText)
+    .replaceAll('{{selection}}', capturedSelectionText)
     .replaceAll('{{clipboard}}', clipboardText);
 }
 

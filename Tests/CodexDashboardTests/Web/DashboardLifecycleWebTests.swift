@@ -6,7 +6,7 @@ import XCTest
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
     func testDashboardLifecycleAndCoreInteractions() async throws {
-        let webView = WKWebView()
+        let webView = DashboardWebTestHarness.makeWebView()
         webView.loadHTMLString(
             """
             <!doctype html>

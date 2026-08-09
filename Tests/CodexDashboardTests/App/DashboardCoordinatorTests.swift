@@ -85,6 +85,11 @@ private final class StubDashboardSession: DashboardSession {
     let codexIsRunning = false
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
+    private let compatibilityChecks: [CompatibilityCheck]
+
+    init(compatibilityChecks: [CompatibilityCheck] = []) {
+        self.compatibilityChecks = compatibilityChecks
+    }
 
     func rendererTargets() async -> [DevToolsTarget] { [] }
     func prepareForRestart() {}
@@ -96,7 +101,7 @@ private final class StubDashboardSession: DashboardSession {
     ) async throws {}
     func disableThreadDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
     func openThreadDashboard() async {}
-    func rendererCompatibilityChecks() async -> [CompatibilityCheck] { [] }
+    func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
 }
 
 @MainActor
@@ -142,6 +147,58 @@ final class DashboardCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.compatibilityReport?.checks, [expected])
         XCTAssertFalse(coordinator.isCheckingCompatibility)
+    }
+
+    func testCompatibilityCheckAcknowledgesVersionOnlyAfterRendererInspection() async throws {
+        let suiteName = "DashboardCoordinatorTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("1.0", forKey: "lastCheckedCodexVersion")
+        let unavailableRenderer = CompatibilityCheck(
+            id: "renderer",
+            title: "Renderer connection",
+            status: .unavailable,
+            detail: "Codex is closed."
+        )
+        let unavailableCoordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            userDefaults: defaults,
+            installedCodexVersion: { "2.0" },
+            runtimeFactory: {
+                StubDashboardSession(compatibilityChecks: [unavailableRenderer])
+            }
+        )
+
+        await unavailableCoordinator.checkCompatibility()
+        XCTAssertEqual(defaults.string(forKey: "lastCheckedCodexVersion"), "1.0")
+
+        let compatibleRenderer = CompatibilityCheck(
+            id: "renderer",
+            title: "Renderer connection",
+            status: .compatible,
+            detail: "Renderer inspected."
+        )
+        let compatibleCoordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            userDefaults: defaults,
+            installedCodexVersion: { "2.0" },
+            runtimeFactory: {
+                StubDashboardSession(compatibilityChecks: [compatibleRenderer])
+            }
+        )
+
+        await compatibleCoordinator.checkCompatibility()
+        XCTAssertEqual(defaults.string(forKey: "lastCheckedCodexVersion"), "2.0")
     }
 
     func testSynchronizationUsesInjectedDependenciesWithoutStartingPolling() async {

@@ -71,11 +71,11 @@ struct RendererCompatibilityChecker {
             id: "composer-controls",
             title: "Composer controls",
             expression: contractExpression(
-                "codexContracts.composerAddButton()?.nextElementSibling?.matches('[data-codex-prompt-launcher]') === true"
+                "Boolean(codexContracts.composerAddButton())"
             ),
-            failureStatus: .incompatible,
-            compatibleDetail: "The Prompts control is mounted directly beside the composer Add button.",
-            failureDetail: "The Prompts control is not mounted beside the composer Add button.",
+            failureStatus: .warning,
+            compatibleDetail: "Codex exposes an Add button beside the active composer for prompt-library integration.",
+            failureDetail: "No compatible composer Add button is currently mounted.",
             in: target
         ))
         checks.append(await inspect(

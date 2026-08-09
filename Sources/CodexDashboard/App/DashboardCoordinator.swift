@@ -39,6 +39,7 @@ final class DashboardCoordinator: ObservableObject {
     private let completionNotifier: any ThreadCompletionNotifying
     private let userDefaults: UserDefaults
     private let versionTracker: CodexVersionCompatibilityTracker
+    private let installedCodexVersion: () -> String?
     private let pollingController = DashboardPollingController()
     private var completionDetector = ThreadCompletionDetector()
     private var runtime: (any DashboardSession)?
@@ -77,6 +78,7 @@ final class DashboardCoordinator: ObservableObject {
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
         completionNotifier: any ThreadCompletionNotifying = DisabledThreadCompletionNotifier(),
         userDefaults: UserDefaults = .standard,
+        installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         runtimeFactory: () throws -> any DashboardSession = { try LiveDashboardSession() }
     ) {
         threadSnapshots = ThreadSnapshotService(
@@ -87,6 +89,7 @@ final class DashboardCoordinator: ObservableObject {
         self.compatibilityChecker = compatibilityChecker
         self.completionNotifier = completionNotifier
         self.userDefaults = userDefaults
+        self.installedCodexVersion = installedCodexVersion
         versionTracker = CodexVersionCompatibilityTracker(userDefaults: userDefaults)
         completionNotificationsEnabled = userDefaults.object(
             forKey: "completionNotificationsEnabled"
@@ -107,7 +110,7 @@ final class DashboardCoordinator: ObservableObject {
             completionNotifier.requestAuthorization()
         }
         compatibilityWasTriggeredByUpdate = versionTracker.updateWasDetected(
-            currentVersion: CodexConfiguration.installedVersion
+            currentVersion: installedCodexVersion()
         )
         pollingController.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
@@ -238,7 +241,9 @@ final class DashboardCoordinator: ObservableObject {
         }
         compatibilityReport = CompatibilityReport(checks: await localChecks + rendererChecks)
         lastCompatibilityCheck = .now
-        versionTracker.markChecked(version: CodexConfiguration.installedVersion)
+        if rendererChecks.contains(where: { $0.id == "renderer" && $0.status == .compatible }) {
+            versionTracker.markChecked(version: installedCodexVersion())
+        }
     }
 
     private func synchronizeRuntime() async {

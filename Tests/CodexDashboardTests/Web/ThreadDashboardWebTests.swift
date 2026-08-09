@@ -85,7 +85,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             </body></html>
             """.utf8
         ).write(to: htmlURL)
-        let webView = WKWebView()
+        let webView = DashboardWebTestHarness.makeWebView()
         webView.loadFileURL(htmlURL, allowingReadAccessTo: directory)
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
         let preferencesStored = try await webView.evaluateJavaScript(
