@@ -23,7 +23,7 @@ actor CodexThreadRepository {
         let title: String
         let preview: String
         let workspacePath: String
-        let updatedAtUnixSeconds: Int64
+        let createdAtUnixSeconds: Int64
         let pinnedValue: Int
         let model: String?
         let totalCount: Int
@@ -31,7 +31,12 @@ actor CodexThreadRepository {
     }
 
     private let stateDatabaseURL: URL
-    private var activityCache: [String: (size: UInt64, modifiedAt: Date, activity: ThreadActivity)] = [:]
+    private struct RolloutStatus: Sendable {
+        let activity: ThreadActivity
+        let lastFinalResponseAtUnixSeconds: Int64?
+    }
+
+    private var rolloutCache: [String: (size: UInt64, modifiedAt: Date, status: RolloutStatus)] = [:]
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -50,7 +55,7 @@ actor CodexThreadRepository {
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
                cwd AS workspacePath,
-               updated_at AS updatedAtUnixSeconds,
+               created_at AS createdAtUnixSeconds,
                is_pinned AS pinnedValue,
                model,
                rollout_path AS rolloutPath,
@@ -63,18 +68,25 @@ actor CodexThreadRepository {
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.workspacePath).lastPathComponent
+            let rolloutStatus = rolloutStatus(at: thread.rolloutPath)
             return DashboardThread(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
                 workspace: directoryName.isEmpty ? thread.workspacePath : directoryName,
                 workspacePath: thread.workspacePath,
-                updatedAtUnixSeconds: thread.updatedAtUnixSeconds,
+                updatedAtUnixSeconds: rolloutStatus.lastFinalResponseAtUnixSeconds
+                    ?? thread.createdAtUnixSeconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
-                activity: activityStatus(at: thread.rolloutPath),
+                activity: rolloutStatus.activity,
                 gitStatus: gitStatuses[thread.workspacePath] ?? .notRepository
             )
+        }.sorted { left, right in
+            if left.updatedAtUnixSeconds == right.updatedAtUnixSeconds {
+                return left.id < right.id
+            }
+            return left.updatedAtUnixSeconds > right.updatedAtUnixSeconds
         }
         return ThreadSnapshot(
             threads: dashboardThreads,
@@ -82,24 +94,24 @@ actor CodexThreadRepository {
         )
     }
 
-    private func activityStatus(at path: String) -> ThreadActivity {
+    private func rolloutStatus(at path: String) -> RolloutStatus {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return .idle
+            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
-        if let cached = activityCache[path],
+        if let cached = rolloutCache[path],
            cached.size == size,
            cached.modifiedAt == modifiedAt {
-            return cached.activity
+            return cached.status
         }
 
-        let activity = latestActivity(in: fileURL)
-        activityCache[path] = (size, modifiedAt, activity)
-        return activity
+        let status = readRolloutStatus(in: fileURL)
+        rolloutCache[path] = (size, modifiedAt, status)
+        return status
     }
 
     private enum ActivityEvent {
@@ -107,24 +119,27 @@ actor CodexThreadRepository {
         case ended
     }
 
-    private func latestActivity(in fileURL: URL) -> ThreadActivity {
+    private func readRolloutStatus(in fileURL: URL) -> RolloutStatus {
         let markers: [(event: ActivityEvent, data: Data)] = [
             (.started, Data(#""type":"task_started""#.utf8)),
             (.ended, Data(#""type":"task_complete""#.utf8)),
             (.ended, Data(#""type":"turn_aborted""#.utf8)),
         ]
-        let overlapSize = (markers.map(\.data.count).max() ?? 1) - 1
+        let finalResponseMarker = Data(#""phase":"final_answer""#.utf8)
+        let timestampMarker = Data(#""timestamp":""#.utf8)
+        let overlapSize = max(markers.map(\.data.count).max() ?? 1, finalResponseMarker.count) - 1
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return .idle
+            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return .idle
+            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         var laterOverlap = Data()
         var lastEvent: ActivityEvent?
+        var lastFinalResponseAtUnixSeconds: Int64?
 
         while cursor > 0 {
             let bytesToRead = min(chunkSize, cursor)
@@ -143,14 +158,35 @@ actor CodexThreadRepository {
                 if lastEvent == nil {
                     lastEvent = matches.max { $0.1 < $1.1 }?.0
                 }
-                if lastEvent != nil { break }
+                if lastFinalResponseAtUnixSeconds == nil,
+                   let finalRange = data.range(of: finalResponseMarker, options: .backwards) {
+                    let lineStart = data[..<finalRange.lowerBound].lastIndex(of: UInt8(ascii: "\n"))
+                        .map { data.index(after: $0) } ?? data.startIndex
+                    let lineEnd = data[finalRange.upperBound...].firstIndex(of: UInt8(ascii: "\n"))
+                        ?? data.endIndex
+                    guard let timestampRange = data[lineStart..<lineEnd].range(of: timestampMarker)
+                    else {
+                        laterOverlap = Data(data.prefix(overlapSize))
+                        continue
+                    }
+                    let valueStart = timestampRange.upperBound
+                    if let valueEnd = data[valueStart...].firstIndex(of: UInt8(ascii: "\"")),
+                       let timestamp = String(data: data[valueStart..<valueEnd], encoding: .utf8),
+                       let date = ISO8601DateFormatter().date(from: timestamp) {
+                        lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
+                    }
+                }
+                if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
 
                 laterOverlap = Data(data.prefix(overlapSize))
             } catch {
                 break
             }
         }
-        return lastEvent == .started ? .running : .idle
+        return RolloutStatus(
+            activity: lastEvent == .started ? .running : .idle,
+            lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
+        )
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {

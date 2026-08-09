@@ -35,7 +35,7 @@ removes it.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files.
 - Activity snapshots run on a fixed two-second cadence; Git status enrichment refreshes independently every ten seconds.
-- Threads are ordered by their last update. The dashboard loads the latest 60; search and filters apply to the loaded set.
+- Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The dashboard loads the latest 60; search and filters apply to the loaded set.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter mirror Codex's own sidebar read state.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes.
