@@ -7,6 +7,7 @@ enum TestDatabaseFactory {
     private static func makeRollout(
         lifecycleEvents: [String],
         finalResponseAtUnixSeconds: Int64,
+        finalResponseMessageSize: Int = 4,
         testCase: XCTestCase
     ) throws -> URL {
         let rolloutURL = FileManager.default.temporaryDirectory
@@ -17,7 +18,11 @@ enum TestDatabaseFactory {
         let finalResponse = try JSONSerialization.data(withJSONObject: [
             "timestamp": timestamp,
             "type": "event_msg",
-            "payload": ["type": "agent_message", "phase": "final_answer", "message": "Done"],
+            "payload": [
+                "type": "agent_message",
+                "phase": "final_answer",
+                "message": String(repeating: "x", count: finalResponseMessageSize),
+            ],
         ])
         let lifecycleLines = try lifecycleEvents.map { event -> String in
             let data = try JSONSerialization.data(withJSONObject: [
@@ -64,11 +69,13 @@ enum TestDatabaseFactory {
         runningWorkspacePath: String = "/tmp/running",
         runningLifecycleEvents: [String] = ["task_complete", "task_started"],
         runningFinalResponseAtUnixSeconds: Int64? = nil,
+        runningFinalResponseMessageSize: Int = 4,
         testCase: XCTestCase
     ) throws -> URL {
         let runningRollout = try makeRollout(
             lifecycleEvents: runningLifecycleEvents,
             finalResponseAtUnixSeconds: runningFinalResponseAtUnixSeconds ?? now - 300,
+            finalResponseMessageSize: runningFinalResponseMessageSize,
             testCase: testCase
         )
         let completedRollout = try makeRollout(
