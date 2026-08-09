@@ -32,12 +32,17 @@ enum DashboardWebTestHarness {
             html: """
             <!doctype html>
             <html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <button type="button" aria-label="Add new project">+</button>
+              </aside>
               <main>
-                <div data-composer-overlay-floating-ui="true" aria-label="Add">
-                  <button role="menuitem" data-list-navigation-item="true"><span>Record a skill</span></button>
+                <div class="composer-shell">
+                  <textarea placeholder="Do anything"></textarea>
+                  <div class="composer-toolbar">
+                    <button type="button" aria-label="Add">+</button>
+                  </div>
                 </div>
-                <textarea placeholder="Do anything"></textarea>
                 \(contentEditableComposer)
               </main>
             </body></html>

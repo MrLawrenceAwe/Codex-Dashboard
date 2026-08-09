@@ -280,7 +280,7 @@ function handlePromptInteraction(event) {
 }
 
 function mount() {
-  promptMenu.mount(open);
+  promptLauncher.mount(open);
   promptInteractionEventTypes.forEach((type) => {
     document.addEventListener(type, handlePromptInteraction, true);
   });
@@ -290,7 +290,7 @@ function unmount() {
   promptInteractionEventTypes.forEach((type) => {
     document.removeEventListener(type, handlePromptInteraction, true);
   });
-  promptMenu.unmount();
+  promptLauncher.unmount();
   close({ restoreFocus: false });
 }
 

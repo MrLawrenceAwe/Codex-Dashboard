@@ -6,7 +6,7 @@
     "prompt-store",
     "composer-adapter",
     "prompt-reordering",
-    "prompt-menu",
+    "prompt-launcher",
     "prompt-dialog",
     "thread-markup",
     "thread-dashboard",

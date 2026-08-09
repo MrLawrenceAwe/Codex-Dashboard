@@ -172,7 +172,7 @@ function mutationTouchesSidebar(record) {
 }
 
 function scheduleMutationSync(records) {
-  promptMenu.scheduleSync();
+  promptLauncher.scheduleSync();
   const sidebarMutation = records.some(mutationTouchesSidebar);
   const dashboardMissing = !document.getElementById(dashboardDOM.elementIDs.page)
     || !document.getElementById(dashboardDOM.elementIDs.navButton);

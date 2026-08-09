@@ -16,11 +16,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               composer.addEventListener('input', (event) => {
                 if (event.data) composer.value += event.data;
               });
-              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
-              menuItem.dispatchEvent(new PointerEvent('pointerdown', {
-                bubbles: true,
-                cancelable: true,
-              }));
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              launcher.click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Review code';
               document.querySelector('[name="section"]').value = 'Code review';
@@ -30,10 +27,10 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-use]').click();
               const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
               document.querySelector('textarea[placeholder="Do anything"]').remove();
-              menuItem.click();
+              launcher.click();
               document.querySelector('[data-prompt-use]').click();
               return {
-                menuLabel: menuItem.textContent.trim(),
+                launcherLabel: launcher.textContent.trim(),
                 savedPromptName,
                 textareaValue,
                 contentEditableValue: document.querySelector('[contenteditable="true"]').textContent,
@@ -43,33 +40,34 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values["menuLabel"] as? String, "Prompts")
+        XCTAssertEqual(values["launcherLabel"] as? String, "Prompts")
         XCTAssertEqual(values["savedPromptName"] as? String, "Review code")
         XCTAssertEqual(values["textareaValue"] as? String, "Review this code for correctness issues.")
         XCTAssertEqual(values["contentEditableValue"] as? String, "Review this code for correctness issues.")
         XCTAssertEqual(values["closedAfterInsertion"] as? Bool, true)
     }
 
-    func testPromptMenuHighlightAndDestroyLifecycle() async throws {
+    func testPromptLauncherIsAdjacentToAddAndRemovedOnDestroy() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
-              menuItem.dispatchEvent(new PointerEvent('pointerenter'));
-              const highlighted = menuItem.classList.contains('opacity-100')
-                && menuItem.classList.contains('bg-token-list-hover-background')
-                && !document.querySelector('[data-list-navigation-item]:not([data-codex-prompt-menu-item])').classList.contains('opacity-100');
+              const addButton = document.querySelector('button[aria-label="Add"]');
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const adjacentToAdd = addButton.nextElementSibling === launcher;
+              const accessibleName = launcher.getAttribute('aria-label');
               window.__codexDashboard.destroy();
               return {
-                highlighted,
-                removedOnDestroy: !document.querySelector('[data-codex-prompt-menu-item]'),
+                adjacentToAdd,
+                accessibleName,
+                removedOnDestroy: !document.querySelector('[data-codex-prompt-launcher]'),
               };
             })()
             """
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values["highlighted"] as? Bool, true)
+        XCTAssertEqual(values["adjacentToAdd"] as? Bool, true)
+        XCTAssertEqual(values["accessibleName"] as? String, "Prompts")
         XCTAssertEqual(values["removedOnDestroy"] as? Bool, true)
     }
 
@@ -78,7 +76,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-codex-prompt-launcher]').click();
               document.querySelector('[data-prompt-new-section]').click();
               document.querySelector('[name="sectionName"]').value = 'Research';
               document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
@@ -136,7 +134,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-codex-prompt-launcher]').click();
               for (let index = 1; index <= 14; index += 1) {
                 document.querySelector('[data-prompt-new-section]').click();
                 document.querySelector('[name="sectionName"]').value = `Section ${index}`;
@@ -169,7 +167,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-codex-prompt-launcher]').click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Temporary';
               document.querySelector('[name="section"]').value = 'Keep me';
@@ -187,7 +185,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let sectionSurvived = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-codex-prompt-launcher]').click();
               return Boolean(document.querySelector('[data-prompt-section="Keep me"]'));
             })()
             """
@@ -219,7 +217,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let migrated = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-codex-prompt-launcher]').click();
               const state = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
               return [
                 document.querySelector('[data-prompt-use] strong').textContent,
@@ -243,9 +241,9 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
-              menuItem.focus();
-              menuItem.click();
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              launcher.focus();
+              launcher.click();
               const lastButton = document.querySelector('[data-prompt-new-section]');
               lastButton.focus();
               lastButton.dispatchEvent(new KeyboardEvent('keydown', {
@@ -259,7 +257,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               }));
               const escapeClosedFromOutside = !document.getElementById('codex-dashboard-prompt-dialog');
 
-              menuItem.click();
+              launcher.click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Unsaved prompt';
               document.querySelector('[name="content"]').value = 'This must not appear as saved.';

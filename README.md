@@ -33,7 +33,7 @@ removes it.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools connection managed by `LiveDashboardRuntime` and `DashboardRenderer`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
-- A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and prompt-menu contract drift after Codex updates.
+- A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and composer-control contract drift after Codex updates.
 - Swift source is grouped by application UI, compatibility checks, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run on a fixed two-second cadence; unread state refreshes independently every 500 milliseconds, and working-tree status enrichment every ten seconds. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
@@ -41,11 +41,11 @@ removes it.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including threads not currently mounted in the sidebar.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Changed projects** filter isolates those projects.
-- The composer’s **Add** menu includes a local **Prompts** library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
+- A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Thread Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Codex host selectors are isolated in `codex-host.js`; prompt storage, menu integration, dialog rendering, composer insertion, dashboard rendering, and host exposure live in focused modules listed by `injection-manifest.json`.
+- Codex host selectors are isolated in `codex-host.js`; prompt storage, composer-launcher integration, dialog rendering, composer insertion, dashboard rendering, and host exposure live in focused modules listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.
