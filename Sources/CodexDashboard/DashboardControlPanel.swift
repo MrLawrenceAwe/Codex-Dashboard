@@ -4,10 +4,10 @@ private struct StatusCard: View {
     @ObservedObject var viewModel: DashboardViewModel
 
     private var statusColor: Color {
-        if viewModel.sessionState.dashboardIsMounted {
+        if viewModel.connectionState.dashboardIsMounted {
             return Color(red: 0.45, green: 0.94, blue: 0.61)
         }
-        if viewModel.sessionState != .appClosed {
+        if viewModel.connectionState != .appClosed {
             return Color(red: 0.96, green: 0.77, blue: 0.42)
         }
         return .secondary
@@ -86,16 +86,16 @@ struct DashboardControlPanel: View {
                 .disabled(viewModel.isPerformingAction)
 
                 Button("Open Dashboard") { Task { await viewModel.openDashboard() } }
-                    .disabled(!viewModel.sessionState.dashboardIsMounted || viewModel.isPerformingAction)
+                    .disabled(!viewModel.connectionState.dashboardIsMounted || viewModel.isPerformingAction)
 
                 Button("Disable Dashboard") { Task { await viewModel.disableDashboard() } }
-                    .disabled(!viewModel.sessionState.bridgeIsConnected || viewModel.isPerformingAction)
+                    .disabled(!viewModel.connectionState.rendererIsAvailable || viewModel.isPerformingAction)
             }
             .controlSize(.large)
 
-            if viewModel.sessionState.errorMessage != nil || viewModel.dataWarning != nil {
+            if viewModel.sessionError != nil || viewModel.dataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let error = viewModel.sessionState.errorMessage { Text(error) }
+                    if let error = viewModel.sessionError { Text(error) }
                     if let warning = viewModel.dataWarning { Text(warning) }
                 }
                 .font(.system(size: 12))

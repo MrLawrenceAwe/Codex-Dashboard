@@ -5,28 +5,29 @@ enum ThreadActivity: String, Codable, Equatable, Sendable {
     case idle
 }
 
-enum WorkspaceGitStatus: String, Codable, Equatable, Sendable {
+enum GitWorkingTreeStatus: String, Codable, Equatable, Sendable {
     case notRepository
+    case unavailable
     case clean
-    case modified
+    case hasChanges
 }
 
 struct DashboardThread: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let preview: String
-    let workspace: String
+    let workspaceName: String
     let workspacePath: String
-    let updatedAtUnixSeconds: Int64
+    let recencyTimestamp: Int64
     let isPinned: Bool
     let model: String?
     let activity: ThreadActivity
-    let gitStatus: WorkspaceGitStatus
+    let gitWorkingTreeStatus: GitWorkingTreeStatus
 }
 
 struct ThreadSnapshot: Sendable {
     let threads: [DashboardThread]
-    let totalThreadCount: Int
+    let availableThreadCount: Int
 }
 
 struct DashboardPayload: Codable, Equatable, Sendable {
