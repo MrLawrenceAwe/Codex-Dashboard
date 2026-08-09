@@ -42,8 +42,20 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let rolloutPath: String
     }
 
+    private struct FileSignature: Equatable {
+        let size: UInt64
+        let modifiedAt: Date
+    }
+
+    private struct DatabaseSignature: Equatable {
+        let database: FileSignature
+        let writeAheadLog: FileSignature?
+    }
+
     private let stateDatabaseURL: URL
     private var rolloutActivityReader = RolloutActivityReader()
+    private var cachedDatabaseSignature: DatabaseSignature?
+    private var cachedStoredThreads: [StoredThread]?
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -73,7 +85,15 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         ORDER BY recency_at_ms DESC
         LIMIT 60;
         """
-        let threads: [StoredThread] = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
+        let databaseSignature = try signature(for: stateDatabaseURL)
+        let threads: [StoredThread]
+        if databaseSignature == cachedDatabaseSignature, let cachedStoredThreads {
+            threads = cachedStoredThreads
+        } else {
+            threads = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
+            cachedDatabaseSignature = databaseSignature
+            cachedStoredThreads = threads
+        }
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let threadActivity = rolloutActivityReader.load(
@@ -106,10 +126,26 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         )
     }
 
-    private func query<T: Decodable>(databaseURL: URL, sql: String) async throws -> T {
-        guard FileManager.default.fileExists(atPath: databaseURL.path) else {
+    private func signature(for databaseURL: URL) throws -> DatabaseSignature {
+        guard let database = fileSignature(at: databaseURL) else {
             throw ThreadCatalogError.missingDatabase(databaseURL)
         }
+        return DatabaseSignature(
+            database: database,
+            writeAheadLog: fileSignature(at: URL(fileURLWithPath: databaseURL.path + "-wal"))
+        )
+    }
+
+    private func fileSignature(at url: URL) -> FileSignature? {
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let size = (attributes[.size] as? NSNumber)?.uint64Value,
+            let modifiedAt = attributes[.modificationDate] as? Date
+        else { return nil }
+        return FileSignature(size: size, modifiedAt: modifiedAt)
+    }
+
+    private func query<T: Decodable>(databaseURL: URL, sql: String) async throws -> T {
         do {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),

@@ -5,6 +5,33 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testUnrelatedHostMutationsDoNotRescanComposerSelectors() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const original = document.querySelectorAll.bind(document);
+              document.documentElement.dataset.querySelectorAllCount = '0';
+              document.querySelectorAll = (...arguments) => {
+                document.documentElement.dataset.querySelectorAllCount = String(
+                  Number(document.documentElement.dataset.querySelectorAllCount) + 1
+                );
+                return original(...arguments);
+              };
+              const unrelated = document.createElement('span');
+              unrelated.textContent = 'Streaming response token';
+              document.querySelector('main').append(unrelated);
+            })()
+            """
+        )
+
+        try await Task.sleep(for: .milliseconds(100))
+        let scanCount = try await webView.evaluateJavaScript(
+            "document.documentElement.dataset.querySelectorAllCount"
+        ) as? String
+        XCTAssertEqual(scanCount, "0")
+    }
+
     func testSavedPromptCanBeCreatedAndInsertedIntoSupportedComposers() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let textareaResult = try await webView.evaluateJavaScript(

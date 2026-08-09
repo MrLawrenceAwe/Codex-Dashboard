@@ -2,6 +2,13 @@ import Foundation
 
 @MainActor
 final class DashboardRenderer {
+    private struct PendingSynchronization {
+        var snapshot: DashboardSnapshot
+        var targets: [DevToolsTarget]
+        var forceRemount: Bool
+        var waiters: [CheckedContinuation<Void, any Error>]
+    }
+
     private let devTools: any DevToolsServing
     private let injectionPayload: DashboardInjectionPayload
     private let compatibilityChecker: RendererCompatibilityChecker
@@ -11,7 +18,7 @@ final class DashboardRenderer {
     private var activeSynchronizationCount = 0
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
-    private var queuedSynchronizations: [CheckedContinuation<Void, Never>] = []
+    private var pendingSynchronization: PendingSynchronization?
     private var lastPromptBackupCheck: Date?
     private var lastHealthCheckByTargetID: [String: Date] = [:]
     private var cachedTargets: [DevToolsTarget] = []
@@ -66,20 +73,73 @@ final class DashboardRenderer {
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
-        activeSynchronizationCount += 1
-        defer { synchronizationFinished() }
-        await acquireSynchronizationSlot()
-        defer { releaseSynchronizationSlot() }
-        do {
-            try await performSynchronization(
-                snapshot,
-                on: targets,
-                forceRemount: forceRemount
-            )
-        } catch {
-            invalidateTargetCache()
-            throw error
+        if synchronizationInProgress {
+            try await withCheckedThrowingContinuation { continuation in
+                if var pendingSynchronization {
+                    pendingSynchronization.snapshot = snapshot
+                    pendingSynchronization.targets = targets
+                    pendingSynchronization.forceRemount = pendingSynchronization.forceRemount || forceRemount
+                    pendingSynchronization.waiters.append(continuation)
+                    self.pendingSynchronization = pendingSynchronization
+                } else {
+                    pendingSynchronization = PendingSynchronization(
+                        snapshot: snapshot,
+                        targets: targets,
+                        forceRemount: forceRemount,
+                        waiters: [continuation]
+                    )
+                }
+            }
+            return
         }
+
+        synchronizationInProgress = true
+        activeSynchronizationCount += 1
+        defer {
+            synchronizationInProgress = false
+            synchronizationFinished()
+        }
+
+        var current = PendingSynchronization(
+            snapshot: snapshot,
+            targets: targets,
+            forceRemount: forceRemount,
+            waiters: []
+        )
+        var initialResult: Result<Void, any Error>?
+
+        while true {
+            let result: Result<Void, any Error>
+            do {
+                try await performSynchronization(
+                    current.snapshot,
+                    on: current.targets,
+                    forceRemount: current.forceRemount
+                )
+                result = .success(())
+            } catch {
+                invalidateTargetCache()
+                result = .failure(error)
+            }
+
+            if initialResult == nil {
+                initialResult = result
+            }
+            for waiter in current.waiters {
+                switch result {
+                case .success:
+                    waiter.resume()
+                case .failure(let error):
+                    waiter.resume(throwing: error)
+                }
+            }
+
+            guard let pendingSynchronization else { break }
+            self.pendingSynchronization = nil
+            current = pendingSynchronization
+        }
+
+        try initialResult?.get()
     }
 
     private func performSynchronization(
@@ -265,24 +325,6 @@ final class DashboardRenderer {
         let waiters = synchronizationWaiters
         synchronizationWaiters = []
         waiters.forEach { $0.resume() }
-    }
-
-    private func acquireSynchronizationSlot() async {
-        guard synchronizationInProgress else {
-            synchronizationInProgress = true
-            return
-        }
-        await withCheckedContinuation { continuation in
-            queuedSynchronizations.append(continuation)
-        }
-    }
-
-    private func releaseSynchronizationSlot() {
-        guard !queuedSynchronizations.isEmpty else {
-            synchronizationInProgress = false
-            return
-        }
-        queuedSynchronizations.removeFirst().resume()
     }
 
     private func waitForSynchronizationsToFinish() async {

@@ -1,6 +1,18 @@
 const promptLauncher = (() => {
   let syncQueued = false;
+  let syncFrame;
   let onActivate;
+
+  const launcherMutationSelector = [
+    'textarea',
+    '[contenteditable="true"]',
+    'button[aria-label="Add"]',
+    'button[aria-label^="Add "]',
+    'button[aria-label*="attachment" i]',
+    'button[data-testid="composer-plus-btn"]',
+    'button[data-testid="composer-attachment-button"]',
+    '[data-codex-prompt-launcher]',
+  ].join(',');
 
   function createButton(addButton) {
     const button = document.createElement('button');
@@ -39,7 +51,19 @@ const promptLauncher = (() => {
   function scheduleSync() {
     if (syncQueued) return;
     syncQueued = true;
-    queueMicrotask(synchronize);
+    syncFrame = requestAnimationFrame(() => {
+      syncFrame = undefined;
+      synchronize();
+    });
+  }
+
+  function mutationsCouldAffectLauncher(records) {
+    const currentButton = document.querySelector('[data-codex-prompt-launcher]');
+    if (currentButton && !currentButton.isConnected) return true;
+    return records.some((record) => [...record.addedNodes, ...record.removedNodes].some((node) => (
+      node instanceof Element
+        && (node.matches(launcherMutationSelector) || node.querySelector(launcherMutationSelector))
+    )));
   }
 
   function mount(activation) {
@@ -48,10 +72,12 @@ const promptLauncher = (() => {
   }
 
   function unmount() {
+    if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
     syncQueued = false;
+    syncFrame = undefined;
     onActivate = undefined;
     document.querySelectorAll('[data-codex-prompt-launcher]').forEach((button) => button.remove());
   }
 
-  return { mount, scheduleSync, unmount };
+  return { mount, mutationsCouldAffectLauncher, scheduleSync, unmount };
 })();

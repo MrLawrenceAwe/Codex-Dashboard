@@ -107,4 +107,30 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             XCTAssertEqual(databaseURL, missingDatabaseURL)
         }
     }
+
+    func testReloadsStoredThreadsWhenDatabaseChanges() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(now: now, testCase: self)
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: stateDatabaseURL)
+
+        let initial = try await provider.loadCatalog(
+            workingTreeStatuses: [:],
+            codexLaunchDate: .distantPast
+        )
+        XCTAssertEqual(initial.threads.first { $0.id == "updated" }?.title, "Renamed thread")
+
+        try await Task.sleep(for: .milliseconds(10))
+        let update = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [stateDatabaseURL.path, "UPDATE threads SET name = 'Fresh title' WHERE id = 'updated';"],
+            timeout: 3
+        )
+        XCTAssertEqual(update.terminationStatus, 0)
+
+        let refreshed = try await provider.loadCatalog(
+            workingTreeStatuses: [:],
+            codexLaunchDate: .distantPast
+        )
+        XCTAssertEqual(refreshed.threads.first { $0.id == "updated" }?.title, "Fresh title")
+    }
 }

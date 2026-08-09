@@ -336,7 +336,9 @@ final class DashboardViewModel: ObservableObject {
 
     private func setThreads(_ updatedThreads: [ThreadSummary]) {
         let completedThreads = completionDetector.observe(updatedThreads)
-        threads = updatedThreads
+        if threads != updatedThreads {
+            threads = updatedThreads
+        }
         guard completionNotificationsEnabled else { return }
         for thread in completedThreads {
             completionNotifier.postCompletion(for: thread)

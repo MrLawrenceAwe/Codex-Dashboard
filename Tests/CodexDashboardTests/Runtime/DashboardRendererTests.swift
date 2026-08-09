@@ -80,6 +80,10 @@ private actor OrderedSnapshotDevTools: DevToolsServing {
             completedSnapshots.append("old")
         } else if expression.contains("New snapshot") {
             completedSnapshots.append("new")
+        } else if expression.contains("Middle snapshot") {
+            completedSnapshots.append("middle")
+        } else if expression.contains("Latest snapshot") {
+            completedSnapshots.append("latest")
         }
         return true
     }
@@ -328,6 +332,51 @@ final class DashboardRendererTests: XCTestCase {
         try await newSynchronization.value
         let completedOrder = await devTools.completedSnapshotOrder()
         XCTAssertEqual(completedOrder, ["old", "new"])
+    }
+
+    func testConcurrentSynchronizationsCoalesceQueuedSnapshotsToLatestState() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = OrderedSnapshotDevTools(target: target)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+        )
+
+        let oldSynchronization = Task { @MainActor in
+            try await renderer.synchronize(
+                DashboardSnapshot(threads: [.fixture(title: "Old snapshot")]),
+                on: [target],
+                forceRemount: true
+            )
+        }
+        while !(await devTools.oldSnapshotHasStarted()) { await Task.yield() }
+        let middleSynchronization = Task { @MainActor in
+            try await renderer.synchronize(
+                DashboardSnapshot(threads: [.fixture(title: "Middle snapshot")]),
+                on: [target]
+            )
+        }
+        await Task.yield()
+        let latestSynchronization = Task { @MainActor in
+            try await renderer.synchronize(
+                DashboardSnapshot(threads: [.fixture(title: "Latest snapshot")]),
+                on: [target]
+            )
+        }
+        await Task.yield()
+
+        await devTools.resumeOldSnapshot()
+        try await oldSynchronization.value
+        try await middleSynchronization.value
+        try await latestSynchronization.value
+
+        let completedOrder = await devTools.completedSnapshotOrder()
+        XCTAssertEqual(completedOrder, ["old", "latest"])
     }
 
     func testRepeatedSynchronizationThrottlesPromptBackupReads() async throws {
