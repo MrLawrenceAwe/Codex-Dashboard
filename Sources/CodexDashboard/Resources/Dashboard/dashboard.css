@@ -33,6 +33,9 @@
 #codex-dashboard-navigation .dashboard-nav-spinner[hidden] { display: none; }
 #codex-dashboard-navigation .dashboard-nav-count { min-width: 18px; padding: 0 5px; border: 0; border-radius: 4px; background: var(--dashboard-active); color: var(--dashboard-muted); font-size: 10px; font-weight: 550; line-height: 18px; text-align: center; }
 #codex-dashboard-navigation .dashboard-nav-count[hidden] { display: none; }
+#codex-dashboard-navigation .dashboard-nav-changes { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; color: var(--dashboard-amber); }
+#codex-dashboard-navigation .dashboard-nav-changes svg { width: 15px; height: 15px; }
+#codex-dashboard-navigation .dashboard-nav-changes[hidden] { display: none; }
 #codex-dashboard-navigation[aria-current="page"] { background: var(--item-background-color, var(--dashboard-active)); }
 
 @keyframes dashboard-nav-spin { to { transform: rotate(360deg); } }

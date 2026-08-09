@@ -71,6 +71,11 @@ function deriveDashboardState() {
         .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
         .map((thread) => String(thread.projectPath).trim()),
     ),
+    dirtyProjectPaths: new Set(
+      threads
+        .filter((thread) => thread.workingTreeStatus === 'hasChanges')
+        .map((thread) => String(thread.projectPath).trim()),
+    ),
   };
 }
 
@@ -231,6 +236,7 @@ function mountNavigationButton() {
     </div>
     <div class="dashboard-nav-status">
       <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running threads" title="0 running threads" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
+      <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${threadMarkup.icon('gitChanges')}</span>
       <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads" hidden>0</strong>
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
@@ -344,7 +350,7 @@ function closePage() {
   document.getElementById(dashboardDOM.elementIDs.navButton)?.removeAttribute('aria-current');
 }
 
-function updateSidebarStatus({ unreadCount, runningThreads }) {
+function updateSidebarStatus({ unreadCount, runningThreads, dirtyProjectPaths }) {
   const unreadBadge = document.querySelector('[data-navigation-count]');
   if (unreadBadge) {
     unreadBadge.textContent = String(unreadCount);
@@ -363,6 +369,14 @@ function updateSidebarStatus({ unreadCount, runningThreads }) {
     spinner.setAttribute('title', runningLabel);
     const spinnerCount = spinner.querySelector('[data-navigation-running-count]');
     if (spinnerCount) spinnerCount.textContent = String(runningCount);
+  }
+  const changes = document.querySelector('[data-navigation-changes]');
+  if (changes) {
+    const changedProjectCount = dirtyProjectPaths.size;
+    const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes`;
+    changes.hidden = changedProjectCount === 0;
+    changes.setAttribute('aria-label', changedProjectLabel);
+    changes.setAttribute('title', changedProjectLabel);
   }
 }
 

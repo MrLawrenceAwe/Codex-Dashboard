@@ -138,6 +138,35 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "1")
     }
 
+    func testNavigationShowsUncommittedChangesIndicatorForDirtyProjects() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside><main>Conversation surface</main>
+            </body></html>
+            """,
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(projectPath: "/tmp/dirty", workingTreeStatus: .hasChanges),
+            .fixture(id: "clean", projectPath: "/tmp/clean", workingTreeStatus: .clean),
+        ])
+
+        let status = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const indicator = document.querySelector('[data-navigation-changes]');
+              return [indicator.hidden, indicator.getAttribute('title')];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(status)
+        XCTAssertEqual(values[0] as? Bool, false)
+        XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes")
+    }
+
     func testProjectCommitActionDispatchesCodexNativeGitCommand() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
