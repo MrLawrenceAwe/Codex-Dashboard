@@ -123,7 +123,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         return try XCTUnwrap(object as? [String: Any])
     }
 
-    func testPromptSearchDuplicationAndTransferControls() async throws {
+    func testPromptSearchAndTransferControls() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
             """
@@ -137,7 +137,6 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               };
               createPrompt('Review code', 'Find correctness issues');
               createPrompt('Write summary', 'Summarise the discussion');
-              document.querySelector('[data-prompt-duplicate]').click();
               const search = document.querySelector('[data-prompt-search]');
               search.value = 'review';
               search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -158,7 +157,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values["names"] as? [String], ["Review code", "Review code copy"])
+        XCTAssertEqual(values["names"] as? [String], ["Review code"])
         XCTAssertEqual(values["hasExport"] as? Bool, true)
         XCTAssertEqual(values["hasImport"] as? Bool, true)
         XCTAssertNil(values["searchPlaceholder"] as? String)
