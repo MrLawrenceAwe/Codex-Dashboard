@@ -5,13 +5,10 @@ import XCTest
 private actor CountingCatalogProvider: ThreadCatalogProviding {
     private(set) var loadCount = 0
 
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?) -> ThreadCatalog {
         loadCount += 1
         return ThreadCatalog(
-            threads: [.fixture(workingTreeStatus: workingTreeStatuses["/tmp/project"] ?? .notRepository)],
+            threads: [.fixture()],
             totalThreadCount: 1
         )
     }
@@ -36,10 +33,7 @@ private struct FailingUnreadIDProvider: UnreadThreadIDProviding {
 private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
     private var continuation: CheckedContinuation<ThreadCatalog, Never>?
 
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) async -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?) async -> ThreadCatalog {
         await withCheckedContinuation { continuation in
             self.continuation = continuation
         }

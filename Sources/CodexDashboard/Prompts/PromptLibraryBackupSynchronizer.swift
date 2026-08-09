@@ -6,11 +6,17 @@ final class PromptLibraryBackupSynchronizer {
     private static let checkInterval: TimeInterval = 30
 
     private let store: PromptBackupStore?
+    private let contractSource: String
     private let now: () -> Date
     private var lastCheck: Date?
 
-    init(store: PromptBackupStore?, now: @escaping () -> Date = Date.init) {
+    init(
+        store: PromptBackupStore?,
+        contractSource: String,
+        now: @escaping () -> Date = Date.init
+    ) {
         self.store = store
+        self.contractSource = contractSource
         self.now = now
     }
 
@@ -29,14 +35,8 @@ final class PromptLibraryBackupSynchronizer {
           const key = '\(Self.storageKey)';
           try {
             const library = JSON.parse(localStorage.getItem(key));
-            if (!library || typeof library !== 'object' || Array.isArray(library)) return false;
-            if (!Array.isArray(library.prompts) || !Array.isArray(library.sections)) return false;
-            if (!library.sections.every((section) => typeof section === 'string')) return false;
-            if (!library.prompts.every((prompt) => prompt && typeof prompt === 'object'
-              && typeof prompt.id === 'string' && typeof prompt.name === 'string'
-              && typeof prompt.content === 'string'
-              && (prompt.section === undefined || typeof prompt.section === 'string'))) return false;
-            return new Set(library.prompts.map((prompt) => prompt.id)).size === library.prompts.length;
+            \(contractSource)
+            return promptLibraryContract.isValidLibrary(library);
           } catch (_) {
             return false;
           }

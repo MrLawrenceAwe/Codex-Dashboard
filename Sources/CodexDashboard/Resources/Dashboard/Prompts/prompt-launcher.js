@@ -3,16 +3,9 @@ const promptLauncher = (() => {
   let syncFrame;
   let onActivate;
 
-  const launcherMutationSelector = [
-    'textarea',
-    '[contenteditable="true"]',
-    'button[aria-label="Add"]',
-    'button[aria-label^="Add "]',
-    'button[aria-label*="attachment" i]',
-    'button[data-testid="composer-plus-btn"]',
-    'button[data-testid="composer-attachment-button"]',
+  const launcherMutationSelector = codexContracts.composerMutationSelector([
     '[data-codex-prompt-launcher]',
-  ].join(',');
+  ]);
 
   function createButton(addButton) {
     const button = document.createElement('button');

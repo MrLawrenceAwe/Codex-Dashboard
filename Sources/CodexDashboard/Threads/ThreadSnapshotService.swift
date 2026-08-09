@@ -38,10 +38,7 @@ actor ThreadSnapshotService {
                 unreadStateWarning = Self.warning(for: error)
             }
         }
-        let catalog = try await catalogProvider.loadCatalog(
-            workingTreeStatuses: workingTreeStatuses,
-            codexLaunchDate: codexLaunchDate
-        )
+        let catalog = try await catalogProvider.loadCatalog(codexLaunchDate: codexLaunchDate)
         hasLoadedSnapshot = true
         let threads = catalog.threads.map { source in
             var thread = source

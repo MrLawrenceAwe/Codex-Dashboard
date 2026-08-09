@@ -110,7 +110,10 @@ final class PromptBackupStoreTests: XCTestCase {
         let library = #"{"prompts":[{"id":"one","name":"Review","content":"Keep this prompt"}],"sections":["General"]}"#
         try await store.save(library)
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: false)
-        let synchronizer = PromptLibraryBackupSynchronizer(store: store)
+        let synchronizer = PromptLibraryBackupSynchronizer(
+            store: store,
+            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+        )
 
         try await synchronizer.restoreIfNeeded(in: target, using: devTools)
 
@@ -129,7 +132,10 @@ final class PromptBackupStoreTests: XCTestCase {
         let store = PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
         try await store.save(#"{"prompts":[],"sections":[]}"#)
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: true)
-        let synchronizer = PromptLibraryBackupSynchronizer(store: store)
+        let synchronizer = PromptLibraryBackupSynchronizer(
+            store: store,
+            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+        )
 
         try await synchronizer.restoreIfNeeded(in: target, using: devTools)
 
@@ -145,7 +151,10 @@ final class PromptBackupStoreTests: XCTestCase {
         let store = PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
         try await store.save(#"{"prompts":[],"sections":[]}"#)
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: false, restoreSucceeds: false)
-        let synchronizer = PromptLibraryBackupSynchronizer(store: store)
+        let synchronizer = PromptLibraryBackupSynchronizer(
+            store: store,
+            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+        )
 
         do {
             try await synchronizer.restoreIfNeeded(in: target, using: devTools)

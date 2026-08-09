@@ -35,7 +35,11 @@ final class RendererDashboardSession {
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionPayload.load()
-        promptBackup = PromptLibraryBackupSynchronizer(store: promptBackupStore, now: now)
+        promptBackup = PromptLibraryBackupSynchronizer(
+            store: promptBackupStore,
+            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource(),
+            now: now
+        )
         self.healthCheckInterval = healthCheckInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(

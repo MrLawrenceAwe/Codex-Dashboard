@@ -6,10 +6,7 @@ import XCTest
 private struct StubCatalogProvider: ThreadCatalogProviding {
     let catalog: ThreadCatalog
 
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) async throws -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog {
         catalog
     }
 }
@@ -50,10 +47,7 @@ private actor SuspendedCatalogProvider: ThreadCatalogProviding {
     private var continuations: [CheckedContinuation<ThreadCatalog, Never>] = []
     private(set) var requestCount = 0
 
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) async -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?) async -> ThreadCatalog {
         requestCount += 1
         return await withCheckedContinuation { continuation in
             continuations.append(continuation)
