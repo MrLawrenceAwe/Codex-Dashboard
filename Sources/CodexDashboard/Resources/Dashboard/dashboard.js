@@ -18,6 +18,8 @@ const collapsedProjects = new Set();
 let mutationObserver;
 let resizeObserver;
 let observedSidebar;
+let mutationFrame;
+let pendingSidebarMutation = false;
 let isOpen = false;
 let unreadThreadIDs = new Set();
 
@@ -99,8 +101,7 @@ function filteredThreads() {
   const query = searchTerm.trim().toLowerCase();
   return threads.filter((thread) => {
     const filterMatch = statusFilter === 'all'
-      || (statusFilter === 'unread' && isThreadUnread(thread))
-      || (statusFilter === 'running' && thread.status === 'running');
+      || (statusFilter === 'unread' && isThreadUnread(thread));
     const searchMatch = !query || `${thread.title} ${thread.preview} ${thread.workspace} ${thread.workspacePath}`.toLowerCase().includes(query);
     return filterMatch && searchMatch;
   });
@@ -192,11 +193,14 @@ function render() {
   updateNavigationStatus();
   const page = document.getElementById(ids.page);
   if (!page) return;
-  const running = threads.filter((thread) => thread.status === 'running').length;
+  const runningThreads = threads.filter((thread) => thread.status === 'running');
   const unread = threads.filter(isThreadUnread).length;
-  page.querySelector('[data-count-running]').textContent = String(running);
   const runningSummary = page.querySelector('[data-running-summary]');
-  if (runningSummary) runningSummary.hidden = running === 0;
+  if (runningSummary) runningSummary.hidden = runningThreads.length === 0;
+  const runningList = page.querySelector('[data-running-list]');
+  if (runningList) runningList.innerHTML = runningThreads
+    .map((thread) => threadMarkup(thread, true))
+    .join('');
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === statusFilter;
     button.classList.toggle('is-active', isActive);
@@ -205,7 +209,6 @@ function render() {
   const filterCounts = {
     all: threads.length,
     unread,
-    running,
   };
   page.querySelectorAll('[data-filter-count]').forEach((count) => {
     count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
@@ -262,6 +265,34 @@ function syncPageHost() {
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
 }
 
+function mutationTouchesSidebar(record) {
+  if (record.target instanceof Element && record.target.closest('aside')) return true;
+  return [...record.addedNodes, ...record.removedNodes].some((node) => (
+    node instanceof Element && (node.matches('aside') || node.querySelector('aside'))
+  ));
+}
+
+function scheduleMutationSync(records) {
+  const sidebarMutation = records.some(mutationTouchesSidebar);
+  const dashboardMissing = !document.getElementById(ids.page)
+    || !document.getElementById(ids.navButton);
+  if (!sidebarMutation && !dashboardMissing) return;
+  if (sidebarMutation) pendingSidebarMutation = true;
+  if (mutationFrame !== undefined) return;
+  mutationFrame = requestAnimationFrame(() => {
+    mutationFrame = undefined;
+    const shouldSyncUnread = pendingSidebarMutation;
+    pendingSidebarMutation = false;
+    const restoredPage = !document.getElementById(ids.page);
+    if (restoredPage) createPage();
+    if (!document.getElementById(ids.navButton)) createNavigation();
+    if (isOpen && restoredPage) openPage();
+    syncPageHost();
+    observeSidebar();
+    if (shouldSyncUnread && syncUnreadFromSidebar()) render();
+  });
+}
+
 function createNavigation() {
   const reference = findSidebarReference();
   if (!reference?.element?.parentElement) return false;
@@ -294,11 +325,12 @@ function createPage() {
       <header class="dashboard-header">
         <h1>Threads</h1>
       </header>
-      <section class="dashboard-stats" data-running-summary aria-label="Thread summary" hidden>
-        <div class="dashboard-stat" data-tone="running">
-          <span class="dashboard-stat-heading"><span class="dashboard-running-spinner" role="status" aria-label="Running threads" title="Running threads"></span>Running</span>
-          <strong data-count-running>0</strong>
+      <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
+        <div class="dashboard-running-heading">
+          <span class="dashboard-running-spinner" role="status" aria-label="Running threads" title="Running threads"></span>
+          <h2>Running</h2>
         </div>
+        <div class="dashboard-running-list" data-running-list></div>
       </section>
       <div class="dashboard-section-header">
         <div class="dashboard-section-title">
@@ -308,7 +340,6 @@ function createPage() {
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
             <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-            <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
           </div>
           <div class="dashboard-view-options" aria-label="View threads">
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
@@ -344,6 +375,12 @@ function createPage() {
       render();
       return;
     }
+    const button = event.target.closest('[data-open-thread]');
+    if (!button) return;
+    const thread = threads.find((item) => item.id === button.dataset.openThread);
+    if (thread) openThread(thread);
+  });
+  page.querySelector('[data-running-list]').addEventListener('click', (event) => {
     const button = event.target.closest('[data-open-thread]');
     if (!button) return;
     const thread = threads.find((item) => item.id === button.dataset.openThread);
@@ -410,16 +447,7 @@ function ensureMounted() {
   if (isOpen && pageWasMissing) openPage();
 
   if (!mutationObserver) {
-    mutationObserver = new MutationObserver(() => {
-      const restoredPage = !document.getElementById(ids.page);
-      if (restoredPage) createPage();
-      if (!document.getElementById(ids.navButton)) createNavigation();
-      if (isOpen && restoredPage) openPage();
-      syncPageHost();
-      observeSidebar();
-      syncContentInset();
-      if (syncUnreadFromSidebar()) render();
-    });
+    mutationObserver = new MutationObserver(scheduleMutationSync);
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
   if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
@@ -440,8 +468,11 @@ function destroy() {
   isOpen = false;
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
+  if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
   mutationObserver = undefined;
   resizeObserver = undefined;
+  mutationFrame = undefined;
+  pendingSidebarMutation = false;
   observedSidebar = undefined;
   document.removeEventListener('pointerdown', handleHostNavigation, true);
   document.removeEventListener('mousedown', handleHostNavigation, true);

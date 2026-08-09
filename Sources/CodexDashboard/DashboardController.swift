@@ -50,7 +50,9 @@ final class DashboardController: ObservableObject {
     private var adapter: DashboardAdapter?
     private var shouldMaintainDashboard = true
     private var monitor: Task<Void, Never>?
+    private var gitMonitor: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var gitStatuses: [String: WorkspaceGitStatus] = [:]
     private var enabledTargetIDs: Set<String> = []
     private var lastDeliveredPayload: DashboardPayload?
 
@@ -93,15 +95,26 @@ final class DashboardController: ObservableObject {
             )
         }
         monitor = Task { [weak self] in
+            let clock = ContinuousClock()
+            var deadline = clock.now
             while !Task.isCancelled {
                 await self?.refresh()
-                try? await Task.sleep(for: .seconds(2))
+                deadline += .seconds(2)
+                if deadline < clock.now { deadline = clock.now }
+                try? await clock.sleep(until: deadline)
+            }
+        }
+        gitMonitor = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshGitStatuses()
+                try? await Task.sleep(for: .seconds(10))
             }
         }
     }
 
     deinit {
         monitor?.cancel()
+        gitMonitor?.cancel()
         refreshTask?.cancel()
     }
 
@@ -122,7 +135,7 @@ final class DashboardController: ObservableObject {
 
     private func performRefresh() async {
         do {
-            let snapshot = try await threadRepository.loadSnapshot()
+            let snapshot = try await threadRepository.loadSnapshot(gitStatuses: gitStatuses)
             guard !Task.isCancelled else { return }
             threads = snapshot.threads
             totalThreadCount = snapshot.totalThreadCount
@@ -153,6 +166,17 @@ final class DashboardController: ObservableObject {
         } else {
             state = hostIsRunning ? .hostRunning : .hostClosed
         }
+    }
+
+    private func refreshGitStatuses() async {
+        guard !isBusy else { return }
+        if threads.isEmpty { await refresh() }
+        let workspacePaths = Set(threads.map(\.workspacePath))
+        guard !workspacePaths.isEmpty, !Task.isCancelled else { return }
+        let statuses = await threadRepository.loadGitStatuses(at: workspacePaths)
+        guard !Task.isCancelled else { return }
+        gitStatuses = statuses
+        await refresh()
     }
 
     func restartCodexAndEnableDashboard() async {
@@ -206,7 +230,7 @@ final class DashboardController: ObservableObject {
             }
             hostConnected = true
 
-            let snapshot = try await threadRepository.loadSnapshot()
+            let snapshot = try await threadRepository.loadSnapshot(gitStatuses: gitStatuses)
             threads = snapshot.threads
             totalThreadCount = snapshot.totalThreadCount
             dataWarning = nil
