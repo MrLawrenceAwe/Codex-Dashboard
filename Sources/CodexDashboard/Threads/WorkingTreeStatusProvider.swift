@@ -1,10 +1,10 @@
 import Foundation
 
-protocol GitStatusProviding: Sendable {
-    func load(projectPaths: Set<String>) async -> [String: GitStatus]
+protocol WorkingTreeStatusProviding: Sendable {
+    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus]
 }
 
-struct SystemGitStatusProvider: GitStatusProviding, Sendable {
+struct SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding, Sendable {
     private static let maximumConcurrentChecks = 6
     private let subprocessTimeout: TimeInterval
 
@@ -12,11 +12,11 @@ struct SystemGitStatusProvider: GitStatusProviding, Sendable {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func load(projectPaths: Set<String>) async -> [String: GitStatus] {
+    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         let timeout = subprocessTimeout
         return await withTaskGroup(
-            of: (String, GitStatus).self,
-            returning: [String: GitStatus].self
+            of: (String, WorkingTreeStatus).self,
+            returning: [String: WorkingTreeStatus].self
         ) { group in
             var paths = projectPaths.makeIterator()
             for _ in 0..<min(Self.maximumConcurrentChecks, projectPaths.count) {
@@ -25,7 +25,7 @@ struct SystemGitStatusProvider: GitStatusProviding, Sendable {
                     (path, Self.status(at: path, timeout: timeout))
                 }
             }
-            var statuses: [String: GitStatus] = [:]
+            var statuses: [String: WorkingTreeStatus] = [:]
             while let (path, status) = await group.next() {
                 statuses[path] = status
                 if let nextPath = paths.next() {
@@ -38,7 +38,7 @@ struct SystemGitStatusProvider: GitStatusProviding, Sendable {
         }
     }
 
-    private static func status(at path: String, timeout: TimeInterval) -> GitStatus {
+    private static func status(at path: String, timeout: TimeInterval) -> WorkingTreeStatus {
         guard FileManager.default.fileExists(atPath: path) else { return .unavailable }
         do {
             let result = try Subprocess.run(

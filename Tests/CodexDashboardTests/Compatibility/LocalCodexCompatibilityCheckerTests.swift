@@ -3,13 +3,13 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class CodexCompatibilityTests: XCTestCase {
+final class LocalCodexCompatibilityCheckerTests: XCTestCase {
     func testLiveLocalContractsWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to inspect local Codex contracts.")
         }
 
-        let checks = await SystemCodexCompatibilityChecker().checkLocalContracts()
+        let checks = await LocalCodexCompatibilityChecker().checkLocalContracts()
 
         XCTAssertFalse(
             checks.contains { $0.status == .incompatible },
@@ -25,7 +25,7 @@ final class CodexCompatibilityTests: XCTestCase {
         let globalStateURL = try makeGlobalState(
             #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["thread-1"]}}}"#
         )
-        let checker = SystemCodexCompatibilityChecker(
+        let checker = LocalCodexCompatibilityChecker(
             applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
             stateDatabaseURL: databaseURL,
             globalStateURL: globalStateURL
@@ -44,7 +44,7 @@ final class CodexCompatibilityTests: XCTestCase {
             testCase: self
         )
         let globalStateURL = try makeGlobalState(#"{"electron-persisted-atom-state":{}}"#)
-        let checker = SystemCodexCompatibilityChecker(
+        let checker = LocalCodexCompatibilityChecker(
             applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
             stateDatabaseURL: databaseURL,
             globalStateURL: globalStateURL

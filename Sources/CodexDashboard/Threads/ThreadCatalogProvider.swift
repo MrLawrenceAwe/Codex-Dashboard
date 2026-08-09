@@ -2,7 +2,7 @@ import Foundation
 
 protocol ThreadCatalogProviding: Sendable {
     func loadCatalog(
-        gitStatuses: [String: GitStatus],
+        workingTreeStatuses: [String: WorkingTreeStatus],
         codexLaunchDate: Date?
     ) async throws -> ThreadCatalog
 }
@@ -38,7 +38,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     private let stateDatabaseURL: URL
-    private var rolloutStatusReader = RolloutStatusReader()
+    private var rolloutActivityReader = RolloutActivityReader()
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -50,7 +50,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     func loadCatalog(
-        gitStatuses: [String: GitStatus],
+        workingTreeStatuses: [String: WorkingTreeStatus],
         codexLaunchDate: Date?
     ) async throws -> ThreadCatalog {
         let threadSQL = """
@@ -71,7 +71,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
-            let rolloutStatus = rolloutStatusReader.load(
+            let threadActivity = rolloutActivityReader.load(
                 at: thread.rolloutPath,
                 codexLaunchDate: codexLaunchDate
             )
@@ -81,18 +81,18 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 preview: thread.preview,
                 projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
                 projectPath: thread.projectPath,
-                sortTimestamp: rolloutStatus.lastFinalResponseAtUnixSeconds
+                recencyTimestamp: threadActivity.lastFinalResponseAtUnixSeconds
                     ?? thread.createdAtUnixSeconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
-                runState: rolloutStatus.runState,
-                gitStatus: gitStatuses[thread.projectPath] ?? .notRepository
+                runState: threadActivity.runState,
+                workingTreeStatus: workingTreeStatuses[thread.projectPath] ?? .notRepository
             )
         }.sorted { left, right in
-            if left.sortTimestamp == right.sortTimestamp {
+            if left.recencyTimestamp == right.recencyTimestamp {
                 return left.id < right.id
             }
-            return left.sortTimestamp > right.sortTimestamp
+            return left.recencyTimestamp > right.recencyTimestamp
         }
         return ThreadCatalog(
             threads: dashboardThreads,

@@ -2,13 +2,13 @@ import Foundation
 
 enum DashboardConnectionState: Equatable {
     case checking
-    case appClosed
-    case appRunning
-    case rendererAvailable
+    case codexClosed
+    case codexRunningWithoutRenderer
+    case rendererReady
     case dashboardMounted
 
     var rendererIsAvailable: Bool {
-        self == .rendererAvailable || self == .dashboardMounted
+        self == .rendererReady || self == .dashboardMounted
     }
 
     var dashboardIsMounted: Bool {
@@ -27,77 +27,77 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var compatibilityReport: CompatibilityReport?
     @Published private(set) var isCheckingCompatibility = false
 
-    private let threadService: ThreadDashboardService
-    private let compatibilityChecker: any CodexCompatibilityChecking
-    private let refreshCoordinator = DashboardRefreshCoordinator()
+    private let threadSnapshots: ThreadSnapshotService
+    private let compatibilityChecker: any LocalCompatibilityChecking
+    private let pollingController = DashboardPollingController()
     private var runtime: (any DashboardRuntime)?
-    private var refreshTask: Task<Void, Never>?
-    private var refreshTaskID: UUID?
+    private var synchronizationTask: Task<Void, Never>?
+    private var synchronizationID: UUID?
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
-            return ("Dashboard needs attention", "Review the message below and try again.")
+            return ("Thread Dashboard needs attention", "Review the message below and try again.")
         }
         return switch connectionState {
         case .checking:
             ("Checking Codex…", "Looking for the local Codex app.")
-        case .appClosed:
-            ("Codex is closed", "The dashboard can relaunch it with local debugging enabled.")
-        case .appRunning:
+        case .codexClosed:
+            ("Codex is closed", "The Thread Dashboard can relaunch it with local debugging enabled.")
+        case .codexRunningWithoutRenderer:
             (
-                "Codex is running without the dashboard connection",
-                "Restart it through this controller once to enable the thread dashboard."
+                "Codex is running without the Thread Dashboard connection",
+                "Restart it through this controller once to enable the Thread Dashboard."
             )
-        case .rendererAvailable:
-            ("Dashboard connection is available", "The local renderer is ready for the thread dashboard.")
+        case .rendererReady:
+            ("Thread Dashboard is ready", "The local renderer is connected and ready.")
         case .dashboardMounted:
-            ("Dashboard is live", connectionSummary)
+            ("Thread Dashboard is live", connectionSummary)
         }
     }
 
     init(
         catalogProvider: any ThreadCatalogProviding = CodexThreadCatalogProvider(),
-        gitStatusProvider: any GitStatusProviding = SystemGitStatusProvider(),
+        workingTreeStatusProvider: any WorkingTreeStatusProviding = SystemWorkingTreeStatusProvider(),
         unreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
-        compatibilityChecker: any CodexCompatibilityChecking = SystemCodexCompatibilityChecker(),
-        runtimeFactory: () throws -> any DashboardRuntime = { try DashboardRuntimeCoordinator() }
+        compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
+        runtimeFactory: () throws -> any DashboardRuntime = { try LiveDashboardRuntime() }
     ) {
-        threadService = ThreadDashboardService(
+        threadSnapshots = ThreadSnapshotService(
             catalogProvider: catalogProvider,
-            gitStatusProvider: gitStatusProvider,
+            workingTreeStatusProvider: workingTreeStatusProvider,
             unreadIDProvider: unreadIDProvider
         )
         self.compatibilityChecker = compatibilityChecker
         do {
             runtime = try runtimeFactory()
         } catch {
-            setFailure(error, lastKnownState: .appClosed)
+            setFailure(error, lastKnownState: .codexClosed)
         }
     }
 
     deinit {
-        refreshTask?.cancel()
+        synchronizationTask?.cancel()
     }
 
-    func startRefreshing() {
-        refreshCoordinator.start(
-            refreshThreads: { [weak self] in await self?.refresh() },
-            refreshGit: { [weak self] in await self?.refreshGitStatuses() },
-            refreshUnread: { [weak self] in await self?.refreshUnreadState() }
+    func startMonitoring() {
+        pollingController.start(
+            synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
+            updateWorkingTrees: { [weak self] in await self?.updateWorkingTreeStatuses() },
+            updateUnreadState: { [weak self] in await self?.updateUnreadState() }
         )
     }
 
-    func stopRefreshing() {
-        refreshCoordinator.stop()
-        refreshTask?.cancel()
-        refreshTask = nil
-        refreshTaskID = nil
+    func stopMonitoring() {
+        pollingController.stop()
+        synchronizationTask?.cancel()
+        synchronizationTask = nil
+        synchronizationID = nil
     }
 
-    func refresh() async {
+    func synchronizeDashboard() async {
         guard !isPerformingAction else { return }
-        if let refreshTask {
-            await refreshTask.value
+        if let synchronizationTask {
+            await synchronizationTask.value
             return
         }
         let taskID = UUID()
@@ -105,31 +105,31 @@ final class DashboardViewModel: ObservableObject {
             guard let self else { return }
             await self.synchronizeRuntime()
         }
-        refreshTask = task
-        refreshTaskID = taskID
+        synchronizationTask = task
+        synchronizationID = taskID
         await task.value
-        if refreshTaskID == taskID {
-            refreshTask = nil
-            refreshTaskID = nil
+        if synchronizationID == taskID {
+            synchronizationTask = nil
+            synchronizationID = nil
         }
     }
 
-    func restartCodexAndEnableDashboard() async {
+    func restartCodexAndEnableThreadDashboard() async {
         guard !isPerformingAction, let runtime else { return }
         isPerformingAction = true
         runtime.prepareForRestart()
         connectionState = .checking
         connectionError = nil
         defer { isPerformingAction = false }
-        await cancelRefresh()
+        await cancelSynchronization()
         var rendererAvailable = false
 
         do {
             let targets = try await runtime.restartCodex()
             rendererAvailable = true
-            try await loadThreadCatalog()
+            try await loadThreadSnapshot()
             try await runtime.synchronizeDashboard(
-                with: RendererSnapshot(threads: threads),
+                with: DashboardSnapshot(threads: threads),
                 on: targets,
                 forceRemount: true
             )
@@ -137,23 +137,23 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             setFailure(
                 error,
-                lastKnownState: rendererAvailable ? .rendererAvailable : .appClosed
+                lastKnownState: rendererAvailable ? .rendererReady : .codexClosed
             )
         }
     }
 
-    func disableDashboard() async {
+    func disableThreadDashboard() async {
         guard !isPerformingAction, let runtime else { return }
         isPerformingAction = true
         defer { isPerformingAction = false }
-        await cancelRefresh()
+        await cancelSynchronization()
 
         do {
-            switch try await runtime.disableDashboard() {
+            switch try await runtime.disableThreadDashboard() {
             case .codexClosed:
-                connectionState = .appClosed
-            case .rendererAvailable:
-                connectionState = .rendererAvailable
+                connectionState = .codexClosed
+            case .rendererReady:
+                connectionState = .rendererReady
             }
             connectionError = nil
         } catch {
@@ -161,11 +161,11 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    func openDashboard() async {
-        await runtime?.openDashboard()
+    func openThreadDashboard() async {
+        await runtime?.openThreadDashboard()
     }
 
-    func runCompatibilityPreflight() async {
+    func checkCompatibility() async {
         guard !isCheckingCompatibility else { return }
         isCheckingCompatibility = true
         defer { isCheckingCompatibility = false }
@@ -190,7 +190,7 @@ final class DashboardViewModel: ObservableObject {
 
     private func synchronizeRuntime() async {
         do {
-            try await loadThreadCatalog()
+            try await loadThreadSnapshot()
         } catch {
             threadDataWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
         }
@@ -204,7 +204,7 @@ final class DashboardViewModel: ObservableObject {
         if runtime.maintainsDashboard, !targets.isEmpty {
             do {
                 try await runtime.synchronizeDashboard(
-                    with: RendererSnapshot(threads: threads),
+                    with: DashboardSnapshot(threads: threads),
                     on: targets,
                     forceRemount: false
                 )
@@ -212,37 +212,37 @@ final class DashboardViewModel: ObservableObject {
                 connectionError = nil
             } catch {
                 guard !Task.isCancelled, runtime.maintainsDashboard else { return }
-                setFailure(error, lastKnownState: .rendererAvailable)
+                setFailure(error, lastKnownState: .rendererReady)
             }
             return
         }
         connectionState = !targets.isEmpty
-            ? .rendererAvailable
-            : (codexIsRunning ? .appRunning : .appClosed)
+            ? .rendererReady
+            : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed)
         connectionError = nil
     }
 
-    private func loadThreadCatalog() async throws {
-        let catalog = try await threadService.loadCatalog(codexLaunchDate: runtime?.codexLaunchDate)
+    private func loadThreadSnapshot() async throws {
+        let catalog = try await threadSnapshots.loadSnapshot(codexLaunchDate: runtime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
         threads = catalog.threads
         totalThreadCount = catalog.totalThreadCount
         threadDataWarning = nil
     }
 
-    private func refreshUnreadState() async {
+    private func updateUnreadState() async {
         guard
             !isPerformingAction,
-            let updatedThreads = await threadService.refreshUnreadState(in: threads)
+            let updatedThreads = await threadSnapshots.updateUnreadState(in: threads)
         else { return }
         threads = updatedThreads
         await publishSnapshotIfMaintained()
     }
 
-    private func refreshGitStatuses() async {
+    private func updateWorkingTreeStatuses() async {
         guard !isPerformingAction else { return }
-        if threads.isEmpty { await refresh() }
-        guard let updatedThreads = await threadService.refreshGitStatuses(in: threads) else { return }
+        if threads.isEmpty { await synchronizeDashboard() }
+        guard let updatedThreads = await threadSnapshots.updateWorkingTreeStatuses(in: threads) else { return }
         threads = updatedThreads
         await publishSnapshotIfMaintained()
     }
@@ -252,10 +252,10 @@ final class DashboardViewModel: ObservableObject {
         return "\(runningCount) running · \(totalThreadCount) available threads"
     }
 
-    private func cancelRefresh() async {
-        let task = refreshTask
-        refreshTask = nil
-        refreshTaskID = nil
+    private func cancelSynchronization() async {
+        let task = synchronizationTask
+        synchronizationTask = nil
+        synchronizationID = nil
         task?.cancel()
         await task?.value
     }
@@ -269,7 +269,7 @@ final class DashboardViewModel: ObservableObject {
         let targets = await runtime.rendererTargets()
         guard !Task.isCancelled, !targets.isEmpty else { return }
         try? await runtime.synchronizeDashboard(
-            with: RendererSnapshot(threads: threads),
+            with: DashboardSnapshot(threads: threads),
             on: targets,
             forceRemount: false
         )

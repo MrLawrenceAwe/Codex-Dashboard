@@ -31,7 +31,7 @@ final class DashboardRendererTests: XCTestCase {
         }
         let renderer = try DashboardRenderer(
             devTools: DevToolsClient(),
-            injection: DashboardInjection(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -45,7 +45,7 @@ final class DashboardRendererTests: XCTestCase {
     func testCompatibilityCheckExplainsUnavailableRenderer() async throws {
         let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),
-            injection: DashboardInjection(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -65,7 +65,7 @@ final class DashboardRendererTests: XCTestCase {
         await devTools.setEvaluationResult(true)
         let renderer = try DashboardRenderer(
             devTools: devTools,
-            injection: DashboardInjection(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -83,7 +83,7 @@ final class DashboardRendererTests: XCTestCase {
     func testPreparingForRestartRestoresMaintenance() throws {
         let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),
-            injection: DashboardInjection(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
         renderer.stopMaintaining()
         XCTAssertFalse(renderer.maintainsDashboard)
@@ -103,7 +103,7 @@ final class DashboardRendererTests: XCTestCase {
         let devTools = StubRendererDevTools(targets: [target])
         let renderer = try DashboardRenderer(
             devTools: devTools,
-            injection: DashboardInjection(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
 
         do {

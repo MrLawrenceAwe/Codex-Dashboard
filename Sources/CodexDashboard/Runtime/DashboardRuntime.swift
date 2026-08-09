@@ -2,7 +2,7 @@ import Foundation
 
 enum DashboardDisableOutcome {
     case codexClosed
-    case rendererAvailable
+    case rendererReady
 }
 
 @MainActor
@@ -15,17 +15,17 @@ protocol DashboardRuntime: AnyObject {
     func prepareForRestart()
     func restartCodex() async throws -> [DevToolsTarget]
     func synchronizeDashboard(
-        with snapshot: RendererSnapshot,
+        with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws
-    func disableDashboard() async throws -> DashboardDisableOutcome
-    func openDashboard() async
+    func disableThreadDashboard() async throws -> DashboardDisableOutcome
+    func openThreadDashboard() async
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
 @MainActor
-final class DashboardRuntimeCoordinator: DashboardRuntime {
+final class LiveDashboardRuntime: DashboardRuntime {
     private let codex: CodexAppController
     private let renderer: DashboardRenderer
 
@@ -63,18 +63,18 @@ final class DashboardRuntimeCoordinator: DashboardRuntime {
     }
 
     func synchronizeDashboard(
-        with snapshot: RendererSnapshot,
+        with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
         try await renderer.synchronize(snapshot, on: targets, forceRemount: forceRemount)
     }
 
-    func disableDashboard() async throws -> DashboardDisableOutcome {
-        try await renderer.disable() ? .rendererAvailable : .codexClosed
+    func disableThreadDashboard() async throws -> DashboardDisableOutcome {
+        try await renderer.disable() ? .rendererReady : .codexClosed
     }
 
-    func openDashboard() async {
+    func openThreadDashboard() async {
         await renderer.open()
     }
 

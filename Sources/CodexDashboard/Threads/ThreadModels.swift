@@ -5,7 +5,7 @@ enum ThreadRunState: String, Codable, Equatable, Sendable {
     case idle
 }
 
-enum GitStatus: String, Codable, Equatable, Sendable {
+enum WorkingTreeStatus: String, Codable, Equatable, Sendable {
     case notRepository
     case unavailable
     case clean
@@ -18,12 +18,12 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let preview: String
     let projectName: String
     let projectPath: String
-    let sortTimestamp: Int64
+    let recencyTimestamp: Int64
     let isPinned: Bool
     var isUnread = false
     let model: String?
     let runState: ThreadRunState
-    var gitStatus: GitStatus
+    var workingTreeStatus: WorkingTreeStatus
 }
 
 struct ThreadCatalog: Sendable {
@@ -31,6 +31,6 @@ struct ThreadCatalog: Sendable {
     let totalThreadCount: Int
 }
 
-struct RendererSnapshot: Codable, Equatable, Sendable {
+struct DashboardSnapshot: Codable, Equatable, Sendable {
     let threads: [ThreadSummary]
 }

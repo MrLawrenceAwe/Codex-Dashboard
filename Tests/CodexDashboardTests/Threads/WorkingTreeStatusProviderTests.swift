@@ -2,7 +2,7 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class SystemGitStatusProviderTests: XCTestCase {
+final class SystemWorkingTreeStatusProviderTests: XCTestCase {
     func testReportsUncommittedChanges() async throws {
         let projectURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
@@ -17,14 +17,14 @@ final class SystemGitStatusProviderTests: XCTestCase {
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("uncommitted\n".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
 
-        let statuses = await SystemGitStatusProvider().load(projectPaths: [projectURL.path])
+        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [projectURL.path])
 
         XCTAssertEqual(statuses[projectURL.path], .hasChanges)
     }
 
     func testReportsUnavailablePath() async {
         let missingPath = "/tmp/codex-dashboard-missing-\(UUID().uuidString)"
-        let statuses = await SystemGitStatusProvider().load(projectPaths: [missingPath])
+        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [missingPath])
         XCTAssertEqual(statuses[missingPath], .unavailable)
     }
 
@@ -34,7 +34,7 @@ final class SystemGitStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
 
-        let statuses = await SystemGitStatusProvider().load(projectPaths: [directory.path])
+        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [directory.path])
         XCTAssertEqual(statuses[directory.path], .notRepository)
     }
 
@@ -43,7 +43,7 @@ final class SystemGitStatusProviderTests: XCTestCase {
             "/tmp/codex-dashboard-missing-\(index)-\(UUID().uuidString)"
         })
 
-        let statuses = await SystemGitStatusProvider().load(projectPaths: paths)
+        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: paths)
 
         XCTAssertEqual(statuses.count, paths.count)
         XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })

@@ -19,13 +19,13 @@ enum DashboardWebTestHarness {
                 "try { localStorage.clear(); true } catch (_) { false }"
             )
         }
-        let injection = try DashboardInjection.load()
+        let injection = try DashboardInjectionPayload.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         return webView
     }
 
     static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {
-        let data = try JSONEncoder().encode(RendererSnapshot(threads: threads))
+        let data = try JSONEncoder().encode(DashboardSnapshot(threads: threads))
         return try XCTUnwrap(String(data: data, encoding: .utf8))
     }
 

@@ -2,7 +2,7 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class RolloutStatusReaderTests: XCTestCase {
+final class RolloutActivityReaderTests: XCTestCase {
     func testReadsLatestActivityAndFinalResponseDirectly() throws {
         let finalResponseAt = Int64(Date().timeIntervalSince1970) - 90
         let rolloutURL = try CodexTestFixtures.makeRollout(
@@ -11,7 +11,7 @@ final class RolloutStatusReaderTests: XCTestCase {
             finalResponseMessageSize: 128 * 1_024,
             testCase: self
         )
-        var reader = RolloutStatusReader()
+        var reader = RolloutActivityReader()
 
         let status = reader.load(
             at: rolloutURL.path,
@@ -28,7 +28,7 @@ final class RolloutStatusReaderTests: XCTestCase {
             finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
             testCase: self
         )
-        var reader = RolloutStatusReader()
+        var reader = RolloutActivityReader()
 
         let status = reader.load(
             at: rolloutURL.path,
@@ -47,7 +47,7 @@ final class RolloutStatusReaderTests: XCTestCase {
             compactionAtUnixSeconds: finalResponseAt + 1_000,
             testCase: self
         )
-        var reader = RolloutStatusReader()
+        var reader = RolloutActivityReader()
 
         let status = reader.load(
             at: rolloutURL.path,
@@ -63,7 +63,7 @@ final class RolloutStatusReaderTests: XCTestCase {
             finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
             testCase: self
         )
-        var reader = RolloutStatusReader()
+        var reader = RolloutActivityReader()
 
         let status = reader.load(
             at: rolloutURL.path,
@@ -83,7 +83,7 @@ final class RolloutStatusReaderTests: XCTestCase {
         try initialHandle.write(contentsOf: Data("\n".utf8))
         try initialHandle.close()
         addTeardownBlock { try? FileManager.default.removeItem(at: rolloutURL) }
-        var reader = RolloutStatusReader()
+        var reader = RolloutActivityReader()
 
         let initial = reader.load(
             at: rolloutURL.path,

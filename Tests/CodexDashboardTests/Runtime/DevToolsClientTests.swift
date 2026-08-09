@@ -47,7 +47,7 @@ final class DevToolsClientTests: XCTestCase {
         let client = DevToolsClient()
         let targets = await client.mainRendererTargets()
         let target = try XCTUnwrap(targets.first)
-        let injection = try DashboardInjection.load()
+        let injection = try DashboardInjectionPayload.load()
         let mounted = try await client.evaluateBoolean(injection.mountExpression, in: target)
 
         XCTAssertTrue(mounted)

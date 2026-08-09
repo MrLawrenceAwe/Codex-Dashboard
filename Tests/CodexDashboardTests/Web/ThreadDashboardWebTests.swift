@@ -94,8 +94,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "First",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
-                sortTimestamp: 3,
-                gitStatus: .hasChanges
+                recencyTimestamp: 3,
+                workingTreeStatus: .hasChanges
             ),
             ThreadSummary.fixture(
                 id: "changed-project-thread-two",
@@ -103,7 +103,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Second",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
-                sortTimestamp: 2
+                recencyTimestamp: 2
             ),
             ThreadSummary.fixture(
                 id: "clean-project-thread",
@@ -111,7 +111,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Clean",
                 projectName: "Clean Project",
                 projectPath: "/tmp/clean-project",
-                sortTimestamp: 1
+                recencyTimestamp: 1
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -155,9 +155,9 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                sortTimestamp: 4,
+                recencyTimestamp: 4,
                 runState: .running,
-                gitStatus: .clean
+                workingTreeStatus: .clean
             ),
             ThreadSummary.fixture(
                 id: "project-a-running-two",
@@ -165,9 +165,9 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                sortTimestamp: 3,
+                recencyTimestamp: 3,
                 runState: .running,
-                gitStatus: .clean
+                workingTreeStatus: .clean
             ),
             ThreadSummary.fixture(
                 id: "project-a-idle",
@@ -175,7 +175,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Idle",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                sortTimestamp: 2
+                recencyTimestamp: 2
             ),
             ThreadSummary.fixture(
                 id: "project-b-running",
@@ -183,9 +183,9 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project B",
                 projectPath: "/tmp/project-b",
-                sortTimestamp: 1,
+                recencyTimestamp: 1,
                 runState: .running,
-                gitStatus: .clean
+                workingTreeStatus: .clean
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
