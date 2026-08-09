@@ -67,7 +67,7 @@ function deriveDashboardState() {
     unreadCount: threads.filter(isThreadUnread).length,
     changedProjectPaths: new Set(
       threads
-        .filter((thread) => thread.workingTreeStatus === 'hasChanges')
+        .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
         .map((thread) => String(thread.projectPath).trim()),
     ),
   };
@@ -76,6 +76,7 @@ function deriveDashboardState() {
 function filterThreads({ changedProjectPaths }) {
   const query = searchTerm.trim().toLowerCase();
   return threads.filter((thread) => {
+    if (thread.runState === 'running') return false;
     const matchesFilter = filterMode === 'all'
       || (filterMode === 'unread' && isThreadUnread(thread))
       || (filterMode === 'changedProjects'
@@ -106,7 +107,11 @@ function renderDashboard() {
   }
   const runningList = page.querySelector('[data-running-list]');
   if (runningList) runningList.innerHTML = state.runningThreads
-    .map((thread) => threadMarkup.thread(thread, { showProject: true, isUnread: isThreadUnread(thread) }))
+    .map((thread) => threadMarkup.thread(thread, {
+      showProject: true,
+      isUnread: isThreadUnread(thread),
+      compact: true,
+    }))
     .join('');
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === filterMode;
@@ -232,13 +237,13 @@ function mountDashboardPage() {
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
             <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-            <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+            <button type="button" data-filter="changedProjects">Changed <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
           </div>
+          <label class="dashboard-search" aria-label="Search loaded threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
           <div class="dashboard-view-options" aria-label="Group threads">
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
             <button type="button" data-view="recent" aria-pressed="false">Recent</button>
           </div>
-          <label class="dashboard-search" aria-label="Search loaded threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
         </div>
       </div>
       <main class="dashboard-list" data-thread-list></main>
@@ -270,16 +275,26 @@ function mountDashboardPage() {
     }
     openThreadFromEvent(event);
   });
+  page.querySelector('[data-thread-list]').addEventListener('keydown', openThreadFromKeyboardEvent);
   page.querySelector('[data-running-list]').addEventListener('click', openThreadFromEvent);
+  page.querySelector('[data-running-list]').addEventListener('keydown', openThreadFromKeyboardEvent);
   codexHost.pageHost().append(page);
 }
 
 function openThreadFromEvent(event) {
   const eventTarget = event.target instanceof Element ? event.target : null;
-  const button = eventTarget?.closest('[data-open-thread]');
-  if (!button) return;
-  const thread = threads.find((item) => item.id === button.dataset.openThread);
+  const target = eventTarget?.closest('[data-open-thread]');
+  if (!target) return;
+  const thread = threads.find((item) => item.id === target.dataset.openThread);
   if (thread) openThread(thread);
+}
+
+function openThreadFromKeyboardEvent(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const eventTarget = event.target instanceof Element ? event.target : null;
+  if (!eventTarget?.matches('[data-open-thread]')) return;
+  event.preventDefault();
+  openThreadFromEvent(event);
 }
 
 function openPage() {

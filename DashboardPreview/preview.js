@@ -1,10 +1,10 @@
 const resourceRoot = '../Sources/CodexDashboard/Resources/Dashboard';
 
-fetch(`${resourceRoot}/injection-manifest.json`)
+fetch(`${resourceRoot}/injection-manifest.json`, { cache: 'no-store' })
   .then((response) => response.json())
   .then(({ scripts: scriptNames, stylesheets: stylesheetNames }) => Promise.all([
-    Promise.all(scriptNames.map((name) => fetch(`${resourceRoot}/${name}.js`).then((response) => response.text()))),
-    Promise.all(stylesheetNames.map((name) => fetch(`${resourceRoot}/${name}.css`).then((response) => response.text()))),
+    Promise.all(scriptNames.map((name) => fetch(`${resourceRoot}/${name}.js`, { cache: 'no-store' }).then((response) => response.text()))),
+    Promise.all(stylesheetNames.map((name) => fetch(`${resourceRoot}/${name}.css`, { cache: 'no-store' }).then((response) => response.text()))),
   ])).then(([scripts, stylesheets]) => {
   const script = scripts.join('\n');
   const stylesheet = stylesheets.join('\n');
@@ -46,7 +46,7 @@ fetch(`${resourceRoot}/injection-manifest.json`)
       workingTreeStatus: 'clean',
     },
   ];
-  new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);
+  new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v2', stylesheet);
   window.__codexDashboard.applySnapshot({ threads });
   window.__codexDashboard.open();
 });

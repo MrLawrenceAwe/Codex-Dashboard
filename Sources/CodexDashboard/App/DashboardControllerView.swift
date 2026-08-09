@@ -41,6 +41,7 @@ private struct ConnectionStatusCard: View {
 
 private struct CompatibilityCard: View {
     @ObservedObject var viewModel: DashboardViewModel
+    @State private var detailsAreExpanded = false
 
     private func color(for status: CompatibilityStatus) -> Color {
         switch status {
@@ -79,38 +80,54 @@ private struct CompatibilityCard: View {
             }
 
             if let report = viewModel.compatibilityReport {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 9) {
-                        ForEach(report.checks) { check in
-                            HStack(alignment: .top, spacing: 8) {
-                                Circle()
-                                    .fill(color(for: check.status))
-                                    .frame(width: 6, height: 6)
-                                    .padding(.top, 4)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text(check.title)
-                                            .font(.system(size: 11, weight: .medium))
-                                        Text(label(for: check.status))
-                                            .font(.system(size: 9, weight: .medium))
-                                            .foregroundStyle(color(for: check.status))
+                DisclosureGroup(isExpanded: $detailsAreExpanded) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 9) {
+                            ForEach(report.checks) { check in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Circle()
+                                        .fill(color(for: check.status))
+                                        .frame(width: 6, height: 6)
+                                        .padding(.top, 4)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(check.title)
+                                                .font(.system(size: 11, weight: .medium))
+                                            Text(label(for: check.status))
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(color(for: check.status))
+                                        }
+                                        Text(check.detail)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
-                                    Text(check.detail)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .frame(height: 190)
+                    .padding(.top, 6)
+                } label: {
+                    Label {
+                        Text(report.summary)
+                            .font(.system(size: 11, weight: .medium))
+                    } icon: {
+                        Circle()
+                            .fill(report.blockingCount > 0 ? Color.red : (report.warningCount > 0 ? Color.orange : Color.green))
+                            .frame(width: 7, height: 7)
+                    }
                 }
-                .frame(height: 190)
+                .disclosureGroupStyle(.automatic)
             }
         }
         .padding(13)
         .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
+        .onChange(of: viewModel.compatibilityReport) { _, report in
+            detailsAreExpanded = report.map { $0.blockingCount > 0 || $0.warningCount > 0 } ?? false
+        }
     }
 }
 
@@ -144,26 +161,38 @@ struct DashboardControllerView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await viewModel.restartCodexAndEnableThreadDashboard() }
+                    Task {
+                        if viewModel.connectionState.dashboardIsMounted {
+                            await viewModel.openThreadDashboard()
+                        } else {
+                            await viewModel.restartCodexAndEnableThreadDashboard()
+                        }
+                    }
                 } label: {
-                    Text("Restart & Enable")
-                        .font(.system(size: 12, weight: .medium))
+                    Text(viewModel.connectionState.dashboardIsMounted ? "Open Dashboard" : "Restart & Enable")
+                        .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 15)
-                        .frame(height: 34)
+                        .frame(height: 36)
                         .frame(maxWidth: .infinity)
-                        .background(
-                            Color.primary.opacity(0.10),
-                            in: RoundedRectangle(cornerRadius: 7)
-                        )
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(Color.white)
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.isPerformingAction)
 
-                Button("Open Thread Dashboard") { Task { await viewModel.openThreadDashboard() } }
-                    .disabled(!viewModel.connectionState.dashboardIsMounted || viewModel.isPerformingAction)
-
-                Button("Disable Thread Dashboard") { Task { await viewModel.disableThreadDashboard() } }
-                    .disabled(!viewModel.connectionState.rendererIsAvailable || viewModel.isPerformingAction)
+                if viewModel.connectionState.rendererIsAvailable {
+                    Menu {
+                        Button("Disable Thread Dashboard", role: .destructive) {
+                            Task { await viewModel.disableThreadDashboard() }
+                        }
+                        .disabled(viewModel.isPerformingAction)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 34, height: 34)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help("More dashboard actions")
+                }
             }
             .controlSize(.large)
 
