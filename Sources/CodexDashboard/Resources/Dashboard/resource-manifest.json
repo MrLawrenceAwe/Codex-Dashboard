@@ -1,0 +1,12 @@
+{
+  "scripts": [
+    "shared",
+    "codex-ui",
+    "prompt-library",
+    "dashboard-runtime"
+  ],
+  "stylesheets": [
+    "dashboard",
+    "prompts"
+  ]
+}

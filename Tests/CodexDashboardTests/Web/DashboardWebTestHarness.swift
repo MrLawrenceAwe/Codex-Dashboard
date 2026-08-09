@@ -6,6 +6,29 @@ import XCTest
 
 @MainActor
 enum DashboardWebTestHarness {
+    static func mountedWebView(
+        html: String,
+        baseURL: URL? = nil,
+        clearLocalStorage: Bool = false
+    ) async throws -> WKWebView {
+        let webView = WKWebView()
+        webView.loadHTMLString(html, baseURL: baseURL)
+        try await waitUntilLoaded(webView)
+        if clearLocalStorage {
+            _ = try? await webView.evaluateJavaScript(
+                "try { localStorage.clear(); true } catch (_) { false }"
+            )
+        }
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        return webView
+    }
+
+    static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {
+        let data = try JSONEncoder().encode(RendererSnapshot(threads: threads))
+        return try XCTUnwrap(String(data: data, encoding: .utf8))
+    }
+
     static func waitUntilLoaded(_ webView: WKWebView) async throws {
         let deadline = ContinuousClock.now + .seconds(3)
         while webView.isLoading {

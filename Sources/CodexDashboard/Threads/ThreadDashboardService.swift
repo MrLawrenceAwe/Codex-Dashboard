@@ -6,6 +6,7 @@ actor ThreadDashboardService {
     private let unreadIDProvider: any UnreadThreadIDProviding
     private var gitStatuses: [String: GitStatus] = [:]
     private var unreadThreadIDs: Set<String> = []
+    private var hasLoadedCatalog = false
 
     init(
         catalogProvider: any ThreadCatalogProviding,
@@ -18,13 +19,15 @@ actor ThreadDashboardService {
     }
 
     func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog {
-        if let latestUnreadIDs = try? await unreadIDProvider.loadUnreadThreadIDs() {
+        if !hasLoadedCatalog,
+           let latestUnreadIDs = try? await unreadIDProvider.loadUnreadThreadIDs() {
             unreadThreadIDs = latestUnreadIDs
         }
         let catalog = try await catalogProvider.loadCatalog(
             gitStatuses: gitStatuses,
             codexLaunchDate: codexLaunchDate
         )
+        hasLoadedCatalog = true
         return ThreadCatalog(
             threads: applyingUnreadState(to: catalog.threads),
             totalThreadCount: catalog.totalThreadCount
@@ -41,14 +44,17 @@ actor ThreadDashboardService {
         return updatedThreads == threads ? nil : updatedThreads
     }
 
-    func refreshGitStatuses(for threads: [ThreadSummary]) async -> Bool {
+    func refreshGitStatuses(in threads: [ThreadSummary]) async -> [ThreadSummary]? {
         let projectPaths = Set(threads.map(\.projectPath))
-        guard !projectPaths.isEmpty, !Task.isCancelled else { return false }
+        guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }
         let latestStatuses = await gitStatusProvider.load(projectPaths: projectPaths)
-        guard !Task.isCancelled else { return false }
-        let changed = latestStatuses != gitStatuses
+        guard !Task.isCancelled, latestStatuses != gitStatuses else { return nil }
         gitStatuses = latestStatuses
-        return changed
+        return threads.map { source in
+            var thread = source
+            thread.gitStatus = latestStatuses[thread.projectPath] ?? .notRepository
+            return thread
+        }
     }
 
     private func applyingUnreadState(to threads: [ThreadSummary]) -> [ThreadSummary] {

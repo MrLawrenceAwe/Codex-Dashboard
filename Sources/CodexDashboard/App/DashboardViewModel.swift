@@ -208,27 +208,15 @@ final class DashboardViewModel: ObservableObject {
             let updatedThreads = await threadService.refreshUnreadState(in: threads)
         else { return }
         threads = updatedThreads
-
-        guard
-            !Task.isCancelled,
-            let runtime,
-            runtime.maintainsDashboard
-        else { return }
-        let targets = await runtime.rendererTargets()
-        guard !Task.isCancelled, !targets.isEmpty else { return }
-        try? await runtime.synchronizeDashboard(
-            with: RendererSnapshot(threads: threads),
-            on: targets,
-            forceRemount: false
-        )
+        await publishSnapshotIfMaintained()
     }
 
     private func refreshGitStatuses() async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await refresh() }
-        if await threadService.refreshGitStatuses(for: threads) {
-            await refresh()
-        }
+        guard let updatedThreads = await threadService.refreshGitStatuses(in: threads) else { return }
+        threads = updatedThreads
+        await publishSnapshotIfMaintained()
     }
 
     private var connectionSummary: String {
@@ -242,6 +230,21 @@ final class DashboardViewModel: ObservableObject {
         refreshTaskID = nil
         task?.cancel()
         await task?.value
+    }
+
+    private func publishSnapshotIfMaintained() async {
+        guard
+            !Task.isCancelled,
+            let runtime,
+            runtime.maintainsDashboard
+        else { return }
+        let targets = await runtime.rendererTargets()
+        guard !Task.isCancelled, !targets.isEmpty else { return }
+        try? await runtime.synchronizeDashboard(
+            with: RendererSnapshot(threads: threads),
+            on: targets,
+            forceRemount: false
+        )
     }
 
     private func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {

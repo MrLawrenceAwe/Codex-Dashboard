@@ -1,19 +1,11 @@
 const resourceRoot = '../Sources/CodexDashboard/Resources/Dashboard';
-const scriptNames = [
-  'shared',
-  'codex-ui',
-  'prompt-storage',
-  'prompt-menu',
-  'prompt-dialog',
-  'prompt-drag-drop',
-  'dashboard-runtime',
-];
-const stylesheetNames = ['dashboard', 'prompts'];
 
-Promise.all([
-  Promise.all(scriptNames.map((name) => fetch(`${resourceRoot}/${name}.js`).then((response) => response.text()))),
-  Promise.all(stylesheetNames.map((name) => fetch(`${resourceRoot}/${name}.css`).then((response) => response.text()))),
-]).then(([scripts, stylesheets]) => {
+fetch(`${resourceRoot}/resource-manifest.json`)
+  .then((response) => response.json())
+  .then(({ scripts: scriptNames, stylesheets: stylesheetNames }) => Promise.all([
+    Promise.all(scriptNames.map((name) => fetch(`${resourceRoot}/${name}.js`).then((response) => response.text()))),
+    Promise.all(stylesheetNames.map((name) => fetch(`${resourceRoot}/${name}.css`).then((response) => response.text()))),
+  ])).then(([scripts, stylesheets]) => {
   const script = scripts.join('\n');
   const stylesheet = stylesheets.join('\n');
   const threads = [

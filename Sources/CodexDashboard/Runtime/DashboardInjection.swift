@@ -2,16 +2,10 @@ import CryptoKit
 import Foundation
 
 struct DashboardInjection: Sendable {
-    private static let scriptNames = [
-        "shared",
-        "codex-ui",
-        "prompt-storage",
-        "prompt-menu",
-        "prompt-dialog",
-        "prompt-drag-drop",
-        "dashboard-runtime",
-    ]
-    private static let stylesheetNames = ["dashboard", "prompts"]
+    private struct ResourceManifest: Decodable {
+        let scripts: [String]
+        let stylesheets: [String]
+    }
 
     let version: String
     let mountExpression: String
@@ -28,13 +22,14 @@ struct DashboardInjection: Sendable {
 
     static func load(bundle: Bundle? = nil) throws -> DashboardInjection {
         let resourceBundle = bundle ?? defaultResourceBundle
+        let manifest = try loadManifest(from: resourceBundle)
         let script = try loadResources(
-            named: scriptNames,
+            named: manifest.scripts,
             withExtension: "js",
             from: resourceBundle
         )
         let stylesheet = try loadResources(
-            named: stylesheetNames,
+            named: manifest.stylesheets,
             withExtension: "css",
             from: resourceBundle
         )
@@ -52,6 +47,21 @@ struct DashboardInjection: Sendable {
         })()
         """
         return DashboardInjection(version: version, mountExpression: mountExpression)
+    }
+
+    private static func loadManifest(from bundle: Bundle) throws -> ResourceManifest {
+        guard let url = bundle.url(
+            forResource: "resource-manifest",
+            withExtension: "json",
+            subdirectory: "Dashboard"
+        ) else {
+            throw DashboardError.missingResources
+        }
+        do {
+            return try JSONDecoder().decode(ResourceManifest.self, from: Data(contentsOf: url))
+        } catch {
+            throw DashboardError.missingResources
+        }
     }
 
     private static func loadResources(
@@ -73,8 +83,8 @@ struct DashboardInjection: Sendable {
 
     private static var defaultResourceBundle: Bundle {
         if Bundle.main.url(
-            forResource: scriptNames[0],
-            withExtension: "js",
+            forResource: "resource-manifest",
+            withExtension: "json",
             subdirectory: "Dashboard"
         ) != nil {
             return .main

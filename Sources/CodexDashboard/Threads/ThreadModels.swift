@@ -23,7 +23,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var isUnread = false
     let model: String?
     let runState: ThreadRunState
-    let gitStatus: GitStatus
+    var gitStatus: GitStatus
 }
 
 struct ThreadCatalog: Sendable {
