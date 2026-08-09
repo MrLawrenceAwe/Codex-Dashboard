@@ -1,10 +1,10 @@
 import Foundation
 
-protocol GitWorkingTreeStatusLoading: Sendable {
-    func load(at workspacePaths: Set<String>) async -> [String: GitWorkingTreeStatus]
+protocol GitStatusProviding: Sendable {
+    func load(projectPaths: Set<String>) async -> [String: GitStatus]
 }
 
-struct GitWorkingTreeStatusLoader: GitWorkingTreeStatusLoading, Sendable {
+struct SystemGitStatusProvider: GitStatusProviding, Sendable {
     private static let maximumConcurrentChecks = 6
     private let subprocessTimeout: TimeInterval
 
@@ -12,20 +12,20 @@ struct GitWorkingTreeStatusLoader: GitWorkingTreeStatusLoading, Sendable {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func load(at workspacePaths: Set<String>) async -> [String: GitWorkingTreeStatus] {
+    func load(projectPaths: Set<String>) async -> [String: GitStatus] {
         let timeout = subprocessTimeout
         return await withTaskGroup(
-            of: (String, GitWorkingTreeStatus).self,
-            returning: [String: GitWorkingTreeStatus].self
+            of: (String, GitStatus).self,
+            returning: [String: GitStatus].self
         ) { group in
-            var paths = workspacePaths.makeIterator()
-            for _ in 0..<min(Self.maximumConcurrentChecks, workspacePaths.count) {
+            var paths = projectPaths.makeIterator()
+            for _ in 0..<min(Self.maximumConcurrentChecks, projectPaths.count) {
                 guard let path = paths.next() else { break }
                 group.addTask {
                     (path, Self.status(at: path, timeout: timeout))
                 }
             }
-            var statuses: [String: GitWorkingTreeStatus] = [:]
+            var statuses: [String: GitStatus] = [:]
             while let (path, status) = await group.next() {
                 statuses[path] = status
                 if let nextPath = paths.next() {
@@ -38,7 +38,7 @@ struct GitWorkingTreeStatusLoader: GitWorkingTreeStatusLoading, Sendable {
         }
     }
 
-    private static func status(at path: String, timeout: TimeInterval) -> GitWorkingTreeStatus {
+    private static func status(at path: String, timeout: TimeInterval) -> GitStatus {
         guard FileManager.default.fileExists(atPath: path) else { return .unavailable }
         do {
             let result = try Subprocess.run(

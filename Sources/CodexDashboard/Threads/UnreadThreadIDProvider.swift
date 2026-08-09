@@ -1,10 +1,10 @@
 import Foundation
 
-protocol UnreadStateLoading: Sendable {
+protocol UnreadThreadIDProviding: Sendable {
     func loadUnreadThreadIDs() async throws -> Set<String>
 }
 
-enum UnreadStateError: LocalizedError {
+enum UnreadThreadIDError: LocalizedError {
     case missingState(URL)
     case invalidState(URL)
 
@@ -18,7 +18,7 @@ enum UnreadStateError: LocalizedError {
     }
 }
 
-actor CodexUnreadStateReader: UnreadStateLoading {
+actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     private struct GlobalState: Decodable {
         let persistedAtoms: PersistedAtoms
 
@@ -43,15 +43,15 @@ actor CodexUnreadStateReader: UnreadStateLoading {
 
     func loadUnreadThreadIDs() throws -> Set<String> {
         guard FileManager.default.fileExists(atPath: stateURL.path) else {
-            throw UnreadStateError.missingState(stateURL)
+            throw UnreadThreadIDError.missingState(stateURL)
         }
         do {
             let data = try Data(contentsOf: stateURL, options: .mappedIfSafe)
             let state = try JSONDecoder().decode(GlobalState.self, from: data)
             return Set(state.persistedAtoms.unreadThreadIDsByHost["local"] ?? [])
         } catch {
-            if error is UnreadStateError { throw error }
-            throw UnreadStateError.invalidState(stateURL)
+            if error is UnreadThreadIDError { throw error }
+            throw UnreadThreadIDError.invalidState(stateURL)
         }
     }
 }

@@ -5,7 +5,7 @@ import XCTest
 final class CodexConfigurationTests: XCTestCase {
     func testCodexLaunchConfiguration() {
         XCTAssertEqual(
-            CodexConfiguration.applicationURL.path,
+            CodexConfiguration.codexApplicationURL.path,
             "/Applications/ChatGPT.app"
         )
         XCTAssertEqual(

@@ -1,6 +1,6 @@
 import SwiftUI
 
-private struct StatusCard: View {
+private struct ConnectionStatusCard: View {
     @ObservedObject var viewModel: DashboardViewModel
 
     private var statusColor: Color {
@@ -39,7 +39,7 @@ private struct StatusCard: View {
     }
 }
 
-struct DashboardControlPanel: View {
+struct ControllerView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
@@ -66,11 +66,11 @@ struct DashboardControlPanel: View {
                 }
             }
 
-            StatusCard(viewModel: viewModel)
+            ConnectionStatusCard(viewModel: viewModel)
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await viewModel.restartAndEnableDashboard() }
+                    Task { await viewModel.restartCodexAndEnableDashboard() }
                 } label: {
                     Text("Restart & Enable Dashboard")
                         .font(.system(size: 12, weight: .medium))
@@ -93,10 +93,10 @@ struct DashboardControlPanel: View {
             }
             .controlSize(.large)
 
-            if viewModel.sessionError != nil || viewModel.dataWarning != nil {
+            if viewModel.connectionError != nil || viewModel.threadDataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let error = viewModel.sessionError { Text(error) }
-                    if let warning = viewModel.dataWarning { Text(warning) }
+                    if let error = viewModel.connectionError { Text(error) }
+                    if let warning = viewModel.threadDataWarning { Text(warning) }
                 }
                 .font(.system(size: 12))
                 .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))

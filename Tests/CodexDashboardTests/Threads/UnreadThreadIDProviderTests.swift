@@ -3,7 +3,7 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class UnreadStateReaderTests: XCTestCase {
+final class UnreadThreadIDProviderTests: XCTestCase {
     func testLoadsLocalUnreadThreadIDsFromGlobalState() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-global-state-\(UUID().uuidString).json")
@@ -20,7 +20,7 @@ final class UnreadStateReaderTests: XCTestCase {
         try Data(state.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
 
-        let unreadThreadIDs = try await CodexUnreadStateReader(stateURL: stateURL)
+        let unreadThreadIDs = try await CodexUnreadThreadIDProvider(stateURL: stateURL)
             .loadUnreadThreadIDs()
 
         XCTAssertEqual(unreadThreadIDs, ["thread-one", "thread-two"])
@@ -33,9 +33,9 @@ final class UnreadStateReaderTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
 
         do {
-            _ = try await CodexUnreadStateReader(stateURL: stateURL).loadUnreadThreadIDs()
+            _ = try await CodexUnreadThreadIDProvider(stateURL: stateURL).loadUnreadThreadIDs()
             XCTFail("Expected invalid global state to be reported")
-        } catch UnreadStateError.invalidState(let invalidURL) {
+        } catch UnreadThreadIDError.invalidState(let invalidURL) {
             XCTAssertEqual(invalidURL, stateURL)
         }
     }

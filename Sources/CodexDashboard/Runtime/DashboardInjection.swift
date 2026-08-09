@@ -3,10 +3,13 @@ import Foundation
 
 struct DashboardInjection: Sendable {
     private static let scriptNames = [
-        "bootstrap",
+        "shared",
         "codex-ui",
-        "prompt-library",
-        "thread-dashboard",
+        "prompt-storage",
+        "prompt-menu",
+        "prompt-dialog",
+        "prompt-drag-drop",
+        "dashboard-runtime",
     ]
     private static let stylesheetNames = ["dashboard", "prompts"]
 

@@ -11,8 +11,6 @@ const elementIDs = {
   promptDialog: 'codex-dashboard-prompt-dialog',
 };
 
-const promptStorageKey = 'codex-dashboard.saved-prompts';
-
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -22,5 +20,3 @@ function escapeHTML(value) {
 function textIs(element, value) {
   return element?.textContent?.trim() === value;
 }
-
-

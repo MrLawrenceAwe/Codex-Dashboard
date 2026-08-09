@@ -1,5 +1,13 @@
 const resourceRoot = '../Sources/CodexDashboard/Resources/Dashboard';
-const scriptNames = ['bootstrap', 'codex-ui', 'prompt-library', 'thread-dashboard'];
+const scriptNames = [
+  'shared',
+  'codex-ui',
+  'prompt-storage',
+  'prompt-menu',
+  'prompt-dialog',
+  'prompt-drag-drop',
+  'dashboard-runtime',
+];
 const stylesheetNames = ['dashboard', 'prompts'];
 
 Promise.all([
@@ -13,37 +21,37 @@ Promise.all([
       id: 'thread-dashboard',
       title: 'Build threads dashboard',
       preview: 'Create an active-thread dashboard embedded directly inside Codex.',
-      workspaceName: 'Codex Dashboard',
-      workspacePath: '/Users/lawrenceawe/Codex Dashboard',
-      recencyTimestamp: Math.round(Date.now() / 1000) - 3,
+      projectName: 'Codex Dashboard',
+      projectPath: '/Users/lawrenceawe/Codex Dashboard',
+      sortTimestamp: Math.round(Date.now() / 1000) - 3,
       isPinned: true,
       model: 'gpt-5.6-sol',
-      activity: 'running',
-      gitWorkingTreeStatus: 'hasChanges',
+      runState: 'running',
+      gitStatus: 'hasChanges',
     },
     {
       id: 'thread-review',
       title: 'Review project for bugs',
       preview: 'Inspect the project for correctness problems and produce actionable findings.',
-      workspaceName: 'voice-tiktok-scroller',
-      workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      recencyTimestamp: Math.round(Date.now() / 1000) - 780,
+      projectName: 'voice-tiktok-scroller',
+      projectPath: '/Users/lawrenceawe/voice-tiktok-scroller',
+      sortTimestamp: Math.round(Date.now() / 1000) - 780,
       isPinned: false,
       model: 'gpt-5.6-terra',
-      activity: 'idle',
-      gitWorkingTreeStatus: 'clean',
+      runState: 'idle',
+      gitStatus: 'clean',
     },
     {
       id: 'thread-idle',
       title: 'Fix back command detection',
       preview: 'Improve recognition of the spoken back command.',
-      workspaceName: 'voice-tiktok-scroller',
-      workspacePath: '/Users/lawrenceawe/voice-tiktok-scroller',
-      recencyTimestamp: Math.round(Date.now() / 1000) - 86400,
+      projectName: 'voice-tiktok-scroller',
+      projectPath: '/Users/lawrenceawe/voice-tiktok-scroller',
+      sortTimestamp: Math.round(Date.now() / 1000) - 86400,
       isPinned: false,
       model: 'gpt-5.6-terra',
-      activity: 'idle',
-      gitWorkingTreeStatus: 'clean',
+      runState: 'idle',
+      gitStatus: 'clean',
     },
   ];
   new Function('DASHBOARD_VERSION', 'DASHBOARD_CSS', script)('preview-v1', stylesheet);

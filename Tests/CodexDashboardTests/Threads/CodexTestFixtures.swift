@@ -3,7 +3,7 @@ import XCTest
 
 @testable import CodexDashboard
 
-enum TestDatabaseFactory {
+enum CodexTestFixtures {
     static func makeRollout(
         lifecycleEvents: [String],
         finalResponseAtUnixSeconds: Int64,
@@ -72,7 +72,7 @@ enum TestDatabaseFactory {
                 encoding: .utf8
             ) ?? "Unknown sqlite3 error"
             XCTFail("Could not create test database: \(message)")
-            throw ThreadRepositoryError.queryFailed(databaseURL, message)
+            throw ThreadCatalogError.queryFailed(databaseURL, message)
         }
         testCase.addTeardownBlock { try? FileManager.default.removeItem(at: databaseURL) }
         return databaseURL
