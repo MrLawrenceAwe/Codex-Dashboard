@@ -34,6 +34,8 @@ final class DashboardViewModel: ObservableObject {
     private var synchronizationTask: Task<Void, Never>?
     private var synchronizationID: UUID?
     private var enrichmentGeneration = 0
+    private var catalogWarning: String?
+    private var unreadStateWarning: String?
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
@@ -193,7 +195,8 @@ final class DashboardViewModel: ObservableObject {
         do {
             try await loadThreadSnapshot()
         } catch {
-            threadDataWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
+            catalogWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
+            refreshThreadDataWarning()
         }
 
         guard !Task.isCancelled, !isPerformingAction, let runtime else { return }
@@ -224,18 +227,23 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func loadThreadSnapshot() async throws {
-        let catalog = try await threadSnapshots.loadSnapshot(codexLaunchDate: runtime?.codexLaunchDate)
+        let snapshot = try await threadSnapshots.loadSnapshot(codexLaunchDate: runtime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        threads = catalog.threads
-        totalThreadCount = catalog.totalThreadCount
-        threadDataWarning = nil
+        threads = snapshot.catalog.threads
+        totalThreadCount = snapshot.catalog.totalThreadCount
+        catalogWarning = nil
+        unreadStateWarning = snapshot.unreadStateWarning
+        refreshThreadDataWarning()
     }
 
     private func updateUnreadState() async {
         guard !isPerformingAction else { return }
         let generation = enrichmentGeneration
-        guard let updatedThreads = await threadSnapshots.updateUnreadState(in: threads) else { return }
+        let refresh = await threadSnapshots.updateUnreadState(in: threads)
         guard !isPerformingAction, generation == enrichmentGeneration else { return }
+        unreadStateWarning = refresh.warning
+        refreshThreadDataWarning()
+        guard let updatedThreads = refresh.threads else { return }
         let unreadByID = Dictionary(uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.isUnread) })
         threads = threads.map { source in
             var thread = source
@@ -294,5 +302,10 @@ final class DashboardViewModel: ObservableObject {
     private func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
         connectionState = lastKnownState
         connectionError = error.localizedDescription
+    }
+
+    private func refreshThreadDataWarning() {
+        let warnings = [catalogWarning, unreadStateWarning].compactMap { $0 }
+        threadDataWarning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
     }
 }

@@ -1,11 +1,22 @@
 import Foundation
 
+struct ThreadSnapshotLoad: Sendable {
+    let catalog: ThreadCatalog
+    let unreadStateWarning: String?
+}
+
+struct UnreadStateRefresh: Sendable {
+    let threads: [ThreadSummary]?
+    let warning: String?
+}
+
 actor ThreadSnapshotService {
     private let catalogProvider: any ThreadCatalogProviding
     private let workingTreeStatusProvider: any WorkingTreeStatusProviding
     private let unreadIDProvider: any UnreadThreadIDProviding
     private var workingTreeStatuses: [String: WorkingTreeStatus] = [:]
     private var unreadThreadIDs: Set<String> = []
+    private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
 
     init(
@@ -18,30 +29,47 @@ actor ThreadSnapshotService {
         self.unreadIDProvider = unreadIDProvider
     }
 
-    func loadSnapshot(codexLaunchDate: Date?) async throws -> ThreadCatalog {
-        if !hasLoadedSnapshot,
-           let latestUnreadIDs = try? await unreadIDProvider.loadUnreadThreadIDs() {
-            unreadThreadIDs = latestUnreadIDs
+    func loadSnapshot(codexLaunchDate: Date?) async throws -> ThreadSnapshotLoad {
+        if !hasLoadedSnapshot {
+            do {
+                unreadThreadIDs = try await unreadIDProvider.loadUnreadThreadIDs()
+                unreadStateWarning = nil
+            } catch {
+                unreadStateWarning = Self.warning(for: error)
+            }
         }
         let catalog = try await catalogProvider.loadCatalog(
             workingTreeStatuses: workingTreeStatuses,
             codexLaunchDate: codexLaunchDate
         )
         hasLoadedSnapshot = true
-        return ThreadCatalog(
-            threads: applyingUnreadState(to: catalog.threads),
-            totalThreadCount: catalog.totalThreadCount
+        return ThreadSnapshotLoad(
+            catalog: ThreadCatalog(
+                threads: applyingUnreadState(to: catalog.threads),
+                totalThreadCount: catalog.totalThreadCount
+            ),
+            unreadStateWarning: unreadStateWarning
         )
     }
 
-    func updateUnreadState(in threads: [ThreadSummary]) async -> [ThreadSummary]? {
-        guard
-            let latestUnreadIDs = try? await unreadIDProvider.loadUnreadThreadIDs(),
-            latestUnreadIDs != unreadThreadIDs
-        else { return nil }
+    func updateUnreadState(in threads: [ThreadSummary]) async -> UnreadStateRefresh {
+        let latestUnreadIDs: Set<String>
+        do {
+            latestUnreadIDs = try await unreadIDProvider.loadUnreadThreadIDs()
+            unreadStateWarning = nil
+        } catch {
+            unreadStateWarning = Self.warning(for: error)
+            return UnreadStateRefresh(threads: nil, warning: unreadStateWarning)
+        }
+        guard latestUnreadIDs != unreadThreadIDs else {
+            return UnreadStateRefresh(threads: nil, warning: nil)
+        }
         unreadThreadIDs = latestUnreadIDs
         let updatedThreads = applyingUnreadState(to: threads)
-        return updatedThreads == threads ? nil : updatedThreads
+        return UnreadStateRefresh(
+            threads: updatedThreads == threads ? nil : updatedThreads,
+            warning: nil
+        )
     }
 
     func updateWorkingTreeStatuses(in threads: [ThreadSummary]) async -> [ThreadSummary]? {
@@ -63,5 +91,9 @@ actor ThreadSnapshotService {
             thread.isUnread = unreadThreadIDs.contains(thread.id)
             return thread
         }
+    }
+
+    private static func warning(for error: Error) -> String {
+        "Unread state could not be refreshed. Showing the last known unread state. \(error.localizedDescription)"
     }
 }

@@ -9,6 +9,8 @@ final class DashboardRenderer {
     private var lastSnapshot: DashboardSnapshot?
     private var activeSynchronizationCount = 0
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
+    private var synchronizationInProgress = false
+    private var queuedSynchronizations: [CheckedContinuation<Void, Never>] = []
 
     private(set) var maintainsDashboard = true
 
@@ -40,6 +42,9 @@ final class DashboardRenderer {
     ) async throws {
         activeSynchronizationCount += 1
         defer { synchronizationFinished() }
+        await acquireSynchronizationSlot()
+        defer { releaseSynchronizationSlot() }
+        try Task.checkCancellation()
 
         let targetIDs = Set(targets.map(\.id))
         var mountedDashboard = false
@@ -153,6 +158,24 @@ final class DashboardRenderer {
         let waiters = synchronizationWaiters
         synchronizationWaiters = []
         waiters.forEach { $0.resume() }
+    }
+
+    private func acquireSynchronizationSlot() async {
+        guard synchronizationInProgress else {
+            synchronizationInProgress = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            queuedSynchronizations.append(continuation)
+        }
+    }
+
+    private func releaseSynchronizationSlot() {
+        guard !queuedSynchronizations.isEmpty else {
+            synchronizationInProgress = false
+            return
+        }
+        queuedSynchronizations.removeFirst().resume()
     }
 
     private func waitForSynchronizationsToFinish() async {
