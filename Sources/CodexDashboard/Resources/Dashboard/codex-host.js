@@ -1,6 +1,6 @@
 const codexHost = {
   sidebar() {
-    return document.querySelector('aside.app-shell-left-panel, aside');
+    return codexContracts.sidebar();
   },
 
   pageHost() {
@@ -8,7 +8,7 @@ const codexHost = {
   },
 
   navigationInsertionPoint() {
-    const navigation = document.querySelector('nav, [role="navigation"]');
+    const navigation = codexContracts.navigation();
     if (!navigation) return null;
     const buttons = [...navigation.querySelectorAll('button')];
     const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
@@ -20,30 +20,11 @@ const codexHost = {
   },
 
   threadReadStates() {
-    const readStates = new Map();
-    document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
-      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = fiberKey ? row[fiberKey] : null;
-      while (fiber) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (
-          typeof props?.conversationId === 'string'
-          && typeof props?.isUnread === 'boolean'
-        ) {
-          readStates.set(props.conversationId, props.isUnread);
-          break;
-        }
-        fiber = fiber.return;
-      }
-    });
-    return readStates;
+    return codexContracts.threadReadStates();
   },
 
   navigateToThread(thread) {
-    const threadKey = `local:${thread.id}`;
-    const sidebarThreadButton = document.querySelector(
-      `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
-    );
+    const sidebarThreadButton = codexContracts.threadRow(thread.id);
     if (sidebarThreadButton) {
       sidebarThreadButton.click();
       return;

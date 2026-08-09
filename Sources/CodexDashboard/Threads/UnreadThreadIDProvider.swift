@@ -47,11 +47,15 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
         }
         do {
             let data = try Data(contentsOf: stateURL, options: .mappedIfSafe)
-            let state = try JSONDecoder().decode(GlobalState.self, from: data)
-            return Set(state.persistedAtoms.unreadThreadIDsByHost["local"] ?? [])
+            return try Self.decodeUnreadThreadIDs(from: data)
         } catch {
             if error is UnreadThreadIDError { throw error }
             throw UnreadThreadIDError.invalidState(stateURL)
         }
+    }
+
+    static func decodeUnreadThreadIDs(from data: Data) throws -> Set<String> {
+        let state = try JSONDecoder().decode(GlobalState.self, from: data)
+        return Set(state.persistedAtoms.unreadThreadIDsByHost["local"] ?? [])
     }
 }

@@ -79,10 +79,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
                 )
             }
             let columns = Set(try JSONDecoder().decode([SQLiteColumn].self, from: result.standardOutput).map(\.name))
-            let required = Set([
-                "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
-                "model", "rollout_path", "archived", "recency_at_ms",
-            ])
+            let required = CodexThreadCatalogProvider.requiredColumnNames
             let missing = required.subtracting(columns).sorted()
             guard missing.isEmpty else {
                 return check(
@@ -111,17 +108,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
         }
         do {
             let data = try Data(contentsOf: globalStateURL, options: .mappedIfSafe)
-            guard
-                let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                let atoms = root["electron-persisted-atom-state"] as? [String: Any],
-                let unread = atoms["unread-thread-ids-by-host-v1"] as? [String: Any],
-                unread["local"] is [Any]
-            else {
-                return check(
-                    "unread-state", "Unread state", .incompatible,
-                    "Codex's persisted unread-state keys or local value have changed."
-                )
-            }
+            _ = try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(from: data)
             return check(
                 "unread-state", "Unread state", .compatible,
                 "The persisted local unread-thread contract is available."
@@ -170,11 +157,11 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             for path in paths {
                 guard let data = tail(of: URL(fileURLWithPath: path), maximumBytes: 512 * 1_024) else { continue }
                 let text = String(decoding: data, as: UTF8.self)
-                foundLifecycle = foundLifecycle
-                    || text.contains(#""type":"task_started""#)
-                    || text.contains(#""type":"task_complete""#)
-                    || text.contains(#""type":"turn_aborted""#)
-                foundFinalResponse = foundFinalResponse || text.contains(#""phase":"final_answer""#)
+                foundLifecycle = foundLifecycle || RolloutActivityReader.lifecycleEventTypes.contains {
+                    text.contains(#""type":"\#($0)""#)
+                }
+                foundFinalResponse = foundFinalResponse
+                    || text.contains(#""phase":"\#(RolloutActivityReader.finalResponsePhase)""#)
             }
             guard foundLifecycle else {
                 return check(

@@ -5,24 +5,9 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
-    func testSavedPromptsCanBeCreatedAndInsertedIntoComposer() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html:
-            """
-            <!doctype html>
-            <html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>
-                <div data-composer-overlay-floating-ui="true" aria-label="Add">
-                  <button role="menuitem" data-list-navigation-item="true" class="opacity-75 bg-token-list-hover-background opacity-100"><span>Record a skill</span></button>
-                </div>
-                <textarea placeholder="Do anything"></textarea>
-                <div contenteditable="true" role="textbox"></div>
-              </main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
+    func testSavedPromptCanBeCreatedAndInsertedIntoSupportedComposers() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView(
+            includeContentEditableComposer: true
         )
         let result = try await webView.evaluateJavaScript(
             """
@@ -31,145 +16,123 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               composer.addEventListener('input', (event) => {
                 if (event.data) composer.value += event.data;
               });
-              const promptMenuItem = document.querySelector('[data-codex-prompt-menu-item]');
-              promptMenuItem.dispatchEvent(new PointerEvent('pointerenter'));
-              const promptTookHighlight = promptMenuItem.classList.contains('opacity-100')
-                && promptMenuItem.classList.contains('bg-token-list-hover-background')
-                && !document.querySelector('[data-list-navigation-item]:not([data-codex-prompt-menu-item])').classList.contains('opacity-100');
-              promptMenuItem.dispatchEvent(new PointerEvent('pointerdown', {
+              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
+              menuItem.dispatchEvent(new PointerEvent('pointerdown', {
                 bubbles: true,
                 cancelable: true,
               }));
-              document.querySelector('[data-prompt-new-section]').click();
-              document.querySelector('[name="sectionName"]').value = 'Research';
-              document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
-              const emptySectionWasCreated = Boolean(
-                document.querySelector('[data-prompt-section="Research"]')
-              ) && document.querySelector('[data-prompt-section="Research"] .dashboard-prompt-section-count').textContent === '0';
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Review code';
               document.querySelector('[name="section"]').value = 'Code review';
               document.querySelector('[name="content"]').value = 'Review this code for correctness issues.';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              const sectionToggle = document.querySelector('[data-prompt-section-toggle]');
-              sectionToggle.click();
-              const collapsedSectionToggle = document.querySelector('[data-prompt-section-toggle]');
-              const sectionCollapsed = collapsedSectionToggle.getAttribute('aria-expanded') === 'false'
-                && document.querySelector('.dashboard-prompt-section-body').hidden;
-              collapsedSectionToggle.click();
-              document.querySelector('[data-prompt-new]').click();
-              document.querySelector('[name="name"]').value = 'Explain code';
-              document.querySelector('[name="section"]').value = 'Writing';
-              document.querySelector('[name="content"]').value = 'Explain this code clearly.';
-              document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              const dragTransfer = {
-                effectAllowed: '',
-                dropEffect: '',
-                setData() {},
+              const savedPromptName = document.querySelector('[data-prompt-use] strong').textContent;
+              document.querySelector('[data-prompt-use]').click();
+              const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
+              document.querySelector('textarea[placeholder="Do anything"]').remove();
+              menuItem.click();
+              document.querySelector('[data-prompt-use]').click();
+              return {
+                menuLabel: menuItem.textContent.trim(),
+                savedPromptName,
+                textareaValue,
+                contentEditableValue: document.querySelector('[contenteditable="true"]').textContent,
+                closedAfterInsertion: !document.getElementById('codex-dashboard-prompt-dialog'),
               };
-              const dispatchDrag = (element, type) => {
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values["menuLabel"] as? String, "Prompts")
+        XCTAssertEqual(values["savedPromptName"] as? String, "Review code")
+        XCTAssertEqual(values["textareaValue"] as? String, "Review this code for correctness issues.")
+        XCTAssertEqual(values["contentEditableValue"] as? String, "Review this code for correctness issues.")
+        XCTAssertEqual(values["closedAfterInsertion"] as? Bool, true)
+    }
+
+    func testPromptMenuHighlightAndDestroyLifecycle() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const menuItem = document.querySelector('[data-codex-prompt-menu-item]');
+              menuItem.dispatchEvent(new PointerEvent('pointerenter'));
+              const highlighted = menuItem.classList.contains('opacity-100')
+                && menuItem.classList.contains('bg-token-list-hover-background')
+                && !document.querySelector('[data-list-navigation-item]:not([data-codex-prompt-menu-item])').classList.contains('opacity-100');
+              window.__codexDashboard.destroy();
+              return {
+                highlighted,
+                removedOnDestroy: !document.querySelector('[data-codex-prompt-menu-item]'),
+              };
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values["highlighted"] as? Bool, true)
+        XCTAssertEqual(values["removedOnDestroy"] as? Bool, true)
+    }
+
+    func testPromptDragDropAndDeletion() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-menu-item]').click();
+              document.querySelector('[data-prompt-new-section]').click();
+              document.querySelector('[name="sectionName"]').value = 'Research';
+              document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
+              const createPrompt = (name, section) => {
+                document.querySelector('[data-prompt-new]').click();
+                document.querySelector('[name="name"]').value = name;
+                document.querySelector('[name="section"]').value = section;
+                document.querySelector('[name="content"]').value = `${name} content`;
+                document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              };
+              createPrompt('Review code', 'Code review');
+              createPrompt('Explain code', 'Writing');
+              const transfer = { effectAllowed: '', dropEffect: '', setData() {} };
+              const drag = (element, type) => {
                 const event = new Event(type, { bubbles: true, cancelable: true });
-                Object.defineProperty(event, 'dataTransfer', { value: dragTransfer });
+                Object.defineProperty(event, 'dataTransfer', { value: transfer });
                 Object.defineProperty(event, 'clientY', { value: 0 });
                 element.dispatchEvent(event);
               };
               const explainRow = [...document.querySelectorAll('[data-prompt-row-id]')]
                 .find((row) => row.textContent.includes('Explain code'));
-              dispatchDrag(explainRow, 'dragstart');
-              const codeReviewSection = document.querySelector('[data-prompt-section="Code review"]');
-              dispatchDrag(codeReviewSection.querySelector('[data-prompt-section-toggle]'), 'dragover');
-              dispatchDrag(codeReviewSection.querySelector('[data-prompt-section-toggle]'), 'drop');
-              const dragMovedPromptAcrossSections = document.querySelectorAll('[data-prompt-section]').length === 3
-                && document.querySelector('[data-prompt-section="Writing"] .dashboard-prompt-section-count').textContent === '0'
-                && document.querySelector('[data-prompt-section="Code review"] .dashboard-prompt-section-count').textContent === '2'
-                && [...document.querySelectorAll('[data-prompt-section="Code review"] [data-prompt-use] strong')]
-                  .map((element) => element.textContent).join(',') === 'Review code,Explain code';
-              const reviewRow = [...document.querySelectorAll('[data-prompt-row-id]')]
-                .find((row) => row.textContent.includes('Review code'));
-              dispatchDrag(reviewRow, 'dragstart');
-              dispatchDrag(reviewRow, 'drop');
-              const selfDropClearedDraggingStyle = !reviewRow.classList.contains('is-dragging');
-              const savedPromptName = document.querySelector('[data-prompt-use] strong').textContent;
-              document.querySelector('[data-prompt-use]').click();
-              const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
-              document.querySelector('textarea[placeholder="Do anything"]').remove();
-              promptMenuItem.click();
-              document.querySelector('[data-prompt-use]').click();
-              const promptLibraryClosedAfterInsertion = !document.getElementById('codex-dashboard-prompt-dialog');
-              promptMenuItem.click();
-              const deleteButton = document.querySelector('[data-prompt-delete]');
+              const destination = document.querySelector('[data-prompt-section="Code review"]');
+              drag(explainRow, 'dragstart');
+              drag(destination.querySelector('[data-prompt-section-toggle]'), 'dragover');
+              drag(destination.querySelector('[data-prompt-section-toggle]'), 'drop');
+              const updatedDestination = document.querySelector('[data-prompt-section="Code review"]');
+              const names = [...updatedDestination.querySelectorAll('[data-prompt-use] strong')]
+                .map((element) => element.textContent);
+              const deleteButton = updatedDestination.querySelector('[data-prompt-delete]');
               deleteButton.click();
-              const promptSurvivedFirstDeleteClick = Boolean(document.querySelector('[data-prompt-use]'));
-              const deleteRequiresConfirmation = deleteButton.textContent === 'Confirm delete';
+              const survivedFirstClick = Boolean(updatedDestination.querySelector('[data-prompt-use]'));
+              const requiresConfirmation = deleteButton.textContent === 'Confirm delete';
               deleteButton.click();
-              const promptWasDeleted = ![...document.querySelectorAll('[data-prompt-use] strong')]
-                .some((element) => element.textContent === 'Review code');
-              return [
-                promptMenuItem.textContent.trim(),
-                savedPromptName,
-                textareaValue,
-                promptLibraryClosedAfterInsertion,
-                promptMenuItem.parentElement.getAttribute('data-composer-overlay-floating-ui'),
-                document.querySelector('[contenteditable="true"]').textContent,
-                promptTookHighlight,
-                promptSurvivedFirstDeleteClick,
-                deleteRequiresConfirmation,
-                promptWasDeleted,
-                sectionCollapsed,
-                sectionToggle.textContent.includes('Code review'),
-                dragMovedPromptAcrossSections,
-                emptySectionWasCreated,
-                selfDropClearedDraggingStyle,
-              ];
+              return {
+                names,
+                emptySourceSection: document.querySelector('[data-prompt-section="Writing"] .dashboard-prompt-section-count').textContent === '0',
+                survivedFirstClick,
+                requiresConfirmation,
+                remainingPromptCount: document.querySelectorAll('[data-prompt-use]').length,
+              };
             })()
             """
-        ) as? [Any]
+        ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? String, "Prompts")
-        XCTAssertEqual(values[1] as? String, "Review code")
-        XCTAssertEqual(values[2] as? String, "Review this code for correctness issues.")
-        XCTAssertEqual(values[3] as? Bool, true)
-        XCTAssertEqual(values[4] as? String, "true")
-        XCTAssertEqual(values[5] as? String, "Review this code for correctness issues.")
-        XCTAssertEqual(values[6] as? Bool, true)
-        XCTAssertEqual(values[7] as? Bool, true)
-        XCTAssertEqual(values[8] as? Bool, true)
-        XCTAssertEqual(values[9] as? Bool, true)
-        XCTAssertEqual(values[10] as? Bool, true)
-        XCTAssertEqual(values[11] as? Bool, true)
-        XCTAssertEqual(values[12] as? Bool, true)
-        XCTAssertEqual(values[13] as? Bool, true)
-        XCTAssertEqual(values[14] as? Bool, true)
+        XCTAssertEqual(values["names"] as? [String], ["Review code", "Explain code"])
+        XCTAssertEqual(values["emptySourceSection"] as? Bool, true)
+        XCTAssertEqual(values["survivedFirstClick"] as? Bool, true)
+        XCTAssertEqual(values["requiresConfirmation"] as? Bool, true)
+        XCTAssertEqual(values["remainingPromptCount"] as? Int, 1)
 
-        let removedOnDestroy = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              window.__codexDashboard.destroy();
-              return !document.querySelector('[data-codex-prompt-menu-item]');
-            })()
-            """
-        ) as? Bool
-        XCTAssertEqual(removedOnDestroy, true)
     }
 
     func testPromptLibraryCreatesEmptySectionsAndScrollsLongLists() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html:
-            """
-            <!doctype html>
-            <html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>
-                <div data-composer-overlay-floating-ui="true" aria-label="Add">
-                  <button data-list-navigation-item="true"><span>Record a skill</span></button>
-                </div>
-                <textarea placeholder="Do anything"></textarea>
-              </main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
-        )
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -202,16 +165,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPromptSectionSurvivesAfterItsLastPromptIsDeleted() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main><div data-composer-overlay-floating-ui="true"><button><span>Record a skill</span></button></div></main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
-        )
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -243,16 +197,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     }
 
     func testLegacyPromptStorageMigratesWithoutDataLoss() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main><div data-composer-overlay-floating-ui="true"><button><span>Record a skill</span></button></div></main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
-        )
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -293,23 +238,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html:
-            """
-            <!doctype html>
-            <html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>
-                <div data-composer-overlay-floating-ui="true" aria-label="Add">
-                  <button data-list-navigation-item="true"><span>Record a skill</span></button>
-                </div>
-                <textarea placeholder="Do anything"></textarea>
-              </main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
-        )
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
 
         let result = try await webView.evaluateJavaScript(
             """

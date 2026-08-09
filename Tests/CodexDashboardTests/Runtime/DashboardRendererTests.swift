@@ -117,12 +117,12 @@ final class DashboardRendererTests: XCTestCase {
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
     }
 
-    func testPreparingForRestartRestoresMaintenance() throws {
+    func testPreparingForRestartRestoresMaintenance() async throws {
         let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),
             injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
         )
-        renderer.stopMaintaining()
+        _ = try await renderer.disable()
         XCTAssertFalse(renderer.maintainsDashboard)
 
         renderer.prepareForRestart()

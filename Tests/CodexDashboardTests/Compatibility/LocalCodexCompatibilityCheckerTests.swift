@@ -57,12 +57,27 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
         XCTAssertEqual(status("rollout-events", in: checks), .unavailable)
     }
 
+    func testRejectsUnreadArraysThatProductionDecoderCannotRead() async throws {
+        let globalStateURL = try makeGlobalState(
+            #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":[42]}}}"#
+        )
+        let checker = LocalCodexCompatibilityChecker(
+            applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
+            stateDatabaseURL: URL(fileURLWithPath: "/missing/state.sqlite"),
+            globalStateURL: globalStateURL
+        )
+
+        let checks = await checker.checkLocalContracts()
+
+        XCTAssertEqual(status("unread-state", in: checks), .incompatible)
+    }
+
     func testReportSeparatesBlockingAndNonBlockingResults() {
         let report = CompatibilityReport(checks: [
             CompatibilityCheck(id: "one", title: "One", status: .incompatible, detail: "Broken"),
             CompatibilityCheck(id: "two", title: "Two", status: .warning, detail: "Changed"),
             CompatibilityCheck(id: "three", title: "Three", status: .unavailable, detail: "Closed"),
-        ], checkedAt: Date())
+        ])
 
         XCTAssertEqual(report.blockingCount, 1)
         XCTAssertEqual(report.warningCount, 2)

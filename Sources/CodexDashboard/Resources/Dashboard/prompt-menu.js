@@ -3,37 +3,6 @@ const promptMenu = (() => {
   let syncQueued = false;
   let onActivate;
 
-  function findAnchor() {
-    const interactiveLabel = [...document.querySelectorAll('button, [role="menuitem"]')]
-      .find((element) => dashboardDOM.textIs(element, 'Record a skill'));
-    const exactLabels = [...document.querySelectorAll('span, div')]
-      .filter((element) => dashboardDOM.textIs(element, 'Record a skill'));
-    const label = interactiveLabel || exactLabels.at(-1);
-    if (!label) return null;
-    const menu = label.closest('[data-composer-overlay-floating-ui], [role="menu"], [data-radix-menu-content], [data-slot="dropdown-menu-content"]')
-      || [...function* ancestors() {
-        let current = label.parentElement;
-        while (current && current !== document.body) {
-          yield current;
-          current = current.parentElement;
-        }
-      }()].find((element) => (
-        element.textContent.includes('Work in a project')
-          && element.textContent.includes('Plan mode')
-      ));
-    if (!menu || menu.closest(`#${dashboardDOM.elementIDs.promptDialog}`)) return null;
-    let row = label.closest('button, [role="menuitem"]');
-    if (!row) {
-      row = label;
-      while (row.parentElement !== menu && row.parentElement) {
-        const parent = row.parentElement;
-        if (parent.textContent.trim() !== 'Record a skill') break;
-        row = parent;
-      }
-    }
-    return row?.parentElement ? row : null;
-  }
-
   function replaceExactText(root, from, to) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
@@ -94,7 +63,7 @@ const promptMenu = (() => {
   function synchronize() {
     syncQueued = false;
     if (document.querySelector('[data-codex-prompt-menu-item]')) return;
-    const anchor = findAnchor();
+    const anchor = codexContracts.promptMenuAnchor();
     if (anchor) createItem(anchor);
   }
 

@@ -186,10 +186,7 @@ final class DashboardViewModel: ObservableObject {
                 detail: "The dashboard runtime is unavailable."
             )]
         }
-        compatibilityReport = CompatibilityReport(
-            checks: await localChecks + rendererChecks,
-            checkedAt: Date()
-        )
+        compatibilityReport = CompatibilityReport(checks: await localChecks + rendererChecks)
     }
 
     private func synchronizeRuntime() async {

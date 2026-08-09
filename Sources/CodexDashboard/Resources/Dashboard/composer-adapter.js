@@ -1,21 +1,6 @@
 const composerAdapter = (() => {
-  function findComposer() {
-    const selectors = [
-      'textarea[placeholder="Do anything"]',
-      '[contenteditable="true"][data-placeholder="Do anything"]',
-      '[contenteditable="true"][role="textbox"]',
-      'textarea',
-      '[contenteditable="true"]',
-    ];
-    return selectors.flatMap((selector) => [...document.querySelectorAll(selector)])
-      .find((element) => (
-        !element.closest(`#${dashboardDOM.elementIDs.promptDialog}`)
-          && element.getClientRects().length > 0
-      ));
-  }
-
   function insert(content) {
-    const composer = findComposer();
+    const composer = codexContracts.composer(dashboardDOM.elementIDs.promptDialog);
     if (!composer) return false;
     composer.focus();
     if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {

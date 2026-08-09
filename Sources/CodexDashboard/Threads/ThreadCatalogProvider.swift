@@ -25,6 +25,11 @@ enum ThreadCatalogError: LocalizedError {
 }
 
 actor CodexThreadCatalogProvider: ThreadCatalogProviding {
+    static let requiredColumnNames: Set<String> = [
+        "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
+        "model", "rollout_path", "archived", "recency_at_ms",
+    ]
+
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String

@@ -6,6 +6,11 @@ struct ThreadActivity: Equatable, Sendable {
 }
 
 struct RolloutActivityReader {
+    static let startedEventType = "task_started"
+    static let endedEventTypes = ["task_complete", "turn_aborted"]
+    static let finalResponsePhase = "final_answer"
+    static let lifecycleEventTypes = [startedEventType] + endedEventTypes
+
     private enum RunEvent {
         case started
         case ended
@@ -84,12 +89,10 @@ struct RolloutActivityReader {
         lowerBound: UInt64 = 0,
         fallbackRunState: ThreadRunState = .idle
     ) -> ThreadActivity {
-        let markers: [(event: RunEvent, data: Data)] = [
-            (.started, Data(#""type":"task_started""#.utf8)),
-            (.ended, Data(#""type":"task_complete""#.utf8)),
-            (.ended, Data(#""type":"turn_aborted""#.utf8)),
-        ]
-        let finalResponseMarker = Data(#""phase":"final_answer""#.utf8)
+        let markers = [(RunEvent.started, Self.startedEventType)]
+            + Self.endedEventTypes.map { (RunEvent.ended, $0) }
+        let encodedMarkers = markers.map { (event: $0.0, data: Data(#""type":"\#($0.1)""#.utf8)) }
+        let finalResponseMarker = Data(#""phase":"\#(Self.finalResponsePhase)""#.utf8)
         let timestampMarker = Data(#""timestamp":""#.utf8)
         let chunkSize: UInt64 = 64 * 1_024
 
@@ -117,7 +120,7 @@ struct RolloutActivityReader {
                     let lineStart = data.index(after: newline)
                     inspect(
                         data[lineStart..<lineEnd],
-                        markers: markers,
+                        markers: encodedMarkers,
                         finalResponseMarker: finalResponseMarker,
                         timestampMarker: timestampMarker,
                         lastEvent: &lastEvent,
@@ -131,7 +134,7 @@ struct RolloutActivityReader {
                 if cursor == lowerBound {
                     inspect(
                         data[..<lineEnd],
-                        markers: markers,
+                        markers: encodedMarkers,
                         finalResponseMarker: finalResponseMarker,
                         timestampMarker: timestampMarker,
                         lastEvent: &lastEvent,
@@ -187,7 +190,7 @@ struct RolloutActivityReader {
             line.range(of: finalResponseMarker) != nil,
             line.range(of: timestampMarker) != nil,
             let envelope = try? JSONDecoder().decode(Envelope.self, from: Data(line)),
-            envelope.payload?.phase == "final_answer",
+            envelope.payload?.phase == Self.finalResponsePhase,
             let timestamp = envelope.timestamp,
             let date = try? Date(timestamp, strategy: .iso8601)
         else { return }
