@@ -1,9 +1,9 @@
 import Foundation
 
 @MainActor
-final class DashboardRenderer {
+final class RendererDashboardSession {
     private struct PendingSynchronization {
-        var snapshot: DashboardSnapshot
+        var snapshot: DashboardSnapshotPayload
         var targets: [DevToolsTarget]
         var forceRemount: Bool
         var waiters: [CheckedContinuation<Void, any Error>]
@@ -12,21 +12,17 @@ final class DashboardRenderer {
     private let devTools: any DevToolsServing
     private let injectionPayload: DashboardInjectionPayload
     private let compatibilityChecker: RendererCompatibilityChecker
-    private let promptBackupStore: PromptBackupStore?
+    private let promptBackup: PromptLibraryBackupSynchronizer
     private var mountedTargetIDs: Set<String> = []
-    private var lastSnapshot: DashboardSnapshot?
-    private var activeSynchronizationCount = 0
+    private var lastSnapshot: DashboardSnapshotPayload?
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var pendingSynchronization: PendingSynchronization?
-    private var lastPromptBackupCheck: Date?
     private var lastHealthCheckByTargetID: [String: Date] = [:]
     private var cachedTargets: [DevToolsTarget] = []
     private var lastTargetRefresh: Date?
     private let healthCheckInterval: TimeInterval
     private let now: () -> Date
-
-    private static let promptBackupCheckInterval: TimeInterval = 30
 
     private(set) var maintainsDashboard = true
 
@@ -39,7 +35,7 @@ final class DashboardRenderer {
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionPayload.load()
-        self.promptBackupStore = promptBackupStore
+        promptBackup = PromptLibraryBackupSynchronizer(store: promptBackupStore, now: now)
         self.healthCheckInterval = healthCheckInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
@@ -69,7 +65,7 @@ final class DashboardRenderer {
     }
 
     func synchronize(
-        _ snapshot: DashboardSnapshot,
+        _ snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
@@ -94,7 +90,6 @@ final class DashboardRenderer {
         }
 
         synchronizationInProgress = true
-        activeSynchronizationCount += 1
         defer {
             synchronizationInProgress = false
             synchronizationFinished()
@@ -143,7 +138,7 @@ final class DashboardRenderer {
     }
 
     private func performSynchronization(
-        _ snapshot: DashboardSnapshot,
+        _ snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws {
@@ -171,7 +166,7 @@ final class DashboardRenderer {
             }
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
-                await restorePromptBackupIfNeeded(in: target)
+                await promptBackup.restoreIfNeeded(in: target, using: devTools)
                 guard try await devTools.evaluateBoolean(injectionPayload.mountExpression, in: target) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."
@@ -191,9 +186,11 @@ final class DashboardRenderer {
         }
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
-        if shouldBackUpPromptLibrary(afterMounting: mountedDashboard) {
-            await backUpPromptLibrary(from: targets.first)
-        }
+        await promptBackup.backUpIfDue(
+            afterMounting: mountedDashboard,
+            from: targets.first,
+            using: devTools
+        )
     }
 
     func disable() async throws -> Bool {
@@ -238,7 +235,7 @@ final class DashboardRenderer {
         await compatibilityChecker.check()
     }
 
-    private func deliver(_ snapshot: DashboardSnapshot, to targets: [DevToolsTarget]) async throws {
+    private func deliver(_ snapshot: DashboardSnapshotPayload, to targets: [DevToolsTarget]) async throws {
         let data = try JSONEncoder().encode(snapshot)
         guard let json = String(data: data, encoding: .utf8) else {
             throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")
@@ -263,7 +260,7 @@ final class DashboardRenderer {
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
-        lastPromptBackupCheck = nil
+        promptBackup.reset()
         lastHealthCheckByTargetID = [:]
         invalidateTargetCache()
     }
@@ -278,57 +275,14 @@ final class DashboardRenderer {
         return now().timeIntervalSince(lastHealthCheck) >= healthCheckInterval
     }
 
-    private func shouldBackUpPromptLibrary(afterMounting mountedDashboard: Bool) -> Bool {
-        let now = Date()
-        guard !mountedDashboard, let lastPromptBackupCheck else {
-            self.lastPromptBackupCheck = now
-            return true
-        }
-        guard now.timeIntervalSince(lastPromptBackupCheck) >= Self.promptBackupCheckInterval else {
-            return false
-        }
-        self.lastPromptBackupCheck = now
-        return true
-    }
-
-    private func restorePromptBackupIfNeeded(in target: DevToolsTarget) async {
-        guard let promptBackupStore else { return }
-        guard let backup = await promptBackupStore.load(),
-              let data = try? JSONSerialization.data(withJSONObject: backup, options: .fragmentsAllowed),
-              let encodedBackup = String(data: data, encoding: .utf8)
-        else { return }
-        let expression = """
-        (() => {
-          const key = 'codex-dashboard.prompt-library';
-          if (localStorage.getItem(key)) return true;
-          localStorage.setItem(key, \(encodedBackup));
-          return true;
-        })()
-        """
-        _ = try? await devTools.evaluateBoolean(expression, in: target)
-    }
-
-    private func backUpPromptLibrary(from target: DevToolsTarget?) async {
-        guard let promptBackupStore,
-              let target,
-              let json = try? await devTools.evaluateString(
-                "localStorage.getItem('codex-dashboard.prompt-library')",
-                in: target
-              )
-        else { return }
-        _ = try? await promptBackupStore.save(json)
-    }
-
     private func synchronizationFinished() {
-        activeSynchronizationCount -= 1
-        guard activeSynchronizationCount == 0 else { return }
         let waiters = synchronizationWaiters
         synchronizationWaiters = []
         waiters.forEach { $0.resume() }
     }
 
     private func waitForSynchronizationsToFinish() async {
-        guard activeSynchronizationCount > 0 else { return }
+        guard synchronizationInProgress else { return }
         await withCheckedContinuation { continuation in
             synchronizationWaiters.append(continuation)
         }

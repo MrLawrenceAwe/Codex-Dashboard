@@ -18,7 +18,7 @@ private actor CountingCatalogProvider: ThreadCatalogProviding {
 }
 
 private struct ChangedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    func load(projectPaths: Set<String>) -> [String: WorkingTreeStatus] {
+    func loadStatuses(for projectPaths: Set<String>) -> [String: WorkingTreeStatus] {
         Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .hasChanges) })
     }
 }
@@ -64,7 +64,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let service = ThreadSnapshotService(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
-            unreadIDProvider: EmptyUnreadIDProvider()
+            unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
         let snapshotTask = Task {
             try await service.loadSnapshot(codexLaunchDate: nil)
@@ -74,8 +74,8 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         }
 
         let sourceThreads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
-        let updatedThreads = await service.updateWorkingTreeStatuses(in: sourceThreads)
-        XCTAssertEqual(updatedThreads?.first?.workingTreeStatus, .hasChanges)
+        let updatedStatuses = await service.updateWorkingTreeStatuses(in: sourceThreads)
+        XCTAssertEqual(updatedStatuses?["/tmp/project"], .hasChanges)
         await catalogProvider.resume(with: .notRepository)
 
         let snapshot = try await snapshotTask.value
@@ -87,14 +87,14 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let service = ThreadSnapshotService(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
-            unreadIDProvider: EmptyUnreadIDProvider()
+            unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
         let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
 
-        let updatedThreads = await service.updateWorkingTreeStatuses(in: snapshot.catalog.threads)
+        let updatedStatuses = await service.updateWorkingTreeStatuses(in: snapshot.catalog.threads)
         let loadCount = await catalogProvider.loadCount
 
-        XCTAssertEqual(updatedThreads?.first?.workingTreeStatus, .hasChanges)
+        XCTAssertEqual(updatedStatuses?["/tmp/project"], .hasChanges)
         XCTAssertEqual(loadCount, 1)
     }
 
@@ -102,16 +102,16 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
             workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
-            unreadIDProvider: FailingUnreadIDProvider()
+            unreadThreadIDProvider: FailingUnreadIDProvider()
         )
 
         let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
-        let refresh = await service.updateUnreadState(in: snapshot.catalog.threads)
+        let refresh = await service.updateUnreadState()
 
         XCTAssertEqual(snapshot.catalog.threads.count, 1)
         XCTAssertFalse(snapshot.catalog.threads[0].isUnread)
         XCTAssertNotNil(snapshot.unreadStateWarning)
         XCTAssertNotNil(refresh.warning)
-        XCTAssertNil(refresh.threads)
+        XCTAssertNil(refresh.unreadThreadIDs)
     }
 }

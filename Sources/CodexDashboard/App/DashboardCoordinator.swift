@@ -18,7 +18,7 @@ enum DashboardConnectionState: Equatable {
 }
 
 @MainActor
-final class DashboardViewModel: ObservableObject {
+final class DashboardCoordinator: ObservableObject {
     @Published private(set) var connectionState: DashboardConnectionState = .checking
     @Published private(set) var connectionError: String?
     @Published private(set) var isPerformingAction = false
@@ -38,9 +38,10 @@ final class DashboardViewModel: ObservableObject {
     private let compatibilityChecker: any LocalCompatibilityChecking
     private let completionNotifier: any ThreadCompletionNotifying
     private let userDefaults: UserDefaults
+    private let versionTracker: CodexVersionCompatibilityTracker
     private let pollingController = DashboardPollingController()
     private var completionDetector = ThreadCompletionDetector()
-    private var runtime: (any DashboardRuntime)?
+    private var runtime: (any DashboardSession)?
     private var synchronizationTask: Task<Void, Never>?
     private var synchronizationID: UUID?
     private var enrichmentGeneration = 0
@@ -71,21 +72,22 @@ final class DashboardViewModel: ObservableObject {
 
     init(
         catalogProvider: any ThreadCatalogProviding = CodexThreadCatalogProvider(),
-        workingTreeStatusProvider: any WorkingTreeStatusProviding = SystemWorkingTreeStatusProvider(),
-        unreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
+        workingTreeStatusProvider: any WorkingTreeStatusProviding = GitWorkingTreeStatusProvider(),
+        unreadThreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
         completionNotifier: any ThreadCompletionNotifying = DisabledThreadCompletionNotifier(),
         userDefaults: UserDefaults = .standard,
-        runtimeFactory: () throws -> any DashboardRuntime = { try LiveDashboardRuntime() }
+        runtimeFactory: () throws -> any DashboardSession = { try LiveDashboardSession() }
     ) {
         threadSnapshots = ThreadSnapshotService(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: workingTreeStatusProvider,
-            unreadIDProvider: unreadIDProvider
+            unreadThreadIDProvider: unreadThreadIDProvider
         )
         self.compatibilityChecker = compatibilityChecker
         self.completionNotifier = completionNotifier
         self.userDefaults = userDefaults
+        versionTracker = CodexVersionCompatibilityTracker(userDefaults: userDefaults)
         completionNotificationsEnabled = userDefaults.object(
             forKey: "completionNotificationsEnabled"
         ) as? Bool ?? true
@@ -104,11 +106,9 @@ final class DashboardViewModel: ObservableObject {
         if completionNotificationsEnabled {
             completionNotifier.requestAuthorization()
         }
-        let currentVersion = CodexConfiguration.installedVersion
-        let previousVersion = UserDefaults.standard.string(forKey: "lastCheckedCodexVersion")
-        compatibilityWasTriggeredByUpdate = previousVersion != nil
-            && currentVersion != nil
-            && previousVersion != currentVersion
+        compatibilityWasTriggeredByUpdate = versionTracker.updateWasDetected(
+            currentVersion: CodexConfiguration.installedVersion
+        )
         pollingController.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
             updateWorkingTrees: { [weak self] in await self?.updateWorkingTreeStatuses() },
@@ -123,7 +123,7 @@ final class DashboardViewModel: ObservableObject {
                 Task { @MainActor in await self?.synchronizeDashboard() }
             }
         }
-        Task { await checkCompatibilityAfterVersionChange() }
+        Task { await checkCompatibility() }
     }
 
     func setCompletionNotificationsEnabled(_ enabled: Bool) {
@@ -182,7 +182,7 @@ final class DashboardViewModel: ObservableObject {
             rendererAvailable = true
             try await loadThreadSnapshot()
             try await runtime.synchronizeDashboard(
-                with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
+                with: DashboardSnapshotPayload(threads: threads, totalThreadCount: totalThreadCount),
                 on: targets,
                 forceRemount: true
             )
@@ -238,9 +238,7 @@ final class DashboardViewModel: ObservableObject {
         }
         compatibilityReport = CompatibilityReport(checks: await localChecks + rendererChecks)
         lastCompatibilityCheck = .now
-        if let version = CodexConfiguration.installedVersion {
-            UserDefaults.standard.set(version, forKey: "lastCheckedCodexVersion")
-        }
+        versionTracker.markChecked(version: CodexConfiguration.installedVersion)
     }
 
     private func synchronizeRuntime() async {
@@ -273,7 +271,7 @@ final class DashboardViewModel: ObservableObject {
         if runtime.maintainsDashboard, !targets.isEmpty {
             do {
                 try await runtime.synchronizeDashboard(
-                    with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
+                    with: DashboardSnapshotPayload(threads: threads, totalThreadCount: totalThreadCount),
                     on: targets,
                     forceRemount: false
                 )
@@ -307,15 +305,14 @@ final class DashboardViewModel: ObservableObject {
     private func updateUnreadState() async {
         guard !isPerformingAction else { return }
         let generation = enrichmentGeneration
-        let refresh = await threadSnapshots.updateUnreadState(in: threads)
+        let refresh = await threadSnapshots.updateUnreadState()
         guard !isPerformingAction, generation == enrichmentGeneration else { return }
         unreadStateWarning = refresh.warning
         refreshThreadDataWarning()
-        guard let updatedThreads = refresh.threads else { return }
-        let unreadByID = Dictionary(uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.isUnread) })
+        guard let unreadThreadIDs = refresh.unreadThreadIDs else { return }
         setThreads(threads.map { source in
             var thread = source
-            thread.isUnread = unreadByID[thread.id] ?? thread.isUnread
+            thread.isUnread = unreadThreadIDs.contains(thread.id)
             return thread
         })
         await publishSnapshotIfMaintained()
@@ -325,14 +322,11 @@ final class DashboardViewModel: ObservableObject {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
         let generation = enrichmentGeneration
-        guard let updatedThreads = await threadSnapshots.updateWorkingTreeStatuses(in: threads) else { return }
+        guard let statusByProjectPath = await threadSnapshots.updateWorkingTreeStatuses(in: threads) else { return }
         guard !isPerformingAction, generation == enrichmentGeneration else { return }
-        let statusByID = Dictionary(
-            uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.workingTreeStatus) }
-        )
         setThreads(threads.map { source in
             var thread = source
-            thread.workingTreeStatus = statusByID[thread.id] ?? thread.workingTreeStatus
+            thread.workingTreeStatus = statusByProjectPath[thread.projectPath] ?? .notRepository
             return thread
         })
         await publishSnapshotIfMaintained()
@@ -372,7 +366,7 @@ final class DashboardViewModel: ObservableObject {
         let targets = await runtime.rendererTargets()
         guard !Task.isCancelled, !targets.isEmpty else { return }
         try? await runtime.synchronizeDashboard(
-            with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
+            with: DashboardSnapshotPayload(threads: threads, totalThreadCount: totalThreadCount),
             on: targets,
             forceRemount: false
         )
@@ -405,38 +399,23 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func copyDiagnostics() {
-        let formatter = ISO8601DateFormatter()
-        let dashboardVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "development"
-        let codexVersion = CodexConfiguration.installedVersion ?? "not found"
-        let refreshDate = lastSuccessfulRefresh.map(formatter.string(from:)) ?? "never"
-        let compatibilityDate = lastCompatibilityCheck.map(formatter.string(from:)) ?? "never"
-        let compatibilitySummary = compatibilityReport?.summary ?? "not checked"
-        let currentConnectionError = connectionError ?? "none"
-        let currentThreadWarning = threadDataWarning ?? "none"
-        let lines = [
-            "Codex Dashboard \(dashboardVersion)",
-            "Codex: \(codexVersion)",
-            "Status: \(statusPresentation.title)",
-            "Renderer targets: \(rendererTargetCount)",
-            "Threads: \(threads.count) loaded / \(totalThreadCount) total",
-            "Last refresh: \(refreshDate)",
-            "Last compatibility check: \(compatibilityDate)",
-            "Compatibility: \(compatibilitySummary)",
-            "Connection error: \(currentConnectionError)",
-            "Thread warning: \(currentThreadWarning)",
-            "Prompt backup: ~/Library/Application Support/Codex Dashboard/prompt-library.json",
-        ]
+        let diagnostics = DashboardDiagnostics(
+            dashboardVersion: Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String ?? "development",
+            codexVersion: CodexConfiguration.installedVersion ?? "not found",
+            status: statusPresentation.title,
+            rendererTargetCount: rendererTargetCount,
+            loadedThreadCount: threads.count,
+            totalThreadCount: totalThreadCount,
+            lastRefresh: lastSuccessfulRefresh,
+            lastCompatibilityCheck: lastCompatibilityCheck,
+            compatibilitySummary: compatibilityReport?.summary ?? "not checked",
+            connectionError: connectionError,
+            threadWarning: threadDataWarning,
+            promptBackupPath: "~/Library/Application Support/Codex Dashboard/prompt-library.json"
+        )
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
-    }
-
-    private func checkCompatibilityAfterVersionChange() async {
-        let currentVersion = CodexConfiguration.installedVersion
-        let previousVersion = UserDefaults.standard.string(forKey: "lastCheckedCodexVersion")
-        compatibilityWasTriggeredByUpdate = previousVersion != nil
-            && currentVersion != nil
-            && previousVersion != currentVersion
-        await checkCompatibility()
+        NSPasteboard.general.setString(diagnostics.text, forType: .string)
     }
 }

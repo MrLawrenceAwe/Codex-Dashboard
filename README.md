@@ -37,10 +37,10 @@ removes it.
 
 - Native SwiftUI control panel; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
-- Loopback-only Chromium DevTools connection managed by `LiveDashboardRuntime` and `DashboardRenderer`.
-- Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
+- Loopback-only Chromium DevTools connection managed by `LiveDashboardSession` and `RendererDashboardSession`.
+- Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`, grouped into `Core`, `Threads`, and `Prompts`.
 - A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and composer-control contract drift after Codex updates.
-- Swift source is grouped by application UI, compatibility checks, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
+- Swift source is grouped by application coordination, compatibility checks, prompt persistence, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run every two seconds while Codex or the controller is active; unread state refreshes independently every 500 milliseconds and working-tree status every ten seconds. Background cadence drops to eight seconds, one second, and thirty seconds respectively. Silent renderer-only read-state changes have a bounded fallback: 1.5 seconds after a native snapshot, then every three seconds while the dashboard is open, ten seconds while closed, and thirty seconds while hidden.
 - Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The most recent 60 are loaded, and the dashboard explicitly shows the loaded and total counts so the scope of search is clear.
@@ -58,7 +58,7 @@ removes it.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Thread Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Codex host selectors are isolated in `codex-host.js`; prompt storage, composer-launcher integration, dialog rendering, composer insertion, dashboard rendering, and host exposure live in focused modules listed by `injection-manifest.json`.
+- Codex host selectors are isolated in `Core/codex-host.js`; prompt storage, composer-launcher integration, prompt-library UI, composer insertion, thread rendering, and host exposure live in feature folders listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.

@@ -2,10 +2,10 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class SystemWorkingTreeStatusProviderTests: XCTestCase {
+final class GitWorkingTreeStatusProviderTests: XCTestCase {
     func testDefaultCacheLifetimesDoNotExceedForegroundPollingInterval() {
-        XCTAssertLessThanOrEqual(SystemWorkingTreeStatusProvider.defaultStatusCacheLifetime, 10)
-        XCTAssertLessThanOrEqual(SystemWorkingTreeStatusProvider.defaultResolutionCacheLifetime, 10)
+        XCTAssertLessThanOrEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 10)
+        XCTAssertLessThanOrEqual(GitWorkingTreeStatusProvider.defaultResolutionCacheLifetime, 10)
     }
 
     func testReportsUncommittedChanges() async throws {
@@ -22,14 +22,14 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("uncommitted\n".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
 
-        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [projectURL.path])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [projectURL.path])
 
         XCTAssertEqual(statuses[projectURL.path], .hasChanges)
     }
 
     func testReportsUnavailablePath() async {
         let missingPath = "/tmp/codex-dashboard-missing-\(UUID().uuidString)"
-        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [missingPath])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [missingPath])
         XCTAssertEqual(statuses[missingPath], .unavailable)
     }
 
@@ -39,7 +39,7 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
 
-        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: [directory.path])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [directory.path])
         XCTAssertEqual(statuses[directory.path], .notRepository)
     }
 
@@ -48,7 +48,7 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
             "/tmp/codex-dashboard-missing-\(index)-\(UUID().uuidString)"
         })
 
-        let statuses = await SystemWorkingTreeStatusProvider().load(projectPaths: paths)
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: paths)
 
         XCTAssertEqual(statuses.count, paths.count)
         XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })
@@ -67,20 +67,20 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
             arguments: ["-C", repositoryURL.path, "init", "--quiet"],
             timeout: 3
         )
-        let provider = SystemWorkingTreeStatusProvider(cacheLifetime: 60)
+        let provider = GitWorkingTreeStatusProvider(cacheLifetime: 60)
         let paths: Set<String> = [firstProjectURL.path, secondProjectURL.path]
 
-        let initial = await provider.load(projectPaths: paths)
+        let initial = await provider.loadStatuses(for: paths)
         XCTAssertEqual(initial[firstProjectURL.path], .clean)
         XCTAssertEqual(initial[secondProjectURL.path], .clean)
 
         try Data("uncommitted\n".utf8).write(to: repositoryURL.appendingPathComponent("notes.txt"))
-        let cached = await provider.load(projectPaths: paths)
+        let cached = await provider.loadStatuses(for: paths)
         XCTAssertEqual(cached[firstProjectURL.path], .clean)
         XCTAssertEqual(cached[secondProjectURL.path], .clean)
 
-        let uncachedProvider = SystemWorkingTreeStatusProvider(cacheLifetime: 0)
-        let refreshed = await uncachedProvider.load(projectPaths: paths)
+        let uncachedProvider = GitWorkingTreeStatusProvider(cacheLifetime: 0)
+        let refreshed = await uncachedProvider.loadStatuses(for: paths)
         XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
         XCTAssertEqual(refreshed[secondProjectURL.path], .hasChanges)
     }
@@ -90,9 +90,9 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-resolution-cache-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-        let provider = SystemWorkingTreeStatusProvider(resolutionCacheLifetime: 60)
+        let provider = GitWorkingTreeStatusProvider(resolutionCacheLifetime: 60)
 
-        let initial = await provider.load(projectPaths: [directory.path])
+        let initial = await provider.loadStatuses(for: [directory.path])
         XCTAssertEqual(initial[directory.path], .notRepository)
         _ = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/git"),
@@ -100,11 +100,11 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
             timeout: 3
         )
 
-        let cached = await provider.load(projectPaths: [directory.path])
+        let cached = await provider.loadStatuses(for: [directory.path])
         XCTAssertEqual(cached[directory.path], .notRepository)
 
-        let uncachedProvider = SystemWorkingTreeStatusProvider(resolutionCacheLifetime: 0)
-        let refreshed = await uncachedProvider.load(projectPaths: [directory.path])
+        let uncachedProvider = GitWorkingTreeStatusProvider(resolutionCacheLifetime: 0)
+        let refreshed = await uncachedProvider.loadStatuses(for: [directory.path])
         XCTAssertEqual(refreshed[directory.path], .clean)
     }
 }

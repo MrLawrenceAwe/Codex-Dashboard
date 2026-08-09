@@ -194,7 +194,7 @@ function renderDashboard() {
     button.setAttribute('aria-pressed', String(isActive));
   });
   const filterCounts = {
-    all: threads.length,
+    all: threads.length - state.runningThreads.length,
     unread: state.unreadCount,
     changedProjects: state.changedProjectPaths.size,
   };
@@ -341,7 +341,7 @@ function mountDashboardPage() {
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
             <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-            <button type="button" data-filter="changedProjects">Changed <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+            <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
           </div>
           <label class="dashboard-search" aria-label="Search loaded threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
           <div class="dashboard-view-options" aria-label="Group threads">

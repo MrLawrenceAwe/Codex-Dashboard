@@ -18,14 +18,14 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct CodexDashboardApp: App {
     @NSApplicationDelegateAdaptor(CodexDashboardAppDelegate.self) private var appDelegate
-    @StateObject private var viewModel = DashboardViewModel(
+    @StateObject private var coordinator = DashboardCoordinator(
         completionNotifier: MacThreadCompletionNotifier()
     )
     @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     var body: some Scene {
         WindowGroup(id: "controller") {
-            DashboardControllerView(viewModel: viewModel, launchAtLogin: launchAtLogin)
+            ControllerWindowView(coordinator: coordinator, launchAtLogin: launchAtLogin)
         }
         .windowResizability(.contentSize)
         .commands {
@@ -33,9 +33,9 @@ struct CodexDashboardApp: App {
         }
 
         MenuBarExtra {
-            DashboardMenu(viewModel: viewModel, launchAtLogin: launchAtLogin)
+            DashboardMenu(coordinator: coordinator, launchAtLogin: launchAtLogin)
         } label: {
-            Image(systemName: viewModel.connectionState.dashboardIsMounted
+            Image(systemName: coordinator.connectionState.dashboardIsMounted
                   ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2")
                 .accessibilityLabel("Codex Dashboard")
         }
@@ -43,30 +43,30 @@ struct CodexDashboardApp: App {
 }
 
 private struct DashboardMenu: View {
-    @ObservedObject var viewModel: DashboardViewModel
+    @ObservedObject var coordinator: DashboardCoordinator
     @ObservedObject var launchAtLogin: LaunchAtLoginController
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text(viewModel.statusPresentation.title)
+        Text(coordinator.statusPresentation.title)
         Button("Open Controller") {
             openWindow(id: "controller")
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button("Open Thread Dashboard") { Task { await viewModel.openThreadDashboard() } }
-            .disabled(!viewModel.connectionState.dashboardIsMounted)
-        Button("Sync Now") { Task { await viewModel.synchronizeDashboard() } }
-        Button("Restart & Enable") { Task { await viewModel.restartCodexAndEnableThreadDashboard() } }
+        Button("Open Thread Dashboard") { Task { await coordinator.openThreadDashboard() } }
+            .disabled(!coordinator.connectionState.dashboardIsMounted)
+        Button("Sync Now") { Task { await coordinator.synchronizeDashboard() } }
+        Button("Restart & Enable") { Task { await coordinator.restartCodexAndEnableThreadDashboard() } }
         Divider()
         Toggle("Completion Notifications", isOn: Binding(
-            get: { viewModel.completionNotificationsEnabled },
-            set: { viewModel.setCompletionNotificationsEnabled($0) }
+            get: { coordinator.completionNotificationsEnabled },
+            set: { coordinator.setCompletionNotificationsEnabled($0) }
         ))
         Toggle("Launch at Login", isOn: Binding(
             get: { launchAtLogin.isEnabled },
             set: { launchAtLogin.setEnabled($0) }
         ))
-        Button("Copy Diagnostics") { viewModel.copyDiagnostics() }
+        Button("Copy Diagnostics") { coordinator.copyDiagnostics() }
         Divider()
         Button("Quit Codex Dashboard") { NSApp.terminate(nil) }
     }

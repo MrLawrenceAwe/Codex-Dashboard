@@ -255,6 +255,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
+                document.querySelector('[data-filter="changedProjects"]').textContent.trim(),
               ];
             })()
             """
@@ -265,6 +266,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             "changed-project-thread-two",
         ])
         XCTAssertEqual(values[1] as? String, "1")
+        XCTAssertEqual(values[2] as? String, "Changed projects 1")
     }
 
     func testNavigationShowsUncommittedChangesIndicatorForDirtyProjects() async throws {
@@ -479,6 +481,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
                 document.querySelector('[data-running-list] .dashboard-thread p') === null,
+                document.querySelector('[data-filter-count="all"]').textContent,
               ];
             })()
             """
@@ -490,6 +493,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? Int, 3)
         XCTAssertEqual(values[4] as? [String], ["project-a-idle"])
         XCTAssertEqual(values[5] as? Bool, true)
+        XCTAssertEqual(values[6] as? String, "1")
     }
 
     func testThreadRowOpensFromPointerOrKeyboardTarget() async throws {

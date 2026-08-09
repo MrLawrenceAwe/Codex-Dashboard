@@ -95,7 +95,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             cachedStoredThreads = threads
         }
         rolloutActivityReader.retainCache(for: Set(threads.map(\.rolloutPath)))
-        let dashboardThreads = threads.map { thread in
+        let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let threadActivity = rolloutActivityReader.load(
                 at: thread.rolloutPath,
@@ -122,7 +122,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             return left.recencyTimestamp > right.recencyTimestamp
         }
         return ThreadCatalog(
-            threads: dashboardThreads,
+            threads: threadSummaries,
             totalThreadCount: threads.first?.totalCount ?? 0
         )
     }
