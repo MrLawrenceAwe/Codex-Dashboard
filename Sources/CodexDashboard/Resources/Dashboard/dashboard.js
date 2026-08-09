@@ -219,6 +219,7 @@ function listMarkup(visibleThreads) {
 }
 
 function render() {
+  updateNavigationStatus();
   const page = document.getElementById(ids.page);
   if (!page) return;
   const running = threads.filter((thread) => thread.status === 'running').length;
@@ -297,9 +298,13 @@ function createNavigation() {
       <span class="dashboard-nav-icon">${iconSVG('threads')}</span>
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
-    <strong class="dashboard-nav-count" data-navigation-count>0</strong>`;
+    <div class="dashboard-nav-status">
+      <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="Threads running" title="Threads running" hidden></span>
+      <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads">0</strong>
+    </div>`;
   if (reference.insertAfter) reference.element.after(button);
   else reference.element.parentElement.insertBefore(button, reference.element);
+  updateNavigationStatus();
   return true;
 }
 
@@ -389,14 +394,26 @@ function closePage() {
   document.getElementById(ids.navButton)?.removeAttribute('aria-current');
 }
 
+function updateNavigationStatus() {
+  const unreadCount = threads.filter(isThreadUnread).length;
+  const hasRunningThreads = threads.some((thread) => thread.status === 'running');
+  const count = document.querySelector('[data-navigation-count]');
+  if (count) {
+    count.textContent = String(unreadCount);
+    count.setAttribute(
+      'aria-label',
+      `${unreadCount} unread ${unreadCount === 1 ? 'thread' : 'threads'}`,
+    );
+  }
+  const spinner = document.querySelector('[data-navigation-running]');
+  if (spinner) spinner.hidden = !hasRunningThreads;
+}
+
 function update(nextSnapshot) {
   const nextThreads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
   initializeReadState(nextThreads);
   threads = nextThreads;
   markSelectedThreadRead(threads);
-  const activeCount = threads.filter((thread) => thread.status === 'running').length;
-  const count = document.querySelector('[data-navigation-count]');
-  if (count) count.textContent = String(activeCount);
   render();
 }
 

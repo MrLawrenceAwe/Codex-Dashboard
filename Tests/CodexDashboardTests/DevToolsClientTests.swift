@@ -19,6 +19,10 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertTrue(adapter.expression.contains("path: `/local/${encodeURIComponent(thread.id)}`"))
         XCTAssertTrue(adapter.expression.contains("codex-dashboard-thread-read-state-v1"))
         XCTAssertTrue(adapter.expression.contains("aria-label=\"Unread response\""))
+        XCTAssertTrue(adapter.expression.contains("const unreadCount = threads.filter(isThreadUnread).length"))
+        XCTAssertTrue(adapter.expression.contains("data-navigation-running"))
+        XCTAssertTrue(adapter.expression.contains("spinner.hidden = !hasRunningThreads"))
+        XCTAssertFalse(adapter.expression.contains("count.textContent = String(activeCount)"))
         XCTAssertFalse(adapter.expression.contains("document.createElement('a')"))
         XCTAssertTrue(adapter.healthCheckExpression.contains(adapter.version))
     }
