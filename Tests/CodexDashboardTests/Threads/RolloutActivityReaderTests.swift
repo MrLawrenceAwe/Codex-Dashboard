@@ -3,6 +3,28 @@ import XCTest
 @testable import CodexDashboard
 
 final class RolloutActivityReaderTests: XCTestCase {
+    func testPrunesCachedRolloutsOutsideCurrentCatalog() throws {
+        let firstURL = try CodexTestFixtures.makeRollout(
+            lifecycleEvents: ["task_started"],
+            finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 20,
+            testCase: self
+        )
+        let secondURL = try CodexTestFixtures.makeRollout(
+            lifecycleEvents: ["task_complete"],
+            finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 10,
+            testCase: self
+        )
+        var reader = RolloutActivityReader()
+
+        _ = reader.load(at: firstURL.path, codexLaunchDate: .distantPast)
+        _ = reader.load(at: secondURL.path, codexLaunchDate: .distantPast)
+        XCTAssertEqual(reader.cachedEntryCount, 2)
+
+        reader.retainCache(for: [secondURL.path])
+
+        XCTAssertEqual(reader.cachedEntryCount, 1)
+    }
+
     func testReadsLatestActivityAndFinalResponseDirectly() throws {
         let finalResponseAt = Int64(Date().timeIntervalSince1970) - 90
         let rolloutURL = try CodexTestFixtures.makeRollout(

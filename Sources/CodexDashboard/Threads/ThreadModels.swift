@@ -32,12 +32,40 @@ struct ThreadCatalog: Sendable {
     let totalThreadCount: Int
 }
 
+struct DashboardThread: Codable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let preview: String
+    let projectName: String
+    let projectPath: String
+    let recencyTimestamp: Int64
+    let isPinned: Bool
+    let isUnread: Bool
+    let model: String?
+    let runState: ThreadRunState
+    let workingTreeStatus: WorkingTreeStatus
+
+    init(_ thread: ThreadSummary) {
+        id = thread.id
+        title = thread.title
+        preview = thread.preview
+        projectName = thread.projectName
+        projectPath = thread.projectPath
+        recencyTimestamp = thread.recencyTimestamp
+        isPinned = thread.isPinned
+        isUnread = thread.isUnread
+        model = thread.model
+        runState = thread.runState
+        workingTreeStatus = thread.workingTreeStatus
+    }
+}
+
 struct DashboardSnapshot: Codable, Equatable, Sendable {
-    let threads: [ThreadSummary]
+    let threads: [DashboardThread]
     let totalThreadCount: Int
 
     init(threads: [ThreadSummary], totalThreadCount: Int? = nil) {
-        self.threads = threads
+        self.threads = threads.map(DashboardThread.init)
         self.totalThreadCount = totalThreadCount ?? threads.count
     }
 }

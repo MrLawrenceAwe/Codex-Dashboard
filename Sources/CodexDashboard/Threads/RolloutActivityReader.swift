@@ -36,6 +36,12 @@ struct RolloutActivityReader {
 
     private var cache: [String: CacheEntry] = [:]
 
+    var cachedEntryCount: Int { cache.count }
+
+    mutating func retainCache(for paths: Set<String>) {
+        cache = cache.filter { paths.contains($0.key) }
+    }
+
     mutating func load(
         at path: String,
         codexLaunchDate: Date?

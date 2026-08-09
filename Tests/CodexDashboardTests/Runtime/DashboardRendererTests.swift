@@ -169,6 +169,21 @@ private actor FailingRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testDashboardSnapshotOmitsNotificationOnlyAssistantMessage() throws {
+        let snapshot = DashboardSnapshot(threads: [
+            .fixture(lastAssistantMessage: String(repeating: "private response", count: 10_000)),
+        ])
+
+        let data = try JSONEncoder().encode(snapshot)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let threads = try XCTUnwrap(object["threads"] as? [[String: Any]])
+
+        XCTAssertNil(try XCTUnwrap(threads.first)["lastAssistantMessage"])
+        XCTAssertEqual(threads.first?["title"] as? String, "Thread")
+    }
+
     func testLiveRendererCompatibilityWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with Codex on port 47832.")
