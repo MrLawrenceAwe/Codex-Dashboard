@@ -5,6 +5,7 @@ import XCTest
 private actor StubRendererDevTools: DevToolsServing {
     private let rendererTargets: [DevToolsTarget]
     private var evaluationResult = false
+    private var evaluatedExpressions: [String] = []
 
     init(targets: [DevToolsTarget]) {
         rendererTargets = targets
@@ -15,11 +16,16 @@ private actor StubRendererDevTools: DevToolsServing {
     }
 
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool {
-        evaluationResult
+        evaluatedExpressions.append(expression)
+        return evaluationResult
     }
 
     func setEvaluationResult(_ result: Bool) {
         evaluationResult = result
+    }
+
+    func expressions() -> [String] {
+        evaluatedExpressions
     }
 }
 
@@ -237,6 +243,11 @@ final class RendererDashboardSessionTests: XCTestCase {
             ]
         )
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
+        let expressions = await devTools.expressions()
+        let composerControlsExpression = try XCTUnwrap(
+            expressions.first { $0.contains("Boolean(codexContracts.composerAddButton())") }
+        )
+        XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-launcher"))
     }
 
     func testPreparingForRestartRestoresMaintenance() async throws {
