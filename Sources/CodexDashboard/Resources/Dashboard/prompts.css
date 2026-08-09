@@ -27,16 +27,34 @@
 #codex-dashboard-prompt-dialog input:focus-visible,
 #codex-dashboard-prompt-dialog textarea:focus-visible { outline: 1px solid rgba(121, 201, 140, .75); outline-offset: 2px; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
-#codex-dashboard-prompt-dialog .dashboard-prompt-panel { position: relative; display: grid; width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 16px; background: #292929; box-shadow: 0 24px 80px rgba(0,0,0,.48); }
+#codex-dashboard-prompt-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 16px; background: #292929; box-shadow: 0 24px 80px rgba(0,0,0,.48); }
 #codex-dashboard-prompt-dialog .dashboard-prompt-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 19px 20px 15px; border-bottom: 1px solid var(--dashboard-line); }
 #codex-dashboard-prompt-dialog .dashboard-prompt-header h2 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -.01em; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-header p { margin: 4px 0 0; color: var(--dashboard-muted); font-size: 12px; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-icon-button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--dashboard-muted); font-size: 22px; line-height: 1; cursor: pointer; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-icon-button:hover { background: rgba(255,255,255,.06); color: var(--dashboard-text); }
-#codex-dashboard-prompt-dialog [data-prompt-content] { min-height: 0; overflow: auto; padding: 14px; }
-#codex-dashboard-prompt-dialog .dashboard-prompt-list { display: grid; gap: 7px; }
-#codex-dashboard-prompt-dialog .dashboard-prompt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; padding: 5px; border: 1px solid var(--dashboard-line); border-radius: 10px; background: rgba(255,255,255,.018); }
+#codex-dashboard-prompt-dialog [data-prompt-content] { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 14px; scrollbar-gutter: stable; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-list { display: grid; gap: 12px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section { display: grid; gap: 6px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 5px; border: 0; border-radius: 6px; background: transparent; color: var(--dashboard-muted); cursor: pointer; text-align: left; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-toggle:hover { background: rgba(255,255,255,.03); color: var(--dashboard-text); }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-title { display: inline-flex; min-width: 0; align-items: center; gap: 7px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-title strong { overflow: hidden; font-size: 11px; font-weight: 570; text-overflow: ellipsis; white-space: nowrap; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-chevron { display: inline-block; color: var(--dashboard-dim); font-size: 17px; line-height: 12px; transform: rotate(90deg); transition: transform 120ms ease; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section.is-collapsed .dashboard-prompt-section-chevron { transform: none; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-count { min-width: 19px; padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.045); color: var(--dashboard-dim); font-size: 9px; text-align: center; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-body { display: grid; gap: 7px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section-body[hidden] { display: none; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 5px; border: 1px solid var(--dashboard-line); border-radius: 10px; background: rgba(255,255,255,.018); }
 #codex-dashboard-prompt-dialog .dashboard-prompt-row:hover { border-color: var(--dashboard-line-strong); background: rgba(255,255,255,.03); }
+#codex-dashboard-prompt-dialog .dashboard-prompt-drag-handle { padding-left: 4px; color: var(--dashboard-dim); font-size: 14px; cursor: grab; user-select: none; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row:active .dashboard-prompt-drag-handle { cursor: grabbing; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row.is-dragging { opacity: .42; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row.is-drop-before::before,
+#codex-dashboard-prompt-dialog .dashboard-prompt-row.is-drop-after::after { position: absolute; right: 4px; left: 4px; height: 2px; content: ""; border-radius: 2px; background: var(--dashboard-green); }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row.is-drop-before::before { top: -5px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-row.is-drop-after::after { bottom: -5px; }
+#codex-dashboard-prompt-dialog .dashboard-prompt-section.is-drop-target { border-radius: 8px; outline: 1px dashed rgba(121, 201, 140, .62); outline-offset: 3px; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-use { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-use strong { overflow: hidden; font-size: 12px; font-weight: 570; text-overflow: ellipsis; white-space: nowrap; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-use span { overflow: hidden; color: var(--dashboard-muted); font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
@@ -48,6 +66,7 @@
 #codex-dashboard-prompt-dialog .dashboard-prompt-empty span { max-width: 330px; font-size: 11px; line-height: 1.45; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-new { width: 100%; margin-top: 10px; padding: 9px 11px; border: 1px dashed var(--dashboard-line-strong); border-radius: 9px; background: transparent; color: var(--dashboard-muted); font-size: 11px; cursor: pointer; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-new:hover { border-style: solid; background: rgba(255,255,255,.03); color: var(--dashboard-text); }
+#codex-dashboard-prompt-dialog .dashboard-prompt-create-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-form { display: grid; gap: 14px; padding: 4px; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-form label { display: grid; gap: 7px; color: var(--dashboard-muted); font-size: 11px; font-weight: 540; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-form input,
@@ -59,4 +78,3 @@
 #codex-dashboard-prompt-dialog .dashboard-prompt-form-actions button { padding: 8px 11px; border-radius: 7px; font-size: 11px; cursor: pointer; }
 #codex-dashboard-prompt-dialog .dashboard-prompt-secondary { border: 1px solid var(--dashboard-line-strong); background: transparent; color: var(--dashboard-muted); }
 #codex-dashboard-prompt-dialog .dashboard-prompt-primary { border: 1px solid #f2f2f2; background: #f2f2f2; color: #202020; font-weight: 580; }
-
