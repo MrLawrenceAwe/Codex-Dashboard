@@ -66,11 +66,11 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
 #codex-dashboard-page h1 { margin: 0; color: var(--db-text); font-size: 28px; font-weight: 590; line-height: 1.15; letter-spacing: -.025em; }
 
-#codex-dashboard-page .dashboard-stats { display: grid; margin: 26px 0 24px; border-block: 1px solid var(--db-line); }
-#codex-dashboard-page .dashboard-stats[hidden] { display: none; }
-#codex-dashboard-page .dashboard-stat { min-width: 0; padding: 13px 15px 12px; }
-#codex-dashboard-page .dashboard-stat-heading { display: flex; align-items: center; gap: 7px; color: var(--db-muted); font-size: 10px; font-weight: 500; }
-#codex-dashboard-page .dashboard-stat strong { display: block; margin-top: 8px; color: var(--db-text); font-size: 20px; font-weight: 560; line-height: 1; letter-spacing: -.025em; }
+#codex-dashboard-page .dashboard-running { display: grid; gap: 9px; margin: 26px 0 24px; padding-block: 12px; border-block: 1px solid var(--db-line); }
+#codex-dashboard-page .dashboard-running[hidden] { display: none; }
+#codex-dashboard-page .dashboard-running-heading { display: flex; align-items: center; gap: 7px; padding-inline: 3px; }
+#codex-dashboard-page .dashboard-running-heading h2 { margin: 0; color: var(--db-muted); font-size: 10px; font-weight: 500; }
+#codex-dashboard-page .dashboard-running-list { display: grid; border: 1px solid var(--db-line); border-radius: 9px; overflow: hidden; }
 
 #codex-dashboard-page .dashboard-section-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 10px; }
 #codex-dashboard-page .dashboard-section-title { min-width: 0; }
@@ -144,9 +144,7 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 @media (max-width: 680px) {
   #codex-dashboard-page .dashboard-shell { width: min(100% - 28px, 620px); padding-top: 25px; }
   #codex-dashboard-page h1 { font-size: 25px; }
-  #codex-dashboard-page .dashboard-stats { margin-top: 21px; }
-  #codex-dashboard-page .dashboard-stat { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 10px 12px; }
-  #codex-dashboard-page .dashboard-stat strong { grid-column: 2; margin: 0; }
+  #codex-dashboard-page .dashboard-running { margin-top: 21px; }
   #codex-dashboard-page .dashboard-toolbar { align-items: stretch; flex-direction: column; }
   #codex-dashboard-page .dashboard-filters { overflow-x: auto; }
   #codex-dashboard-page .dashboard-filters button { flex: 1; justify-content: center; }

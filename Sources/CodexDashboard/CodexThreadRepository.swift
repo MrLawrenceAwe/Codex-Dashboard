@@ -22,11 +22,6 @@ actor CodexThreadRepository {
         let status: ThreadActivityStatus
     }
 
-    private struct CachedGitStatus: Sendable {
-        let value: WorkspaceGitStatus
-        let checkedAt: Date
-    }
-
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
@@ -40,9 +35,7 @@ actor CodexThreadRepository {
     }
 
     private let stateDatabaseURL: URL
-    private var gitStatusCache: [String: CachedGitStatus] = [:]
     private var rolloutActivityCache: [String: (size: UInt64, modifiedAt: Date, activity: RolloutActivity)] = [:]
-    private let gitStatusCacheLifetime: TimeInterval = 10
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -53,7 +46,9 @@ actor CodexThreadRepository {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func loadSnapshot() throws -> ThreadSnapshot {
+    func loadSnapshot(
+        gitStatuses: [String: WorkspaceGitStatus]
+    ) throws -> ThreadSnapshot {
         let threadSQL = """
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
@@ -70,11 +65,6 @@ actor CodexThreadRepository {
         LIMIT 60;
         """
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
-        let workspacePaths = Set(threads.map(\.cwd))
-        var gitStatuses: [String: WorkspaceGitStatus] = [:]
-        for path in workspacePaths {
-            gitStatuses[path] = workspaceGitStatus(at: path)
-        }
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.cwd).lastPathComponent
             let activity = rolloutActivity(at: thread.rolloutPath)
@@ -95,6 +85,27 @@ actor CodexThreadRepository {
             threads: dashboardThreads,
             totalThreadCount: threads.first?.totalCount ?? 0
         )
+    }
+
+    func loadGitStatuses(
+        at workspacePaths: Set<String>
+    ) async -> [String: WorkspaceGitStatus] {
+        let timeout = subprocessTimeout
+        return await withTaskGroup(
+            of: (String, WorkspaceGitStatus).self,
+            returning: [String: WorkspaceGitStatus].self
+        ) { group in
+            for path in workspacePaths {
+                group.addTask {
+                    (path, Self.workspaceGitStatus(at: path, timeout: timeout))
+                }
+            }
+            var statuses: [String: WorkspaceGitStatus] = [:]
+            for await (path, status) in group {
+                statuses[path] = status
+            }
+            return statuses
+        }
     }
 
     private func rolloutActivity(at path: String) -> RolloutActivity {
@@ -169,19 +180,16 @@ actor CodexThreadRepository {
         return RolloutActivity(status: lastEvent == .started ? .running : .idle)
     }
 
-    private func workspaceGitStatus(at path: String) -> WorkspaceGitStatus {
-        let checkedAt = Date()
-        if let cached = gitStatusCache[path],
-           checkedAt.timeIntervalSince(cached.checkedAt) < gitStatusCacheLifetime {
-            return cached.value
-        }
-
+    nonisolated private static func workspaceGitStatus(
+        at path: String,
+        timeout: TimeInterval
+    ) -> WorkspaceGitStatus {
         let status: WorkspaceGitStatus
         do {
             let result = try Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/git"),
                 arguments: ["-C", path, "status", "--porcelain=v1", "--untracked-files=normal"],
-                timeout: subprocessTimeout
+                timeout: timeout
             )
             if result.terminationStatus != 0 {
                 status = .notRepository
@@ -193,7 +201,6 @@ actor CodexThreadRepository {
         } catch {
             status = .notRepository
         }
-        gitStatusCache[path] = CachedGitStatus(value: status, checkedAt: checkedAt)
         return status
     }
 
