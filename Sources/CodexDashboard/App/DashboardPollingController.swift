@@ -1,11 +1,12 @@
+import AppKit
 import Foundation
 
 @MainActor
 final class DashboardPollingController {
     private enum Schedule {
-        static let catalog: Duration = .seconds(2)
-        static let workingTree: Duration = .seconds(10)
-        static let unread: Duration = .milliseconds(500)
+        static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
+        static func workingTree(active: Bool) -> Duration { active ? .seconds(10) : .seconds(30) }
+        static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
     }
 
     private var catalogPollingTask: Task<Void, Never>?
@@ -30,26 +31,28 @@ final class DashboardPollingController {
 
         catalogPollingTask = Task {
             let clock = ContinuousClock()
-            var deadline = clock.now
             while !Task.isCancelled {
                 await synchronizeDashboard()
-                deadline += Schedule.catalog
-                if deadline < clock.now { deadline = clock.now }
-                try? await clock.sleep(until: deadline)
+                try? await clock.sleep(for: Schedule.catalog(active: Self.isUserActive))
             }
         }
         workingTreePollingTask = Task {
             while !Task.isCancelled {
                 await updateWorkingTrees()
-                try? await Task.sleep(for: Schedule.workingTree)
+                try? await Task.sleep(for: Schedule.workingTree(active: Self.isUserActive))
             }
         }
         unreadPollingTask = Task {
             while !Task.isCancelled {
                 await updateUnreadState()
-                try? await Task.sleep(for: Schedule.unread)
+                try? await Task.sleep(for: Schedule.unread(active: Self.isUserActive))
             }
         }
+    }
+
+    private static var isUserActive: Bool {
+        NSApp.isActive
+            || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
     }
 
     func stop() {

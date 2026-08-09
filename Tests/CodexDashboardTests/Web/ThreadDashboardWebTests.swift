@@ -5,6 +5,59 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testRestoresAndSavesDashboardPreferences() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.loadHTMLString(
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button>New chat</button></aside><main>Conversation</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test")
+        )
+        try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        let preferencesStored = try await webView.evaluateJavaScript(
+            "try { localStorage.setItem('codex-dashboard.thread-preferences', JSON.stringify({ filterMode: 'unread', viewMode: 'recent', collapsedProjects: ['/tmp/project'] })); true } catch (_) { false }"
+        ) as? Bool
+        XCTAssertEqual(preferencesStored, true)
+        let injection = try DashboardInjectionPayload.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            ThreadSummary.fixture(id: "one", isUnread: true),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              try {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const restored = [
+                document.querySelector('[data-filter="unread"]').classList.contains('is-active'),
+                document.querySelector('[data-view="recent"]').classList.contains('is-active'),
+              ];
+              document.querySelector('[data-filter="all"]').click();
+              document.querySelector('[data-view="projects"]').click();
+              const saved = JSON.parse(localStorage.getItem('codex-dashboard.thread-preferences'));
+              return JSON.stringify([restored, saved.filterMode, saved.viewMode, saved.collapsedProjects[0]]);
+              } catch (error) {
+                return JSON.stringify({ error: String(error), stack: error?.stack || '' });
+              }
+            })()
+            """
+        ) as? String
+        let json = try XCTUnwrap(result)
+        let values = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
+        )
+        XCTAssertEqual(values[0] as? [Bool], [true, true])
+        XCTAssertEqual(values[1] as? String, "all")
+        XCTAssertEqual(values[2] as? String, "projects")
+        XCTAssertEqual(values[3] as? String, "/tmp/project")
+    }
+
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

@@ -79,6 +79,8 @@ const promptStore = (() => {
     ),
 
     normalizeSection,
+    normalizePrompts,
+    normalizeSections,
 
     resolveSection(section) {
       const normalizedSection = normalizeSection(section);

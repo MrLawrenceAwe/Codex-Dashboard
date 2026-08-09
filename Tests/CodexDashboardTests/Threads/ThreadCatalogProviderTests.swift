@@ -53,7 +53,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads[1].recencyTimestamp, now - 1_200)
     }
 
-    func testReportsFullCountWhenThreadRowsAreLimited() async throws {
+    func testReportsFullCountWhenInitialThreadRowsAreLimited() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,
@@ -68,7 +68,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.totalThreadCount, 63)
     }
 
-    func testThreadLimitUsesStableRecencyInsteadOfTransientActivity() async throws {
+    func testInitialThreadLimitUsesStableRecencyInsteadOfTransientActivity() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,

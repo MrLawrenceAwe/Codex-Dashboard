@@ -5,6 +5,7 @@ final class DashboardRenderer {
     private let devTools: any DevToolsServing
     private let injectionPayload: DashboardInjectionPayload
     private let compatibilityChecker: RendererCompatibilityChecker
+    private let promptBackupStore: PromptBackupStore?
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshot?
     private var activeSynchronizationCount = 0
@@ -16,10 +17,12 @@ final class DashboardRenderer {
 
     init(
         devTools: any DevToolsServing = DevToolsClient(),
-        injectionPayload: DashboardInjectionPayload? = nil
+        injectionPayload: DashboardInjectionPayload? = nil,
+        promptBackupStore: PromptBackupStore? = nil
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionPayload.load()
+        self.promptBackupStore = promptBackupStore
         compatibilityChecker = RendererCompatibilityChecker(
             devTools: devTools,
             contractSource: try DashboardInjectionPayload.loadRendererContractSource()
@@ -64,6 +67,7 @@ final class DashboardRenderer {
             }
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
+                await restorePromptBackupIfNeeded(in: target)
                 guard try await devTools.evaluateBoolean(injectionPayload.mountExpression, in: target) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."
@@ -81,6 +85,7 @@ final class DashboardRenderer {
             lastSnapshot = snapshot
         }
         mountedTargetIDs = targetIDs
+        await backUpPromptLibrary(from: targets.first)
     }
 
     func disable() async throws -> Bool {
@@ -150,6 +155,34 @@ final class DashboardRenderer {
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
+    }
+
+    private func restorePromptBackupIfNeeded(in target: DevToolsTarget) async {
+        guard let promptBackupStore else { return }
+        guard let backup = await promptBackupStore.load(),
+              let data = try? JSONSerialization.data(withJSONObject: backup, options: .fragmentsAllowed),
+              let encodedBackup = String(data: data, encoding: .utf8)
+        else { return }
+        let expression = """
+        (() => {
+          const key = 'codex-dashboard.prompt-library';
+          if (localStorage.getItem(key)) return true;
+          localStorage.setItem(key, \(encodedBackup));
+          return true;
+        })()
+        """
+        _ = try? await devTools.evaluateBoolean(expression, in: target)
+    }
+
+    private func backUpPromptLibrary(from target: DevToolsTarget?) async {
+        guard let promptBackupStore,
+              let target,
+              let json = try? await devTools.evaluateString(
+                "localStorage.getItem('codex-dashboard.prompt-library')",
+                in: target
+              )
+        else { return }
+        try? await promptBackupStore.save(json)
     }
 
     private func synchronizationFinished() {

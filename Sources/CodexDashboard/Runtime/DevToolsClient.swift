@@ -34,6 +34,11 @@ struct DevToolsTarget: Decodable, Identifiable, Sendable {
 protocol DevToolsServing: Sendable {
     func mainRendererTargets() async -> [DevToolsTarget]
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool
+    func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String?
+}
+
+extension DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? { nil }
 }
 
 actor DevToolsClient: DevToolsServing {
@@ -80,10 +85,36 @@ actor DevToolsClient: DevToolsServing {
         }
     }
 
+    func evaluateString(
+        _ expression: String,
+        in target: DevToolsTarget
+    ) async throws -> String? {
+        try await withDevToolsTimeout(.seconds(4)) { [self] in
+            try await evaluateStringWithoutTimeout(expression, in: target)
+        }
+    }
+
+    private func evaluateStringWithoutTimeout(
+        _ expression: String,
+        in target: DevToolsTarget
+    ) async throws -> String? {
+        try await evaluateValueWithoutTimeout(expression, in: target) as? String
+    }
+
     private func evaluateBooleanWithoutTimeout(
         _ expression: String,
         in target: DevToolsTarget
     ) async throws -> Bool {
+        guard let value = try await evaluateValueWithoutTimeout(expression, in: target) as? Bool else {
+            throw DashboardError.invalidDevToolsResponse
+        }
+        return value
+    }
+
+    private func evaluateValueWithoutTimeout(
+        _ expression: String,
+        in target: DevToolsTarget
+    ) async throws -> Any? {
         try await withConnection(to: target) { task in
             let response = try await command(
                 id: 1,
@@ -98,13 +129,10 @@ actor DevToolsClient: DevToolsServing {
             if response["exceptionDetails"] != nil {
                 throw DashboardError.enableFailed("The dashboard injection raised an exception in the renderer.")
             }
-            guard
-                let remoteResult = response["result"] as? [String: Any],
-                let value = remoteResult["value"] as? Bool
-            else {
+            guard let remoteResult = response["result"] as? [String: Any] else {
                 throw DashboardError.invalidDevToolsResponse
             }
-            return value
+            return remoteResult["value"]
         }
     }
 

@@ -6,29 +6,37 @@ import XCTest
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     func testSavedPromptCanBeCreatedAndInsertedIntoSupportedComposers() async throws {
-        let webView = try await DashboardWebTestHarness.promptLibraryWebView(
-            includeContentEditableComposer: true
-        )
-        let result = try await webView.evaluateJavaScript(
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let textareaResult = try await webView.evaluateJavaScript(
             """
             (() => {
-              const composer = document.querySelector('textarea[placeholder="Do anything"]');
-              composer.addEventListener('input', (event) => {
-                if (event.data) composer.value += event.data;
-              });
               const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const composer = document.querySelector('textarea[placeholder="Do anything"]');
               launcher.click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Review code';
               document.querySelector('[name="section"]').value = 'Code review';
-              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.\n\nReturn only actionable findings.';
+              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.\\n\\nReturn only actionable findings.';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               const savedPromptButton = document.querySelector('[data-prompt-use]');
               const savedPromptName = savedPromptButton.querySelector('strong').textContent;
               const savedPromptID = savedPromptButton.dataset.promptUse;
               document.querySelector('[data-prompt-use]').click();
               const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
-              document.querySelector('textarea[placeholder="Do anything"]').remove();
+              return JSON.stringify({ launcherLabel: launcher.textContent.trim(), savedPromptName, textareaValue });
+            })()
+            """
+        ) as? String
+        let textareaValues = try decodeJSONObject(try XCTUnwrap(textareaResult))
+
+        let richTextWebView = try await DashboardWebTestHarness.promptLibraryWebView(
+            includeContentEditableComposer: true
+        )
+
+        let richTextResult = try await richTextWebView.evaluateJavaScript(
+            """
+            (() => {
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
               const contentEditable = document.querySelector('[contenteditable="true"]');
               contentEditable.classList.add('ProseMirror');
               contentEditable.textContent = 'Existing content';
@@ -59,7 +67,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 },
                 dispatch: ({ slice }) => {
                   pasteCount += 1;
-                  contentEditable.textContent += `\n${slice.content.map((paragraph) => paragraph.text).join('\n')}`;
+                  contentEditable.textContent += `\\n${slice.content.map((paragraph) => paragraph.text).join('\\n')}`;
                 },
               };
               contentEditable.parentElement.__reactFiber$test = {
@@ -70,6 +78,12 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 },
               };
               launcher.click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Review code';
+              document.querySelector('[name="section"]').value = 'Code review';
+              document.querySelector('[name="content"]').value = 'Review this code for correctness issues.\\n\\nReturn only actionable findings.';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const savedPromptID = document.querySelector('[data-prompt-use]').dataset.promptUse;
               document.querySelector('[data-prompt-use]').click();
               const insertedContent = contentEditable.textContent;
               const foreignDialog = document.createElement('div');
@@ -79,32 +93,80 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               foreignDialog.querySelector('button').click();
               const foreignDialogIgnored = contentEditable.textContent === insertedContent;
               foreignDialog.remove();
-              return {
-                launcherLabel: launcher.textContent.trim(),
-                savedPromptName,
-                textareaValue,
+              return JSON.stringify({
                 contentEditableValue: document.querySelector('[contenteditable="true"]').textContent,
                 pasteCount,
                 foreignDialogIgnored,
                 closedAfterInsertion: !document.getElementById('codex-dashboard-prompt-library-dialog'),
+              });
+            })()
+            """
+        ) as? String
+        let richTextValues = try decodeJSONObject(try XCTUnwrap(richTextResult))
+        XCTAssertEqual(textareaValues["launcherLabel"] as? String, "Prompts")
+        XCTAssertEqual(textareaValues["savedPromptName"] as? String, "Review code")
+        XCTAssertEqual(
+            textareaValues["textareaValue"] as? String,
+            "Review this code for correctness issues.\n\nReturn only actionable findings."
+        )
+        XCTAssertEqual(
+            richTextValues["contentEditableValue"] as? String,
+            "Existing content\n\nReview this code for correctness issues.\n\nReturn only actionable findings."
+        )
+        XCTAssertEqual(richTextValues["pasteCount"] as? Int, 1)
+        XCTAssertEqual(richTextValues["foreignDialogIgnored"] as? Bool, true)
+        XCTAssertEqual(richTextValues["closedAfterInsertion"] as? Bool, true)
+    }
+
+    private func decodeJSONObject(_ json: String) throws -> [String: Any] {
+        let object = try JSONSerialization.jsonObject(with: Data(json.utf8))
+        return try XCTUnwrap(object as? [String: Any])
+    }
+
+    func testPromptSearchDuplicationAndTransferControls() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              const createPrompt = (name, content) => {
+                document.querySelector('[data-prompt-new]').click();
+                document.querySelector('[name="name"]').value = name;
+                document.querySelector('[name="content"]').value = content;
+                document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              };
+              createPrompt('Review code', 'Find correctness issues');
+              createPrompt('Write summary', 'Summarise the discussion');
+              document.querySelector('[data-prompt-duplicate]').click();
+              const search = document.querySelector('[data-prompt-search]');
+              search.value = 'review';
+              search.dispatchEvent(new Event('input', { bubbles: true }));
+              const renderedSearch = document.querySelector('[data-prompt-search]');
+              const exportButton = document.querySelector('[data-prompt-export]');
+              return {
+                names: [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent),
+                hasExport: Boolean(exportButton),
+                hasImport: Boolean(document.querySelector('[data-prompt-import-file][accept*="json"]')),
+                searchPlaceholder: renderedSearch.getAttribute('placeholder'),
+                headerSubtitle: document.querySelector('.dashboard-prompt-header p')?.textContent || null,
+                searchHeight: getComputedStyle(renderedSearch).height,
+                searchFontSize: getComputedStyle(renderedSearch).fontSize,
+                exportHeight: getComputedStyle(exportButton).height,
+                exportFontSize: getComputedStyle(exportButton).fontSize,
               };
             })()
             """
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values["launcherLabel"] as? String, "Prompts")
-        XCTAssertEqual(values["savedPromptName"] as? String, "Review code")
-        XCTAssertEqual(
-            values["textareaValue"] as? String,
-            "Review this code for correctness issues.\n\nReturn only actionable findings."
-        )
-        XCTAssertEqual(
-            values["contentEditableValue"] as? String,
-            "Existing content\n\nReview this code for correctness issues.\n\nReturn only actionable findings."
-        )
-        XCTAssertEqual(values["pasteCount"] as? Int, 1)
-        XCTAssertEqual(values["foreignDialogIgnored"] as? Bool, true)
-        XCTAssertEqual(values["closedAfterInsertion"] as? Bool, true)
+        XCTAssertEqual(values["names"] as? [String], ["Review code", "Review code copy"])
+        XCTAssertEqual(values["hasExport"] as? Bool, true)
+        XCTAssertEqual(values["hasImport"] as? Bool, true)
+        XCTAssertNil(values["searchPlaceholder"] as? String)
+        XCTAssertNil(values["headerSubtitle"] as? String)
+        XCTAssertEqual(values["searchHeight"] as? String, "32px")
+        XCTAssertEqual(values["searchFontSize"] as? String, "12px")
+        XCTAssertEqual(values["exportHeight"] as? String, "32px")
+        XCTAssertEqual(values["exportFontSize"] as? String, "11px")
     }
 
     func testPromptLauncherIsAdjacentToAddAndRemovedOnDestroy() async throws {

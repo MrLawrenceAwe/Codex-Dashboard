@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum DashboardConnectionState: Equatable {
@@ -26,6 +27,11 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var totalThreadCount = 0
     @Published private(set) var compatibilityReport: CompatibilityReport?
     @Published private(set) var isCheckingCompatibility = false
+    @Published private(set) var lastSuccessfulRefresh: Date?
+    @Published private(set) var lastCompatibilityCheck: Date?
+    @Published private(set) var lastErrorDate: Date?
+    @Published private(set) var rendererTargetCount = 0
+    @Published private(set) var compatibilityWasTriggeredByUpdate = false
 
     private let threadSnapshots: ThreadSnapshotService
     private let compatibilityChecker: any LocalCompatibilityChecking
@@ -36,6 +42,7 @@ final class DashboardViewModel: ObservableObject {
     private var enrichmentGeneration = 0
     private var catalogWarning: String?
     private var unreadStateWarning: String?
+    private var activationObserver: NSObjectProtocol?
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
@@ -83,11 +90,26 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func startMonitoring() {
+        let currentVersion = CodexConfiguration.installedVersion
+        let previousVersion = UserDefaults.standard.string(forKey: "lastCheckedCodexVersion")
+        compatibilityWasTriggeredByUpdate = previousVersion != nil
+            && currentVersion != nil
+            && previousVersion != currentVersion
         pollingController.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
             updateWorkingTrees: { [weak self] in await self?.updateWorkingTreeStatuses() },
             updateUnreadState: { [weak self] in await self?.updateUnreadState() }
         )
+        if activationObserver == nil {
+            activationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in await self?.synchronizeDashboard() }
+            }
+        }
+        Task { await checkCompatibilityAfterVersionChange() }
     }
 
     func stopMonitoring() {
@@ -96,6 +118,10 @@ final class DashboardViewModel: ObservableObject {
         synchronizationTask?.cancel()
         synchronizationTask = nil
         synchronizationID = nil
+        if let activationObserver {
+            NotificationCenter.default.removeObserver(activationObserver)
+            self.activationObserver = nil
+        }
     }
 
     func synchronizeDashboard() async {
@@ -134,7 +160,7 @@ final class DashboardViewModel: ObservableObject {
             rendererAvailable = true
             try await loadThreadSnapshot()
             try await runtime.synchronizeDashboard(
-                with: DashboardSnapshot(threads: threads),
+                with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
                 on: targets,
                 forceRemount: true
             )
@@ -189,6 +215,10 @@ final class DashboardViewModel: ObservableObject {
             )]
         }
         compatibilityReport = CompatibilityReport(checks: await localChecks + rendererChecks)
+        lastCompatibilityCheck = .now
+        if let version = CodexConfiguration.installedVersion {
+            UserDefaults.standard.set(version, forKey: "lastCheckedCodexVersion")
+        }
     }
 
     private func synchronizeRuntime() async {
@@ -203,12 +233,23 @@ final class DashboardViewModel: ObservableObject {
 
         let codexIsRunning = runtime.codexIsRunning
         let targets = await runtime.rendererTargets()
+        rendererTargetCount = targets.count
         guard !Task.isCancelled, !isPerformingAction else { return }
+
+        if compatibilityWasTriggeredByUpdate && isCheckingCompatibility {
+            connectionState = targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady
+            return
+        }
+        if let compatibilityReport, compatibilityReport.blockingCount > 0 {
+            connectionState = targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady
+            connectionError = "The dashboard was not mounted because a required Codex contract is incompatible. Review Compatibility details."
+            return
+        }
 
         if runtime.maintainsDashboard, !targets.isEmpty {
             do {
                 try await runtime.synchronizeDashboard(
-                    with: DashboardSnapshot(threads: threads),
+                    with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
                     on: targets,
                     forceRemount: false
                 )
@@ -234,6 +275,7 @@ final class DashboardViewModel: ObservableObject {
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
+        lastSuccessfulRefresh = .now
     }
 
     private func updateUnreadState() async {
@@ -293,7 +335,7 @@ final class DashboardViewModel: ObservableObject {
         let targets = await runtime.rendererTargets()
         guard !Task.isCancelled, !targets.isEmpty else { return }
         try? await runtime.synchronizeDashboard(
-            with: DashboardSnapshot(threads: threads),
+            with: DashboardSnapshot(threads: threads, totalThreadCount: totalThreadCount),
             on: targets,
             forceRemount: false
         )
@@ -302,10 +344,47 @@ final class DashboardViewModel: ObservableObject {
     private func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
         connectionState = lastKnownState
         connectionError = error.localizedDescription
+        lastErrorDate = .now
     }
 
     private func refreshThreadDataWarning() {
         let warnings = [catalogWarning, unreadStateWarning].compactMap { $0 }
         threadDataWarning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+    }
+
+    func copyDiagnostics() {
+        let formatter = ISO8601DateFormatter()
+        let dashboardVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "development"
+        let codexVersion = CodexConfiguration.installedVersion ?? "not found"
+        let refreshDate = lastSuccessfulRefresh.map(formatter.string(from:)) ?? "never"
+        let compatibilityDate = lastCompatibilityCheck.map(formatter.string(from:)) ?? "never"
+        let compatibilitySummary = compatibilityReport?.summary ?? "not checked"
+        let currentConnectionError = connectionError ?? "none"
+        let currentThreadWarning = threadDataWarning ?? "none"
+        let lines = [
+            "Codex Dashboard \(dashboardVersion)",
+            "Codex: \(codexVersion)",
+            "Status: \(statusPresentation.title)",
+            "Renderer targets: \(rendererTargetCount)",
+            "Threads: \(threads.count) loaded / \(totalThreadCount) total",
+            "Last refresh: \(refreshDate)",
+            "Last compatibility check: \(compatibilityDate)",
+            "Compatibility: \(compatibilitySummary)",
+            "Connection error: \(currentConnectionError)",
+            "Thread warning: \(currentThreadWarning)",
+            "Prompt backup: ~/Library/Application Support/Codex Dashboard/prompt-library.json",
+        ]
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    private func checkCompatibilityAfterVersionChange() async {
+        let currentVersion = CodexConfiguration.installedVersion
+        let previousVersion = UserDefaults.standard.string(forKey: "lastCheckedCodexVersion")
+        compatibilityWasTriggeredByUpdate = previousVersion != nil
+            && currentVersion != nil
+            && previousVersion != currentVersion
+        await checkCompatibility()
     }
 }

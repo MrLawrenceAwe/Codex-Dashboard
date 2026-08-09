@@ -34,7 +34,7 @@ final class LiveDashboardRuntime: DashboardRuntime {
         renderer: DashboardRenderer? = nil
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? DashboardRenderer()
+        self.renderer = try renderer ?? DashboardRenderer(promptBackupStore: .shared)
     }
 
     var codexIsRunning: Bool { codex.isRunning }

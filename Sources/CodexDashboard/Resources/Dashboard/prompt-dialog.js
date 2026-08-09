@@ -3,6 +3,7 @@ const promptLibrary = (() => {
   const insertionGuard = Symbol.for('codex-dashboard.prompt-insertion-guard');
   let dialogState = { mode: 'list' };
   let returnFocusElement;
+  let promptSearchTerm = '';
 
   function showStorageError() {
     const error = document.querySelector('[data-prompt-storage-error]');
@@ -16,7 +17,7 @@ const promptLibrary = (() => {
   }
 
   const promptInteractionEventTypes = [
-  'pointerdown', 'mousedown', 'click', 'keydown', 'submit',
+  'pointerdown', 'mousedown', 'click', 'keydown', 'input', 'change', 'submit',
   'dragstart', 'dragover', 'dragleave', 'drop', 'dragend',
 ];
 
@@ -28,10 +29,7 @@ function createDialogElement() {
     <div class="dashboard-prompt-backdrop" data-prompt-close></div>
     <section class="dashboard-prompt-panel" role="dialog" aria-modal="true" aria-labelledby="dashboard-prompt-title">
       <header class="dashboard-prompt-header">
-        <div>
-          <h2 id="dashboard-prompt-title">Prompts</h2>
-          <p>Reusable instructions for any chat</p>
-        </div>
+        <h2 id="dashboard-prompt-title">Prompts</h2>
         <button type="button" class="dashboard-prompt-icon-button" data-prompt-close aria-label="Close prompts">×</button>
       </header>
       <p class="dashboard-prompt-storage-error" data-prompt-storage-error role="alert" hidden>Could not save this prompt change. Reloading Codex will restore the last successfully saved version.</p>
@@ -75,6 +73,10 @@ function renderDialog() {
     content.querySelector('[name="name"]')?.focus();
     return;
   }
+  const query = promptSearchTerm.trim().toLowerCase();
+  const visiblePrompts = query ? promptStore.prompts.filter((prompt) => (
+    `${prompt.name} ${prompt.section} ${prompt.content}`.toLowerCase().includes(query)
+  )) : promptStore.prompts;
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
     <article class="dashboard-prompt-row" data-prompt-row-id="${dashboardDOM.escapeHTML(prompt.id)}" draggable="true">
       <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
@@ -84,12 +86,13 @@ function renderDialog() {
       </button>
       <div class="dashboard-prompt-row-actions">
         <button type="button" data-prompt-edit="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Edit ${dashboardDOM.escapeHTML(prompt.name)}">Edit</button>
+        <button type="button" data-prompt-duplicate="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Duplicate ${dashboardDOM.escapeHTML(prompt.name)}">Duplicate</button>
         <button type="button" data-prompt-delete="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Delete ${dashboardDOM.escapeHTML(prompt.name)}">Delete</button>
       </div>
     </article>`).join('');
   const groupedPrompts = new Map();
   promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
-  promptStore.prompts.forEach((prompt) => {
+  visiblePrompts.forEach((prompt) => {
     const section = promptStore.normalizeSection(prompt.section);
     if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
     groupedPrompts.get(section).push(prompt);
@@ -112,14 +115,20 @@ function renderDialog() {
       </section>`;
   }).join('');
   content.innerHTML = `
+    <div class="dashboard-prompt-tools">
+      <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${dashboardDOM.escapeHTML(promptSearchTerm)}" /></label>
+      <button type="button" class="dashboard-prompt-secondary" data-prompt-export>Export</button>
+      <button type="button" class="dashboard-prompt-secondary" data-prompt-import>Import</button>
+      <input type="file" accept="application/json,.json" data-prompt-import-file hidden />
+    </div>
     <div class="dashboard-prompt-list">
-      ${sections || '<div class="dashboard-prompt-empty"><strong>No saved prompts yet</strong><span>Save instructions you use often, then insert them into a chat in one click.</span></div>'}
+      ${sections || `<div class="dashboard-prompt-empty"><strong>${query ? 'No matching prompts' : 'No saved prompts yet'}</strong><span>${query ? 'Try a different search.' : 'Save instructions you use often, then insert them into a chat in one click.'}</span></div>`}
     </div>
     <div class="dashboard-prompt-create-actions">
       <button type="button" class="dashboard-prompt-new" data-prompt-new>+ New prompt</button>
       <button type="button" class="dashboard-prompt-new" data-prompt-new-section>+ New section</button>
     </div>`;
-  content.querySelector('[data-prompt-use], [data-prompt-new], [data-prompt-new-section]')?.focus();
+  content.querySelector('[data-prompt-search]')?.focus();
 }
 
 function open() {
@@ -128,9 +137,45 @@ function open() {
     ? document.activeElement
     : undefined;
   dialogState = { mode: 'list' };
+  promptSearchTerm = '';
   const dialog = createDialogElement();
   document.body.append(dialog);
   renderDialog();
+}
+
+function exportLibrary() {
+  const payload = JSON.stringify({
+    version: 1,
+    prompts: promptStore.prompts,
+    sections: promptStore.sections,
+  }, null, 2);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+  link.download = `codex-dashboard-prompts-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 0);
+}
+
+async function importLibrary(file) {
+  try {
+    const payload = JSON.parse(await file.text());
+    const prompts = promptStore.normalizePrompts(payload?.prompts);
+    const sections = promptStore.normalizeSections(payload?.sections, prompts);
+    if (!persistLibrary(prompts, sections)) return;
+    promptStore.prompts = prompts;
+    promptStore.sections = sections;
+    promptSearchTerm = '';
+    renderDialog();
+  } catch (_) {
+    showStorageError();
+  }
+}
+
+function expandedPromptContent(content, clipboardText = '') {
+  const selectedText = window.getSelection()?.toString() || '';
+  return content
+    .replaceAll('{{selection}}', selectedText)
+    .replaceAll('{{clipboard}}', clipboardText);
 }
 
 function close({ restoreFocus = true } = {}) {
@@ -212,10 +257,24 @@ function handlePromptKeyboard(event, dialog) {
 }
 
 function handlePromptSubmit(event, form) {
+  event.preventDefault();
   if (form.matches('[data-prompt-form]')) savePrompt(form);
   else if (form.matches('[data-prompt-section-form]')) createPromptSection(form);
-  else return;
-  event.preventDefault();
+}
+
+function insertSavedPrompt(prompt) {
+  const insert = (clipboardText = '') => {
+    if (composerAdapter.insert(expandedPromptContent(prompt.content, clipboardText))) {
+      close({ restoreFocus: false });
+      return true;
+    }
+    return false;
+  };
+  if (!prompt.content.includes('{{clipboard}}')) return insert();
+  navigator.clipboard.readText()
+    .then(insert)
+    .catch(() => insert(''));
+  return true;
 }
 
 function handlePromptClick(target) {
@@ -244,6 +303,24 @@ function handlePromptClick(target) {
       promptID: target.closest('[data-prompt-edit]').dataset.promptEdit,
     };
     renderDialog();
+  } else if (target.closest('[data-prompt-duplicate]')) {
+    const source = promptStore.prompts.find((item) => item.id === target.closest('[data-prompt-duplicate]').dataset.promptDuplicate);
+    if (!source) return;
+    const duplicate = {
+      ...source,
+      id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
+      name: `${source.name} copy`,
+    };
+    const sourceIndex = promptStore.prompts.indexOf(source);
+    const nextPrompts = [...promptStore.prompts];
+    nextPrompts.splice(sourceIndex + 1, 0, duplicate);
+    if (!persistLibrary(nextPrompts, promptStore.sections)) return;
+    promptStore.prompts = nextPrompts;
+    renderDialog();
+  } else if (target.closest('[data-prompt-export]')) {
+    exportLibrary();
+  } else if (target.closest('[data-prompt-import]')) {
+    document.querySelector('[data-prompt-import-file]')?.click();
   } else if (target.closest('[data-prompt-delete-confirm]')) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
     const nextPrompts = promptStore.prompts.filter((prompt) => prompt.id !== id);
@@ -265,9 +342,7 @@ function handlePromptClick(target) {
         && now - previousInsertion.timestamp < 500
     ) return;
     window[insertionGuard] = { promptID: id, timestamp: now };
-    if (prompt && composerAdapter.insert(prompt.content)) {
-      close({ restoreFocus: false });
-    } else {
+    if (!prompt || !insertSavedPrompt(prompt)) {
       delete window[insertionGuard];
     }
   }
@@ -286,7 +361,20 @@ function handlePromptInteraction(event) {
   const dialog = target?.closest(`#${dashboardDOM.elementIDs.promptDialog}`);
   if (!dialog || dialog[dialogOwner] !== true) return;
   if (promptReordering.handle(event, target, dialog, persistLibrary, renderDialog)) return;
-  if (event.type === 'keydown') handlePromptKeyboard(event, dialog);
+  if (event.type === 'keydown') {
+    if (event.target.matches('[data-prompt-search]') && event.key === 'ArrowDown') {
+      event.preventDefault();
+      dialog.querySelector('[data-prompt-use]')?.focus();
+    } else handlePromptKeyboard(event, dialog);
+  }
+  else if (event.type === 'input' && event.target.matches('[data-prompt-search]')) {
+    promptSearchTerm = event.target.value;
+    renderDialog();
+  }
+  else if (event.type === 'change' && event.target.matches('[data-prompt-import-file]')) {
+    const [file] = event.target.files || [];
+    if (file) void importLibrary(file);
+  }
   else if (event.type === 'submit') handlePromptSubmit(event, target);
   else if (event.type === 'click') handlePromptClick(target);
 }

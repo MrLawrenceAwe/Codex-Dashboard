@@ -132,17 +132,19 @@ private struct CompatibilityCard: View {
 }
 
 struct DashboardControllerView: View {
-    @StateObject private var viewModel = DashboardViewModel()
+    @ObservedObject var viewModel: DashboardViewModel
+    @ObservedObject var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
+        let codexVersion = CodexConfiguration.installedVersion ?? "not found"
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.primary.opacity(0.07))
-                    Text("D")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
                 }
                 .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 4) {
@@ -158,6 +160,33 @@ struct DashboardControllerView: View {
             ConnectionStatusCard(viewModel: viewModel)
 
             CompatibilityCard(viewModel: viewModel)
+
+            DisclosureGroup("Diagnostics") {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Codex \(codexVersion) · \(viewModel.rendererTargetCount) renderer target(s)")
+                    Text("\(viewModel.threads.count) loaded · \(viewModel.totalThreadCount) total threads")
+                    if let refreshed = viewModel.lastSuccessfulRefresh {
+                        Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
+                    }
+                    if viewModel.compatibilityWasTriggeredByUpdate {
+                        Text("Compatibility was checked because the Codex version changed.")
+                            .foregroundStyle(.orange)
+                    }
+                    HStack {
+                        Button("Copy Diagnostics") { viewModel.copyDiagnostics() }
+                        Toggle("Launch at Login", isOn: Binding(
+                            get: { launchAtLogin.isEnabled },
+                            set: { launchAtLogin.setEnabled($0) }
+                        ))
+                        .toggleStyle(.checkbox)
+                    }
+                    if let error = launchAtLogin.errorMessage { Text(error).foregroundStyle(.red) }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(.top, 5)
+            }
+            .font(.system(size: 11, weight: .medium))
 
             HStack(spacing: 10) {
                 if viewModel.connectionState.dashboardIsMounted {
@@ -229,11 +258,9 @@ struct DashboardControllerView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
-        .frame(width: 620, height: 600, alignment: .topLeading)
+        .frame(width: 620, height: 680, alignment: .topLeading)
         .onAppear {
             viewModel.startMonitoring()
-            Task { await viewModel.checkCompatibility() }
         }
-        .onDisappear { viewModel.stopMonitoring() }
     }
 }

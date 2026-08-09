@@ -3,10 +3,17 @@ const navigationEventTypes = ['pointerdown', 'mousedown', 'click', 'keydown'];
 const routeEventTypes = ['message', 'popstate', 'hashchange'];
 
 let threads = [];
-let filterMode = 'all';
+let totalThreadCount = 0;
+const dashboardPreferencesKey = 'codex-dashboard.thread-preferences';
+let storedPreferences = {};
+try { storedPreferences = JSON.parse(localStorage.getItem(dashboardPreferencesKey) || '{}'); } catch (_) {}
+let filterMode = ['all', 'unread', 'changedProjects'].includes(storedPreferences.filterMode)
+  ? storedPreferences.filterMode : 'all';
 let searchTerm = '';
-let viewMode = 'projects';
-const collapsedProjects = new Set();
+let viewMode = ['projects', 'recent'].includes(storedPreferences.viewMode)
+  ? storedPreferences.viewMode : 'projects';
+const collapsedProjects = new Set(Array.isArray(storedPreferences.collapsedProjects)
+  ? storedPreferences.collapsedProjects.filter((value) => typeof value === 'string') : []);
 let mutationObserver;
 let resizeObserver;
 let observedSidebar;
@@ -16,6 +23,16 @@ let pendingSidebarMutation = false;
 let dashboardIsOpen = false;
 let unreadThreadIDs = new Set();
 let handoffError = '';
+
+function saveDashboardPreferences() {
+  try {
+    localStorage.setItem(dashboardPreferencesKey, JSON.stringify({
+      filterMode,
+      viewMode,
+      collapsedProjects: [...collapsedProjects],
+    }));
+  } catch (_) {}
+}
 
 function syncUnreadFromSidebar() {
   const readStates = codexHost.threadReadStates();
@@ -119,6 +136,14 @@ function renderDashboard() {
   updateSidebarStatus(state);
   const page = document.getElementById(dashboardDOM.elementIDs.page);
   if (!page) return;
+  const loadedSummary = page.querySelector('[data-loaded-summary]');
+  if (loadedSummary) {
+    const isPartial = totalThreadCount > threads.length;
+    loadedSummary.hidden = !isPartial;
+    loadedSummary.textContent = isPartial
+      ? `Showing ${threads.length} of ${totalThreadCount} threads. Search covers loaded threads.`
+      : '';
+  }
   const notice = page.querySelector('[data-dashboard-notice]');
   if (notice) {
     notice.textContent = handoffError;
@@ -276,17 +301,20 @@ function mountDashboardPage() {
           </div>
         </div>
       </div>
+      <p class="dashboard-loaded-summary" data-loaded-summary hidden></p>
       <main class="dashboard-list" data-thread-list></main>
     </div>`;
   page.querySelectorAll('[data-filter]').forEach((button) => {
     button.addEventListener('click', () => {
       filterMode = button.dataset.filter;
+      saveDashboardPreferences();
       renderDashboard();
     });
   });
   page.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => {
       viewMode = button.dataset.view;
+      saveDashboardPreferences();
       renderDashboard();
     });
   });
@@ -306,6 +334,7 @@ function mountDashboardPage() {
       const projectPath = projectToggle.dataset.projectToggle;
       if (collapsedProjects.has(projectPath)) collapsedProjects.delete(projectPath);
       else collapsedProjects.add(projectPath);
+      saveDashboardPreferences();
       renderDashboard();
       return;
     }
@@ -383,6 +412,9 @@ function updateSidebarStatus({ unreadCount, runningThreads, dirtyProjectPaths })
 function applySnapshot(nextSnapshot) {
   const nextThreads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
   threads = nextThreads;
+  totalThreadCount = Number.isFinite(nextSnapshot?.totalThreadCount)
+    ? Math.max(nextThreads.length, nextSnapshot.totalThreadCount)
+    : nextThreads.length;
   unreadThreadIDs = new Set(
     nextThreads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
