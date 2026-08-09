@@ -5,6 +5,7 @@ protocol GitWorkingTreeStatusLoading: Sendable {
 }
 
 struct GitWorkingTreeStatusLoader: GitWorkingTreeStatusLoading, Sendable {
+    private static let maximumConcurrentChecks = 6
     private let subprocessTimeout: TimeInterval
 
     init(subprocessTimeout: TimeInterval = 3) {
@@ -17,14 +18,21 @@ struct GitWorkingTreeStatusLoader: GitWorkingTreeStatusLoading, Sendable {
             of: (String, GitWorkingTreeStatus).self,
             returning: [String: GitWorkingTreeStatus].self
         ) { group in
-            for path in workspacePaths {
+            var paths = workspacePaths.makeIterator()
+            for _ in 0..<min(Self.maximumConcurrentChecks, workspacePaths.count) {
+                guard let path = paths.next() else { break }
                 group.addTask {
                     (path, Self.status(at: path, timeout: timeout))
                 }
             }
             var statuses: [String: GitWorkingTreeStatus] = [:]
-            for await (path, status) in group {
+            while let (path, status) = await group.next() {
                 statuses[path] = status
+                if let nextPath = paths.next() {
+                    group.addTask {
+                        (nextPath, Self.status(at: nextPath, timeout: timeout))
+                    }
+                }
             }
             return statuses
         }
