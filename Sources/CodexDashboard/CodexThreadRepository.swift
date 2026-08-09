@@ -48,7 +48,8 @@ actor CodexThreadRepository {
     }
 
     func loadSnapshot(
-        gitStatuses: [String: WorkspaceGitStatus]
+        gitStatuses: [String: WorkspaceGitStatus],
+        activeApplicationLaunchDate: Date?
     ) throws -> ThreadSnapshot {
         let threadSQL = """
         SELECT id,
@@ -68,7 +69,10 @@ actor CodexThreadRepository {
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.workspacePath).lastPathComponent
-            let rolloutStatus = rolloutStatus(at: thread.rolloutPath)
+            let rolloutStatus = rolloutStatus(
+                at: thread.rolloutPath,
+                activeApplicationLaunchDate: activeApplicationLaunchDate
+            )
             return DashboardThread(
                 id: thread.id,
                 title: thread.title,
@@ -94,7 +98,10 @@ actor CodexThreadRepository {
         )
     }
 
-    private func rolloutStatus(at path: String) -> RolloutStatus {
+    private func rolloutStatus(
+        at path: String,
+        activeApplicationLaunchDate: Date?
+    ) -> RolloutStatus {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
@@ -103,14 +110,21 @@ actor CodexThreadRepository {
         else {
             return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
+        let status: RolloutStatus
         if let cached = rolloutCache[path],
            cached.size == size,
            cached.modifiedAt == modifiedAt {
-            return cached.status
+            status = cached.status
+        } else {
+            status = readRolloutStatus(in: fileURL)
+            rolloutCache[path] = (size, modifiedAt, status)
         }
-
-        let status = readRolloutStatus(in: fileURL)
-        rolloutCache[path] = (size, modifiedAt, status)
+        guard let activeApplicationLaunchDate, modifiedAt >= activeApplicationLaunchDate else {
+            return RolloutStatus(
+                activity: .idle,
+                lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
+            )
+        }
         return status
     }
 

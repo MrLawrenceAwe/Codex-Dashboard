@@ -19,9 +19,17 @@ final class CodexHostSession {
     }
 
     var applicationIsRunning: Bool {
-        !NSRunningApplication.runningApplications(
+        !runningApplications.isEmpty
+    }
+
+    var applicationLaunchDate: Date? {
+        runningApplications.compactMap(\.launchDate).max()
+    }
+
+    private var runningApplications: [NSRunningApplication] {
+        NSRunningApplication.runningApplications(
             withBundleIdentifier: CodexConfiguration.bundleIdentifier
-        ).isEmpty
+        )
     }
 
     var keepsDashboardMounted: Bool {
@@ -34,6 +42,11 @@ final class CodexHostSession {
 
     func stopMaintainingDashboard() {
         shouldKeepDashboardMounted = false
+        clearMountState()
+    }
+
+    func prepareForRestart() {
+        shouldKeepDashboardMounted = true
         clearMountState()
     }
 
@@ -118,10 +131,6 @@ final class CodexHostSession {
             lastDeliveredPayload = payload
         }
         mountedTargetIDs = targetIDs
-    }
-
-    func resumeMaintainingDashboard() {
-        shouldKeepDashboardMounted = true
     }
 
     func disableDashboard() async throws -> DisableResult {

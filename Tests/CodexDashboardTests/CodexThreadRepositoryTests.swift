@@ -8,7 +8,10 @@ final class CodexThreadRepositoryTests: XCTestCase {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex snapshot.")
         }
 
-        let snapshot = try await CodexThreadRepository().loadSnapshot(gitStatuses: [:])
+        let snapshot = try await CodexThreadRepository().loadSnapshot(
+            gitStatuses: [:],
+            activeApplicationLaunchDate: .distantPast
+        )
         XCTAssertFalse(snapshot.threads.isEmpty)
         XCTAssertGreaterThanOrEqual(snapshot.totalThreadCount, snapshot.threads.count)
         XCTAssertTrue(snapshot.threads.contains { $0.activity == .running })
@@ -19,7 +22,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(now: now, testCase: self)
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:])
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.totalThreadCount, 3)
         XCTAssertEqual(snapshot.threads.map(\.id), ["running", "updated", "idle"])
@@ -34,16 +37,31 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 600)
     }
 
-    func testRunningLifecycleDoesNotDependOnRecentLogs() async throws {
+    func testRunningLifecycleAfterApplicationLaunchDoesNotDependOnRecentLogs() async throws {
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
             now: Int64(Date().timeIntervalSince1970),
             testCase: self
         )
         let repository = CodexThreadRepository(stateDatabaseURL: stateDatabaseURL)
-        let snapshot = try await repository.loadSnapshot(gitStatuses: [:])
+        let snapshot = try await repository.loadSnapshot(
+            gitStatuses: [:],
+            activeApplicationLaunchDate: .distantPast
+        )
         XCTAssertEqual(snapshot.threads.count, 3)
         XCTAssertEqual(snapshot.totalThreadCount, 3)
         XCTAssertEqual(snapshot.threads.first?.activity, .running)
+    }
+
+    func testStartedBeforeCurrentApplicationLaunchIsIdle() async throws {
+        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
+            now: Int64(Date().timeIntervalSince1970),
+            testCase: self
+        )
+        let snapshot = try await CodexThreadRepository(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantFuture)
+
+        XCTAssertEqual(snapshot.threads.first { $0.id == "running" }?.activity, .idle)
     }
 
     func testOrdersThreadsByFinalResponseInsteadOfDatabaseActivity() async throws {
@@ -55,7 +73,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:])
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.threads.map(\.id), ["updated", "running", "idle"])
         XCTAssertEqual(snapshot.threads[1].activity, .running)
@@ -71,7 +89,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:])
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.threads.first?.activity, .idle)
     }
@@ -85,7 +103,7 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
         let snapshot = try await CodexThreadRepository(
             stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:])
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
 
         XCTAssertEqual(snapshot.threads.count, 60)
         XCTAssertEqual(snapshot.totalThreadCount, 63)
@@ -96,7 +114,10 @@ final class CodexThreadRepositoryTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")
         let repository = CodexThreadRepository(stateDatabaseURL: missingDatabaseURL)
         do {
-            _ = try await repository.loadSnapshot(gitStatuses: [:])
+            _ = try await repository.loadSnapshot(
+                gitStatuses: [:],
+                activeApplicationLaunchDate: .distantPast
+            )
             XCTFail("Expected the missing state database to be reported")
         } catch ThreadRepositoryError.missingDatabase(let databaseURL) {
             XCTAssertEqual(databaseURL, missingDatabaseURL)
