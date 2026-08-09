@@ -346,7 +346,10 @@ function insertPromptIntoComposer(content) {
     valueSetter?.call(composer, nextValue);
     const nextCursor = start + separator.length + content.length;
     composer.setSelectionRange(nextCursor, nextCursor);
-    composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: content }));
+    // The value has already been replaced through the native setter. Sending the
+    // prompt again as InputEvent.data makes some composer implementations treat
+    // the notification as a second insertion.
+    composer.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   }
   const selection = window.getSelection();
