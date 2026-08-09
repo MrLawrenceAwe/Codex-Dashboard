@@ -71,7 +71,7 @@ const host = {
 };
 
 let threads = [];
-let readFilter = 'all';
+let filterMode = 'all';
 let searchTerm = '';
 let groupingMode = 'projects';
 const collapsedProjects = new Set();
@@ -139,11 +139,18 @@ function relativeTime(unixSeconds) {
 
 function getVisibleThreads() {
   const query = searchTerm.trim().toLowerCase();
+  const uncommittedProjectPaths = new Set(
+    threads
+      .filter((thread) => thread.gitStatus === 'modified')
+      .map((thread) => String(thread.workspacePath).trim()),
+  );
   return threads.filter((thread) => {
-    const matchesReadFilter = readFilter === 'all'
-      || (readFilter === 'unread' && isThreadUnread(thread));
+    const matchesFilter = filterMode === 'all'
+      || (filterMode === 'unread' && isThreadUnread(thread))
+      || (filterMode === 'uncommitted'
+        && uncommittedProjectPaths.has(String(thread.workspacePath).trim()));
     const matchesSearch = !query || `${thread.title} ${thread.preview} ${thread.workspace} ${thread.workspacePath}`.toLowerCase().includes(query);
-    return matchesReadFilter && matchesSearch;
+    return matchesFilter && matchesSearch;
   });
 }
 
@@ -226,17 +233,22 @@ function render() {
   if (runningList) runningList.innerHTML = runningThreads
     .map((thread) => renderThreadHTML(thread, true))
     .join('');
-  page.querySelectorAll('[data-read-filter]').forEach((button) => {
-    const isActive = button.dataset.readFilter === readFilter;
+  page.querySelectorAll('[data-filter]').forEach((button) => {
+    const isActive = button.dataset.filter === filterMode;
     button.classList.toggle('is-active', isActive);
     button.setAttribute('aria-pressed', String(isActive));
   });
-  const readFilterCounts = {
+  const filterCounts = {
     all: threads.length,
     unread,
+    uncommitted: new Set(
+      threads
+        .filter((thread) => thread.gitStatus === 'modified')
+        .map((thread) => String(thread.workspacePath).trim()),
+    ).size,
   };
-  page.querySelectorAll('[data-read-filter-count]').forEach((count) => {
-    count.textContent = String(readFilterCounts[count.dataset.readFilterCount] ?? 0);
+  page.querySelectorAll('[data-filter-count]').forEach((count) => {
+    count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
   });
   page.querySelectorAll('[data-grouping]').forEach((button) => {
     const isActive = button.dataset.grouping === groupingMode;
@@ -248,7 +260,7 @@ function render() {
   page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'}`;
   const list = page.querySelector('[data-thread-list]');
   if (!visibleThreads.length) {
-    const emptyMessage = readFilter === 'unread' && !searchTerm.trim()
+    const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
       ? 'You’re all caught up'
       : 'No threads found';
     list.innerHTML = `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`;
@@ -350,8 +362,9 @@ function createPage() {
         </div>
         <div class="dashboard-toolbar">
           <div class="dashboard-filters" aria-label="Filter threads">
-            <button type="button" data-read-filter="all" class="is-active">All <span class="dashboard-filter-count" data-read-filter-count="all">0</span></button>
-            <button type="button" data-read-filter="unread">Unread <span class="dashboard-filter-count" data-read-filter-count="unread">0</span></button>
+            <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
+            <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
+            <button type="button" data-filter="uncommitted">Uncommitted <span class="dashboard-filter-count" data-filter-count="uncommitted">0</span></button>
           </div>
           <div class="dashboard-view-options" aria-label="Group threads">
             <button type="button" data-grouping="projects" class="is-active" aria-pressed="true">Projects</button>
@@ -362,9 +375,9 @@ function createPage() {
       </div>
       <main class="dashboard-list" data-thread-list></main>
     </div>`;
-  page.querySelectorAll('[data-read-filter]').forEach((button) => {
+  page.querySelectorAll('[data-filter]').forEach((button) => {
     button.addEventListener('click', () => {
-      readFilter = button.dataset.readFilter;
+      filterMode = button.dataset.filter;
       render();
     });
   });
