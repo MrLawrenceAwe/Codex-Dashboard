@@ -81,9 +81,10 @@ const promptReordering = (() => {
       const bounds = destination.row?.getBoundingClientRect();
       const dropAfter = Boolean(bounds && event.clientY > bounds.top + bounds.height / 2);
       const moved = reorder(destination, dropAfter, persist);
+      dialog?.querySelector('.is-dragging')?.classList.remove('is-dragging');
+      clearIndicators(dialog);
       draggedPromptID = undefined;
       if (moved) render();
-      else clearIndicators(dialog);
       return true;
     }
     return false;

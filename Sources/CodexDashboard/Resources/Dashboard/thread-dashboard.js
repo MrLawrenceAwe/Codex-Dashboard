@@ -1,5 +1,6 @@
 const threadDashboard = (() => {
-const navigationEventTypes = ['pointerdown', 'mousedown', 'click'];
+const navigationEventTypes = ['pointerdown', 'mousedown', 'click', 'keydown'];
+const routeEventTypes = ['message', 'popstate', 'hashchange'];
 
 let threads = [];
 let filterMode = 'all';
@@ -36,6 +37,19 @@ function isThreadUnread(thread) {
 }
 
 function handleHostNavigation(event) {
+  if (event.type === 'message') {
+    if (dashboardIsOpen && event.data?.type === 'navigate-to-route') closePage();
+    return;
+  }
+  if (event.type === 'popstate' || event.type === 'hashchange') {
+    if (dashboardIsOpen) closePage();
+    return;
+  }
+  if (event.type === 'keydown') {
+    const opensNewChat = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n';
+    if (dashboardIsOpen && opensNewChat) closePage();
+    return;
+  }
   const eventTarget = event.target instanceof Element ? event.target : null;
   if (eventTarget?.closest(`#${dashboardDOM.elementIDs.navButton}`)) {
     event.preventDefault();
@@ -347,6 +361,9 @@ function ensureMounted() {
   navigationEventTypes.forEach((type) => {
     document.addEventListener(type, handleHostNavigation, true);
   });
+  routeEventTypes.forEach((type) => {
+    window.addEventListener(type, handleHostNavigation, true);
+  });
   return Boolean(
     document.getElementById(dashboardDOM.elementIDs.style)
       && document.getElementById(dashboardDOM.elementIDs.page)
@@ -369,6 +386,9 @@ function destroy() {
   promptLibrary.unmount();
   navigationEventTypes.forEach((type) => {
     document.removeEventListener(type, handleHostNavigation, true);
+  });
+  routeEventTypes.forEach((type) => {
+    window.removeEventListener(type, handleHostNavigation, true);
   });
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');

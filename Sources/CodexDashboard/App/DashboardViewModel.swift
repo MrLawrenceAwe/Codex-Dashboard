@@ -33,6 +33,7 @@ final class DashboardViewModel: ObservableObject {
     private var runtime: (any DashboardRuntime)?
     private var synchronizationTask: Task<Void, Never>?
     private var synchronizationID: UUID?
+    private var enrichmentGeneration = 0
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
@@ -88,6 +89,7 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func stopMonitoring() {
+        enrichmentGeneration += 1
         pollingController.stop()
         synchronizationTask?.cancel()
         synchronizationTask = nil
@@ -117,6 +119,7 @@ final class DashboardViewModel: ObservableObject {
     func restartCodexAndEnableThreadDashboard() async {
         guard !isPerformingAction, let runtime else { return }
         isPerformingAction = true
+        enrichmentGeneration += 1
         runtime.prepareForRestart()
         connectionState = .checking
         connectionError = nil
@@ -145,6 +148,7 @@ final class DashboardViewModel: ObservableObject {
     func disableThreadDashboard() async {
         guard !isPerformingAction, let runtime else { return }
         isPerformingAction = true
+        enrichmentGeneration += 1
         defer { isPerformingAction = false }
         await cancelSynchronization()
 
@@ -231,19 +235,33 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func updateUnreadState() async {
-        guard
-            !isPerformingAction,
-            let updatedThreads = await threadSnapshots.updateUnreadState(in: threads)
-        else { return }
-        threads = updatedThreads
+        guard !isPerformingAction else { return }
+        let generation = enrichmentGeneration
+        guard let updatedThreads = await threadSnapshots.updateUnreadState(in: threads) else { return }
+        guard !isPerformingAction, generation == enrichmentGeneration else { return }
+        let unreadByID = Dictionary(uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.isUnread) })
+        threads = threads.map { source in
+            var thread = source
+            thread.isUnread = unreadByID[thread.id] ?? thread.isUnread
+            return thread
+        }
         await publishSnapshotIfMaintained()
     }
 
     private func updateWorkingTreeStatuses() async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
+        let generation = enrichmentGeneration
         guard let updatedThreads = await threadSnapshots.updateWorkingTreeStatuses(in: threads) else { return }
-        threads = updatedThreads
+        guard !isPerformingAction, generation == enrichmentGeneration else { return }
+        let statusByID = Dictionary(
+            uniqueKeysWithValues: updatedThreads.map { ($0.id, $0.workingTreeStatus) }
+        )
+        threads = threads.map { source in
+            var thread = source
+            thread.workingTreeStatus = statusByID[thread.id] ?? thread.workingTreeStatus
+            return thread
+        }
         await publishSnapshotIfMaintained()
     }
 
@@ -263,6 +281,7 @@ final class DashboardViewModel: ObservableObject {
     private func publishSnapshotIfMaintained() async {
         guard
             !Task.isCancelled,
+            !isPerformingAction,
             let runtime,
             runtime.maintainsDashboard
         else { return }

@@ -7,6 +7,8 @@ final class DashboardRenderer {
     private let compatibilityChecker: RendererCompatibilityChecker
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshot?
+    private var activeSynchronizationCount = 0
+    private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
 
     private(set) var maintainsDashboard = true
 
@@ -38,6 +40,9 @@ final class DashboardRenderer {
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
+        activeSynchronizationCount += 1
+        defer { synchronizationFinished() }
+
         let targetIDs = Set(targets.map(\.id))
         var mountedDashboard = false
 
@@ -61,35 +66,47 @@ final class DashboardRenderer {
                         "The dashboard injection did not mount in the Codex renderer."
                     )
                 }
+                guard !Task.isCancelled, maintainsDashboard else { return }
                 mountedDashboard = true
             }
         }
 
+        guard !Task.isCancelled, maintainsDashboard else { return }
         if mountedDashboard || snapshot != lastSnapshot || targetIDs != mountedTargetIDs {
             try await deliver(snapshot, to: targets)
+            guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
         mountedTargetIDs = targetIDs
     }
 
     func disable() async throws -> Bool {
-        let targets = await targets()
-        guard !targets.isEmpty else {
-            stopMaintaining()
-            return false
-        }
+        let wasMaintainingDashboard = maintainsDashboard
+        maintainsDashboard = false
+        await waitForSynchronizationsToFinish()
 
-        for target in targets {
-            let disabled = try await devTools.evaluateBoolean(
-                "(() => { window.__codexDashboard?.destroy?.(); return typeof window.__codexDashboard === 'undefined'; })()",
-                in: target
-            )
-            guard disabled else {
-                throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
+        do {
+            let targets = await targets()
+            guard !targets.isEmpty else {
+                clearMountState()
+                return false
             }
+
+            for target in targets {
+                let disabled = try await devTools.evaluateBoolean(
+                    "(() => { window.__codexDashboard?.destroy?.(); return typeof window.__codexDashboard === 'undefined'; })()",
+                    in: target
+                )
+                guard disabled else {
+                    throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
+                }
+            }
+            clearMountState()
+            return true
+        } catch {
+            maintainsDashboard = wasMaintainingDashboard
+            throw error
         }
-        stopMaintaining()
-        return true
     }
 
     func open() async {
@@ -130,5 +147,20 @@ final class DashboardRenderer {
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
+    }
+
+    private func synchronizationFinished() {
+        activeSynchronizationCount -= 1
+        guard activeSynchronizationCount == 0 else { return }
+        let waiters = synchronizationWaiters
+        synchronizationWaiters = []
+        waiters.forEach { $0.resume() }
+    }
+
+    private func waitForSynchronizationsToFinish() async {
+        guard activeSynchronizationCount > 0 else { return }
+        await withCheckedContinuation { continuation in
+            synchronizationWaiters.append(continuation)
+        }
     }
 }

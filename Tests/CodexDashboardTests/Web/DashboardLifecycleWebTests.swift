@@ -122,6 +122,28 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? Bool, false)
         XCTAssertEqual(values[4] as? String, "thread-unread")
 
+        let closesForHostRouteChanges = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.open();
+              window.dispatchEvent(new MessageEvent('message', {
+                data: { type: 'navigate-to-route', path: '/local/another-thread' },
+              }));
+              const closedForMessage = !document.documentElement.classList.contains('codex-dashboard-open');
+              window.__codexDashboard.open();
+              window.dispatchEvent(new PopStateEvent('popstate'));
+              const closedForHistory = !document.documentElement.classList.contains('codex-dashboard-open');
+              window.__codexDashboard.open();
+              document.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'n', metaKey: true, bubbles: true,
+              }));
+              const closedForNewChatShortcut = !document.documentElement.classList.contains('codex-dashboard-open');
+              return [closedForMessage, closedForHistory, closedForNewChatShortcut];
+            })()
+            """
+        ) as? [Bool]
+        XCTAssertEqual(closesForHostRouteChanges, [true, true, true])
+
         let destroyed = try await webView.evaluateJavaScript(
             """
             (() => {
