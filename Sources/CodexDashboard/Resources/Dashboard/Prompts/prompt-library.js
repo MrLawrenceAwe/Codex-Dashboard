@@ -173,23 +173,9 @@ function exportLibrary() {
 async function importLibrary(file) {
   try {
     const payload = JSON.parse(await file.text());
-    const validPrompts = Array.isArray(payload?.prompts) && payload.prompts.every((prompt) => (
-      prompt && typeof prompt === 'object'
-        && typeof prompt.id === 'string'
-        && typeof prompt.name === 'string'
-        && typeof prompt.content === 'string'
-        && (prompt.section === undefined || typeof prompt.section === 'string')
-    ));
-    const validSections = Array.isArray(payload?.sections)
-      && payload.sections.every((section) => typeof section === 'string');
-    const promptIDs = validPrompts ? payload.prompts.map((prompt) => prompt.id) : [];
-    if (
-      !payload || typeof payload !== 'object' || Array.isArray(payload)
-        || payload.version !== 1
-        || !validPrompts
-        || !validSections
-        || new Set(promptIDs).size !== promptIDs.length
-    ) throw new Error('invalid prompt library');
+    if (!promptLibraryContract.isValidExport(payload)) {
+      throw new Error('invalid prompt library');
+    }
     const prompts = promptStore.normalizePrompts(payload?.prompts);
     const sections = promptStore.normalizeSections(payload?.sections, prompts);
     if (!persistLibrary(prompts, sections)) return;

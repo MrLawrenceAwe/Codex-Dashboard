@@ -58,8 +58,6 @@ actor PromptBackupStore {
         return true
     }
 
-    var path: String { backupURL.path }
-
     nonisolated static func isValidLibrary(_ json: String) -> Bool {
         guard let data = json.data(using: .utf8),
               let library = try? JSONDecoder().decode(Library.self, from: data)

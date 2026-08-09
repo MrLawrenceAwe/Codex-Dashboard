@@ -83,6 +83,10 @@ const codexContracts = (() => {
     return null;
   }
 
+  function composerMutationSelector(additionalSelectors = []) {
+    return [...composerSelectors, ...composerAddButtonSelectors, ...additionalSelectors].join(',');
+  }
+
   function composerEditorView(composerElement) {
     const host = composerElement?.parentElement;
     const fiberKey = host && Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
@@ -161,6 +165,7 @@ const codexContracts = (() => {
     threadReadStates,
     composer,
     composerAddButton,
+    composerMutationSelector,
     composerEditorView,
     sidePanelToggle,
     environmentToggle,

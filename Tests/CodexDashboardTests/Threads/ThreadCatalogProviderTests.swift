@@ -8,10 +8,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex thread catalog.")
         }
 
-        let catalog = try await CodexThreadCatalogProvider().loadCatalog(
-            workingTreeStatuses: [:],
-            codexLaunchDate: .distantPast
-        )
+        let catalog = try await CodexThreadCatalogProvider().loadCatalog(codexLaunchDate: .distantPast)
         XCTAssertFalse(catalog.threads.isEmpty)
         XCTAssertGreaterThanOrEqual(catalog.totalThreadCount, catalog.threads.count)
         XCTAssertTrue(catalog.threads.contains { $0.runState == .running })
@@ -22,7 +19,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(now: now, testCase: self)
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL
-        ).loadCatalog(workingTreeStatuses: [:], codexLaunchDate: .distantPast)
+        ).loadCatalog(codexLaunchDate: .distantPast)
 
         XCTAssertEqual(catalog.totalThreadCount, 3)
         XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated", "idle"])
@@ -46,7 +43,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         )
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL
-        ).loadCatalog(workingTreeStatuses: [:], codexLaunchDate: .distantPast)
+        ).loadCatalog(codexLaunchDate: .distantPast)
 
         XCTAssertEqual(catalog.threads.map(\.id), ["updated", "running", "idle"])
         XCTAssertEqual(catalog.threads[1].runState, .running)
@@ -62,7 +59,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         )
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL
-        ).loadCatalog(workingTreeStatuses: [:], codexLaunchDate: .distantPast)
+        ).loadCatalog(codexLaunchDate: .distantPast)
 
         XCTAssertEqual(catalog.threads.count, 60)
         XCTAssertEqual(catalog.totalThreadCount, 63)
@@ -87,7 +84,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
 
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL
-        ).loadCatalog(workingTreeStatuses: [:], codexLaunchDate: .distantPast)
+        ).loadCatalog(codexLaunchDate: .distantPast)
 
         XCTAssertEqual(Set(catalog.threads.map(\.id)), Set((0..<60).map { "extra-\($0)" }))
         XCTAssertFalse(catalog.threads.contains { $0.id == "running" })
@@ -98,10 +95,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")
         let provider = CodexThreadCatalogProvider(stateDatabaseURL: missingDatabaseURL)
         do {
-            _ = try await provider.loadCatalog(
-                workingTreeStatuses: [:],
-                codexLaunchDate: .distantPast
-            )
+            _ = try await provider.loadCatalog(codexLaunchDate: .distantPast)
             XCTFail("Expected the missing state database to be reported")
         } catch ThreadCatalogError.missingDatabase(let databaseURL) {
             XCTAssertEqual(databaseURL, missingDatabaseURL)
@@ -113,10 +107,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(now: now, testCase: self)
         let provider = CodexThreadCatalogProvider(stateDatabaseURL: stateDatabaseURL)
 
-        let initial = try await provider.loadCatalog(
-            workingTreeStatuses: [:],
-            codexLaunchDate: .distantPast
-        )
+        let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast)
         XCTAssertEqual(initial.threads.first { $0.id == "updated" }?.title, "Renamed thread")
 
         try await Task.sleep(for: .milliseconds(10))
@@ -127,10 +118,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         )
         XCTAssertEqual(update.terminationStatus, 0)
 
-        let refreshed = try await provider.loadCatalog(
-            workingTreeStatuses: [:],
-            codexLaunchDate: .distantPast
-        )
+        let refreshed = try await provider.loadCatalog(codexLaunchDate: .distantPast)
         XCTAssertEqual(refreshed.threads.first { $0.id == "updated" }?.title, "Fresh title")
     }
 }

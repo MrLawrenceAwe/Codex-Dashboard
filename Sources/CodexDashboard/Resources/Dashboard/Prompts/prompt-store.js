@@ -4,9 +4,11 @@ const promptStore = (() => {
   const collapsedSectionsStorageKey = 'codex-dashboard.collapsed-prompt-sections';
   const legacySectionsStorageKey = 'codex-dashboard.prompt-sections';
 
-  function normalizeSection(value) {
-    return String(value || '').trim() || 'General';
-  }
+  const {
+    normalizePrompts,
+    normalizeSection,
+    normalizeSections,
+  } = promptLibraryContract;
 
   function readJSON(key, fallback) {
     try {
@@ -23,28 +25,6 @@ const promptStore = (() => {
     } catch (_) {
       return false;
     }
-  }
-
-  function normalizePrompts(storedPrompts) {
-    if (!Array.isArray(storedPrompts)) return [];
-    return storedPrompts.filter((prompt) => (
-      prompt && typeof prompt.id === 'string'
-        && typeof prompt.name === 'string'
-        && typeof prompt.content === 'string'
-    )).map((prompt) => ({
-      ...prompt,
-      section: normalizeSection(prompt.section),
-    }));
-  }
-
-  function normalizeSections(storedSections, storedPrompts) {
-    const sections = Array.isArray(storedSections)
-      ? storedSections.filter((item) => typeof item === 'string')
-      : [];
-    return [...new Set([
-      ...sections.map(normalizeSection),
-      ...storedPrompts.map((prompt) => normalizeSection(prompt.section)),
-    ])];
   }
 
   function loadLibrary() {

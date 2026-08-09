@@ -1,10 +1,7 @@
 import Foundation
 
 protocol ThreadCatalogProviding: Sendable {
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) async throws -> ThreadCatalog
+    func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog
 }
 
 enum ThreadCatalogError: LocalizedError {
@@ -66,10 +63,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func loadCatalog(
-        workingTreeStatuses: [String: WorkingTreeStatus],
-        codexLaunchDate: Date?
-    ) async throws -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog {
         let threadSQL = """
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
@@ -113,7 +107,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: threadActivity.runState,
-                workingTreeStatus: workingTreeStatuses[thread.projectPath] ?? .notRepository
+                workingTreeStatus: .notRepository
             )
         }.sorted { left, right in
             if left.recencyTimestamp == right.recencyTimestamp {
