@@ -17,4 +17,9 @@ enum CodexConfiguration {
 
     static let stateDatabaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
     static let globalStateURL = codexDirectory.appendingPathComponent(".codex-global-state.json")
+
+    static var installedVersion: String? {
+        guard let bundle = Bundle(url: codexApplicationURL) else { return nil }
+        return bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
 }

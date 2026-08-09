@@ -33,4 +33,10 @@ struct ThreadCatalog: Sendable {
 
 struct DashboardSnapshot: Codable, Equatable, Sendable {
     let threads: [ThreadSummary]
+    let totalThreadCount: Int
+
+    init(threads: [ThreadSummary], totalThreadCount: Int? = nil) {
+        self.threads = threads
+        self.totalThreadCount = totalThreadCount ?? threads.count
+    }
 }

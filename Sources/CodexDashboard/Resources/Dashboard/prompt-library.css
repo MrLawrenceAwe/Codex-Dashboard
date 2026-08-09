@@ -18,7 +18,6 @@
 .dashboard-prompt-launcher svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .dashboard-prompt-launcher:hover { background: var(--color-background-button-secondary-hover, rgba(255,255,255,.06)); color: var(--color-text-foreground, #ececec); }
 .dashboard-prompt-launcher:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 1px; }
-
 #codex-dashboard-prompt-library-dialog { position: fixed; z-index: 2147483647; inset: 0; display: grid; place-items: end center; padding: 24px; color: var(--dashboard-text); }
 #codex-dashboard-prompt-library-dialog * { box-sizing: border-box; }
 #codex-dashboard-prompt-library-dialog button,
@@ -29,14 +28,23 @@
 #codex-dashboard-prompt-library-dialog textarea:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--dashboard-line-strong); border-radius: 16px; background: var(--color-background-elevated-primary-opaque, #292929); box-shadow: 0 24px 80px rgba(0,0,0,.48); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 19px 20px 15px; border-bottom: 1px solid var(--dashboard-line); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 20px; border-bottom: 1px solid var(--dashboard-line); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-header h2 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -.01em; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-header p { margin: 4px 0 0; color: var(--dashboard-muted); font-size: 12px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error { margin: 0; padding: 9px 20px; border-bottom: 1px solid var(--color-border-error, rgba(255, 120, 120, .22)); background: var(--color-background-status-error, rgba(180, 45, 45, .13)); color: var(--color-text-error, #ffb0b0); font-size: 11px; line-height: 1.4; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error[hidden] { display: none; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-icon-button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--dashboard-muted); font-size: 22px; line-height: 1; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-icon-button:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
 #codex-dashboard-prompt-library-dialog [data-prompt-content] { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 14px; scrollbar-gutter: stable; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-tools { display: flex; align-items: center; gap: 7px; padding: 0 0 12px; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search { display: block; flex: 1 1 auto; min-width: 0; margin: 0; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"] { display: block; width: 100%; height: 32px; min-height: 0; margin: 0; padding: 0 10px; appearance: none; -webkit-appearance: none; border: 1px solid var(--dashboard-line-strong); border-radius: 7px; outline: 0; background: var(--dashboard-control); color: var(--dashboard-text); font-family: inherit; font-size: 12px; font-weight: 400; line-height: 30px; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-appearance: none; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]::placeholder { color: var(--dashboard-dim); opacity: 1; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]:focus { border-color: var(--color-border-focus, rgba(121, 201, 140, .75)); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-tools .dashboard-prompt-secondary { display: inline-flex; flex: 0 0 auto; height: 32px; min-height: 0; align-items: center; justify-content: center; margin: 0; padding: 0 10px; appearance: none; -webkit-appearance: none; border: 1px solid var(--dashboard-line-strong); border-radius: 7px; background: transparent; color: var(--dashboard-muted); font-family: inherit; font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-tools .dashboard-prompt-secondary:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
+#codex-dashboard-prompt-library-dialog .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+#codex-dashboard-prompt-library-dialog [data-prompt-import-file][hidden] { display: none !important; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-list { display: grid; gap: 12px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section { display: grid; gap: 6px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 5px; border: 0; border-radius: 6px; background: transparent; color: var(--dashboard-muted); cursor: pointer; text-align: left; }

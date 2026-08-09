@@ -28,6 +28,9 @@ enum DashboardWebTestHarness {
         let contentEditableComposer = includeContentEditableComposer
             ? #"<div contenteditable="true" role="textbox"></div>"#
             : ""
+        let textareaComposer = includeContentEditableComposer
+            ? ""
+            : #"<textarea placeholder="Do anything"></textarea>"#
         return try await mountedWebView(
             html: """
             <!doctype html>
@@ -38,7 +41,7 @@ enum DashboardWebTestHarness {
               </aside>
               <main>
                 <div class="composer-shell">
-                  <textarea placeholder="Do anything"></textarea>
+                  \(textareaComposer)
                   <div class="composer-toolbar">
                     <button type="button" aria-label="Add">+</button>
                   </div>

@@ -19,7 +19,6 @@ const composerAdapter = (() => {
   function insert(content) {
     const composer = codexContracts.composer(dashboardDOM.elementIDs.promptDialog);
     if (!composer) return false;
-    composer.focus();
     if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
       const start = composer.selectionStart ?? composer.value.length;
       const end = composer.selectionEnd ?? start;
@@ -33,8 +32,10 @@ const composerAdapter = (() => {
       const nextCursor = start + separator.length + content.length;
       composer.setSelectionRange(nextCursor, nextCursor);
       composer.dispatchEvent(new Event('input', { bubbles: true }));
+      requestAnimationFrame(() => composer.focus());
       return true;
     }
+    composer.focus();
     const selection = window.getSelection();
     const needsSeparator = Boolean(composer.textContent && !/\s$/.test(composer.textContent));
     const insertedContent = `${needsSeparator ? '\n\n' : ''}${content}`;

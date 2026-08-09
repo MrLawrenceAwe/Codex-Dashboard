@@ -12,8 +12,13 @@ Run:
 ./install.sh
 ```
 
-This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
-`$HOME/Applications`.
+This runs the test suite, builds and ad-hoc signs `Codex Dashboard.app`, then
+installs it in `$HOME/Applications`. Use `./install.sh --relaunch` to open the
+new build, or `--skip-tests` during local iteration. `--no-launch` is the
+default and is also accepted explicitly.
+
+To uninstall without permanently deleting the bundle, run `./uninstall.sh`.
+It moves the installed app to the Trash.
 
 ## Use
 
@@ -23,7 +28,8 @@ This builds and ad-hoc signs `Codex Dashboard.app`, then installs it in
 4. Select **Thread Dashboard** directly in the Codex sidebar. It opens in
    the main content pane while the rest of Codex navigation stays available.
 
-The controller must remain open to refresh thread activity and restore the dashboard after renderer reloads. Use
+The application must remain running to refresh thread activity and restore the dashboard after renderer reloads,
+but its controller window can be closed; menu-bar controls remain available. Launch at Login is optional. Use
 **Disable Thread Dashboard** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 
@@ -36,13 +42,18 @@ removes it.
 - A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and composer-control contract drift after Codex updates.
 - Swift source is grouped by application UI, compatibility checks, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
-- Activity snapshots run on a fixed two-second cadence; unread state refreshes independently every 500 milliseconds, and working-tree status enrichment every ten seconds. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
-- Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The dashboard loads the latest 60; search and filters apply to the loaded set.
+- Activity snapshots run every two seconds while Codex or the controller is active; unread state refreshes independently every 500 milliseconds and working-tree status every ten seconds. Background cadence drops to eight seconds, one second, and thirty seconds respectively. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
+- Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The most recent 60 are loaded, and the dashboard explicitly shows the loaded and total counts so the scope of search is clear.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including threads not currently mounted in the sidebar.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Changed projects** filter isolates those projects.
 - Changed project groups expose **Commit or push**, which opens the most recent idle thread for that project and dispatches Codex's native Git command. The Environment-panel control is retained as a compatibility fallback.
 - A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
+- Prompt search, duplication, JSON import/export, `{{selection}}` and `{{clipboard}}` placeholders, and an automatic app-owned backup under `~/Library/Application Support/Codex Dashboard/` protect and speed up reusable prompt workflows.
+- Dashboard filter, grouping, and collapsed-project preferences persist across renderer reloads.
+- The menu-bar controller provides open, sync, restart, diagnostics, and launch-at-login actions after the main window is closed.
+- Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
+- Diagnostics show versions, refresh state, thread counts, renderer targets, warnings, and the prompt-backup location, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Thread Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.

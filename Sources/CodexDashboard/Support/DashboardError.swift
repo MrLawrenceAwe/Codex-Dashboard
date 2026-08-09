@@ -10,6 +10,7 @@ enum DashboardError: LocalizedError {
     case devToolsCommandFailed(String)
     case enableFailed(String)
     case disableFailed(String)
+    case invalidPromptLibrary
 
     var errorDescription: String? {
         switch self {
@@ -31,6 +32,8 @@ enum DashboardError: LocalizedError {
             return "Dashboard enablement failed: \(message)"
         case .disableFailed(let message):
             return "Dashboard disablement failed: \(message)"
+        case .invalidPromptLibrary:
+            return "The saved prompt library backup is invalid."
         }
     }
 }
