@@ -144,12 +144,15 @@ function openThread(thread) {
   const target = document.querySelector(
     `[data-app-action-sidebar-thread-id="${CSS.escape(threadKey)}"]`,
   );
-  markThreadRead(thread);
   closePage();
   if (target) {
+    // The captured host-navigation handler marks the thread read only once a
+    // real sidebar destination receives the click.
     target.click();
     return;
   }
+  // A missing sidebar destination uses Codex's route bridge. The next payload
+  // marks the thread read after Codex exposes it as the selected destination.
   window.dispatchEvent(new MessageEvent('message', {
     data: {
       type: 'navigate-to-route',
@@ -178,7 +181,7 @@ function threadMarkup(thread, showProject = false) {
         </div>
       </div>
       <div class="dashboard-thread-actions">
-        ${thread.status === 'running' ? '<span class="dashboard-status-label">Running</span>' : ''}
+        ${thread.status === 'running' ? '<span class="dashboard-running-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
         <button type="button" data-open-thread="${escapeHTML(thread.id)}">Open ${iconSVG('arrow')}</button>
       </div>
     </article>`;
@@ -210,7 +213,10 @@ function listMarkup(visibleThreads) {
             <span class="dashboard-project-name">${escapeHTML(project)}</span>
             ${projectThreads.some((thread) => thread.gitStatus === 'modified') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconSVG('gitChanges')}<span>Uncommitted</span></span>` : ''}
           </span>
-          <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+          <span class="dashboard-project-summary">
+            ${projectThreads.some((thread) => thread.status === 'running') ? '<span class="dashboard-running-spinner" role="status" aria-label="Thread running" title="Thread running"></span>' : ''}
+            <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
+          </span>
         </button>
       </header>
       <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((thread) => threadMarkup(thread)).join('')}</div>
@@ -224,6 +230,8 @@ function render() {
   if (!page) return;
   const running = threads.filter((thread) => thread.status === 'running').length;
   page.querySelector('[data-count-running]').textContent = String(running);
+  const runningSummary = page.querySelector('[data-running-summary]');
+  if (runningSummary) runningSummary.hidden = running === 0;
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === statusFilter;
     button.classList.toggle('is-active', isActive);
@@ -317,9 +325,9 @@ function createPage() {
       <header class="dashboard-header">
         <h1>Threads</h1>
       </header>
-      <section class="dashboard-stats" aria-label="Thread summary">
+      <section class="dashboard-stats" data-running-summary aria-label="Thread summary" hidden>
         <div class="dashboard-stat" data-tone="running">
-          <span class="dashboard-stat-heading"><i class="dashboard-stat-indicator"></i>Running</span>
+          <span class="dashboard-stat-heading"><span class="dashboard-running-spinner" role="status" aria-label="Running threads" title="Running threads"></span>Running</span>
           <strong data-count-running>0</strong>
         </div>
       </section>

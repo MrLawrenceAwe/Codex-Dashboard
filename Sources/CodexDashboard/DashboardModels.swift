@@ -34,7 +34,6 @@ struct DashboardThread: Codable, Equatable, Identifiable, Sendable {
 struct ThreadSnapshot: Sendable {
     let threads: [DashboardThread]
     let totalThreadCount: Int
-    let warning: String?
 }
 
 struct DashboardPayload: Codable, Equatable, Sendable {

@@ -126,7 +126,7 @@ final class DashboardController: ObservableObject {
             guard !Task.isCancelled else { return }
             threads = snapshot.threads
             totalThreadCount = snapshot.totalThreadCount
-            dataWarning = snapshot.warning
+            dataWarning = nil
         } catch {
             dataWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
         }
@@ -164,6 +164,7 @@ final class DashboardController: ObservableObject {
         state = .checking
         defer { isBusy = false }
         await cancelRefresh()
+        var hostConnected = false
 
         do {
             let executableURL = AppConfiguration.hostExecutableURL
@@ -204,15 +205,16 @@ final class DashboardController: ObservableObject {
                 }
                 try await Task.sleep(for: .milliseconds(350))
             }
+            hostConnected = true
 
             let snapshot = try await threadRepository.loadSnapshot()
             threads = snapshot.threads
             totalThreadCount = snapshot.totalThreadCount
-            dataWarning = snapshot.warning
+            dataWarning = nil
             shouldMaintainDashboard = true
             try await synchronizeDashboard(with: targets, forceMount: true)
         } catch {
-            setFailure(error, hostConnected: false)
+            setFailure(error, hostConnected: hostConnected)
         }
     }
 

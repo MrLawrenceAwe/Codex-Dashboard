@@ -10,5 +10,4 @@ enum AppConfiguration {
         .appendingPathComponent(".codex", isDirectory: true)
 
     static let stateDatabaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
-    static let activityDatabaseURL = codexDirectory.appendingPathComponent("logs_2.sqlite")
 }

@@ -32,24 +32,21 @@ actor CodexThreadRepository {
         let isPinned: Int
         let model: String?
         let totalCount: Int
-    }
-
-    private struct ThreadActivity: Decodable, Sendable {
-        let threadId: String
-        let lastActivity: Int64
+        let rolloutPath: String
     }
 
     private let stateDatabaseURL: URL
-    private let activityDatabaseURL: URL
     private var gitStatusCache: [String: CachedGitStatus] = [:]
+    private var rolloutStatusCache: [String: (size: UInt64, modifiedAt: Date, status: ThreadActivityStatus)] = [:]
     private let gitStatusCacheLifetime: TimeInterval = 10
+    private let subprocessTimeout: TimeInterval
 
     init(
         stateDatabaseURL: URL = AppConfiguration.stateDatabaseURL,
-        activityDatabaseURL: URL = AppConfiguration.activityDatabaseURL
+        subprocessTimeout: TimeInterval = 3
     ) {
         self.stateDatabaseURL = stateDatabaseURL
-        self.activityDatabaseURL = activityDatabaseURL
+        self.subprocessTimeout = subprocessTimeout
     }
 
     func loadSnapshot() throws -> ThreadSnapshot {
@@ -61,45 +58,20 @@ actor CodexThreadRepository {
                updated_at AS updatedAt,
                is_pinned AS isPinned,
                model,
+               rollout_path AS rolloutPath,
                COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
         ORDER BY updated_at DESC
         LIMIT 60;
         """
-        let activitySQL = """
-        SELECT thread_id AS threadId, MAX(ts) AS lastActivity
-        FROM logs
-        WHERE thread_id IS NOT NULL AND thread_id <> ''
-          AND ts >= CAST(strftime('%s','now') AS INTEGER) - 120
-        GROUP BY thread_id;
-        """
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
-        let activity: [ThreadActivity]
-        let warning: String?
-        do {
-            activity = try query(databaseURL: activityDatabaseURL, sql: activitySQL)
-            warning = nil
-        } catch {
-            activity = []
-            warning = "Thread activity is temporarily unavailable. \(error.localizedDescription)"
-        }
-
-        let latestActivity = Dictionary(uniqueKeysWithValues: activity.map { ($0.threadId, $0.lastActivity) })
         let workspacePaths = Set(threads.map(\.cwd))
         var gitStatuses: [String: WorkspaceGitStatus] = [:]
         for path in workspacePaths {
             gitStatuses[path] = workspaceGitStatus(at: path)
         }
-        let now = Int64(Date().timeIntervalSince1970)
         let dashboardThreads = threads.map { thread in
-            let lastLogTime = latestActivity[thread.id] ?? 0
-            let status: ThreadActivityStatus
-            if now - lastLogTime <= 12 {
-                status = .running
-            } else {
-                status = .idle
-            }
             let directoryName = URL(fileURLWithPath: thread.cwd).lastPathComponent
             return DashboardThread(
                 id: thread.id,
@@ -110,15 +82,76 @@ actor CodexThreadRepository {
                 updatedAt: thread.updatedAt,
                 isPinned: thread.isPinned != 0,
                 model: thread.model,
-                status: status,
+                status: rolloutStatus(at: thread.rolloutPath),
                 gitStatus: gitStatuses[thread.cwd] ?? .notRepository
             )
         }
         return ThreadSnapshot(
             threads: dashboardThreads,
-            totalThreadCount: threads.first?.totalCount ?? 0,
-            warning: warning
+            totalThreadCount: threads.first?.totalCount ?? 0
         )
+    }
+
+    private func rolloutStatus(at path: String) -> ThreadActivityStatus {
+        let fileURL = URL(fileURLWithPath: path)
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+            let size = (attributes[.size] as? NSNumber)?.uint64Value,
+            let modifiedAt = attributes[.modificationDate] as? Date
+        else {
+            return .idle
+        }
+        if let cached = rolloutStatusCache[path],
+           cached.size == size,
+           cached.modifiedAt == modifiedAt {
+            return cached.status
+        }
+
+        let status = lastLifecycleEvent(in: fileURL) == .started
+            ? ThreadActivityStatus.running
+            : ThreadActivityStatus.idle
+        rolloutStatusCache[path] = (size, modifiedAt, status)
+        return status
+    }
+
+    private enum LifecycleEvent {
+        case started
+        case completed
+    }
+
+    private func lastLifecycleEvent(in fileURL: URL) -> LifecycleEvent? {
+        let startedMarker = Data(#""type":"task_started""#.utf8)
+        let completedMarker = Data(#""type":"task_complete""#.utf8)
+        let overlapSize = max(startedMarker.count, completedMarker.count) - 1
+        let chunkSize: UInt64 = 64 * 1_024
+
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+        defer { try? handle.close() }
+        guard var cursor = try? handle.seekToEnd() else { return nil }
+        var laterOverlap = Data()
+
+        while cursor > 0 {
+            let bytesToRead = min(chunkSize, cursor)
+            cursor -= bytesToRead
+            do {
+                try handle.seek(toOffset: cursor)
+                guard var data = try handle.read(upToCount: Int(bytesToRead)) else { return nil }
+                data.append(laterOverlap)
+
+                let startedRange = data.range(of: startedMarker, options: .backwards)
+                let completedRange = data.range(of: completedMarker, options: .backwards)
+                if let startedRange, let completedRange {
+                    return startedRange.lowerBound > completedRange.lowerBound ? .started : .completed
+                }
+                if startedRange != nil { return .started }
+                if completedRange != nil { return .completed }
+
+                laterOverlap = Data(data.prefix(overlapSize))
+            } catch {
+                return nil
+            }
+        }
+        return nil
     }
 
     private func workspaceGitStatus(at path: String) -> WorkspaceGitStatus {
@@ -128,29 +161,16 @@ actor CodexThreadRepository {
             return cached.value
         }
 
-        guard containsGitMetadata(at: path) else {
-            let status: WorkspaceGitStatus = .notRepository
-            gitStatusCache[path] = CachedGitStatus(value: status, checkedAt: checkedAt)
-            return status
-        }
-
-        let process = Process()
-        let output = Pipe()
-        let errorOutput = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", path, "status", "--porcelain=v1", "--untracked-files=normal"]
-        process.standardOutput = output
-        process.standardError = errorOutput
-
         let status: WorkspaceGitStatus
         do {
-            try process.run()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            _ = errorOutput.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus != 0 {
+            let result = try Subprocess.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                arguments: ["-C", path, "status", "--porcelain=v1", "--untracked-files=normal"],
+                timeout: subprocessTimeout
+            )
+            if result.terminationStatus != 0 {
                 status = .notRepository
-            } else if data.isEmpty {
+            } else if result.standardOutput.isEmpty {
                 status = .clean
             } else {
                 status = .modified
@@ -162,49 +182,25 @@ actor CodexThreadRepository {
         return status
     }
 
-    private func containsGitMetadata(at path: String) -> Bool {
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            return false
-        }
-
-        var directory = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        while true {
-            if fileManager.fileExists(atPath: directory.appendingPathComponent(".git").path) {
-                return true
-            }
-            let parent = directory.deletingLastPathComponent()
-            if parent.path == directory.path { return false }
-            directory = parent
-        }
-    }
-
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
             throw ThreadRepositoryError.missingDatabase(databaseURL)
         }
-        let process = Process()
-        let output = Pipe()
-        let errorOutput = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
-        process.arguments = ["-readonly", "-json", databaseURL.path, sql]
-        process.standardOutput = output
-        process.standardError = errorOutput
         do {
-            try process.run()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorOutput.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else {
-                let message = String(data: errorData, encoding: .utf8)?
+            let result = try Subprocess.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+                arguments: ["-readonly", "-json", databaseURL.path, sql],
+                timeout: subprocessTimeout
+            )
+            guard result.terminationStatus == 0 else {
+                let message = String(data: result.standardError, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let detail = message.flatMap { $0.isEmpty ? nil : $0 }
-                    ?? "sqlite3 exited with status \(process.terminationStatus)"
+                    ?? "sqlite3 exited with status \(result.terminationStatus)"
                 throw ThreadRepositoryError.queryFailed(databaseURL, detail)
             }
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try JSONDecoder().decode(T.self, from: result.standardOutput)
             } catch {
                 throw ThreadRepositoryError.invalidResponse(databaseURL)
             }
