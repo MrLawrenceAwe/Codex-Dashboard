@@ -20,6 +20,7 @@ struct DashboardThread: Codable, Equatable, Identifiable, Sendable {
     let workspacePath: String
     let recencyTimestamp: Int64
     let isPinned: Bool
+    var isUnread = false
     let model: String?
     let activity: ThreadActivity
     let gitWorkingTreeStatus: GitWorkingTreeStatus

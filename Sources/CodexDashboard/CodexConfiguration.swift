@@ -16,4 +16,5 @@ enum CodexConfiguration {
         .appendingPathComponent(".codex", isDirectory: true)
 
     static let stateDatabaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
+    static let globalStateURL = codexDirectory.appendingPathComponent(".codex-global-state.json")
 }

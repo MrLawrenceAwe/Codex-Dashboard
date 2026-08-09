@@ -130,14 +130,127 @@ final class DashboardInjectionTests: XCTestCase {
         let destroyed = try await webView.evaluateJavaScript(
             """
             (() => {
+              let clearedTimerCount = 0;
+              const originalClearInterval = window.clearInterval;
+              window.clearInterval = (timer) => {
+                clearedTimerCount += 1;
+                originalClearInterval(timer);
+              };
               window.__codexDashboard.destroy();
-              return typeof window.__codexDashboard === 'undefined'
-                && !document.getElementById('codex-dashboard-page')
-                && !document.getElementById('codex-dashboard-navigation');
+              return [
+                typeof window.__codexDashboard === 'undefined'
+                  && !document.getElementById('codex-dashboard-page')
+                  && !document.getElementById('codex-dashboard-navigation'),
+                clearedTimerCount,
+              ];
             })()
             """
-        ) as? Bool
-        XCTAssertEqual(destroyed, true)
+        ) as? [Any]
+        XCTAssertEqual(destroyed?[0] as? Bool, true)
+        XCTAssertEqual(destroyed?[1] as? Int, 1)
+    }
+
+    func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+        try await waitUntilLoaded(webView)
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        var thread = DashboardThread(
+            id: "off-sidebar-unread",
+            title: "Off-sidebar unread",
+            preview: "Not mounted in the sidebar",
+            workspaceName: "Project",
+            workspacePath: "/tmp/project",
+            recencyTimestamp: 1,
+            isPinned: false,
+            model: nil,
+            activity: .idle,
+            gitWorkingTreeStatus: .clean
+        )
+        thread.isUnread = true
+        let payloadData = try JSONEncoder().encode(DashboardPayload(threads: [thread]))
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
+              return [
+                document.querySelector('[data-filter-count="unread"]').textContent,
+                document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId,
+              ];
+            })()
+            """
+        ) as? [String]
+
+        XCTAssertEqual(result, ["1", "off-sidebar-unread"])
+    }
+
+    func testUnreadFallbackDetectsSilentReactStateChange() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString(
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread-one">Thread</button>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+        try await waitUntilLoaded(webView)
+        let injection = try DashboardInjection.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let thread = DashboardThread(
+            id: "thread-one",
+            title: "Thread",
+            preview: "Preview",
+            workspaceName: "Project",
+            workspacePath: "/tmp/project",
+            recencyTimestamp: 1,
+            isPinned: false,
+            model: nil,
+            activity: .idle,
+            gitWorkingTreeStatus: .clean
+        )
+        let payloadData = try JSONEncoder().encode(DashboardPayload(threads: [thread]))
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+              row.__reactFiber$test = {
+                memoizedProps: { conversationId: 'thread-one', isUnread: true },
+                return: null,
+              };
+              window.__codexDashboard.applySnapshot(\(payload));
+              row.__reactFiber$test.memoizedProps = {
+                conversationId: 'thread-one',
+                isUnread: false,
+              };
+            })()
+            """
+        )
+
+        try await Task.sleep(for: .milliseconds(600))
+        let unreadCount = try await webView.evaluateJavaScript(
+            #"document.querySelector('[data-filter-count="unread"]').textContent"#
+        ) as? String
+
+        XCTAssertEqual(unreadCount, "0")
     }
 
     func testUncommittedFilterIncludesEveryThreadFromProjectsWithChanges() async throws {

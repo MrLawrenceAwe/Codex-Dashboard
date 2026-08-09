@@ -13,16 +13,25 @@ let mutationObserver;
 let resizeObserver;
 let observedSidebar;
 let mutationFrame;
+let unreadSyncTimer;
 let pendingSidebarMutation = false;
 let isOpen = false;
 let unreadThreadIDs = new Set();
 
 function syncUnreadFromSidebar() {
-  const nextUnreadThreadIDs = codexUI.unreadThreadIDs();
-  const changed = nextUnreadThreadIDs.size !== unreadThreadIDs.size
-    || [...nextUnreadThreadIDs].some((id) => !unreadThreadIDs.has(id));
-  unreadThreadIDs = nextUnreadThreadIDs;
+  const readStates = codexUI.threadReadStates();
+  let changed = false;
+  readStates.forEach((isUnread, id) => {
+    if (isUnread === unreadThreadIDs.has(id)) return;
+    changed = true;
+    if (isUnread) unreadThreadIDs.add(id);
+    else unreadThreadIDs.delete(id);
+  });
   return changed;
+}
+
+function refreshUnreadFromSidebar() {
+  if (syncUnreadFromSidebar()) renderDashboard();
 }
 
 function isThreadUnread(thread) {
@@ -392,6 +401,9 @@ function updateNavigationStatus() {
 function applySnapshot(nextSnapshot) {
   const nextThreads = Array.isArray(nextSnapshot?.threads) ? nextSnapshot.threads : [];
   threads = nextThreads;
+  unreadThreadIDs = new Set(
+    nextThreads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
+  );
   syncUnreadFromSidebar();
   renderDashboard();
 }
@@ -416,6 +428,9 @@ function ensureMounted() {
     mutationObserver = new MutationObserver(scheduleMutationSync);
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
+  if (unreadSyncTimer === undefined) {
+    unreadSyncTimer = window.setInterval(refreshUnreadFromSidebar, 250);
+  }
   if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(syncContentInset);
     observeSidebar();
@@ -438,9 +453,11 @@ function destroy() {
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
   if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
+  if (unreadSyncTimer !== undefined) clearInterval(unreadSyncTimer);
   mutationObserver = undefined;
   resizeObserver = undefined;
   mutationFrame = undefined;
+  unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
   promptMenuSyncQueued = false;
   observedSidebar = undefined;

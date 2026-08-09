@@ -34,10 +34,10 @@ removes it.
 - Loopback-only Chromium DevTools connection managed by `CodexDashboardHost`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
-- Activity snapshots run on a fixed two-second cadence; Git status enrichment refreshes independently every ten seconds.
+- Activity snapshots run on a fixed two-second cadence; unread state refreshes independently every 500 milliseconds, and Git status enrichment every ten seconds. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
 - Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The dashboard loads the latest 60; search and filters apply to the loaded set.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
-- Unread dots and the Unread filter mirror Codex's own sidebar read state.
+- Unread dots and the Unread filter use Codex's complete persisted local unread set, including threads not currently mounted in the sidebar.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the Uncommitted filter isolates those projects.
 - The composer’s **Add** menu includes a local **Prompts** library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
