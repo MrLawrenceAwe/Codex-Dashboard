@@ -27,11 +27,14 @@ final class DashboardViewModel: ObservableObject {
 
     private let threadRepository: any ThreadSnapshotLoading
     private let gitStatusLoader: any GitWorkingTreeStatusLoading
+    private let unreadStateLoader: any UnreadStateLoading
     private var dashboardHost: (any DashboardHost)?
     private var threadRefreshLoopTask: Task<Void, Never>?
     private var gitRefreshLoopTask: Task<Void, Never>?
+    private var unreadRefreshLoopTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var gitWorkingTreeStatuses: [String: GitWorkingTreeStatus] = [:]
+    private var unreadThreadIDs: Set<String> = []
 
     var statusPresentation: (title: String, detail: String) {
         if sessionError != nil {
@@ -57,10 +60,12 @@ final class DashboardViewModel: ObservableObject {
     init(
         threadRepository: any ThreadSnapshotLoading = CodexThreadRepository(),
         gitStatusLoader: any GitWorkingTreeStatusLoading = GitWorkingTreeStatusLoader(),
+        unreadStateLoader: any UnreadStateLoading = CodexUnreadStateReader(),
         dashboardHostFactory: () throws -> any DashboardHost = { try CodexDashboardHost() }
     ) {
         self.threadRepository = threadRepository
         self.gitStatusLoader = gitStatusLoader
+        self.unreadStateLoader = unreadStateLoader
         do {
             dashboardHost = try dashboardHostFactory()
         } catch {
@@ -71,20 +76,27 @@ final class DashboardViewModel: ObservableObject {
     deinit {
         threadRefreshLoopTask?.cancel()
         gitRefreshLoopTask?.cancel()
+        unreadRefreshLoopTask?.cancel()
         refreshTask?.cancel()
     }
 
     func startRefreshing() {
-        guard threadRefreshLoopTask == nil, gitRefreshLoopTask == nil else { return }
+        guard
+            threadRefreshLoopTask == nil,
+            gitRefreshLoopTask == nil,
+            unreadRefreshLoopTask == nil
+        else { return }
         startRefreshLoops()
     }
 
     func stopRefreshing() {
         threadRefreshLoopTask?.cancel()
         gitRefreshLoopTask?.cancel()
+        unreadRefreshLoopTask?.cancel()
         refreshTask?.cancel()
         threadRefreshLoopTask = nil
         gitRefreshLoopTask = nil
+        unreadRefreshLoopTask = nil
         refreshTask = nil
     }
 
@@ -171,6 +183,12 @@ final class DashboardViewModel: ObservableObject {
                 try? await Task.sleep(for: .seconds(10))
             }
         }
+        unreadRefreshLoopTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshUnreadState()
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
     }
 
     private func performRefresh() async {
@@ -212,14 +230,54 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func refreshThreadSnapshot() async throws {
+        if let latestUnreadThreadIDs = try? await unreadStateLoader.loadUnreadThreadIDs() {
+            unreadThreadIDs = latestUnreadThreadIDs
+        }
         let snapshot = try await threadRepository.loadSnapshot(
             gitWorkingTreeStatuses: gitWorkingTreeStatuses,
             activeApplicationLaunchDate: dashboardHost?.applicationLaunchDate
         )
         guard !Task.isCancelled else { return }
-        threads = snapshot.threads
+        threads = applyingUnreadState(to: snapshot.threads)
         availableThreadCount = snapshot.availableThreadCount
         dataWarning = nil
+    }
+
+    private func refreshUnreadState() async {
+        guard !isPerformingAction else { return }
+        let nextUnreadThreadIDs: Set<String>
+        do {
+            nextUnreadThreadIDs = try await unreadStateLoader.loadUnreadThreadIDs()
+        } catch {
+            return
+        }
+        guard nextUnreadThreadIDs != unreadThreadIDs else { return }
+        unreadThreadIDs = nextUnreadThreadIDs
+
+        let updatedThreads = applyingUnreadState(to: threads)
+        guard updatedThreads != threads else { return }
+        threads = updatedThreads
+
+        guard
+            !Task.isCancelled,
+            let dashboardHost,
+            dashboardHost.keepsDashboardMounted
+        else { return }
+        let targets = await dashboardHost.mainRendererTargets()
+        guard !Task.isCancelled, !targets.isEmpty else { return }
+        try? await dashboardHost.mountDashboard(
+            with: DashboardPayload(threads: threads),
+            on: targets,
+            force: false
+        )
+    }
+
+    private func applyingUnreadState(to sourceThreads: [DashboardThread]) -> [DashboardThread] {
+        sourceThreads.map { sourceThread in
+            var thread = sourceThread
+            thread.isUnread = unreadThreadIDs.contains(thread.id)
+            return thread
+        }
     }
 
     private func refreshGitStatuses() async {

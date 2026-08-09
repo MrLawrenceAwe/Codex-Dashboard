@@ -19,8 +19,8 @@ const codexUI = {
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
   },
 
-  unreadThreadIDs() {
-    const unreadIDs = new Set();
+  threadReadStates() {
+    const readStates = new Map();
     document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
       const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
       let fiber = fiberKey ? row[fiberKey] : null;
@@ -30,13 +30,13 @@ const codexUI = {
           typeof props?.conversationId === 'string'
           && typeof props?.isUnread === 'boolean'
         ) {
-          if (props.isUnread) unreadIDs.add(props.conversationId);
+          readStates.set(props.conversationId, props.isUnread);
           break;
         }
         fiber = fiber.return;
       }
     });
-    return unreadIDs;
+    return readStates;
   },
 
   navigateToThread(thread) {
@@ -57,4 +57,3 @@ const codexUI = {
     }));
   },
 };
-
