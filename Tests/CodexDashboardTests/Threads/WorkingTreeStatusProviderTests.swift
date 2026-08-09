@@ -57,7 +57,7 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: firstProjectURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: secondProjectURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: repositoryURL) }
-        _ = try Subprocess.run(
+        _ = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/git"),
             arguments: ["-C", repositoryURL.path, "init", "--quiet"],
             timeout: 3

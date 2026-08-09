@@ -19,6 +19,11 @@ enum UnreadThreadIDError: LocalizedError {
 }
 
 actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
+    private struct FileSignature: Equatable {
+        let size: UInt64
+        let modifiedAt: Date
+    }
+
     private struct GlobalState: Decodable {
         let persistedAtoms: PersistedAtoms
 
@@ -36,18 +41,42 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     }
 
     private let stateURL: URL
+    private let dataLoader: @Sendable (URL) throws -> Data
+    private var cachedSignature: FileSignature?
+    private var cachedUnreadThreadIDs: Set<String> = []
 
-    init(stateURL: URL = CodexConfiguration.globalStateURL) {
+    init(
+        stateURL: URL = CodexConfiguration.globalStateURL,
+        dataLoader: @escaping @Sendable (URL) throws -> Data = {
+            try Data(contentsOf: $0, options: .mappedIfSafe)
+        }
+    ) {
         self.stateURL = stateURL
+        self.dataLoader = dataLoader
     }
 
     func loadUnreadThreadIDs() throws -> Set<String> {
-        guard FileManager.default.fileExists(atPath: stateURL.path) else {
-            throw UnreadThreadIDError.missingState(stateURL)
-        }
+        let attributes: [FileAttributeKey: Any]
         do {
-            let data = try Data(contentsOf: stateURL, options: .mappedIfSafe)
-            return try Self.decodeUnreadThreadIDs(from: data)
+            attributes = try FileManager.default.attributesOfItem(atPath: stateURL.path)
+        } catch CocoaError.fileReadNoSuchFile {
+            throw UnreadThreadIDError.missingState(stateURL)
+        } catch {
+            throw UnreadThreadIDError.invalidState(stateURL)
+        }
+        guard
+            let size = (attributes[.size] as? NSNumber)?.uint64Value,
+            let modifiedAt = attributes[.modificationDate] as? Date
+        else { throw UnreadThreadIDError.invalidState(stateURL) }
+        let signature = FileSignature(size: size, modifiedAt: modifiedAt)
+        if signature == cachedSignature { return cachedUnreadThreadIDs }
+
+        do {
+            let data = try dataLoader(stateURL)
+            let unreadThreadIDs = try Self.decodeUnreadThreadIDs(from: data)
+            cachedSignature = signature
+            cachedUnreadThreadIDs = unreadThreadIDs
+            return unreadThreadIDs
         } catch {
             if error is UnreadThreadIDError { throw error }
             throw UnreadThreadIDError.invalidState(stateURL)
