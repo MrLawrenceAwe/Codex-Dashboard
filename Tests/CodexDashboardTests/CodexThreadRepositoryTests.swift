@@ -98,6 +98,25 @@ final class CodexThreadRepositoryTests: XCTestCase {
         )
     }
 
+    func testIgnoresHistoricalFinalResponsesEmbeddedInCompactionEvents() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let finalResponseAt = now - 1_200
+        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
+            now: now,
+            runningFinalResponseAtUnixSeconds: finalResponseAt,
+            runningCompactionAtUnixSeconds: now - 30,
+            testCase: self
+        )
+        let snapshot = try await CodexThreadRepository(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
+
+        XCTAssertEqual(
+            snapshot.threads.first { $0.id == "running" }?.updatedAtUnixSeconds,
+            finalResponseAt
+        )
+    }
+
     func testAbortedTurnIsIdle() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(

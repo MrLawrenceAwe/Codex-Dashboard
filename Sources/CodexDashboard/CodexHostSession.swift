@@ -115,8 +115,7 @@ final class CodexHostSession {
             if !isHealthy {
                 guard try await devTools.evaluateBoolean(
                     injection.mountExpression,
-                    in: target,
-                    bypassContentSecurityPolicy: true
+                    in: target
                 ) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."

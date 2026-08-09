@@ -36,6 +36,15 @@ actor CodexThreadRepository {
         let lastFinalResponseAtUnixSeconds: Int64?
     }
 
+    private struct RolloutEnvelope: Decodable {
+        struct Payload: Decodable {
+            let phase: String?
+        }
+
+        let timestamp: String?
+        let payload: Payload?
+    }
+
     private var rolloutCache: [String: (size: UInt64, modifiedAt: Date, status: RolloutStatus)] = [:]
     private let subprocessTimeout: TimeInterval
 
@@ -221,13 +230,10 @@ actor CodexThreadRepository {
         guard
             lastFinalResponseAtUnixSeconds == nil,
             line.range(of: finalResponseMarker) != nil,
-            let timestampRange = line.range(of: timestampMarker)
-        else { return }
-
-        let valueStart = timestampRange.upperBound
-        guard
-            let valueEnd = line[valueStart...].firstIndex(of: UInt8(ascii: "\"")),
-            let timestamp = String(data: line[valueStart..<valueEnd], encoding: .utf8),
+            line.range(of: timestampMarker) != nil,
+            let envelope = try? JSONDecoder().decode(RolloutEnvelope.self, from: Data(line)),
+            envelope.payload?.phase == "final_answer",
+            let timestamp = envelope.timestamp,
             let date = ISO8601DateFormatter().date(from: timestamp)
         else { return }
         lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
