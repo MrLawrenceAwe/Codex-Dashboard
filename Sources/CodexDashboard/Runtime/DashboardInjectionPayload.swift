@@ -49,6 +49,14 @@ struct DashboardInjectionPayload: Sendable {
         return DashboardInjectionPayload(version: version, mountExpression: mountExpression)
     }
 
+    static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
+        try loadResources(
+            named: ["codex-contracts"],
+            withExtension: "js",
+            from: bundle ?? defaultResourceBundle
+        )
+    }
+
     private static func loadManifest(from bundle: Bundle) throws -> ResourceManifest {
         guard let url = bundle.url(
             forResource: "injection-manifest",

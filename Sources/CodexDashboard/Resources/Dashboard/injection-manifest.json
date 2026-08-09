@@ -1,6 +1,7 @@
 {
   "scripts": [
     "dashboard-dom",
+    "codex-contracts",
     "codex-host",
     "prompt-store",
     "composer-adapter",

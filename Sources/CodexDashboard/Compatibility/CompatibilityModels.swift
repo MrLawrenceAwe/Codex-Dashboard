@@ -1,6 +1,6 @@
 import Foundation
 
-enum CompatibilityStatus: String, Sendable {
+enum CompatibilityStatus: Sendable {
     case compatible
     case warning
     case incompatible
@@ -16,7 +16,6 @@ struct CompatibilityCheck: Identifiable, Equatable, Sendable {
 
 struct CompatibilityReport: Equatable, Sendable {
     let checks: [CompatibilityCheck]
-    let checkedAt: Date
 
     var blockingCount: Int {
         checks.count { $0.status == .incompatible }

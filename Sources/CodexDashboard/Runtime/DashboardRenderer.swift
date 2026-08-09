@@ -18,7 +18,10 @@ final class DashboardRenderer {
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionPayload.load()
-        compatibilityChecker = RendererCompatibilityChecker(devTools: devTools)
+        compatibilityChecker = RendererCompatibilityChecker(
+            devTools: devTools,
+            contractSource: try DashboardInjectionPayload.loadRendererContractSource()
+        )
     }
 
     func targets() async -> [DevToolsTarget] {
@@ -27,11 +30,6 @@ final class DashboardRenderer {
 
     func prepareForRestart() {
         maintainsDashboard = true
-        clearMountState()
-    }
-
-    func stopMaintaining() {
-        maintainsDashboard = false
         clearMountState()
     }
 

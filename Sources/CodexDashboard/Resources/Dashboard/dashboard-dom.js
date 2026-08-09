@@ -17,8 +17,4 @@ const dashboardDOM = {
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
     })[character]);
   },
-
-  textIs(element, value) {
-    return element?.textContent?.trim() === value;
-  },
 };

@@ -3,9 +3,11 @@ import Foundation
 @MainActor
 struct RendererCompatibilityChecker {
     private let devTools: any DevToolsServing
+    private let contractSource: String
 
-    init(devTools: any DevToolsServing) {
+    init(devTools: any DevToolsServing, contractSource: String) {
         self.devTools = devTools
+        self.contractSource = contractSource
     }
 
     func check() async -> [CompatibilityCheck] {
@@ -27,7 +29,9 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "sidebar-host",
             title: "Sidebar integration",
-            expression: "Boolean(document.querySelector('aside.app-shell-left-panel, aside') && document.querySelector('nav, [role=\"navigation\"]'))",
+            expression: contractExpression(
+                "Boolean(codexContracts.sidebar() && codexContracts.navigation())"
+            ),
             failureStatus: .incompatible,
             compatibleDetail: "The dashboard sidebar host and navigation container are available.",
             failureDetail: "The expected sidebar or navigation container was not found.",
@@ -36,7 +40,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "thread-navigation",
             title: "Thread navigation",
-            expression: "Boolean(document.querySelector('[data-app-action-sidebar-thread-id]'))",
+            expression: contractExpression("codexContracts.threadRows().length > 0"),
             failureStatus: .warning,
             compatibleDetail: "Codex exposes sidebar thread actions used for direct navigation.",
             failureDetail: "No sidebar thread action is currently mounted; route fallback remains available.",
@@ -45,18 +49,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "sidebar-unread",
             title: "Sidebar unread sync",
-            expression: """
-            (() => [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')].some((row) => {
-              const key = Object.keys(row).find((candidate) => candidate.startsWith('__reactFiber$'));
-              let fiber = key ? row[key] : null;
-              while (fiber) {
-                const props = fiber.memoizedProps || fiber.pendingProps;
-                if (typeof props?.conversationId === 'string' && typeof props?.isUnread === 'boolean') return true;
-                fiber = fiber.return;
-              }
-              return false;
-            }))()
-            """,
+            expression: contractExpression("codexContracts.threadReadStates().size > 0"),
             failureStatus: .warning,
             compatibleDetail: "Codex's mounted thread rows expose the unread state used for immediate synchronization.",
             failureDetail: "The React unread-state contract was not found; persisted unread state remains available.",
@@ -65,7 +58,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "composer",
             title: "Composer integration",
-            expression: "[...document.querySelectorAll('textarea, [contenteditable=\"true\"][role=\"textbox\"], [contenteditable=\"true\"]')].some((element) => !element.closest('#codex-dashboard-prompt-dialog') && element.getClientRects().length > 0)",
+            expression: contractExpression("Boolean(codexContracts.composer())"),
             failureStatus: .warning,
             compatibleDetail: "A supported Codex composer is available for saved-prompt insertion.",
             failureDetail: "No supported composer is currently mounted.",
@@ -73,14 +66,14 @@ struct RendererCompatibilityChecker {
         ))
 
         let promptMenuIsOpen = (try? await devTools.evaluateBoolean(
-            "[...document.querySelectorAll('[data-composer-overlay-floating-ui], [role=\"menu\"], [data-radix-menu-content], [data-slot=\"dropdown-menu-content\"]')].some((menu) => menu.textContent.includes('Work in a project') && menu.textContent.includes('Plan mode'))",
+            contractExpression("codexContracts.promptMenuIsOpen()"),
             in: target
         )) == true
         if promptMenuIsOpen {
             checks.append(await inspect(
                 id: "prompt-menu",
                 title: "Prompt menu anchor",
-                expression: "[...document.querySelectorAll('button, [role=\"menuitem\"], span, div')].some((element) => element.textContent?.trim() === 'Record a skill')",
+                expression: contractExpression("Boolean(codexContracts.promptMenuAnchor())"),
                 failureStatus: .incompatible,
                 compatibleDetail: "The Record a skill anchor used by the Prompts item is available.",
                 failureDetail: "The open Add menu no longer contains the expected Record a skill anchor.",
@@ -95,6 +88,15 @@ struct RendererCompatibilityChecker {
             ))
         }
         return checks
+    }
+
+    private func contractExpression(_ expression: String) -> String {
+        """
+        (() => {
+          \(contractSource)
+          return \(expression);
+        })()
+        """
     }
 
     private func inspect(

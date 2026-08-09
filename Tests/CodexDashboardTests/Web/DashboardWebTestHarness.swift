@@ -24,6 +24,29 @@ enum DashboardWebTestHarness {
         return webView
     }
 
+    static func promptLibraryWebView(includeContentEditableComposer: Bool = false) async throws -> WKWebView {
+        let contentEditableComposer = includeContentEditableComposer
+            ? #"<div contenteditable="true" role="textbox"></div>"#
+            : ""
+        return try await mountedWebView(
+            html: """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>
+                <div data-composer-overlay-floating-ui="true" aria-label="Add">
+                  <button role="menuitem" data-list-navigation-item="true"><span>Record a skill</span></button>
+                </div>
+                <textarea placeholder="Do anything"></textarea>
+                \(contentEditableComposer)
+              </main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+    }
+
     static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {
         let data = try JSONEncoder().encode(DashboardSnapshot(threads: threads))
         return try XCTUnwrap(String(data: data, encoding: .utf8))
