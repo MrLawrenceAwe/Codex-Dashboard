@@ -1,13 +1,13 @@
 import Foundation
 
-protocol ThreadSnapshotLoading: Sendable {
-    func loadSnapshot(
-        gitWorkingTreeStatuses: [String: GitWorkingTreeStatus],
-        activeApplicationLaunchDate: Date?
-    ) async throws -> ThreadSnapshot
+protocol ThreadCatalogProviding: Sendable {
+    func loadCatalog(
+        gitStatuses: [String: GitStatus],
+        codexLaunchDate: Date?
+    ) async throws -> ThreadCatalog
 }
 
-enum ThreadRepositoryError: LocalizedError {
+enum ThreadCatalogError: LocalizedError {
     case missingDatabase(URL)
     case queryFailed(URL, String)
     case invalidResponse(URL)
@@ -24,12 +24,12 @@ enum ThreadRepositoryError: LocalizedError {
     }
 }
 
-actor CodexThreadRepository: ThreadSnapshotLoading {
+actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
         let preview: String
-        let workspacePath: String
+        let projectPath: String
         let createdAtUnixSeconds: Int64
         let pinnedValue: Int
         let model: String?
@@ -49,15 +49,15 @@ actor CodexThreadRepository: ThreadSnapshotLoading {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func loadSnapshot(
-        gitWorkingTreeStatuses: [String: GitWorkingTreeStatus],
-        activeApplicationLaunchDate: Date?
-    ) async throws -> ThreadSnapshot {
+    func loadCatalog(
+        gitStatuses: [String: GitStatus],
+        codexLaunchDate: Date?
+    ) async throws -> ThreadCatalog {
         let threadSQL = """
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
-               cwd AS workspacePath,
+               cwd AS projectPath,
                created_at AS createdAtUnixSeconds,
                is_pinned AS pinnedValue,
                model,
@@ -70,39 +70,39 @@ actor CodexThreadRepository: ThreadSnapshotLoading {
         """
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
-            let directoryName = URL(fileURLWithPath: thread.workspacePath).lastPathComponent
+            let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let rolloutStatus = rolloutStatusReader.load(
                 at: thread.rolloutPath,
-                activeApplicationLaunchDate: activeApplicationLaunchDate
+                codexLaunchDate: codexLaunchDate
             )
-            return DashboardThread(
+            return ThreadSummary(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                workspaceName: directoryName.isEmpty ? thread.workspacePath : directoryName,
-                workspacePath: thread.workspacePath,
-                recencyTimestamp: rolloutStatus.lastFinalResponseAtUnixSeconds
+                projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
+                projectPath: thread.projectPath,
+                sortTimestamp: rolloutStatus.lastFinalResponseAtUnixSeconds
                     ?? thread.createdAtUnixSeconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
-                activity: rolloutStatus.activity,
-                gitWorkingTreeStatus: gitWorkingTreeStatuses[thread.workspacePath] ?? .notRepository
+                runState: rolloutStatus.runState,
+                gitStatus: gitStatuses[thread.projectPath] ?? .notRepository
             )
         }.sorted { left, right in
-            if left.recencyTimestamp == right.recencyTimestamp {
+            if left.sortTimestamp == right.sortTimestamp {
                 return left.id < right.id
             }
-            return left.recencyTimestamp > right.recencyTimestamp
+            return left.sortTimestamp > right.sortTimestamp
         }
-        return ThreadSnapshot(
+        return ThreadCatalog(
             threads: dashboardThreads,
-            availableThreadCount: threads.first?.totalCount ?? 0
+            totalThreadCount: threads.first?.totalCount ?? 0
         )
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
-            throw ThreadRepositoryError.missingDatabase(databaseURL)
+            throw ThreadCatalogError.missingDatabase(databaseURL)
         }
         do {
             let result = try Subprocess.run(
@@ -115,16 +115,16 @@ actor CodexThreadRepository: ThreadSnapshotLoading {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let detail = message.flatMap { $0.isEmpty ? nil : $0 }
                     ?? "sqlite3 exited with status \(result.terminationStatus)"
-                throw ThreadRepositoryError.queryFailed(databaseURL, detail)
+                throw ThreadCatalogError.queryFailed(databaseURL, detail)
             }
             do {
                 return try JSONDecoder().decode(T.self, from: result.standardOutput)
             } catch {
-                throw ThreadRepositoryError.invalidResponse(databaseURL)
+                throw ThreadCatalogError.invalidResponse(databaseURL)
             }
         } catch {
-            if error is ThreadRepositoryError { throw error }
-            throw ThreadRepositoryError.queryFailed(databaseURL, error.localizedDescription)
+            if error is ThreadCatalogError { throw error }
+            throw ThreadCatalogError.queryFailed(databaseURL, error.localizedDescription)
         }
     }
 }

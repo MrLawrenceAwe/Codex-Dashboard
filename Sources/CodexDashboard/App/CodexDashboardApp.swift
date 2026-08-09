@@ -20,7 +20,7 @@ struct CodexDashboardApp: App {
 
     var body: some Scene {
         WindowGroup {
-            DashboardControlPanel()
+            ControllerView()
         }
         .windowResizability(.contentSize)
         .commands {

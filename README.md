@@ -31,19 +31,20 @@ removes it.
 
 - Native SwiftUI control panel; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
-- Loopback-only Chromium DevTools connection managed by `CodexDashboardHost`.
+- Loopback-only Chromium DevTools connection managed by `DashboardRuntimeCoordinator` and `DashboardRenderer`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`.
+- Swift source is grouped by application UI, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Activity snapshots run on a fixed two-second cadence; unread state refreshes independently every 500 milliseconds, and Git status enrichment every ten seconds. Visible sidebar read-state changes have an additional 250-millisecond renderer fallback.
 - Threads are ordered by Codex's last final response, so in-progress commentary does not reshuffle them. Before the first final response, creation time is used. The dashboard loads the latest 60; search and filters apply to the loaded set.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including threads not currently mounted in the sidebar.
-- Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the Uncommitted filter isolates those projects.
+- Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Changed projects** filter isolates those projects.
 - The composer’s **Add** menu includes a local **Prompts** library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Codex UI selectors are isolated in `codex-ui.js`; thread and prompt behavior live in separate resources.
+- Codex UI selectors are isolated in `codex-ui.js`; dashboard lifecycle and each prompt-library concern live in focused resources.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.

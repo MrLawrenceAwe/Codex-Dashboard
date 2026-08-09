@@ -1,12 +1,12 @@
 import Foundation
 
 struct RolloutStatus: Equatable, Sendable {
-    let activity: ThreadActivity
+    let runState: ThreadRunState
     let lastFinalResponseAtUnixSeconds: Int64?
 }
 
 struct RolloutStatusReader {
-    private enum ActivityEvent {
+    private enum RunEvent {
         case started
         case ended
     }
@@ -31,7 +31,7 @@ struct RolloutStatusReader {
 
     mutating func load(
         at path: String,
-        activeApplicationLaunchDate: Date?
+        codexLaunchDate: Date?
     ) -> RolloutStatus {
         let fileURL = URL(fileURLWithPath: path)
         guard
@@ -39,7 +39,7 @@ struct RolloutStatusReader {
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
 
         let status: RolloutStatus
@@ -53,10 +53,10 @@ struct RolloutStatusReader {
             let appendedStatus = read(
                 in: fileURL,
                 lowerBound: cached.size,
-                fallbackActivity: cached.status.activity
+                fallbackRunState: cached.status.runState
             )
             status = RolloutStatus(
-                activity: appendedStatus.activity,
+                runState: appendedStatus.runState,
                 lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
                     ?? cached.status.lastFinalResponseAtUnixSeconds
             )
@@ -70,9 +70,9 @@ struct RolloutStatusReader {
             status: status
         )
 
-        guard let activeApplicationLaunchDate, modifiedAt >= activeApplicationLaunchDate else {
+        guard let codexLaunchDate, modifiedAt >= codexLaunchDate else {
             return RolloutStatus(
-                activity: .idle,
+                runState: .idle,
                 lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
             )
         }
@@ -82,9 +82,9 @@ struct RolloutStatusReader {
     private func read(
         in fileURL: URL,
         lowerBound: UInt64 = 0,
-        fallbackActivity: ThreadActivity = .idle
+        fallbackRunState: ThreadRunState = .idle
     ) -> RolloutStatus {
-        let markers: [(event: ActivityEvent, data: Data)] = [
+        let markers: [(event: RunEvent, data: Data)] = [
             (.started, Data(#""type":"task_started""#.utf8)),
             (.ended, Data(#""type":"task_complete""#.utf8)),
             (.ended, Data(#""type":"turn_aborted""#.utf8)),
@@ -94,14 +94,14 @@ struct RolloutStatusReader {
         let chunkSize: UInt64 = 64 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
+            return RolloutStatus(runState: .idle, lastFinalResponseAtUnixSeconds: nil)
         }
         var laterLineFragment = Data()
-        var lastEvent: ActivityEvent?
+        var lastEvent: RunEvent?
         var lastFinalResponseAtUnixSeconds: Int64?
 
         while cursor > lowerBound {
@@ -145,8 +145,8 @@ struct RolloutStatusReader {
             }
         }
         return RolloutStatus(
-            activity: lastEvent.map { $0 == .started ? .running : .idle }
-                ?? fallbackActivity,
+            runState: lastEvent.map { $0 == .started ? .running : .idle }
+                ?? fallbackRunState,
             lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
         )
     }
@@ -166,14 +166,14 @@ struct RolloutStatusReader {
 
     private func inspect(
         _ line: Data.SubSequence,
-        markers: [(event: ActivityEvent, data: Data)],
+        markers: [(event: RunEvent, data: Data)],
         finalResponseMarker: Data,
         timestampMarker: Data,
-        lastEvent: inout ActivityEvent?,
+        lastEvent: inout RunEvent?,
         lastFinalResponseAtUnixSeconds: inout Int64?
     ) {
         if lastEvent == nil {
-            let matches = markers.compactMap { marker -> (ActivityEvent, Data.Index)? in
+            let matches = markers.compactMap { marker -> (RunEvent, Data.Index)? in
                 guard let range = line.range(of: marker.data, options: .backwards) else {
                     return nil
                 }

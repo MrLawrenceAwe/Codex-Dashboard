@@ -2,7 +2,7 @@ import Foundation
 
 enum CodexConfiguration {
     static let bundleIdentifier = "com.openai.codex"
-    static let applicationURL = URL(fileURLWithPath: "/Applications/ChatGPT.app", isDirectory: true)
+    static let codexApplicationURL = URL(fileURLWithPath: "/Applications/ChatGPT.app", isDirectory: true)
     static let devToolsAddress = "127.0.0.1"
     static let devToolsPort = 47_832
 

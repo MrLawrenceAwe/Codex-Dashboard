@@ -1,13 +1,9 @@
-const promptEventTypes = [
-  'pointerdown', 'mousedown', 'click', 'keydown', 'submit',
-  'dragstart', 'dragover', 'dragleave', 'drop', 'dragend',
-];
 const navigationEventTypes = ['pointerdown', 'mousedown', 'click'];
 
 let threads = [];
 let filterMode = 'all';
 let searchTerm = '';
-let groupingMode = 'projects';
+let viewMode = 'projects';
 const collapsedProjects = new Set();
 let mutationObserver;
 let resizeObserver;
@@ -15,7 +11,7 @@ let observedSidebar;
 let mutationFrame;
 let unreadSyncTimer;
 let pendingSidebarMutation = false;
-let isOpen = false;
+let dashboardIsOpen = false;
 let unreadThreadIDs = new Set();
 
 function syncUnreadFromSidebar() {
@@ -46,11 +42,11 @@ function handleHostNavigation(event) {
     if (event.type === 'click') openPage();
     return;
   }
-  if (event.type !== 'click' || !isOpen) return;
+  if (event.type !== 'click' || !dashboardIsOpen) return;
   if (eventTarget?.closest('aside') && !eventTarget.closest(`#${elementIDs.navButton}`)) closePage();
 }
 
-function iconSvg(name) {
+function iconMarkup(name) {
   const paths = {
     threads: '<path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
     project: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5l2 2H19.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>',
@@ -74,19 +70,26 @@ function formatRelativeTime(timestamp) {
   return `${days}d ago`;
 }
 
-function selectVisibleThreads() {
+function deriveDashboardState() {
+  return {
+    runningThreads: threads.filter((thread) => thread.runState === 'running'),
+    unreadCount: threads.filter(isThreadUnread).length,
+    changedProjectPaths: new Set(
+      threads
+        .filter((thread) => thread.gitStatus === 'hasChanges')
+        .map((thread) => String(thread.projectPath).trim()),
+    ),
+  };
+}
+
+function filterThreads({ changedProjectPaths }) {
   const query = searchTerm.trim().toLowerCase();
-  const uncommittedProjectPaths = new Set(
-    threads
-      .filter((thread) => thread.gitWorkingTreeStatus === 'hasChanges')
-      .map((thread) => String(thread.workspacePath).trim()),
-  );
   return threads.filter((thread) => {
     const matchesFilter = filterMode === 'all'
       || (filterMode === 'unread' && isThreadUnread(thread))
-      || (filterMode === 'uncommitted'
-        && uncommittedProjectPaths.has(String(thread.workspacePath).trim()));
-    const matchesSearch = !query || `${thread.title} ${thread.preview} ${thread.workspaceName} ${thread.workspacePath}`.toLowerCase().includes(query);
+      || (filterMode === 'changedProjects'
+        && changedProjectPaths.has(String(thread.projectPath).trim()));
+    const matchesSearch = !query || `${thread.title} ${thread.preview} ${thread.projectName} ${thread.projectPath}`.toLowerCase().includes(query);
     return matchesFilter && matchesSearch;
   });
 }
@@ -96,59 +99,59 @@ function openThread(thread) {
   codexUI.navigateToThread(thread);
 }
 
-function threadHTML(thread, showProject = false) {
+function renderThreadMarkup(thread, showProject = false) {
   const unread = isThreadUnread(thread);
   return `
-    <article class="dashboard-thread" data-activity="${escapeHTML(thread.activity)}" data-unread="${String(unread)}" data-thread-id="${escapeHTML(thread.id)}">
-      <div class="dashboard-status-dot" title="${escapeHTML(thread.activity)}"></div>
+    <article class="dashboard-thread" data-run-state="${escapeHTML(thread.runState)}" data-unread="${String(unread)}" data-thread-id="${escapeHTML(thread.id)}">
+      <div class="dashboard-status-dot" title="${escapeHTML(thread.runState)}"></div>
       <div class="dashboard-thread-copy">
         <div class="dashboard-thread-title-row">
           ${unread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
           <h2>${escapeHTML(thread.title)}</h2>
-          ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconSvg('pin')}</span>` : ''}
+          ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${iconMarkup('pin')}</span>` : ''}
         </div>
         <p>${escapeHTML(thread.preview || 'No preview available')}</p>
         <div class="dashboard-meta">
-          ${showProject ? `<span>${escapeHTML(thread.workspaceName)}</span>` : ''}
-          <span>${formatRelativeTime(thread.recencyTimestamp)}</span>
+          ${showProject ? `<span>${escapeHTML(thread.projectName)}</span>` : ''}
+          <span>${formatRelativeTime(thread.sortTimestamp)}</span>
           ${thread.model ? `<span>${escapeHTML(thread.model)}</span>` : ''}
         </div>
       </div>
       <div class="dashboard-thread-actions">
-        ${thread.activity === 'running' ? '<span class="dashboard-running-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
-        <button type="button" data-open-thread="${escapeHTML(thread.id)}">Open ${iconSvg('arrow')}</button>
+        ${thread.runState === 'running' ? '<span class="dashboard-running-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
+        <button type="button" data-open-thread="${escapeHTML(thread.id)}">Open ${iconMarkup('arrow')}</button>
       </div>
     </article>`;
 }
 
-function threadListHTML(visibleThreads) {
-  if (groupingMode === 'recency') {
+function renderThreadListMarkup(visibleThreads) {
+  if (viewMode === 'recent') {
     return [...visibleThreads]
-      .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0))
-      .map((thread) => threadHTML(thread, true))
+      .sort((left, right) => Number(right.sortTimestamp || 0) - Number(left.sortTimestamp || 0))
+      .map((thread) => renderThreadMarkup(thread, true))
       .join('');
   }
   const groups = new Map();
   visibleThreads.forEach((thread) => {
-    const projectPath = String(thread.workspacePath).trim();
+    const projectPath = String(thread.projectPath).trim();
     if (!groups.has(projectPath)) {
-      groups.set(projectPath, { path: projectPath, name: thread.workspaceName, threads: [] });
+      groups.set(projectPath, { path: projectPath, name: thread.projectName, threads: [] });
     }
     groups.get(projectPath).threads.push(thread);
   });
   return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
     const isCollapsed = collapsedProjects.has(projectPath);
     const projectListID = `dashboard-project-${index}`;
-    const runningCount = projectThreads.filter((thread) => thread.activity === 'running').length;
+    const runningCount = projectThreads.filter((thread) => thread.runState === 'running').length;
     return `
     <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${escapeHTML(project)} project">
       <header class="dashboard-project-heading">
         <button type="button" class="dashboard-project-toggle" data-project-toggle="${escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
           <span class="dashboard-project-title">
-            <span class="dashboard-project-chevron">${iconSvg('chevron')}</span>
-            <span class="dashboard-project-icon">${iconSvg('project')}</span>
+            <span class="dashboard-project-chevron">${iconMarkup('chevron')}</span>
+            <span class="dashboard-project-icon">${iconMarkup('project')}</span>
             <span class="dashboard-project-name">${escapeHTML(project)}</span>
-            ${projectThreads.some((thread) => thread.gitWorkingTreeStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconSvg('gitChanges')}<span>Uncommitted</span></span>` : ''}
+            ${projectThreads.some((thread) => thread.gitStatus === 'hasChanges') ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${iconMarkup('gitChanges')}<span>Uncommitted</span></span>` : ''}
           </span>
           <span class="dashboard-project-summary">
             ${runningCount > 0 ? `<span class="dashboard-running-spinner has-count" role="status" aria-label="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}" title="${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}"><span aria-hidden="true">${runningCount}</span></span>` : ''}
@@ -156,29 +159,28 @@ function threadListHTML(visibleThreads) {
           </span>
         </button>
       </header>
-      <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((thread) => threadHTML(thread)).join('')}</div>
+      <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((thread) => renderThreadMarkup(thread)).join('')}</div>
     </section>`;
   }).join('');
 }
 
 function renderDashboard() {
-  updateNavigationStatus();
+  const state = deriveDashboardState();
+  updateSidebarStatus(state);
   const page = document.getElementById(elementIDs.page);
   if (!page) return;
-  const runningThreads = threads.filter((thread) => thread.activity === 'running');
-  const unread = threads.filter(isThreadUnread).length;
   const runningSummary = page.querySelector('[data-running-summary]');
-  if (runningSummary) runningSummary.hidden = runningThreads.length === 0;
+  if (runningSummary) runningSummary.hidden = state.runningThreads.length === 0;
   const runningCount = page.querySelector('[data-running-count]');
   if (runningCount) {
-    runningCount.textContent = String(runningThreads.length);
-    const runningLabel = `${runningThreads.length} running ${runningThreads.length === 1 ? 'thread' : 'threads'}`;
+    runningCount.textContent = String(state.runningThreads.length);
+    const runningLabel = `${state.runningThreads.length} running ${state.runningThreads.length === 1 ? 'thread' : 'threads'}`;
     runningCount.parentElement?.setAttribute('aria-label', runningLabel);
     runningCount.parentElement?.setAttribute('title', runningLabel);
   }
   const runningList = page.querySelector('[data-running-list]');
-  if (runningList) runningList.innerHTML = runningThreads
-    .map((thread) => threadHTML(thread, true))
+  if (runningList) runningList.innerHTML = state.runningThreads
+    .map((thread) => renderThreadMarkup(thread, true))
     .join('');
   page.querySelectorAll('[data-filter]').forEach((button) => {
     const isActive = button.dataset.filter === filterMode;
@@ -187,23 +189,19 @@ function renderDashboard() {
   });
   const filterCounts = {
     all: threads.length,
-    unread,
-    uncommitted: new Set(
-      threads
-        .filter((thread) => thread.gitWorkingTreeStatus === 'hasChanges')
-        .map((thread) => String(thread.workspacePath).trim()),
-    ).size,
+    unread: state.unreadCount,
+    changedProjects: state.changedProjectPaths.size,
   };
   page.querySelectorAll('[data-filter-count]').forEach((count) => {
     count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
   });
-  page.querySelectorAll('[data-grouping]').forEach((button) => {
-    const isActive = button.dataset.grouping === groupingMode;
+  page.querySelectorAll('[data-view]').forEach((button) => {
+    const isActive = button.dataset.view === viewMode;
     button.classList.toggle('is-active', isActive);
     button.setAttribute('aria-pressed', String(isActive));
   });
 
-  const visibleThreads = selectVisibleThreads();
+  const visibleThreads = filterThreads(state);
   const list = page.querySelector('[data-thread-list]');
   if (!visibleThreads.length) {
     const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
@@ -212,7 +210,7 @@ function renderDashboard() {
     list.innerHTML = `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`;
     return;
   }
-  list.innerHTML = threadListHTML(visibleThreads);
+  list.innerHTML = renderThreadListMarkup(visibleThreads);
 }
 
 function syncContentInset() {
@@ -229,7 +227,7 @@ function observeSidebar() {
   observedSidebar = sidebar;
 }
 
-function syncPageHost() {
+function attachPageToCodexContent() {
   const page = document.getElementById(elementIDs.page);
   const pageHost = codexUI.pageHost();
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
@@ -257,8 +255,8 @@ function scheduleMutationSync(records) {
     const restoredPage = !document.getElementById(elementIDs.page);
     if (restoredPage) mountDashboardPage();
     if (!document.getElementById(elementIDs.navButton)) mountNavigationButton();
-    if (isOpen && restoredPage) openPage();
-    syncPageHost();
+    if (dashboardIsOpen && restoredPage) openPage();
+    attachPageToCodexContent();
     observeSidebar();
     if (shouldSyncUnread && syncUnreadFromSidebar()) renderDashboard();
   });
@@ -274,7 +272,7 @@ function mountNavigationButton() {
   button.setAttribute('aria-label', 'Dashboard');
   button.innerHTML = `
     <div class="dashboard-nav-copy">
-      <span class="dashboard-nav-icon">${iconSvg('threads')}</span>
+      <span class="dashboard-nav-icon">${iconMarkup('threads')}</span>
       <span class="dashboard-nav-label">Dashboard</span>
     </div>
     <div class="dashboard-nav-status">
@@ -283,7 +281,7 @@ function mountNavigationButton() {
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
   else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
-  updateNavigationStatus();
+  updateSidebarStatus(deriveDashboardState());
   return true;
 }
 
@@ -308,13 +306,13 @@ function mountDashboardPage() {
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
             <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-            <button type="button" data-filter="uncommitted">Uncommitted <span class="dashboard-filter-count" data-filter-count="uncommitted">0</span></button>
+            <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
           </div>
           <div class="dashboard-view-options" aria-label="Group threads">
-            <button type="button" data-grouping="projects" class="is-active" aria-pressed="true">Projects</button>
-            <button type="button" data-grouping="recency" aria-pressed="false">Latest response</button>
+            <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
+            <button type="button" data-view="recent" aria-pressed="false">Recent</button>
           </div>
-          <label class="dashboard-search" aria-label="Search loaded threads">${iconSvg('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
+          <label class="dashboard-search" aria-label="Search loaded threads">${iconMarkup('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
         </div>
       </div>
       <main class="dashboard-list" data-thread-list></main>
@@ -325,9 +323,9 @@ function mountDashboardPage() {
       renderDashboard();
     });
   });
-  page.querySelectorAll('[data-grouping]').forEach((button) => {
+  page.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => {
-      groupingMode = button.dataset.grouping;
+      viewMode = button.dataset.view;
       renderDashboard();
     });
   });
@@ -361,7 +359,7 @@ function openThreadFromEvent(event) {
 function openPage() {
   const page = document.getElementById(elementIDs.page);
   if (!page) return;
-  isOpen = true;
+  dashboardIsOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
   document.getElementById(elementIDs.navButton)?.setAttribute('aria-current', 'page');
@@ -369,26 +367,25 @@ function openPage() {
 }
 
 function closePage() {
-  isOpen = false;
+  dashboardIsOpen = false;
   document.getElementById(elementIDs.page)?.classList.remove('is-open');
   document.documentElement.classList.remove('codex-dashboard-open');
   document.getElementById(elementIDs.navButton)?.removeAttribute('aria-current');
 }
 
-function updateNavigationStatus() {
-  const unreadCount = threads.filter(isThreadUnread).length;
-  const runningCount = threads.filter((thread) => thread.activity === 'running').length;
-  const count = document.querySelector('[data-navigation-count]');
-  if (count) {
-    count.textContent = String(unreadCount);
-    count.hidden = unreadCount === 0;
-    count.setAttribute(
+function updateSidebarStatus({ unreadCount, runningThreads }) {
+  const unreadBadge = document.querySelector('[data-navigation-count]');
+  if (unreadBadge) {
+    unreadBadge.textContent = String(unreadCount);
+    unreadBadge.hidden = unreadCount === 0;
+    unreadBadge.setAttribute(
       'aria-label',
       `${unreadCount} unread ${unreadCount === 1 ? 'thread' : 'threads'}`,
     );
   }
   const spinner = document.querySelector('[data-navigation-running]');
   if (spinner) {
+    const runningCount = runningThreads.length;
     const runningLabel = `${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}`;
     spinner.hidden = runningCount === 0;
     spinner.setAttribute('aria-label', runningLabel);
@@ -419,10 +416,10 @@ function ensureMounted() {
   const pageWasMissing = !document.getElementById(elementIDs.page);
   if (pageWasMissing) mountDashboardPage();
   if (!document.getElementById(elementIDs.navButton)) mountNavigationButton();
-  syncPageHost();
+  attachPageToCodexContent();
   syncContentInset();
-  syncPromptMenuItem();
-  if (isOpen && pageWasMissing) openPage();
+  mountPromptLibrary();
+  if (dashboardIsOpen && pageWasMissing) openPage();
 
   if (!mutationObserver) {
     mutationObserver = new MutationObserver(scheduleMutationSync);
@@ -435,9 +432,6 @@ function ensureMounted() {
     resizeObserver = new ResizeObserver(syncContentInset);
     observeSidebar();
   }
-  promptEventTypes.forEach((type) => {
-    document.addEventListener(type, handlePromptInteraction, true);
-  });
   navigationEventTypes.forEach((type) => {
     document.addEventListener(type, handleHostNavigation, true);
   });
@@ -449,7 +443,7 @@ function ensureMounted() {
 }
 
 function destroy() {
-  isOpen = false;
+  dashboardIsOpen = false;
   mutationObserver?.disconnect();
   resizeObserver?.disconnect();
   if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
@@ -459,17 +453,13 @@ function destroy() {
   mutationFrame = undefined;
   unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
-  promptMenuSyncQueued = false;
   observedSidebar = undefined;
-  promptEventTypes.forEach((type) => {
-    document.removeEventListener(type, handlePromptInteraction, true);
-  });
+  unmountPromptLibrary();
   navigationEventTypes.forEach((type) => {
     document.removeEventListener(type, handleHostNavigation, true);
   });
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');
-  document.querySelectorAll('[data-codex-prompt-menu-item]').forEach((item) => item.remove());
   Object.values(elementIDs).forEach((id) => document.getElementById(id)?.remove());
   delete window.__codexDashboard;
 }

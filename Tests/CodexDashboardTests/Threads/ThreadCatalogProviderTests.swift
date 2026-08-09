@@ -1,0 +1,85 @@
+import XCTest
+
+@testable import CodexDashboard
+
+final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testLiveCatalogWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex thread catalog.")
+        }
+
+        let catalog = try await CodexThreadCatalogProvider().loadCatalog(
+            gitStatuses: [:],
+            codexLaunchDate: .distantPast
+        )
+        XCTAssertFalse(catalog.threads.isEmpty)
+        XCTAssertGreaterThanOrEqual(catalog.totalThreadCount, catalog.threads.count)
+        XCTAssertTrue(catalog.threads.contains { $0.runState == .running })
+    }
+
+    func testLoadsAndClassifiesThreads() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(now: now, testCase: self)
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(gitStatuses: [:], codexLaunchDate: .distantPast)
+
+        XCTAssertEqual(catalog.totalThreadCount, 3)
+        XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated", "idle"])
+        XCTAssertEqual(catalog.threads.map(\.runState), [.running, .idle, .idle])
+        XCTAssertEqual(catalog.threads.first?.title, "Running thread")
+        XCTAssertEqual(catalog.threads.first?.projectName, "running")
+        XCTAssertEqual(catalog.threads.first?.projectPath, "/tmp/running")
+        XCTAssertEqual(catalog.threads.first?.sortTimestamp, now - 300)
+        XCTAssertEqual(catalog.threads.first?.gitStatus, .notRepository)
+        XCTAssertTrue(catalog.threads.first?.isPinned == true)
+        XCTAssertEqual(catalog.threads[1].title, "Renamed thread")
+        XCTAssertEqual(catalog.threads[1].sortTimestamp, now - 600)
+    }
+
+    func testOrdersThreadsByFinalResponseInsteadOfDatabaseActivity() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            runningFinalResponseAtUnixSeconds: now - 1_200,
+            testCase: self
+        )
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(gitStatuses: [:], codexLaunchDate: .distantPast)
+
+        XCTAssertEqual(catalog.threads.map(\.id), ["updated", "running", "idle"])
+        XCTAssertEqual(catalog.threads[1].runState, .running)
+        XCTAssertEqual(catalog.threads[1].sortTimestamp, now - 1_200)
+    }
+
+    func testReportsFullCountWhenThreadRowsAreLimited() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            additionalThreadCount: 60,
+            testCase: self
+        )
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(gitStatuses: [:], codexLaunchDate: .distantPast)
+
+        XCTAssertEqual(catalog.threads.count, 60)
+        XCTAssertEqual(catalog.totalThreadCount, 63)
+    }
+
+    func testReportsMissingStateDatabase() async throws {
+        let missingDatabaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: missingDatabaseURL)
+        do {
+            _ = try await provider.loadCatalog(
+                gitStatuses: [:],
+                codexLaunchDate: .distantPast
+            )
+            XCTFail("Expected the missing state database to be reported")
+        } catch ThreadCatalogError.missingDatabase(let databaseURL) {
+            XCTAssertEqual(databaseURL, missingDatabaseURL)
+        }
+    }
+}

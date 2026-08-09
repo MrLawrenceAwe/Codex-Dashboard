@@ -5,7 +5,7 @@ import XCTest
 final class RolloutStatusReaderTests: XCTestCase {
     func testReadsLatestActivityAndFinalResponseDirectly() throws {
         let finalResponseAt = Int64(Date().timeIntervalSince1970) - 90
-        let rolloutURL = try TestDatabaseFactory.makeRollout(
+        let rolloutURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_complete", "task_started"],
             finalResponseAtUnixSeconds: finalResponseAt,
             finalResponseMessageSize: 128 * 1_024,
@@ -15,15 +15,15 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let status = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantPast
+            codexLaunchDate: .distantPast
         )
 
-        XCTAssertEqual(status.activity, .running)
+        XCTAssertEqual(status.runState, .running)
         XCTAssertEqual(status.lastFinalResponseAtUnixSeconds, finalResponseAt)
     }
 
     func testActivityBeforeApplicationLaunchIsIdle() throws {
-        let rolloutURL = try TestDatabaseFactory.makeRollout(
+        let rolloutURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_complete", "task_started"],
             finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
             testCase: self
@@ -32,16 +32,16 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let status = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantFuture
+            codexLaunchDate: .distantFuture
         )
 
-        XCTAssertEqual(status.activity, .idle)
+        XCTAssertEqual(status.runState, .idle)
         XCTAssertNotNil(status.lastFinalResponseAtUnixSeconds)
     }
 
     func testIgnoresHistoricalFinalResponseEmbeddedInCompaction() throws {
         let finalResponseAt = Int64(Date().timeIntervalSince1970) - 1_200
-        let rolloutURL = try TestDatabaseFactory.makeRollout(
+        let rolloutURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_started"],
             finalResponseAtUnixSeconds: finalResponseAt,
             compactionAtUnixSeconds: finalResponseAt + 1_000,
@@ -51,14 +51,14 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let status = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantPast
+            codexLaunchDate: .distantPast
         )
 
         XCTAssertEqual(status.lastFinalResponseAtUnixSeconds, finalResponseAt)
     }
 
     func testAbortedTurnIsIdle() throws {
-        let rolloutURL = try TestDatabaseFactory.makeRollout(
+        let rolloutURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_complete", "task_started", "turn_aborted"],
             finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
             testCase: self
@@ -67,10 +67,10 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let status = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantPast
+            codexLaunchDate: .distantPast
         )
 
-        XCTAssertEqual(status.activity, .idle)
+        XCTAssertEqual(status.runState, .idle)
     }
 
     func testAppendedEventsReuseCachedHistoryWithoutLosingStatus() throws {
@@ -87,9 +87,9 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let initial = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantPast
+            codexLaunchDate: .distantPast
         )
-        XCTAssertEqual(initial.activity, .running)
+        XCTAssertEqual(initial.runState, .running)
         XCTAssertNil(initial.lastFinalResponseAtUnixSeconds)
 
         let finalResponseAt = Int64(Date().timeIntervalSince1970) - 10
@@ -110,10 +110,10 @@ final class RolloutStatusReaderTests: XCTestCase {
 
         let updated = reader.load(
             at: rolloutURL.path,
-            activeApplicationLaunchDate: .distantPast
+            codexLaunchDate: .distantPast
         )
 
-        XCTAssertEqual(updated.activity, .idle)
+        XCTAssertEqual(updated.runState, .idle)
         XCTAssertEqual(updated.lastFinalResponseAtUnixSeconds, finalResponseAt)
     }
 }
