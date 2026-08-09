@@ -56,7 +56,7 @@ enum DashboardWebTestHarness {
     }
 
     static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {
-        let data = try JSONEncoder().encode(DashboardSnapshot(threads: threads))
+        let data = try JSONEncoder().encode(DashboardSnapshotPayload(threads: threads))
         return try XCTUnwrap(String(data: data, encoding: .utf8))
     }
 

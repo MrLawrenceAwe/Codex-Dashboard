@@ -51,7 +51,7 @@ final class DashboardPollingController {
     }
 
     private static var isUserActive: Bool {
-        NSApp.isActive
+        NSApp?.isActive == true
             || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
     }
 

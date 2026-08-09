@@ -1,10 +1,10 @@
 import Foundation
 
 protocol WorkingTreeStatusProviding: Sendable {
-    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus]
+    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus]
 }
 
-actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     static let defaultStatusCacheLifetime: TimeInterval = 10
     static let defaultResolutionCacheLifetime: TimeInterval = 10
 
@@ -33,15 +33,15 @@ actor SystemWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     init(
         subprocessTimeout: TimeInterval = 3,
-        cacheLifetime: TimeInterval = SystemWorkingTreeStatusProvider.defaultStatusCacheLifetime,
-        resolutionCacheLifetime: TimeInterval = SystemWorkingTreeStatusProvider.defaultResolutionCacheLifetime
+        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime,
+        resolutionCacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultResolutionCacheLifetime
     ) {
         self.subprocessTimeout = subprocessTimeout
         self.cacheLifetime = cacheLifetime
         self.resolutionCacheLifetime = resolutionCacheLifetime
     }
 
-    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
         let now = Date()

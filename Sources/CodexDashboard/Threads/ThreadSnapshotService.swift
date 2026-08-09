@@ -1,19 +1,19 @@
 import Foundation
 
-struct ThreadSnapshotLoad: Sendable {
+struct ThreadSnapshotResult: Sendable {
     let catalog: ThreadCatalog
     let unreadStateWarning: String?
 }
 
-struct UnreadStateRefresh: Sendable {
-    let threads: [ThreadSummary]?
+struct UnreadStateUpdate: Sendable {
+    let unreadThreadIDs: Set<String>?
     let warning: String?
 }
 
 actor ThreadSnapshotService {
     private let catalogProvider: any ThreadCatalogProviding
     private let workingTreeStatusProvider: any WorkingTreeStatusProviding
-    private let unreadIDProvider: any UnreadThreadIDProviding
+    private let unreadThreadIDProvider: any UnreadThreadIDProviding
     private var workingTreeStatuses: [String: WorkingTreeStatus] = [:]
     private var unreadThreadIDs: Set<String> = []
     private var unreadStateWarning: String?
@@ -22,17 +22,17 @@ actor ThreadSnapshotService {
     init(
         catalogProvider: any ThreadCatalogProviding,
         workingTreeStatusProvider: any WorkingTreeStatusProviding,
-        unreadIDProvider: any UnreadThreadIDProviding
+        unreadThreadIDProvider: any UnreadThreadIDProviding
     ) {
         self.catalogProvider = catalogProvider
         self.workingTreeStatusProvider = workingTreeStatusProvider
-        self.unreadIDProvider = unreadIDProvider
+        self.unreadThreadIDProvider = unreadThreadIDProvider
     }
 
-    func loadSnapshot(codexLaunchDate: Date?) async throws -> ThreadSnapshotLoad {
+    func loadSnapshot(codexLaunchDate: Date?) async throws -> ThreadSnapshotResult {
         if !hasLoadedSnapshot {
             do {
-                unreadThreadIDs = try await unreadIDProvider.loadUnreadThreadIDs()
+                unreadThreadIDs = try await unreadThreadIDProvider.loadUnreadThreadIDs()
                 unreadStateWarning = nil
             } catch {
                 unreadStateWarning = Self.warning(for: error)
@@ -48,7 +48,7 @@ actor ThreadSnapshotService {
             thread.workingTreeStatus = workingTreeStatuses[thread.projectPath] ?? .notRepository
             return thread
         }
-        return ThreadSnapshotLoad(
+        return ThreadSnapshotResult(
             catalog: ThreadCatalog(
                 threads: applyingUnreadState(to: threads),
                 totalThreadCount: catalog.totalThreadCount
@@ -57,37 +57,32 @@ actor ThreadSnapshotService {
         )
     }
 
-    func updateUnreadState(in threads: [ThreadSummary]) async -> UnreadStateRefresh {
+    func updateUnreadState() async -> UnreadStateUpdate {
         let latestUnreadIDs: Set<String>
         do {
-            latestUnreadIDs = try await unreadIDProvider.loadUnreadThreadIDs()
+            latestUnreadIDs = try await unreadThreadIDProvider.loadUnreadThreadIDs()
             unreadStateWarning = nil
         } catch {
             unreadStateWarning = Self.warning(for: error)
-            return UnreadStateRefresh(threads: nil, warning: unreadStateWarning)
+            return UnreadStateUpdate(unreadThreadIDs: nil, warning: unreadStateWarning)
         }
         guard latestUnreadIDs != unreadThreadIDs else {
-            return UnreadStateRefresh(threads: nil, warning: nil)
+            return UnreadStateUpdate(unreadThreadIDs: nil, warning: nil)
         }
         unreadThreadIDs = latestUnreadIDs
-        let updatedThreads = applyingUnreadState(to: threads)
-        return UnreadStateRefresh(
-            threads: updatedThreads == threads ? nil : updatedThreads,
+        return UnreadStateUpdate(
+            unreadThreadIDs: latestUnreadIDs,
             warning: nil
         )
     }
 
-    func updateWorkingTreeStatuses(in threads: [ThreadSummary]) async -> [ThreadSummary]? {
+    func updateWorkingTreeStatuses(in threads: [ThreadSummary]) async -> [String: WorkingTreeStatus]? {
         let projectPaths = Set(threads.map(\.projectPath))
         guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }
-        let latestStatuses = await workingTreeStatusProvider.load(projectPaths: projectPaths)
+        let latestStatuses = await workingTreeStatusProvider.loadStatuses(for: projectPaths)
         guard !Task.isCancelled, latestStatuses != workingTreeStatuses else { return nil }
         workingTreeStatuses = latestStatuses
-        return threads.map { source in
-            var thread = source
-            thread.workingTreeStatus = latestStatuses[thread.projectPath] ?? .notRepository
-            return thread
-        }
+        return latestStatuses
     }
 
     private func applyingUnreadState(to threads: [ThreadSummary]) -> [ThreadSummary] {

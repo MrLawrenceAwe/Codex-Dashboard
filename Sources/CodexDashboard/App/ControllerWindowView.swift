@@ -1,20 +1,20 @@
 import SwiftUI
 
 private struct ConnectionStatusCard: View {
-    @ObservedObject var viewModel: DashboardViewModel
+    @ObservedObject var coordinator: DashboardCoordinator
 
     private var statusColor: Color {
-        if viewModel.connectionState.dashboardIsMounted {
+        if coordinator.connectionState.dashboardIsMounted {
             return Color(red: 0.45, green: 0.94, blue: 0.61)
         }
-        if viewModel.connectionState != .codexClosed {
+        if coordinator.connectionState != .codexClosed {
             return Color(red: 0.96, green: 0.77, blue: 0.42)
         }
         return .secondary
     }
 
     var body: some View {
-        let status = viewModel.statusPresentation
+        let status = coordinator.statusPresentation
         HStack(alignment: .top, spacing: 10) {
             Circle()
                 .fill(statusColor)
@@ -29,7 +29,7 @@ private struct ConnectionStatusCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            Button("Sync Now") { Task { await viewModel.synchronizeDashboard() } }
+            Button("Sync Now") { Task { await coordinator.synchronizeDashboard() } }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11, weight: .medium))
         }
@@ -40,7 +40,7 @@ private struct ConnectionStatusCard: View {
 }
 
 private struct CompatibilityCard: View {
-    @ObservedObject var viewModel: DashboardViewModel
+    @ObservedObject var coordinator: DashboardCoordinator
     @State private var detailsAreExpanded = false
 
     private func color(for status: CompatibilityStatus) -> Color {
@@ -66,20 +66,20 @@ private struct CompatibilityCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Codex update compatibility")
                         .font(.system(size: 12, weight: .medium))
-                    Text(viewModel.compatibilityReport?.summary ?? "Check private Codex contracts before or after an update.")
+                    Text(coordinator.compatibilityReport?.summary ?? "Check private Codex contracts before or after an update.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(viewModel.isCheckingCompatibility ? "Checking…" : "Check Compatibility") {
-                    Task { await viewModel.checkCompatibility() }
+                Button(coordinator.isCheckingCompatibility ? "Checking…" : "Check Compatibility") {
+                    Task { await coordinator.checkCompatibility() }
                 }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11, weight: .medium))
-                .disabled(viewModel.isCheckingCompatibility)
+                .disabled(coordinator.isCheckingCompatibility)
             }
 
-            if let report = viewModel.compatibilityReport {
+            if let report = coordinator.compatibilityReport {
                 DisclosureGroup(isExpanded: $detailsAreExpanded) {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 9) {
@@ -125,14 +125,14 @@ private struct CompatibilityCard: View {
         .padding(13)
         .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
-        .onChange(of: viewModel.compatibilityReport) { _, report in
+        .onChange(of: coordinator.compatibilityReport) { _, report in
             detailsAreExpanded = report.map { $0.blockingCount > 0 || $0.warningCount > 0 } ?? false
         }
     }
 }
 
-struct DashboardControllerView: View {
-    @ObservedObject var viewModel: DashboardViewModel
+struct ControllerWindowView: View {
+    @ObservedObject var coordinator: DashboardCoordinator
     @ObservedObject var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
@@ -157,26 +157,26 @@ struct DashboardControllerView: View {
                 }
             }
 
-            ConnectionStatusCard(viewModel: viewModel)
+            ConnectionStatusCard(coordinator: coordinator)
 
-            CompatibilityCard(viewModel: viewModel)
+            CompatibilityCard(coordinator: coordinator)
 
             DisclosureGroup("Diagnostics") {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Codex \(codexVersion) · \(viewModel.rendererTargetCount) renderer target(s)")
-                    Text("\(viewModel.threads.count) loaded · \(viewModel.totalThreadCount) total threads")
-                    if let refreshed = viewModel.lastSuccessfulRefresh {
+                    Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
+                    Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total threads")
+                    if let refreshed = coordinator.lastSuccessfulRefresh {
                         Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
                     }
-                    if viewModel.compatibilityWasTriggeredByUpdate {
+                    if coordinator.compatibilityWasTriggeredByUpdate {
                         Text("Compatibility was checked because the Codex version changed.")
                             .foregroundStyle(.orange)
                     }
                     HStack {
-                        Button("Copy Diagnostics") { viewModel.copyDiagnostics() }
+                        Button("Copy Diagnostics") { coordinator.copyDiagnostics() }
                         Toggle("Completion notifications", isOn: Binding(
-                            get: { viewModel.completionNotificationsEnabled },
-                            set: { viewModel.setCompletionNotificationsEnabled($0) }
+                            get: { coordinator.completionNotificationsEnabled },
+                            set: { coordinator.setCompletionNotificationsEnabled($0) }
                         ))
                         .toggleStyle(.checkbox)
                         Toggle("Launch at Login", isOn: Binding(
@@ -194,9 +194,9 @@ struct DashboardControllerView: View {
             .font(.system(size: 11, weight: .medium))
 
             HStack(spacing: 10) {
-                if viewModel.connectionState.dashboardIsMounted {
+                if coordinator.connectionState.dashboardIsMounted {
                     Button {
-                        Task { await viewModel.openThreadDashboard() }
+                        Task { await coordinator.openThreadDashboard() }
                     } label: {
                         Text("Open Dashboard")
                             .font(.system(size: 12, weight: .semibold))
@@ -207,15 +207,15 @@ struct DashboardControllerView: View {
                             .foregroundStyle(Color.white)
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.isPerformingAction)
+                    .disabled(coordinator.isPerformingAction)
 
                     Button("Restart & Enable") {
-                        Task { await viewModel.restartCodexAndEnableThreadDashboard() }
+                        Task { await coordinator.restartCodexAndEnableThreadDashboard() }
                     }
-                    .disabled(viewModel.isPerformingAction)
+                    .disabled(coordinator.isPerformingAction)
                 } else {
                     Button {
-                        Task { await viewModel.restartCodexAndEnableThreadDashboard() }
+                        Task { await coordinator.restartCodexAndEnableThreadDashboard() }
                     } label: {
                         Text("Restart & Enable")
                             .font(.system(size: 12, weight: .semibold))
@@ -226,15 +226,15 @@ struct DashboardControllerView: View {
                             .foregroundStyle(Color.white)
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.isPerformingAction)
+                    .disabled(coordinator.isPerformingAction)
                 }
 
-                if viewModel.connectionState.rendererIsAvailable {
+                if coordinator.connectionState.rendererIsAvailable {
                     Menu {
                         Button("Disable Thread Dashboard", role: .destructive) {
-                            Task { await viewModel.disableThreadDashboard() }
+                            Task { await coordinator.disableThreadDashboard() }
                         }
-                        .disabled(viewModel.isPerformingAction)
+                        .disabled(coordinator.isPerformingAction)
                     } label: {
                         Image(systemName: "ellipsis")
                             .frame(width: 34, height: 34)
@@ -245,10 +245,10 @@ struct DashboardControllerView: View {
             }
             .controlSize(.large)
 
-            if viewModel.connectionError != nil || viewModel.threadDataWarning != nil {
+            if coordinator.connectionError != nil || coordinator.threadDataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let error = viewModel.connectionError { Text(error) }
-                    if let warning = viewModel.threadDataWarning { Text(warning) }
+                    if let error = coordinator.connectionError { Text(error) }
+                    if let warning = coordinator.threadDataWarning { Text(warning) }
                 }
                 .font(.system(size: 12))
                 .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))
@@ -265,7 +265,7 @@ struct DashboardControllerView: View {
         .padding(24)
         .frame(width: 620, height: 680, alignment: .topLeading)
         .onAppear {
-            viewModel.startMonitoring()
+            coordinator.startMonitoring()
         }
     }
 }

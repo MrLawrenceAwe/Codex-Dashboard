@@ -32,7 +32,7 @@ struct ThreadCatalog: Sendable {
     let totalThreadCount: Int
 }
 
-struct DashboardThread: Codable, Equatable, Sendable {
+struct DashboardThreadPayload: Codable, Equatable, Sendable {
     let id: String
     let title: String
     let preview: String
@@ -60,12 +60,12 @@ struct DashboardThread: Codable, Equatable, Sendable {
     }
 }
 
-struct DashboardSnapshot: Codable, Equatable, Sendable {
-    let threads: [DashboardThread]
+struct DashboardSnapshotPayload: Codable, Equatable, Sendable {
+    let threads: [DashboardThreadPayload]
     let totalThreadCount: Int
 
     init(threads: [ThreadSummary], totalThreadCount: Int? = nil) {
-        self.threads = threads.map(DashboardThread.init)
+        self.threads = threads.map(DashboardThreadPayload.init)
         self.totalThreadCount = totalThreadCount ?? threads.count
     }
 }

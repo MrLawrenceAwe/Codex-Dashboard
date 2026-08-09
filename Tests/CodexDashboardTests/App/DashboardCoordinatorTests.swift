@@ -15,7 +15,7 @@ private struct StubCatalogProvider: ThreadCatalogProviding {
 }
 
 private struct StubWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    func load(projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         [:]
     }
 }
@@ -81,7 +81,7 @@ private struct StubCompatibilityChecker: LocalCompatibilityChecking {
 }
 
 @MainActor
-private final class StubDashboardRuntime: DashboardRuntime {
+private final class StubDashboardSession: DashboardSession {
     let codexIsRunning = false
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
@@ -90,7 +90,7 @@ private final class StubDashboardRuntime: DashboardRuntime {
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] { [] }
     func synchronizeDashboard(
-        with snapshot: DashboardSnapshot,
+        with snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws {}
@@ -100,22 +100,22 @@ private final class StubDashboardRuntime: DashboardRuntime {
 }
 
 @MainActor
-final class DashboardViewModelTests: XCTestCase {
+final class DashboardCoordinatorTests: XCTestCase {
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let viewModel = DashboardViewModel(
+        let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
-            runtimeFactory: { StubDashboardRuntime() }
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { StubDashboardSession() }
         )
-        await viewModel.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
         var publicationCount = 0
-        let cancellable = viewModel.objectWillChange.sink { publicationCount += 1 }
+        let cancellable = coordinator.objectWillChange.sink { publicationCount += 1 }
 
-        await viewModel.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
 
         XCTAssertEqual(publicationCount, 0)
         withExtendedLifetime(cancellable) {}
@@ -128,61 +128,61 @@ final class DashboardViewModelTests: XCTestCase {
             status: .compatible,
             detail: "Healthy"
         )
-        let viewModel = DashboardViewModel(
+        let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { StubDashboardSession() }
         )
 
-        await viewModel.checkCompatibility()
+        await coordinator.checkCompatibility()
 
-        XCTAssertEqual(viewModel.compatibilityReport?.checks, [expected])
-        XCTAssertFalse(viewModel.isCheckingCompatibility)
+        XCTAssertEqual(coordinator.compatibilityReport?.checks, [expected])
+        XCTAssertFalse(coordinator.isCheckingCompatibility)
     }
 
     func testSynchronizationUsesInjectedDependenciesWithoutStartingPolling() async {
         let thread = ThreadSummary.fixture(id: "thread-1", title: "Injected thread")
-        let viewModel = DashboardViewModel(
+        let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 4)
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
-            runtimeFactory: { StubDashboardRuntime() }
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
+            runtimeFactory: { StubDashboardSession() }
         )
 
-        XCTAssertEqual(viewModel.connectionState, .checking)
-        await viewModel.synchronizeDashboard()
+        XCTAssertEqual(coordinator.connectionState, .checking)
+        await coordinator.synchronizeDashboard()
 
-        XCTAssertTrue(viewModel.threads.first?.isUnread == true)
-        XCTAssertEqual(viewModel.totalThreadCount, 4)
-        XCTAssertEqual(viewModel.connectionState, .codexClosed)
-        XCTAssertEqual(viewModel.statusPresentation.title, "Codex is closed")
+        XCTAssertTrue(coordinator.threads.first?.isUnread == true)
+        XCTAssertEqual(coordinator.totalThreadCount, 4)
+        XCTAssertEqual(coordinator.connectionState, .codexClosed)
+        XCTAssertEqual(coordinator.statusPresentation.title, "Codex is closed")
     }
 
     func testUnreadPollingUpdatesThread() async throws {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let unreadIDProvider = MutableUnreadIDProvider()
-        let viewModel = DashboardViewModel(
+        let unreadThreadIDProvider = MutableUnreadIDProvider()
+        let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: unreadIDProvider,
-            runtimeFactory: { StubDashboardRuntime() }
+            unreadThreadIDProvider: unreadThreadIDProvider,
+            runtimeFactory: { StubDashboardSession() }
         )
-        viewModel.startMonitoring()
-        defer { viewModel.stopMonitoring() }
+        coordinator.startMonitoring()
+        defer { coordinator.stopMonitoring() }
 
-        try await waitUntil { viewModel.threads.count == 1 }
-        await unreadIDProvider.setUnreadThreadIDs([thread.id])
-        try await waitUntil { viewModel.threads.first?.isUnread == true }
+        try await waitUntil { coordinator.threads.count == 1 }
+        await unreadThreadIDProvider.setUnreadThreadIDs([thread.id])
+        try await waitUntil { coordinator.threads.first?.isUnread == true }
 
-        XCTAssertTrue(viewModel.threads.first?.isUnread == true)
+        XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
     func testUnreadPollingScheduleMatchesDocumentedLatencyBounds() {
@@ -192,46 +192,46 @@ final class DashboardViewModelTests: XCTestCase {
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let viewModel = DashboardViewModel(
+        let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: FailingViewModelUnreadIDProvider(),
-            runtimeFactory: { StubDashboardRuntime() }
+            unreadThreadIDProvider: FailingViewModelUnreadIDProvider(),
+            runtimeFactory: { StubDashboardSession() }
         )
 
-        await viewModel.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
 
-        XCTAssertEqual(viewModel.threads.map(\.id), [thread.id])
-        XCTAssertTrue(viewModel.threadDataWarning?.contains("Unread state could not be refreshed") == true)
+        XCTAssertEqual(coordinator.threads.map(\.id), [thread.id])
+        XCTAssertTrue(coordinator.threadDataWarning?.contains("Unread state could not be refreshed") == true)
     }
 
     func testCancelledSynchronizationCannotClearNewSynchronizationTask() async throws {
         let catalogProvider = SuspendedCatalogProvider()
-        let viewModel = DashboardViewModel(
+        let coordinator = DashboardCoordinator(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
-            runtimeFactory: { StubDashboardRuntime() }
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { StubDashboardSession() }
         )
 
-        viewModel.startMonitoring()
+        coordinator.startMonitoring()
         try await waitUntil { await catalogProvider.count() == 1 }
-        viewModel.stopMonitoring()
-        viewModel.startMonitoring()
+        coordinator.stopMonitoring()
+        coordinator.startMonitoring()
         try await waitUntil { await catalogProvider.count() == 2 }
 
         await catalogProvider.resumeNext()
         try await Task.sleep(for: .milliseconds(50))
-        let coalescedRefresh = Task { @MainActor in await viewModel.synchronizeDashboard() }
+        let coalescedRefresh = Task { @MainActor in await coordinator.synchronizeDashboard() }
         try await Task.sleep(for: .milliseconds(50))
         let requestCount = await catalogProvider.count()
         XCTAssertEqual(requestCount, 2)
 
         await catalogProvider.resumeNext()
         await coalescedRefresh.value
-        viewModel.stopMonitoring()
+        coordinator.stopMonitoring()
     }
 
     private func waitUntil(

@@ -51,7 +51,7 @@ struct DashboardInjectionPayload: Sendable {
 
     static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
         try loadResources(
-            named: ["codex-contracts"],
+            named: ["Core/codex-contracts"],
             withExtension: "js",
             from: bundle ?? defaultResourceBundle
         )
@@ -78,10 +78,15 @@ struct DashboardInjectionPayload: Sendable {
         from bundle: Bundle
     ) throws -> String {
         try names.map { name in
+            let path = name as NSString
+            let directory = path.deletingLastPathComponent
+            let subdirectory = directory == "."
+                ? "Dashboard"
+                : "Dashboard/\(directory)"
             guard let url = bundle.url(
-                forResource: name,
+                forResource: path.lastPathComponent,
                 withExtension: resourceExtension,
-                subdirectory: "Dashboard"
+                subdirectory: subdirectory
             ) else {
                 throw DashboardError.missingResources
             }

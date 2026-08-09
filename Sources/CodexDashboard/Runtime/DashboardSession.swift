@@ -6,7 +6,7 @@ enum DashboardDisableOutcome {
 }
 
 @MainActor
-protocol DashboardRuntime: AnyObject {
+protocol DashboardSession: AnyObject {
     var codexIsRunning: Bool { get }
     var codexLaunchDate: Date? { get }
     var maintainsDashboard: Bool { get }
@@ -15,7 +15,7 @@ protocol DashboardRuntime: AnyObject {
     func prepareForRestart()
     func restartCodex() async throws -> [DevToolsTarget]
     func synchronizeDashboard(
-        with snapshot: DashboardSnapshot,
+        with snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws
@@ -25,17 +25,17 @@ protocol DashboardRuntime: AnyObject {
 }
 
 @MainActor
-final class LiveDashboardRuntime: DashboardRuntime {
+final class LiveDashboardSession: DashboardSession {
     private let codex: CodexAppController
-    private let renderer: DashboardRenderer
+    private let renderer: RendererDashboardSession
     private var lastObservedCodexLaunchDate: Date?
 
     init(
         codex: CodexAppController = CodexAppController(),
-        renderer: DashboardRenderer? = nil
+        renderer: RendererDashboardSession? = nil
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? DashboardRenderer(promptBackupStore: .shared)
+        self.renderer = try renderer ?? RendererDashboardSession(promptBackupStore: .shared)
     }
 
     var codexIsRunning: Bool { codex.isRunning }
@@ -68,7 +68,7 @@ final class LiveDashboardRuntime: DashboardRuntime {
     }
 
     func synchronizeDashboard(
-        with snapshot: DashboardSnapshot,
+        with snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {

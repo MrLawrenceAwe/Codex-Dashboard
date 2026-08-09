@@ -1,19 +1,19 @@
 {
   "scripts": [
-    "dashboard-dom",
-    "codex-contracts",
-    "codex-host",
-    "prompt-store",
-    "composer-adapter",
-    "prompt-reordering",
-    "prompt-launcher",
-    "prompt-dialog",
-    "thread-markup",
-    "thread-dashboard",
-    "dashboard-host"
+    "Core/dashboard-dom",
+    "Core/codex-contracts",
+    "Core/codex-host",
+    "Prompts/prompt-store",
+    "Prompts/composer-adapter",
+    "Prompts/prompt-reordering",
+    "Prompts/prompt-launcher",
+    "Prompts/prompt-library",
+    "Threads/thread-markup",
+    "Threads/thread-dashboard",
+    "Core/dashboard-host"
   ],
   "stylesheets": [
-    "dashboard",
-    "prompt-library"
+    "Threads/dashboard",
+    "Prompts/prompt-library"
   ]
 }
