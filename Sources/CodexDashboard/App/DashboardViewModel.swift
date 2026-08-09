@@ -27,7 +27,7 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var totalThreadCount = 0
     @Published private(set) var compatibilityReport: CompatibilityReport?
     @Published private(set) var isCheckingCompatibility = false
-    @Published private(set) var lastSuccessfulRefresh: Date?
+    private(set) var lastSuccessfulRefresh: Date?
     @Published private(set) var lastCompatibilityCheck: Date?
     @Published private(set) var lastErrorDate: Date?
     @Published private(set) var rendererTargetCount = 0
@@ -171,8 +171,8 @@ final class DashboardViewModel: ObservableObject {
         isPerformingAction = true
         enrichmentGeneration += 1
         runtime.prepareForRestart()
-        connectionState = .checking
-        connectionError = nil
+        setConnectionState(.checking)
+        setConnectionError(nil)
         defer { isPerformingAction = false }
         await cancelSynchronization()
         var rendererAvailable = false
@@ -186,7 +186,7 @@ final class DashboardViewModel: ObservableObject {
                 on: targets,
                 forceRemount: true
             )
-            connectionState = .dashboardMounted
+            setConnectionState(.dashboardMounted)
         } catch {
             setFailure(
                 error,
@@ -205,11 +205,11 @@ final class DashboardViewModel: ObservableObject {
         do {
             switch try await runtime.disableThreadDashboard() {
             case .codexClosed:
-                connectionState = .codexClosed
+                setConnectionState(.codexClosed)
             case .rendererReady:
-                connectionState = .rendererReady
+                setConnectionState(.rendererReady)
             }
-            connectionError = nil
+            setConnectionError(nil)
         } catch {
             setFailure(error, lastKnownState: .dashboardMounted)
         }
@@ -255,16 +255,18 @@ final class DashboardViewModel: ObservableObject {
 
         let codexIsRunning = runtime.codexIsRunning
         let targets = await runtime.rendererTargets()
-        rendererTargetCount = targets.count
+        if rendererTargetCount != targets.count {
+            rendererTargetCount = targets.count
+        }
         guard !Task.isCancelled, !isPerformingAction else { return }
 
         if compatibilityWasTriggeredByUpdate && isCheckingCompatibility {
-            connectionState = targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady
+            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady)
             return
         }
         if let compatibilityReport, compatibilityReport.blockingCount > 0 {
-            connectionState = targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady
-            connectionError = "The dashboard was not mounted because a required Codex contract is incompatible. Review Compatibility details."
+            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady)
+            setConnectionError("The dashboard was not mounted because a required Codex contract is incompatible. Review Compatibility details.")
             return
         }
 
@@ -275,25 +277,27 @@ final class DashboardViewModel: ObservableObject {
                     on: targets,
                     forceRemount: false
                 )
-                connectionState = .dashboardMounted
-                connectionError = nil
+                setConnectionState(.dashboardMounted)
+                setConnectionError(nil)
             } catch {
                 guard !Task.isCancelled, runtime.maintainsDashboard else { return }
                 setFailure(error, lastKnownState: .rendererReady)
             }
             return
         }
-        connectionState = !targets.isEmpty
+        setConnectionState(!targets.isEmpty
             ? .rendererReady
-            : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed)
-        connectionError = nil
+            : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed))
+        setConnectionError(nil)
     }
 
     private func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshots.loadSnapshot(codexLaunchDate: runtime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
         setThreads(snapshot.catalog.threads)
-        totalThreadCount = snapshot.catalog.totalThreadCount
+        if totalThreadCount != snapshot.catalog.totalThreadCount {
+            totalThreadCount = snapshot.catalog.totalThreadCount
+        }
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
@@ -375,14 +379,29 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
-        connectionState = lastKnownState
-        connectionError = error.localizedDescription
+        setConnectionState(lastKnownState)
+        setConnectionError(error.localizedDescription)
         lastErrorDate = .now
     }
 
     private func refreshThreadDataWarning() {
         let warnings = [catalogWarning, unreadStateWarning].compactMap { $0 }
-        threadDataWarning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+        let warning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+        if threadDataWarning != warning {
+            threadDataWarning = warning
+        }
+    }
+
+    private func setConnectionState(_ state: DashboardConnectionState) {
+        if connectionState != state {
+            connectionState = state
+        }
+    }
+
+    private func setConnectionError(_ error: String?) {
+        if connectionError != error {
+            connectionError = error
+        }
     }
 
     func copyDiagnostics() {

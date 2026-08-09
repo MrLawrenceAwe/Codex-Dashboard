@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 
 @testable import CodexDashboard
@@ -100,6 +101,26 @@ private final class StubDashboardRuntime: DashboardRuntime {
 
 @MainActor
 final class DashboardViewModelTests: XCTestCase {
+    func testUnchangedSynchronizationDoesNotRepublishViewState() async {
+        let thread = ThreadSummary.fixture(id: "thread-1")
+        let viewModel = DashboardViewModel(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+        await viewModel.synchronizeDashboard()
+        var publicationCount = 0
+        let cancellable = viewModel.objectWillChange.sink { publicationCount += 1 }
+
+        await viewModel.synchronizeDashboard()
+
+        XCTAssertEqual(publicationCount, 0)
+        withExtendedLifetime(cancellable) {}
+    }
+
     func testCompatibilityCheckPublishesCapabilityReport() async {
         let expected = CompatibilityCheck(
             id: "storage",

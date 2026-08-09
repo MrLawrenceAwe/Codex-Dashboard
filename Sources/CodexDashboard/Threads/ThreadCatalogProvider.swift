@@ -94,6 +94,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             cachedDatabaseSignature = databaseSignature
             cachedStoredThreads = threads
         }
+        rolloutActivityReader.retainCache(for: Set(threads.map(\.rolloutPath)))
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let threadActivity = rolloutActivityReader.load(
