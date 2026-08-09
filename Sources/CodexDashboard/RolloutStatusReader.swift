@@ -144,7 +144,7 @@ struct RolloutStatusReader {
             let envelope = try? JSONDecoder().decode(Envelope.self, from: Data(line)),
             envelope.payload?.phase == "final_answer",
             let timestamp = envelope.timestamp,
-            let date = ISO8601DateFormatter().date(from: timestamp)
+            let date = try? Date(timestamp, strategy: .iso8601)
         else { return }
         lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
     }

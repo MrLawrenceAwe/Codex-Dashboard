@@ -13,8 +13,10 @@ enum TestDatabaseFactory {
     ) throws -> URL {
         let rolloutURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-rollout-\(UUID().uuidString).jsonl")
-        let timestamp = ISO8601DateFormatter().string(
-            from: Date(timeIntervalSince1970: TimeInterval(finalResponseAtUnixSeconds))
+        let timestampFormatter = ISO8601DateFormatter()
+        timestampFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = timestampFormatter.string(
+            from: Date(timeIntervalSince1970: TimeInterval(finalResponseAtUnixSeconds) + 0.487)
         )
         let finalResponse = try JSONSerialization.data(withJSONObject: [
             "timestamp": timestamp,

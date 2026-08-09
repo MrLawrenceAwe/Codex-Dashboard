@@ -299,16 +299,20 @@ function handlePromptInteraction(event) {
       promptID: target.closest('[data-prompt-edit]').dataset.promptEdit,
     };
     renderPromptLibrary();
-  } else if (target.closest('[data-prompt-delete]')) {
-    const id = target.closest('[data-prompt-delete]').dataset.promptDelete;
+  } else if (target.closest('[data-prompt-delete-confirm]')) {
+    const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
     savedPrompts = savedPrompts.filter((prompt) => prompt.id !== id);
     persistSavedPrompts();
     renderPromptLibrary();
+  } else if (target.closest('[data-prompt-delete]')) {
+    const button = target.closest('[data-prompt-delete]');
+    button.dataset.promptDeleteConfirm = button.dataset.promptDelete;
+    button.textContent = 'Confirm delete';
+    button.setAttribute('aria-label', 'Confirm prompt deletion');
   } else if (target.closest('[data-prompt-use]')) {
     const id = target.closest('[data-prompt-use]').dataset.promptUse;
     const prompt = savedPrompts.find((item) => item.id === id);
     if (prompt && insertPromptIntoComposer(prompt.content)) closePromptLibrary();
   }
 }
-
 
