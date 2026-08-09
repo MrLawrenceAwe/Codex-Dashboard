@@ -174,6 +174,11 @@ struct DashboardControllerView: View {
                     }
                     HStack {
                         Button("Copy Diagnostics") { viewModel.copyDiagnostics() }
+                        Toggle("Completion notifications", isOn: Binding(
+                            get: { viewModel.completionNotificationsEnabled },
+                            set: { viewModel.setCompletionNotificationsEnabled($0) }
+                        ))
+                        .toggleStyle(.checkbox)
                         Toggle("Launch at Login", isOn: Binding(
                             get: { launchAtLogin.isEnabled },
                             set: { launchAtLogin.setEnabled($0) }

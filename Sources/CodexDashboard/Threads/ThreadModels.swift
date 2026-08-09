@@ -16,6 +16,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let preview: String
+    let lastAssistantMessage: String?
     let projectName: String
     let projectPath: String
     let recencyTimestamp: Int64

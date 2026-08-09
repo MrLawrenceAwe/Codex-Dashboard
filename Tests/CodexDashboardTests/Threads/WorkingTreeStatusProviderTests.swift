@@ -48,4 +48,35 @@ final class SystemWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(statuses.count, paths.count)
         XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })
     }
+
+    func testNestedProjectPathsShareRepositoryStatusAndUseFreshCache() async throws {
+        let repositoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
+        let firstProjectURL = repositoryURL.appendingPathComponent("Sources/FeatureA", isDirectory: true)
+        let secondProjectURL = repositoryURL.appendingPathComponent("Sources/FeatureB", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstProjectURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondProjectURL, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: repositoryURL) }
+        _ = try Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", repositoryURL.path, "init", "--quiet"],
+            timeout: 3
+        )
+        let provider = SystemWorkingTreeStatusProvider(cacheLifetime: 60)
+        let paths: Set<String> = [firstProjectURL.path, secondProjectURL.path]
+
+        let initial = await provider.load(projectPaths: paths)
+        XCTAssertEqual(initial[firstProjectURL.path], .clean)
+        XCTAssertEqual(initial[secondProjectURL.path], .clean)
+
+        try Data("uncommitted\n".utf8).write(to: repositoryURL.appendingPathComponent("notes.txt"))
+        let cached = await provider.load(projectPaths: paths)
+        XCTAssertEqual(cached[firstProjectURL.path], .clean)
+        XCTAssertEqual(cached[secondProjectURL.path], .clean)
+
+        let uncachedProvider = SystemWorkingTreeStatusProvider(cacheLifetime: 0)
+        let refreshed = await uncachedProvider.load(projectPaths: paths)
+        XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
+        XCTAssertEqual(refreshed[secondProjectURL.path], .hasChanges)
+    }
 }

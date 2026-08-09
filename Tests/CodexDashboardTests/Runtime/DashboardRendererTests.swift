@@ -98,6 +98,25 @@ private actor OrderedSnapshotDevTools: DevToolsServing {
     }
 }
 
+private actor BackupCountingDevTools: DevToolsServing {
+    private var stringEvaluationCount = 0
+
+    func mainRendererTargets() -> [DevToolsTarget] { [] }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool {
+        true
+    }
+
+    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+        stringEvaluationCount += 1
+        return #"{"prompts":[],"sections":[]}"#
+    }
+
+    func backupReadCount() -> Int {
+        stringEvaluationCount
+    }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
@@ -263,5 +282,30 @@ final class DashboardRendererTests: XCTestCase {
         try await newSynchronization.value
         let completedOrder = await devTools.completedSnapshotOrder()
         XCTAssertEqual(completedOrder, ["old", "new"])
+    }
+
+    func testRepeatedSynchronizationThrottlesPromptBackupReads() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-renderer-backup-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let devTools = BackupCountingDevTools()
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount"),
+            promptBackupStore: PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
+        )
+        let snapshot = DashboardSnapshot(threads: [])
+
+        try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
+        try await renderer.synchronize(snapshot, on: [target])
+
+        let backupReadCount = await devTools.backupReadCount()
+        XCTAssertEqual(backupReadCount, 1)
     }
 }

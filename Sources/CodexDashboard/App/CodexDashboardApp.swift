@@ -18,7 +18,9 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct CodexDashboardApp: App {
     @NSApplicationDelegateAdaptor(CodexDashboardAppDelegate.self) private var appDelegate
-    @StateObject private var viewModel = DashboardViewModel()
+    @StateObject private var viewModel = DashboardViewModel(
+        completionNotifier: MacThreadCompletionNotifier()
+    )
     @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     var body: some Scene {
@@ -56,6 +58,10 @@ private struct DashboardMenu: View {
         Button("Sync Now") { Task { await viewModel.synchronizeDashboard() } }
         Button("Restart & Enable") { Task { await viewModel.restartCodexAndEnableThreadDashboard() } }
         Divider()
+        Toggle("Completion Notifications", isOn: Binding(
+            get: { viewModel.completionNotificationsEnabled },
+            set: { viewModel.setCompletionNotificationsEnabled($0) }
+        ))
         Toggle("Launch at Login", isOn: Binding(
             get: { launchAtLogin.isEnabled },
             set: { launchAtLogin.setEnabled($0) }

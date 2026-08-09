@@ -84,6 +84,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
+                lastAssistantMessage: threadActivity.lastFinalResponseMessage,
                 projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
                 projectPath: thread.projectPath,
                 recencyTimestamp: threadActivity.lastFinalResponseAtUnixSeconds

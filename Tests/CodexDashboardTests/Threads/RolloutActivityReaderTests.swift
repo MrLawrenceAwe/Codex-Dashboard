@@ -20,6 +20,7 @@ final class RolloutActivityReaderTests: XCTestCase {
 
         XCTAssertEqual(status.runState, .running)
         XCTAssertEqual(status.lastFinalResponseAtUnixSeconds, finalResponseAt)
+        XCTAssertEqual(status.lastFinalResponseMessage, String(repeating: "x", count: 128 * 1_024))
     }
 
     func testActivityBeforeApplicationLaunchIsIdle() throws {
@@ -115,5 +116,6 @@ final class RolloutActivityReaderTests: XCTestCase {
 
         XCTAssertEqual(updated.runState, .idle)
         XCTAssertEqual(updated.lastFinalResponseAtUnixSeconds, finalResponseAt)
+        XCTAssertNil(updated.lastFinalResponseMessage)
     }
 }
