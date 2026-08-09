@@ -149,7 +149,7 @@ final class DashboardRendererTests: XCTestCase {
             checks.map(\.id),
             [
                 "renderer", "sidebar-host", "thread-navigation", "sidebar-unread",
-                "composer", "prompt-menu",
+                "composer", "composer-controls",
             ]
         )
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })

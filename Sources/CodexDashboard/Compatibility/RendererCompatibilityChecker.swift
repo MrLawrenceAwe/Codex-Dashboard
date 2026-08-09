@@ -65,28 +65,17 @@ struct RendererCompatibilityChecker {
             in: target
         ))
 
-        let promptMenuIsOpen = (try? await devTools.evaluateBoolean(
-            contractExpression("codexContracts.promptMenuIsOpen()"),
+        checks.append(await inspect(
+            id: "composer-controls",
+            title: "Composer controls",
+            expression: contractExpression(
+                "codexContracts.composerAddButton()?.nextElementSibling?.matches('[data-codex-prompt-launcher]') === true"
+            ),
+            failureStatus: .incompatible,
+            compatibleDetail: "The Prompts control is mounted directly beside the composer Add button.",
+            failureDetail: "The Prompts control is not mounted beside the composer Add button.",
             in: target
-        )) == true
-        if promptMenuIsOpen {
-            checks.append(await inspect(
-                id: "prompt-menu",
-                title: "Prompt menu anchor",
-                expression: contractExpression("Boolean(codexContracts.promptMenuAnchor())"),
-                failureStatus: .incompatible,
-                compatibleDetail: "The Record a skill anchor used by the Prompts item is available.",
-                failureDetail: "The open Add menu no longer contains the expected Record a skill anchor.",
-                in: target
-            ))
-        } else {
-            checks.append(CompatibilityCheck(
-                id: "prompt-menu",
-                title: "Prompt menu anchor",
-                status: .unavailable,
-                detail: "Open the composer Add menu and run the check again to verify this anchor."
-            ))
-        }
+        ))
         return checks
     }
 
