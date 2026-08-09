@@ -187,7 +187,6 @@ function renderDashboard() {
   });
 
   const visibleThreads = selectVisibleThreads();
-  page.querySelector('[data-visible-summary]').textContent = `${visibleThreads.length} ${visibleThreads.length === 1 ? 'thread' : 'threads'}`;
   const list = page.querySelector('[data-thread-list]');
   if (!visibleThreads.length) {
     const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
@@ -288,9 +287,6 @@ function mountDashboardPage() {
         <div class="dashboard-running-list" data-running-list></div>
       </section>
       <div class="dashboard-section-header">
-        <div class="dashboard-section-title">
-          <p data-visible-summary>0 threads</p>
-        </div>
         <div class="dashboard-toolbar">
           <div class="dashboard-filters" aria-label="Filter threads">
             <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
