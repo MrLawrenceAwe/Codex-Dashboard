@@ -27,6 +27,10 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-use]').click();
               const textareaValue = document.querySelector('textarea[placeholder="Do anything"]').value;
               document.querySelector('textarea[placeholder="Do anything"]').remove();
+              const contentEditable = document.querySelector('[contenteditable="true"]');
+              contentEditable.addEventListener('input', (event) => {
+                if (event.data) contentEditable.textContent += event.data;
+              });
               launcher.click();
               document.querySelector('[data-prompt-use]').click();
               return {
