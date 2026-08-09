@@ -39,6 +39,32 @@ private actor MutableUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
+private actor SuspendedCatalogProvider: ThreadCatalogProviding {
+    private var continuations: [CheckedContinuation<ThreadCatalog, Never>] = []
+    private(set) var requestCount = 0
+
+    func loadCatalog(
+        gitStatuses: [String: GitStatus],
+        codexLaunchDate: Date?
+    ) async -> ThreadCatalog {
+        requestCount += 1
+        return await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func resumeNext() {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume(
+            returning: ThreadCatalog(threads: [], totalThreadCount: 0)
+        )
+    }
+
+    func count() -> Int {
+        requestCount
+    }
+}
+
 @MainActor
 private final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning = false
@@ -122,6 +148,33 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.threads.first?.isUnread == true)
     }
 
+    func testCancelledRefreshCannotClearNewRefreshTask() async throws {
+        let catalogProvider = SuspendedCatalogProvider()
+        let viewModel = DashboardViewModel(
+            catalogProvider: catalogProvider,
+            gitStatusProvider: StubGitStatusProvider(),
+            unreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        viewModel.startRefreshing()
+        try await waitUntil { await catalogProvider.count() == 1 }
+        viewModel.stopRefreshing()
+        viewModel.startRefreshing()
+        try await waitUntil { await catalogProvider.count() == 2 }
+
+        await catalogProvider.resumeNext()
+        try await Task.sleep(for: .milliseconds(50))
+        let coalescedRefresh = Task { @MainActor in await viewModel.refresh() }
+        try await Task.sleep(for: .milliseconds(50))
+        let requestCount = await catalogProvider.count()
+        XCTAssertEqual(requestCount, 2)
+
+        await catalogProvider.resumeNext()
+        await coalescedRefresh.value
+        viewModel.stopRefreshing()
+    }
+
     private func waitUntil(
         timeout: Duration = .seconds(2),
         condition: @escaping @MainActor () -> Bool
@@ -132,5 +185,18 @@ final class DashboardViewModelTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(25))
         }
         XCTAssertTrue(condition())
+    }
+
+    private func waitUntil(
+        timeout: Duration = .seconds(2),
+        condition: @escaping () async -> Bool
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while !(await condition()), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        let conditionWasMet = await condition()
+        XCTAssertTrue(conditionWasMet)
     }
 }

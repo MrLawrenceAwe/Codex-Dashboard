@@ -68,6 +68,31 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.totalThreadCount, 63)
     }
 
+    func testThreadLimitUsesStableRecencyInsteadOfTransientActivity() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            additionalThreadCount: 60,
+            testCase: self
+        )
+        let update = try Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [
+                stateDatabaseURL.path,
+                "UPDATE threads SET updated_at = \(now + 10_000), recency_at_ms = 0 WHERE id = 'running';",
+            ],
+            timeout: 3
+        )
+        XCTAssertEqual(update.terminationStatus, 0)
+
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(gitStatuses: [:], codexLaunchDate: .distantPast)
+
+        XCTAssertEqual(Set(catalog.threads.map(\.id)), Set((0..<60).map { "extra-\($0)" }))
+        XCTAssertFalse(catalog.threads.contains { $0.id == "running" })
+    }
+
     func testReportsMissingStateDatabase() async throws {
         let missingDatabaseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")

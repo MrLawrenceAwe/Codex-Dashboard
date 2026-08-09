@@ -29,6 +29,7 @@ final class DashboardViewModel: ObservableObject {
     private let refreshCoordinator = DashboardRefreshCoordinator()
     private var runtime: (any DashboardRuntime)?
     private var refreshTask: Task<Void, Never>?
+    private var refreshTaskID: UUID?
 
     var statusPresentation: (title: String, detail: String) {
         if connectionError != nil {
@@ -85,6 +86,7 @@ final class DashboardViewModel: ObservableObject {
         refreshCoordinator.stop()
         refreshTask?.cancel()
         refreshTask = nil
+        refreshTaskID = nil
     }
 
     func refresh() async {
@@ -93,13 +95,18 @@ final class DashboardViewModel: ObservableObject {
             await refreshTask.value
             return
         }
+        let taskID = UUID()
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             await self.synchronizeRuntime()
         }
         refreshTask = task
+        refreshTaskID = taskID
         await task.value
-        refreshTask = nil
+        if refreshTaskID == taskID {
+            refreshTask = nil
+            refreshTaskID = nil
+        }
     }
 
     func restartCodexAndEnableDashboard() async {
@@ -232,6 +239,7 @@ final class DashboardViewModel: ObservableObject {
     private func cancelRefresh() async {
         let task = refreshTask
         refreshTask = nil
+        refreshTaskID = nil
         task?.cancel()
         await task?.value
     }

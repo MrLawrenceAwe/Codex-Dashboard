@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class DashboardLifecycleWebTests: XCTestCase {
+final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
     func testDashboardLifecycleAndCoreInteractions() async throws {
         let webView = WKWebView()
         webView.loadHTMLString(

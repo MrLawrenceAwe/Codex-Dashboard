@@ -1,4 +1,6 @@
+import Darwin
 import WebKit
+import XCTest
 
 @testable import CodexDashboard
 
@@ -12,5 +14,30 @@ enum DashboardWebTestHarness {
             }
             try await Task.sleep(for: .milliseconds(20))
         }
+    }
+}
+
+class SerializedDashboardWebTestCase: XCTestCase {
+    private var lockFileDescriptor: Int32 = -1
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        let lockURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-web-tests.lock")
+        lockFileDescriptor = Darwin.open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard lockFileDescriptor >= 0, flock(lockFileDescriptor, LOCK_EX) == 0 else {
+            if lockFileDescriptor >= 0 { Darwin.close(lockFileDescriptor) }
+            lockFileDescriptor = -1
+            throw CocoaError(.fileLocking)
+        }
+    }
+
+    override func tearDownWithError() throws {
+        if lockFileDescriptor >= 0 {
+            flock(lockFileDescriptor, LOCK_UN)
+            Darwin.close(lockFileDescriptor)
+            lockFileDescriptor = -1
+        }
+        try super.tearDownWithError()
     }
 }
