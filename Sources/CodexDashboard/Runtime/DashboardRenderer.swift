@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class DashboardRenderer {
-    private let devTools: DevToolsClient
+    private let devTools: any DevToolsServing
     private let injection: DashboardInjection
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: RendererSnapshot?
@@ -10,7 +10,7 @@ final class DashboardRenderer {
     private(set) var maintainsDashboard = true
 
     init(
-        devTools: DevToolsClient = DevToolsClient(),
+        devTools: any DevToolsServing = DevToolsClient(),
         injection: DashboardInjection? = nil
     ) throws {
         self.devTools = devTools
@@ -71,9 +71,11 @@ final class DashboardRenderer {
     }
 
     func disable() async throws -> Bool {
-        stopMaintaining()
         let targets = await targets()
-        guard !targets.isEmpty else { return false }
+        guard !targets.isEmpty else {
+            stopMaintaining()
+            return false
+        }
 
         for target in targets {
             let disabled = try await devTools.evaluateBoolean(
@@ -84,6 +86,7 @@ final class DashboardRenderer {
                 throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
             }
         }
+        stopMaintaining()
         return true
     }
 

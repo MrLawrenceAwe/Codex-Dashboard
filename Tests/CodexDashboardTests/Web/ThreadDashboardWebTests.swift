@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class ThreadDashboardWebTests: XCTestCase {
+final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
         let webView = WKWebView()
         webView.loadHTMLString(

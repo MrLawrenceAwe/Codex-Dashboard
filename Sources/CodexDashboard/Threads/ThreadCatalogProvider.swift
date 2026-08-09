@@ -65,7 +65,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
-        ORDER BY updated_at DESC
+        ORDER BY recency_at_ms DESC
         LIMIT 60;
         """
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)

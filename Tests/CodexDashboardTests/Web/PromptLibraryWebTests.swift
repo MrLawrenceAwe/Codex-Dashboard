@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class PromptLibraryWebTests: XCTestCase {
+final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
     func testSavedPromptsCanBeCreatedAndInsertedIntoComposer() async throws {
         let webView = WKWebView()
         webView.loadHTMLString(

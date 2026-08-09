@@ -31,7 +31,12 @@ struct DevToolsTarget: Decodable, Identifiable, Sendable {
     }
 }
 
-actor DevToolsClient {
+protocol DevToolsServing: Sendable {
+    func mainRendererTargets() async -> [DevToolsTarget]
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool
+}
+
+actor DevToolsClient: DevToolsServing {
     private let session: URLSession
 
     init() {
