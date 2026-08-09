@@ -1,13 +1,31 @@
 import AppKit
 import Foundation
 
-@MainActor
-final class CodexHostSession {
-    enum DisableResult {
-        case applicationClosed
-        case bridgeConnected
-    }
+enum DashboardDisableResult {
+    case applicationClosed
+    case bridgeConnected
+}
 
+@MainActor
+protocol DashboardHosting: AnyObject {
+    var applicationIsRunning: Bool { get }
+    var applicationLaunchDate: Date? { get }
+    var keepsDashboardMounted: Bool { get }
+
+    func mainRendererTargets() async -> [DevToolsTarget]
+    func prepareForRestart()
+    func restartApplication() async throws -> [DevToolsTarget]
+    func mountDashboard(
+        with payload: DashboardPayload,
+        on targets: [DevToolsTarget],
+        force: Bool
+    ) async throws
+    func disableDashboard() async throws -> DashboardDisableResult
+    func openDashboard() async
+}
+
+@MainActor
+final class CodexHostSession: DashboardHosting {
     private let devTools = DevToolsClient()
     private let injection: DashboardInjection
     private var shouldKeepDashboardMounted = true
@@ -132,7 +150,7 @@ final class CodexHostSession {
         mountedTargetIDs = targetIDs
     }
 
-    func disableDashboard() async throws -> DisableResult {
+    func disableDashboard() async throws -> DashboardDisableResult {
         stopMaintainingDashboard()
         let targets = await mainRendererTargets()
         guard !targets.isEmpty else { return .applicationClosed }

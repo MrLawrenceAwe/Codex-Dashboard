@@ -44,55 +44,66 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var threads: [DashboardThread] = []
     @Published private(set) var totalThreadCount = 0
 
-    private let threadRepository = CodexThreadRepository()
-    private let gitStatusLoader = WorkspaceGitStatusLoader()
-    private var hostSession: CodexHostSession?
+    private let threadRepository: any ThreadSnapshotLoading
+    private let gitStatusLoader: any WorkspaceGitStatusLoading
+    private var hostSession: (any DashboardHosting)?
     private var threadRefreshLoopTask: Task<Void, Never>?
     private var gitRefreshLoopTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var gitStatuses: [String: WorkspaceGitStatus] = [:]
 
-    var statusTitle: String {
-        switch sessionState {
-        case .checking: "Checking Codex…"
-        case .appClosed: "Codex is closed"
-        case .appRunning: "Codex is running without the dashboard bridge"
-        case .bridgeConnected: "Dashboard bridge is connected"
-        case .dashboardMounted: "Dashboard is live"
-        case .needsAttention: "Dashboard needs attention"
-        }
-    }
-
-    var statusDetail: String {
+    var statusPresentation: (title: String, detail: String) {
         switch sessionState {
         case .checking:
-            "Looking for the local Codex app."
+            ("Checking Codex…", "Looking for the local Codex app.")
         case .appClosed:
-            "The dashboard can relaunch it with local debugging enabled."
+            ("Codex is closed", "The dashboard can relaunch it with local debugging enabled.")
         case .appRunning:
-            "Restart it through this controller once to enable the thread dashboard."
+            (
+                "Codex is running without the dashboard bridge",
+                "Restart it through this controller once to enable the thread dashboard."
+            )
         case .bridgeConnected:
-            "The local renderer is ready for the thread dashboard."
+            ("Dashboard bridge is connected", "The local renderer is ready for the thread dashboard.")
         case .dashboardMounted:
-            activitySummary
+            ("Dashboard is live", activitySummary)
         case .needsAttention:
-            "Review the message below and try again."
+            ("Dashboard needs attention", "Review the message below and try again.")
         }
     }
 
-    init() {
+    init(
+        threadRepository: any ThreadSnapshotLoading = CodexThreadRepository(),
+        gitStatusLoader: any WorkspaceGitStatusLoading = WorkspaceGitStatusLoader(),
+        hostSessionFactory: () throws -> any DashboardHosting = { try CodexHostSession() }
+    ) {
+        self.threadRepository = threadRepository
+        self.gitStatusLoader = gitStatusLoader
         do {
-            hostSession = try CodexHostSession()
+            hostSession = try hostSessionFactory()
         } catch {
             setFailure(error, bridgeConnected: false)
         }
-        startRefreshLoops()
     }
 
     deinit {
         threadRefreshLoopTask?.cancel()
         gitRefreshLoopTask?.cancel()
         refreshTask?.cancel()
+    }
+
+    func startRefreshing() {
+        guard threadRefreshLoopTask == nil, gitRefreshLoopTask == nil else { return }
+        startRefreshLoops()
+    }
+
+    func stopRefreshing() {
+        threadRefreshLoopTask?.cancel()
+        gitRefreshLoopTask?.cancel()
+        refreshTask?.cancel()
+        threadRefreshLoopTask = nil
+        gitRefreshLoopTask = nil
+        refreshTask = nil
     }
 
     func refresh() async {
@@ -200,7 +211,8 @@ final class DashboardViewModel: ObservableObject {
             do {
                 try await hostSession.mountDashboard(
                     with: DashboardPayload(threads: threads),
-                    on: targets
+                    on: targets,
+                    force: false
                 )
                 sessionState = .dashboardMounted
             } catch {

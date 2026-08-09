@@ -1,5 +1,12 @@
 import Foundation
 
+protocol ThreadSnapshotLoading: Sendable {
+    func loadSnapshot(
+        gitStatuses: [String: WorkspaceGitStatus],
+        activeApplicationLaunchDate: Date?
+    ) async throws -> ThreadSnapshot
+}
+
 enum ThreadRepositoryError: LocalizedError {
     case missingDatabase(URL)
     case queryFailed(URL, String)
@@ -17,7 +24,7 @@ enum ThreadRepositoryError: LocalizedError {
     }
 }
 
-actor CodexThreadRepository {
+actor CodexThreadRepository: ThreadSnapshotLoading {
     private struct StoredThread: Decodable, Sendable {
         let id: String
         let title: String
@@ -31,21 +38,7 @@ actor CodexThreadRepository {
     }
 
     private let stateDatabaseURL: URL
-    private struct RolloutStatus: Sendable {
-        let activity: ThreadActivity
-        let lastFinalResponseAtUnixSeconds: Int64?
-    }
-
-    private struct RolloutEnvelope: Decodable {
-        struct Payload: Decodable {
-            let phase: String?
-        }
-
-        let timestamp: String?
-        let payload: Payload?
-    }
-
-    private var rolloutCache: [String: (size: UInt64, modifiedAt: Date, status: RolloutStatus)] = [:]
+    private var rolloutStatusReader = RolloutStatusReader()
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -59,7 +52,7 @@ actor CodexThreadRepository {
     func loadSnapshot(
         gitStatuses: [String: WorkspaceGitStatus],
         activeApplicationLaunchDate: Date?
-    ) throws -> ThreadSnapshot {
+    ) async throws -> ThreadSnapshot {
         let threadSQL = """
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
@@ -78,7 +71,7 @@ actor CodexThreadRepository {
         let threads: [StoredThread] = try query(databaseURL: stateDatabaseURL, sql: threadSQL)
         let dashboardThreads = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.workspacePath).lastPathComponent
-            let rolloutStatus = rolloutStatus(
+            let rolloutStatus = rolloutStatusReader.load(
                 at: thread.rolloutPath,
                 activeApplicationLaunchDate: activeApplicationLaunchDate
             )
@@ -105,138 +98,6 @@ actor CodexThreadRepository {
             threads: dashboardThreads,
             totalThreadCount: threads.first?.totalCount ?? 0
         )
-    }
-
-    private func rolloutStatus(
-        at path: String,
-        activeApplicationLaunchDate: Date?
-    ) -> RolloutStatus {
-        let fileURL = URL(fileURLWithPath: path)
-        guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-            let size = (attributes[.size] as? NSNumber)?.uint64Value,
-            let modifiedAt = attributes[.modificationDate] as? Date
-        else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
-        }
-        let status: RolloutStatus
-        if let cached = rolloutCache[path],
-           cached.size == size,
-           cached.modifiedAt == modifiedAt {
-            status = cached.status
-        } else {
-            status = readRolloutStatus(in: fileURL)
-            rolloutCache[path] = (size, modifiedAt, status)
-        }
-        guard let activeApplicationLaunchDate, modifiedAt >= activeApplicationLaunchDate else {
-            return RolloutStatus(
-                activity: .idle,
-                lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
-            )
-        }
-        return status
-    }
-
-    private enum ActivityEvent {
-        case started
-        case ended
-    }
-
-    private func readRolloutStatus(in fileURL: URL) -> RolloutStatus {
-        let markers: [(event: ActivityEvent, data: Data)] = [
-            (.started, Data(#""type":"task_started""#.utf8)),
-            (.ended, Data(#""type":"task_complete""#.utf8)),
-            (.ended, Data(#""type":"turn_aborted""#.utf8)),
-        ]
-        let finalResponseMarker = Data(#""phase":"final_answer""#.utf8)
-        let timestampMarker = Data(#""timestamp":""#.utf8)
-        let chunkSize: UInt64 = 64 * 1_024
-
-        guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
-        }
-        defer { try? handle.close() }
-        guard var cursor = try? handle.seekToEnd() else {
-            return RolloutStatus(activity: .idle, lastFinalResponseAtUnixSeconds: nil)
-        }
-        var laterLineFragment = Data()
-        var lastEvent: ActivityEvent?
-        var lastFinalResponseAtUnixSeconds: Int64?
-
-        while cursor > 0 {
-            let bytesToRead = min(chunkSize, cursor)
-            cursor -= bytesToRead
-            do {
-                try handle.seek(toOffset: cursor)
-                guard var data = try handle.read(upToCount: Int(bytesToRead)) else { break }
-                data.append(laterLineFragment)
-
-                var lineEnd = data.endIndex
-                while let newline = data[..<lineEnd].lastIndex(of: UInt8(ascii: "\n")) {
-                    let lineStart = data.index(after: newline)
-                    inspectRolloutLine(
-                        data[lineStart..<lineEnd],
-                        markers: markers,
-                        finalResponseMarker: finalResponseMarker,
-                        timestampMarker: timestampMarker,
-                        lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
-                    )
-                    lineEnd = newline
-                    if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
-                }
-                if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
-
-                if cursor == 0 {
-                    inspectRolloutLine(
-                        data[..<lineEnd],
-                        markers: markers,
-                        finalResponseMarker: finalResponseMarker,
-                        timestampMarker: timestampMarker,
-                        lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
-                    )
-                } else {
-                    laterLineFragment = Data(data[..<lineEnd])
-                }
-            } catch {
-                break
-            }
-        }
-        return RolloutStatus(
-            activity: lastEvent == .started ? .running : .idle,
-            lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
-        )
-    }
-
-    private func inspectRolloutLine(
-        _ line: Data.SubSequence,
-        markers: [(event: ActivityEvent, data: Data)],
-        finalResponseMarker: Data,
-        timestampMarker: Data,
-        lastEvent: inout ActivityEvent?,
-        lastFinalResponseAtUnixSeconds: inout Int64?
-    ) {
-        if lastEvent == nil {
-            let matches = markers.compactMap { marker -> (ActivityEvent, Data.Index)? in
-                guard let range = line.range(of: marker.data, options: .backwards) else {
-                    return nil
-                }
-                return (marker.event, range.lowerBound)
-            }
-            lastEvent = matches.max { $0.1 < $1.1 }?.0
-        }
-
-        guard
-            lastFinalResponseAtUnixSeconds == nil,
-            line.range(of: finalResponseMarker) != nil,
-            line.range(of: timestampMarker) != nil,
-            let envelope = try? JSONDecoder().decode(RolloutEnvelope.self, from: Data(line)),
-            envelope.payload?.phase == "final_answer",
-            let timestamp = envelope.timestamp,
-            let date = ISO8601DateFormatter().date(from: timestamp)
-        else { return }
-        lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
     }
 
     private func query<T: Decodable>(databaseURL: URL, sql: String) throws -> T {

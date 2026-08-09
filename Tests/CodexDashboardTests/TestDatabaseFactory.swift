@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 enum TestDatabaseFactory {
-    private static func makeRollout(
+    static func makeRollout(
         lifecycleEvents: [String],
         finalResponseAtUnixSeconds: Int64,
         compactionAtUnixSeconds: Int64? = nil,

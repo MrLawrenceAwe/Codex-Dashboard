@@ -37,33 +37,6 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 600)
     }
 
-    func testRunningLifecycleAfterApplicationLaunchDoesNotDependOnRecentLogs() async throws {
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: Int64(Date().timeIntervalSince1970),
-            testCase: self
-        )
-        let repository = CodexThreadRepository(stateDatabaseURL: stateDatabaseURL)
-        let snapshot = try await repository.loadSnapshot(
-            gitStatuses: [:],
-            activeApplicationLaunchDate: .distantPast
-        )
-        XCTAssertEqual(snapshot.threads.count, 3)
-        XCTAssertEqual(snapshot.totalThreadCount, 3)
-        XCTAssertEqual(snapshot.threads.first?.activity, .running)
-    }
-
-    func testStartedBeforeCurrentApplicationLaunchIsIdle() async throws {
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: Int64(Date().timeIntervalSince1970),
-            testCase: self
-        )
-        let snapshot = try await CodexThreadRepository(
-            stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantFuture)
-
-        XCTAssertEqual(snapshot.threads.first { $0.id == "running" }?.activity, .idle)
-    }
-
     func testOrdersThreadsByFinalResponseInsteadOfDatabaseActivity() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
@@ -78,57 +51,6 @@ final class CodexThreadRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.threads.map(\.id), ["updated", "running", "idle"])
         XCTAssertEqual(snapshot.threads[1].activity, .running)
         XCTAssertEqual(snapshot.threads[1].updatedAtUnixSeconds, now - 1_200)
-    }
-
-    func testReadsFinalResponseTimestampAcrossChunkBoundaries() async throws {
-        let now = Int64(Date().timeIntervalSince1970)
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: now,
-            runningFinalResponseAtUnixSeconds: now - 90,
-            runningFinalResponseMessageSize: 128 * 1_024,
-            testCase: self
-        )
-        let snapshot = try await CodexThreadRepository(
-            stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
-
-        XCTAssertEqual(
-            snapshot.threads.first { $0.id == "running" }?.updatedAtUnixSeconds,
-            now - 90
-        )
-    }
-
-    func testIgnoresHistoricalFinalResponsesEmbeddedInCompactionEvents() async throws {
-        let now = Int64(Date().timeIntervalSince1970)
-        let finalResponseAt = now - 1_200
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: now,
-            runningFinalResponseAtUnixSeconds: finalResponseAt,
-            runningCompactionAtUnixSeconds: now - 30,
-            testCase: self
-        )
-        let snapshot = try await CodexThreadRepository(
-            stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
-
-        XCTAssertEqual(
-            snapshot.threads.first { $0.id == "running" }?.updatedAtUnixSeconds,
-            finalResponseAt
-        )
-    }
-
-    func testAbortedTurnIsIdle() async throws {
-        let now = Int64(Date().timeIntervalSince1970)
-        let stateDatabaseURL = try TestDatabaseFactory.makeStateDatabase(
-            now: now,
-            runningLifecycleEvents: ["task_complete", "task_started", "turn_aborted"],
-            testCase: self
-        )
-        let snapshot = try await CodexThreadRepository(
-            stateDatabaseURL: stateDatabaseURL
-        ).loadSnapshot(gitStatuses: [:], activeApplicationLaunchDate: .distantPast)
-
-        XCTAssertEqual(snapshot.threads.first?.activity, .idle)
     }
 
     func testReportsFullCountWhenThreadRowsAreLimited() async throws {
