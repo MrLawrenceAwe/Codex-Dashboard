@@ -5,7 +5,7 @@ import Foundation
 final class DashboardPollingController {
     enum Schedule {
         static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
-        static func workingTree(active: Bool) -> Duration { active ? .seconds(10) : .seconds(60) }
+        static func workingTree(active: Bool) -> Duration { active ? .seconds(60) : .seconds(300) }
         static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
     }
 

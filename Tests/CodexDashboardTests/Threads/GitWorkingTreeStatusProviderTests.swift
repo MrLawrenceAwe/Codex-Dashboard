@@ -5,7 +5,6 @@ import XCTest
 final class GitWorkingTreeStatusProviderTests: XCTestCase {
     func testDefaultStatusCacheDoesNotDelayWorkingTreeUpdates() {
         XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 0)
-        XCTAssertLessThanOrEqual(GitWorkingTreeStatusProvider.defaultResolutionCacheLifetime, 10)
     }
 
     func testDefaultProviderImmediatelyObservesCleanWorkingTree() async throws {
@@ -136,12 +135,12 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(refreshed[secondProjectURL.path], .clean)
     }
 
-    func testTerminalRepositoryResolutionIsCachedUntilExpiry() async throws {
+    func testRepositoryResolutionImmediatelyObservesNewRepository() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-resolution-cache-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-        let provider = GitWorkingTreeStatusProvider(resolutionCacheLifetime: 60)
+        let provider = GitWorkingTreeStatusProvider()
 
         let initial = await provider.loadStatuses(for: [directory.path])
         XCTAssertEqual(initial[directory.path], .notRepository)
@@ -151,11 +150,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             timeout: 3
         )
 
-        let cached = await provider.loadStatuses(for: [directory.path])
-        XCTAssertEqual(cached[directory.path], .notRepository)
-
-        let uncachedProvider = GitWorkingTreeStatusProvider(resolutionCacheLifetime: 0)
-        let refreshed = await uncachedProvider.loadStatuses(for: [directory.path])
+        let refreshed = await provider.loadStatuses(for: [directory.path])
         XCTAssertEqual(refreshed[directory.path], .clean)
     }
 }
