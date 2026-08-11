@@ -1,6 +1,6 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS controller that adds a recent-thread dashboard
+Codex Dashboard is a native macOS menu-bar utility that adds a recent-thread dashboard
 to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
@@ -22,20 +22,20 @@ It moves the installed app to the Trash.
 
 ## Use
 
-1. Open **Codex Dashboard** from `$HOME/Applications`.
+1. Open **Codex Dashboard** from `$HOME/Applications`; it appears in the menu bar.
 2. Finish any active response in Codex.
 3. Select **Restart & Enable**.
 4. Select **Thread Dashboard** directly in the Codex sidebar. It opens in
    the main content pane while the rest of Codex navigation stays available.
 
-The application must remain running to refresh thread activity and restore the dashboard after renderer reloads,
-but its controller window can be closed; menu-bar controls remain available. Launch at Login is optional. Use
+The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
+All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. Use
 **Disable Thread Dashboard** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 
 ## Architecture
 
-- Native SwiftUI control panel; no browser automation or Node runtime.
+- Native SwiftUI menu-bar utility with an on-demand diagnostics window; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools connection managed by `LiveDashboardSession` and `RendererDashboardSession`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`, grouped into `Core`, `Threads`, and `Prompts`.
@@ -51,7 +51,7 @@ removes it.
 - A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
 - Prompt search, keyboard and pointer reordering, section rename/deletion, JSON import/export, `{{selection}}` and `{{clipboard}}` placeholders, and an automatic app-owned backup under `~/Library/Application Support/Codex Dashboard/` protect and speed up reusable prompt workflows. Deleting a section moves its prompts to **General** rather than deleting them.
 - Dashboard filter, grouping, and collapsed-project preferences persist across renderer reloads.
-- The menu-bar controller provides open, sync, restart, diagnostics, and launch-at-login actions after the main window is closed.
+- The menu bar provides dashboard, restart, disable, compatibility, diagnostics, and launch-at-login actions.
 - Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
 - Diagnostics show versions, refresh state, thread counts, renderer targets, warnings, and the prompt-backup location, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.

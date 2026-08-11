@@ -22,12 +22,8 @@ struct CodexDashboardApp: App {
     @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     var body: some Scene {
-        WindowGroup(id: "controller") {
-            ControllerWindowView(coordinator: coordinator, launchAtLogin: launchAtLogin)
-        }
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(replacing: .newItem) { }
+        Settings {
+            DiagnosticsWindowView(coordinator: coordinator)
         }
 
         MenuBarExtra {
@@ -36,6 +32,9 @@ struct CodexDashboardApp: App {
             Image(systemName: coordinator.connectionState.dashboardIsMounted
                   ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2")
                 .accessibilityLabel("Codex Dashboard")
+                .task {
+                    coordinator.startMonitoring()
+                }
         }
     }
 }
@@ -43,18 +42,28 @@ struct CodexDashboardApp: App {
 private struct DashboardMenu: View {
     @ObservedObject var coordinator: DashboardCoordinator
     @ObservedObject var launchAtLogin: LaunchAtLoginController
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Text(coordinator.statusPresentation.title)
-        Button("Open Controller") {
-            openWindow(id: "controller")
+        Button("Open Diagnostics…") {
+            openSettings()
             NSApp.activate(ignoringOtherApps: true)
         }
+        Divider()
         Button("Open Thread Dashboard") { Task { await coordinator.openThreadDashboard() } }
             .disabled(!coordinator.connectionState.dashboardIsMounted)
-        Button("Sync Now") { Task { await coordinator.synchronizeDashboard() } }
         Button("Restart & Enable") { Task { await coordinator.restartCodexAndEnableThreadDashboard() } }
+            .disabled(coordinator.isPerformingAction)
+        Button("Disable Thread Dashboard") { Task { await coordinator.disableThreadDashboard() } }
+            .disabled(!coordinator.connectionState.rendererIsAvailable || coordinator.isPerformingAction)
+        Divider()
+        Button(coordinator.isCheckingCompatibility ? "Checking Compatibility…" : "Check Compatibility") {
+            openSettings()
+            NSApp.activate(ignoringOtherApps: true)
+            Task { await coordinator.checkCompatibility() }
+        }
+        .disabled(coordinator.isCheckingCompatibility)
         Divider()
         Toggle("Launch at Login", isOn: Binding(
             get: { launchAtLogin.isEnabled },

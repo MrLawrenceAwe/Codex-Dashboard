@@ -29,9 +29,6 @@ private struct ConnectionStatusCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            Button("Sync Now") { Task { await coordinator.synchronizeDashboard() } }
-                .buttonStyle(.borderless)
-                .font(.system(size: 11, weight: .medium))
         }
         .padding(13)
         .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
@@ -131,9 +128,8 @@ private struct CompatibilityCard: View {
     }
 }
 
-struct ControllerWindowView: View {
+struct DiagnosticsWindowView: View {
     @ObservedObject var coordinator: DashboardCoordinator
-    @ObservedObject var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
         let codexVersion = CodexConfiguration.installedVersion ?? "not found"
@@ -148,10 +144,10 @@ struct ControllerWindowView: View {
                 }
                 .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Codex Dashboard")
+                    Text("Diagnostics")
                         .font(.system(size: 24, weight: .semibold))
                         .tracking(-0.5)
-                    Text("Recent threads, built into your local Codex app.")
+                    Text("Codex Dashboard status, compatibility, and runtime details.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -161,84 +157,20 @@ struct ControllerWindowView: View {
 
             CompatibilityCard(coordinator: coordinator)
 
-            DisclosureGroup("Diagnostics") {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
-                    Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total threads")
-                    if let refreshed = coordinator.lastSuccessfulRefresh {
-                        Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
-                    }
-                    if coordinator.compatibilityWasTriggeredByUpdate {
-                        Text("Compatibility was checked because the Codex version changed.")
-                            .foregroundStyle(.orange)
-                    }
-                    HStack {
-                        Button("Copy Diagnostics") { coordinator.copyDiagnostics() }
-                        Toggle("Launch at Login", isOn: Binding(
-                            get: { launchAtLogin.isEnabled },
-                            set: { launchAtLogin.setEnabled($0) }
-                        ))
-                        .toggleStyle(.checkbox)
-                    }
-                    if let error = launchAtLogin.errorMessage { Text(error).foregroundStyle(.red) }
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
+                Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total threads")
+                if let refreshed = coordinator.lastSuccessfulRefresh {
+                    Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
                 }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .padding(.top, 5)
+                if coordinator.compatibilityWasTriggeredByUpdate {
+                    Text("Compatibility was checked because the Codex version changed.")
+                        .foregroundStyle(.orange)
+                }
+                Button("Copy Diagnostics") { coordinator.copyDiagnostics() }
             }
-            .font(.system(size: 11, weight: .medium))
-
-            HStack(spacing: 10) {
-                if coordinator.connectionState.dashboardIsMounted {
-                    Button {
-                        Task { await coordinator.openThreadDashboard() }
-                    } label: {
-                        Text("Open Dashboard")
-                            .font(.system(size: 12, weight: .semibold))
-                            .padding(.horizontal, 15)
-                            .frame(height: 36)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
-                            .foregroundStyle(Color.white)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(coordinator.isPerformingAction)
-
-                    Button("Restart & Enable") {
-                        Task { await coordinator.restartCodexAndEnableThreadDashboard() }
-                    }
-                    .disabled(coordinator.isPerformingAction)
-                } else {
-                    Button {
-                        Task { await coordinator.restartCodexAndEnableThreadDashboard() }
-                    } label: {
-                        Text("Restart & Enable")
-                            .font(.system(size: 12, weight: .semibold))
-                            .padding(.horizontal, 15)
-                            .frame(height: 36)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
-                            .foregroundStyle(Color.white)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(coordinator.isPerformingAction)
-                }
-
-                if coordinator.connectionState.rendererIsAvailable {
-                    Menu {
-                        Button("Disable Thread Dashboard", role: .destructive) {
-                            Task { await coordinator.disableThreadDashboard() }
-                        }
-                        .disabled(coordinator.isPerformingAction)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 34, height: 34)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .help("More dashboard actions")
-                }
-            }
-            .controlSize(.large)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
 
             if coordinator.connectionError != nil || coordinator.threadDataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
@@ -252,15 +184,12 @@ struct ControllerWindowView: View {
                 .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Text("The Thread Dashboard reads local Codex thread metadata and activity logs. Restarting closes Codex briefly; the signed application bundle is never modified.")
+            Text("The app runs from the menu bar. The Thread Dashboard reads local Codex thread metadata and activity logs; the signed Codex application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
-        .frame(width: 620, height: 680, alignment: .topLeading)
-        .onAppear {
-            coordinator.startMonitoring()
-        }
+        .frame(width: 620, height: 560, alignment: .topLeading)
     }
 }
