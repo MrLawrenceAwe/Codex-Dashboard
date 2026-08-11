@@ -174,11 +174,6 @@ struct ControllerWindowView: View {
                     }
                     HStack {
                         Button("Copy Diagnostics") { coordinator.copyDiagnostics() }
-                        Toggle("Completion notifications", isOn: Binding(
-                            get: { coordinator.completionNotificationsEnabled },
-                            set: { coordinator.setCompletionNotificationsEnabled($0) }
-                        ))
-                        .toggleStyle(.checkbox)
                         Toggle("Launch at Login", isOn: Binding(
                             get: { launchAtLogin.isEnabled },
                             set: { launchAtLogin.setEnabled($0) }

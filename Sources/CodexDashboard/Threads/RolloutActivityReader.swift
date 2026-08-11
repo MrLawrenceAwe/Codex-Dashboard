@@ -2,9 +2,7 @@ import Foundation
 
 struct ThreadActivity: Equatable, Sendable {
     let runState: ThreadRunState
-    let lastRunTermination: ThreadRunTermination
     let lastFinalResponseAtUnixSeconds: Int64?
-    let lastFinalResponseMessage: String?
 }
 
 struct RolloutActivityReader {
@@ -22,19 +20,11 @@ struct RolloutActivityReader {
             self == .started ? .running : .idle
         }
 
-        var termination: ThreadRunTermination {
-            switch self {
-            case .started: .unknown
-            case .completed: .completed
-            case .aborted: .aborted
-            }
-        }
     }
 
     private struct Envelope: Decodable {
         struct Payload: Decodable {
             let phase: String?
-            let message: String?
         }
 
         let timestamp: String?
@@ -68,9 +58,7 @@ struct RolloutActivityReader {
         else {
             return ThreadActivity(
                 runState: .idle,
-                lastRunTermination: .unknown,
-                lastFinalResponseAtUnixSeconds: nil,
-                lastFinalResponseMessage: nil
+                lastFinalResponseAtUnixSeconds: nil
             )
         }
 
@@ -92,11 +80,8 @@ struct RolloutActivityReader {
             )
             status = ThreadActivity(
                 runState: appendedStatus.runState,
-                lastRunTermination: appendedStatus.lastRunTermination,
                 lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
-                    ?? cached.status.lastFinalResponseAtUnixSeconds,
-                lastFinalResponseMessage: appendedStatus.lastFinalResponseMessage
-                    ?? cached.status.lastFinalResponseMessage
+                    ?? cached.status.lastFinalResponseAtUnixSeconds
             )
             endsWithNewline = fileEndsWithNewline(fileURL, size: size)
         } else {
@@ -113,9 +98,7 @@ struct RolloutActivityReader {
         guard let codexLaunchDate, modifiedAt >= codexLaunchDate else {
             return ThreadActivity(
                 runState: .idle,
-                lastRunTermination: .unknown,
-                lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds,
-                lastFinalResponseMessage: status.lastFinalResponseMessage
+                lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
             )
         }
         return status
@@ -139,24 +122,19 @@ struct RolloutActivityReader {
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
             return ThreadActivity(
                 runState: .idle,
-                lastRunTermination: .unknown,
-                lastFinalResponseAtUnixSeconds: nil,
-                lastFinalResponseMessage: nil
+                lastFinalResponseAtUnixSeconds: nil
             )
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
             return ThreadActivity(
                 runState: .idle,
-                lastRunTermination: .unknown,
-                lastFinalResponseAtUnixSeconds: nil,
-                lastFinalResponseMessage: nil
+                lastFinalResponseAtUnixSeconds: nil
             )
         }
         var laterLineFragment = Data()
         var lastEvent: RunEvent?
         var lastFinalResponseAtUnixSeconds: Int64?
-        var lastFinalResponseMessage: String?
 
         while cursor > lowerBound {
             let bytesToRead = min(chunkSize, cursor - lowerBound)
@@ -175,8 +153,7 @@ struct RolloutActivityReader {
                         finalResponseMarker: finalResponseMarker,
                         timestampMarker: timestampMarker,
                         lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds,
-                        lastFinalResponseMessage: &lastFinalResponseMessage
+                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
                     )
                     lineEnd = newline
                     if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
@@ -190,8 +167,7 @@ struct RolloutActivityReader {
                         finalResponseMarker: finalResponseMarker,
                         timestampMarker: timestampMarker,
                         lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds,
-                        lastFinalResponseMessage: &lastFinalResponseMessage
+                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
                     )
                 } else {
                     laterLineFragment = Data(data[..<lineEnd])
@@ -202,9 +178,7 @@ struct RolloutActivityReader {
         }
         return ThreadActivity(
             runState: lastEvent?.runState ?? fallbackRunState,
-            lastRunTermination: lastEvent?.termination ?? .unknown,
-            lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds,
-            lastFinalResponseMessage: lastFinalResponseMessage
+            lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
         )
     }
 
@@ -227,8 +201,7 @@ struct RolloutActivityReader {
         finalResponseMarker: Data,
         timestampMarker: Data,
         lastEvent: inout RunEvent?,
-        lastFinalResponseAtUnixSeconds: inout Int64?,
-        lastFinalResponseMessage: inout String?
+        lastFinalResponseAtUnixSeconds: inout Int64?
     ) {
         if lastEvent == nil {
             let matches = markers.compactMap { marker -> (RunEvent, Data.Index)? in
@@ -250,6 +223,5 @@ struct RolloutActivityReader {
             let date = try? Date(timestamp, strategy: .iso8601)
         else { return }
         lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
-        lastFinalResponseMessage = envelope.payload?.message
     }
 }

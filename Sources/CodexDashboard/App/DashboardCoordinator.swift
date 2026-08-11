@@ -1,18 +1,6 @@
 import AppKit
 import Foundation
 
-private final class NotificationObserverToken: @unchecked Sendable {
-    let observer: any NSObjectProtocol
-
-    init(_ observer: any NSObjectProtocol) {
-        self.observer = observer
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(observer)
-    }
-}
-
 @MainActor
 final class DashboardCoordinator: ObservableObject {
     @Published private(set) var connectionState: DashboardConnectionState = .checking
@@ -28,23 +16,19 @@ final class DashboardCoordinator: ObservableObject {
     @Published private(set) var lastErrorDate: Date?
     @Published private(set) var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
-    @Published private(set) var completionNotificationsEnabled: Bool
 
     private let threadSnapshots: ThreadSnapshotService
     private let compatibilityChecker: any LocalCompatibilityChecking
-    private let completionNotifier: any ThreadCompletionNotifying
     private let userDefaults: UserDefaults
     private let versionTracker: CodexVersionCompatibilityTracker
     private let installedCodexVersion: () -> String?
     private let pollingController: DashboardPollingController
     private let synchronizationGate = DashboardSynchronizationGate()
-    private var completionDetector = ThreadCompletionDetector()
     private var runtime: (any DashboardSession)?
     private var enrichmentGeneration = 0
     private var catalogWarning: String?
     private var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
-    private var completionNotificationObserver: NotificationObserverToken?
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -58,7 +42,6 @@ final class DashboardCoordinator: ObservableObject {
         workingTreeStatusProvider: any WorkingTreeStatusProviding = GitWorkingTreeStatusProvider(),
         unreadThreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
-        completionNotifier: any ThreadCompletionNotifying = DisabledThreadCompletionNotifier(),
         userDefaults: UserDefaults = .standard,
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
@@ -70,35 +53,18 @@ final class DashboardCoordinator: ObservableObject {
             unreadThreadIDProvider: unreadThreadIDProvider
         )
         self.compatibilityChecker = compatibilityChecker
-        self.completionNotifier = completionNotifier
         self.userDefaults = userDefaults
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion
         versionTracker = CodexVersionCompatibilityTracker(userDefaults: userDefaults)
-        completionNotificationsEnabled = userDefaults.object(
-            forKey: "completionNotificationsEnabled"
-        ) as? Bool ?? true
         do {
             runtime = try runtimeFactory()
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
-        completionNotificationObserver = NotificationObserverToken(NotificationCenter.default.addObserver(
-            forName: .codexDashboardOpenCompletedThread,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let threadID = CompletionNotificationPayload.threadID(from: notification.userInfo ?? [:]) else {
-                return
-            }
-            Task { @MainActor in await self?.runtime?.openThread(threadID) }
-        })
     }
 
     func startMonitoring() {
-        if completionNotificationsEnabled {
-            completionNotifier.requestAuthorization()
-        }
         compatibilityWasTriggeredByUpdate = versionTracker.updateWasDetected(
             currentVersion: installedCodexVersion()
         )
@@ -117,14 +83,6 @@ final class DashboardCoordinator: ObservableObject {
             }
         }
         Task { await checkCompatibility() }
-    }
-
-    func setCompletionNotificationsEnabled(_ enabled: Bool) {
-        completionNotificationsEnabled = enabled
-        userDefaults.set(enabled, forKey: "completionNotificationsEnabled")
-        if enabled {
-            completionNotifier.requestAuthorization()
-        }
     }
 
     func stopMonitoring() {
@@ -316,13 +274,8 @@ final class DashboardCoordinator: ObservableObject {
 
     private func setThreads(_ updatedThreads: [ThreadSummary]) {
         pollingController.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
-        let completedThreads = completionDetector.observe(updatedThreads)
         if threads != updatedThreads {
             threads = updatedThreads
-        }
-        guard completionNotificationsEnabled else { return }
-        for thread in completedThreads {
-            completionNotifier.postCompletion(for: thread)
         }
     }
 

@@ -98,7 +98,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                lastAssistantMessage: threadActivity.lastFinalResponseMessage,
                 projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
                 projectPath: thread.projectPath,
                 recencyTimestamp: threadActivity.lastFinalResponseAtUnixSeconds
@@ -106,7 +105,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: threadActivity.runState,
-                lastRunTermination: threadActivity.lastRunTermination,
                 workingTreeStatus: .notRepository
             )
         }.sorted { left, right in

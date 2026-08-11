@@ -273,7 +273,11 @@ function renamePromptSection(form) {
   if (!name) return;
   const source = dialogState.section;
   const destination = promptStore.normalizeSection(name);
-  if (destination !== source && promptStore.sections.includes(destination)) {
+  const conflictingSection = promptStore.sections.find((section) => (
+    section !== source
+      && section.localeCompare(destination, undefined, { sensitivity: 'accent' }) === 0
+  ));
+  if (conflictingSection) {
     showStorageError('A section with that name already exists.');
     return;
   }

@@ -7,7 +7,6 @@ extension ThreadSummary {
         id: String = "thread",
         title: String = "Thread",
         preview: String = "Preview",
-        lastAssistantMessage: String? = nil,
         projectName: String = "Project",
         projectPath: String = "/tmp/project",
         recencyTimestamp: Int64 = 1,
@@ -15,21 +14,18 @@ extension ThreadSummary {
         isUnread: Bool = false,
         model: String? = nil,
         runState: ThreadRunState = .idle,
-        lastRunTermination: ThreadRunTermination = .unknown,
         workingTreeStatus: WorkingTreeStatus = .clean
     ) -> ThreadSummary {
         var thread = ThreadSummary(
             id: id,
             title: title,
             preview: preview,
-            lastAssistantMessage: lastAssistantMessage,
             projectName: projectName,
             projectPath: projectPath,
             recencyTimestamp: recencyTimestamp,
             isPinned: isPinned,
             model: model,
             runState: runState,
-            lastRunTermination: lastRunTermination,
             workingTreeStatus: workingTreeStatus
         )
         thread.isUnread = isUnread

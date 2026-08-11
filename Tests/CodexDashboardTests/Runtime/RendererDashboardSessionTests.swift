@@ -175,7 +175,7 @@ private actor FailingRendererDevTools: DevToolsServing {
 
 @MainActor
 final class RendererDashboardSessionTests: XCTestCase {
-    func testOpeningNotificationThreadDispatchesItsRoute() async throws {
+    func testOpeningThreadDispatchesItsRoute() async throws {
         let target = DevToolsTarget(
             id: "main",
             type: "page",
@@ -198,10 +198,8 @@ final class RendererDashboardSessionTests: XCTestCase {
         XCTAssertTrue(expression.contains("thread"))
     }
 
-    func testDashboardSnapshotPayloadOmitsNotificationOnlyAssistantMessage() throws {
-        let snapshot = DashboardSnapshotPayload(threads: [
-            .fixture(lastAssistantMessage: String(repeating: "private response", count: 10_000)),
-        ])
+    func testDashboardSnapshotPayloadContainsOnlyDashboardFields() throws {
+        let snapshot = DashboardSnapshotPayload(threads: [.fixture()])
 
         let data = try JSONEncoder().encode(snapshot)
         let object = try XCTUnwrap(
@@ -209,7 +207,6 @@ final class RendererDashboardSessionTests: XCTestCase {
         )
         let threads = try XCTUnwrap(object["threads"] as? [[String: Any]])
 
-        XCTAssertNil(try XCTUnwrap(threads.first)["lastAssistantMessage"])
         XCTAssertEqual(threads.first?["title"] as? String, "Thread")
     }
 
