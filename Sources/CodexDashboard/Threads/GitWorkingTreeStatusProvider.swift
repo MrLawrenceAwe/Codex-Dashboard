@@ -6,15 +6,9 @@ protocol WorkingTreeStatusProviding: Sendable {
 
 actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     static let defaultStatusCacheLifetime: TimeInterval = 0
-    static let defaultResolutionCacheLifetime: TimeInterval = 10
 
     private struct CachedStatus {
         let value: WorkingTreeStatus
-        let loadedAt: Date
-    }
-
-    private struct CachedResolution {
-        let value: RepositoryResolution
         let loadedAt: Date
     }
 
@@ -27,40 +21,24 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     private let subprocessTimeout: TimeInterval
     private let cacheLifetime: TimeInterval
-    private let resolutionCacheLifetime: TimeInterval
-    private var resolutionByProjectPath: [String: CachedResolution] = [:]
     private var statusByProjectPath: [String: CachedStatus] = [:]
 
     init(
         subprocessTimeout: TimeInterval = 3,
-        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime,
-        resolutionCacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultResolutionCacheLifetime
+        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime
     ) {
         self.subprocessTimeout = subprocessTimeout
         self.cacheLifetime = cacheLifetime
-        self.resolutionCacheLifetime = resolutionCacheLifetime
     }
 
     func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
         let now = Date()
-        var resolutions: [String: RepositoryResolution] = [:]
-        let unresolvedPaths = projectPaths.filter { path in
-            guard let cached = resolutionByProjectPath[path],
-                  now.timeIntervalSince(cached.loadedAt) < resolutionCacheLifetime
-            else { return true }
-            resolutions[path] = cached.value
-            return false
-        }
+        let resolutions = Dictionary(uniqueKeysWithValues: projectPaths.map { path in
+            (path, Self.resolveRepository(at: path))
+        })
         let timeout = subprocessTimeout
-        let resolved = await Self.concurrentMap(unresolvedPaths) { path in
-            (path, await Self.resolveRepository(at: path, timeout: timeout))
-        }
-        for (path, resolution) in resolved {
-            resolutions[path] = resolution
-            resolutionByProjectPath[path] = CachedResolution(value: resolution, loadedAt: now)
-        }
 
         let repositoryProjectPaths = projectPaths.filter { path in
             guard case .repository = resolutions[path] else { return false }
@@ -121,28 +99,22 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         }
     }
 
-    private static func resolveRepository(
-        at path: String,
-        timeout: TimeInterval
-    ) async -> RepositoryResolution {
-        guard FileManager.default.fileExists(atPath: path) else { return .terminal(.unavailable) }
-        do {
-            let result = try await Subprocess.run(
-                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-                arguments: ["-C", path, "rev-parse", "--show-toplevel"],
-                timeout: timeout
-            )
-            guard result.terminationStatus == 0 else {
-                let error = String(decoding: result.standardError, as: UTF8.self)
-                return error.localizedCaseInsensitiveContains("not a git repository")
-                    ? .terminal(.notRepository)
-                    : .terminal(.unavailable)
+    private static func resolveRepository(at path: String) -> RepositoryResolution {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else { return .terminal(.unavailable) }
+
+        var candidate = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        while true {
+            if FileManager.default.fileExists(
+                atPath: candidate.appendingPathComponent(".git").path
+            ) {
+                return .repository
             }
-            let root = String(decoding: result.standardOutput, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return root.isEmpty ? .terminal(.unavailable) : .repository
-        } catch {
-            return .terminal(.unavailable)
+            let parent = candidate.deletingLastPathComponent()
+            guard parent.path != candidate.path else { return .terminal(.notRepository) }
+            candidate = parent
         }
     }
 
@@ -154,7 +126,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/git"),
                 arguments: [
-                    "-C", path,
+                    "--no-optional-locks", "-C", path,
                     "status", "--porcelain=v1", "--untracked-files=normal",
                     "--", ".", ":(exclude).DS_Store", ":(exclude)**/.DS_Store",
                 ],
