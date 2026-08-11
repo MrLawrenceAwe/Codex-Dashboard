@@ -201,7 +201,7 @@ function observeMutationHosts() {
   const structureRoot = codexHost.pageHost();
   if (structureObserver && structureRoot !== observedStructureRoot) {
     structureObserver.disconnect();
-    if (structureRoot) structureObserver.observe(structureRoot, { childList: true });
+    if (structureRoot) structureObserver.observe(structureRoot, { childList: true, subtree: true });
     observedStructureRoot = structureRoot;
   }
   const sidebar = codexHost.sidebar();
@@ -234,12 +234,22 @@ function scheduleHostSync({ syncUnread = false, rebindHosts = false } = {}) {
     if (dashboardIsOpen && restoredPage) openPage();
     attachPageToCodexContent();
     observeSidebar();
-    if (shouldRebindHosts) observeMutationHosts();
+    if (shouldRebindHosts) {
+      observeMutationHosts();
+      promptLauncher.scheduleSync();
+    }
     if (shouldSyncUnread && syncUnreadFromSidebar()) requestDashboardRender();
   });
 }
 
 function handleStructureMutations() {
+  const launcher = document.querySelector('[data-codex-prompt-launcher]');
+  if (
+    document.getElementById(dashboardDOM.elementIDs.page)
+      && document.getElementById(dashboardDOM.elementIDs.navButton)
+      && launcher?.isConnected
+      && observedComposerRoot?.isConnected
+  ) return;
   scheduleHostSync({ rebindHosts: true });
 }
 
@@ -248,6 +258,10 @@ function handleSidebarMutations() {
 }
 
 function handleComposerMutations() {
+  if (composerMutationRoot() !== observedComposerRoot) {
+    scheduleHostSync({ rebindHosts: true });
+    return;
+  }
   promptLauncher.scheduleSync();
 }
 
