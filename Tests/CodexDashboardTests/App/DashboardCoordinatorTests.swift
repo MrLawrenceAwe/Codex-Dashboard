@@ -131,27 +131,6 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.connectionError?.contains("incompatible") == true)
     }
 
-    func testCompletionNotificationRoutesToItsThread() async throws {
-        let runtime = StubDashboardSession()
-        let coordinator = DashboardCoordinator(
-            catalogProvider: StubCatalogProvider(
-                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
-            ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
-            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
-            runtimeFactory: { runtime }
-        )
-
-        NotificationCenter.default.post(
-            name: .codexDashboardOpenCompletedThread,
-            object: nil,
-            userInfo: [CompletionNotificationPayload.threadIDKey: "completed-thread"]
-        )
-        try await waitUntil { runtime.openedThreadIDs == ["completed-thread"] }
-
-        XCTAssertEqual(runtime.openedThreadIDs, ["completed-thread"])
-        withExtendedLifetime(coordinator) {}
-    }
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let coordinator = DashboardCoordinator(

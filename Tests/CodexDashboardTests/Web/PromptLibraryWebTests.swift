@@ -342,6 +342,42 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(sectionSurvived, true)
     }
 
+    func testRenamingSectionRejectsCaseInsensitiveDuplicate() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'General prompt';
+              document.querySelector('[name="section"]').value = 'General';
+              document.querySelector('[name="content"]').value = 'Keep General canonical';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              document.querySelector('[data-prompt-new-section]').click();
+              document.querySelector('[name="sectionName"]').value = 'Code review';
+              document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
+              document.querySelector('[data-prompt-section-rename="Code review"]').click();
+              document.querySelector('[name="sectionName"]').value = 'general';
+              document.querySelector('[data-prompt-section-rename-form] button[type="submit"]').click();
+              const hasError = !document.querySelector('[data-prompt-storage-error]').hidden;
+              document.querySelector('[data-prompt-cancel]').click();
+              return {
+                hasError,
+                general: Boolean(document.querySelector('[data-prompt-section="General"]')),
+                codeReview: Boolean(document.querySelector('[data-prompt-section="Code review"]')),
+                storedSections: JSON.parse(localStorage.getItem('codex-dashboard.prompt-library')).sections,
+              };
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+
+        XCTAssertEqual(values["hasError"] as? Bool, true)
+        XCTAssertEqual(values["general"] as? Bool, true)
+        XCTAssertEqual(values["codeReview"] as? Bool, true)
+        XCTAssertEqual(values["storedSections"] as? [String], ["General", "Code review"])
+    }
+
     func testLegacyPromptStorageMigratesWithoutDataLoss() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
