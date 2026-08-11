@@ -68,7 +68,7 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page * { box-sizing: border-box; }
 #codex-dashboard-page button, #codex-dashboard-page input { font: inherit; }
 #codex-dashboard-page button:focus-visible, #codex-dashboard-page input:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
-#codex-dashboard-page .dashboard-shell { width: min(980px, calc(100% - 64px)); margin: 0 auto; padding: 34px 0 64px; }
+#codex-dashboard-page .dashboard-shell { width: min(980px, calc(100% - 64px)); margin: 0 auto; padding: 42px 0 64px; }
 
 #codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
 #codex-dashboard-page h1 { margin: 0; color: var(--dashboard-text); font-size: 28px; font-weight: 590; line-height: 1.15; letter-spacing: -.025em; }
@@ -81,17 +81,19 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-running-heading h2 { margin: 0; color: var(--dashboard-muted); font-size: 12px; font-weight: 570; }
 #codex-dashboard-page .dashboard-running-list { display: grid; border: 1px solid var(--dashboard-line); border-radius: 9px; overflow: hidden; }
 
-#codex-dashboard-page .dashboard-section-header { margin-bottom: 15px; }
-#codex-dashboard-page .dashboard-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; grid-template-areas: "search filters view"; align-items: center; gap: 8px; }
+#codex-dashboard-page .dashboard-section-header { margin: 26px 0 15px; }
+#codex-dashboard-page .dashboard-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; grid-template-areas: "search filters view"; align-items: end; gap: 14px; }
+#codex-dashboard-page .dashboard-toolbar-group { display: grid; gap: 6px; }
+#codex-dashboard-page .dashboard-control-label { padding-left: 2px; color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
 #codex-dashboard-page .dashboard-filters { display: flex; gap: 1px; padding: 2px; border: 1px solid var(--dashboard-line); border-radius: 7px; background: var(--dashboard-control); }
-#codex-dashboard-page .dashboard-filters { grid-area: filters; }
+#codex-dashboard-page .dashboard-filter-group { grid-area: filters; }
 #codex-dashboard-page .dashboard-filters button { display: inline-flex; min-height: 30px; align-items: center; gap: 5px; padding: 5px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--dashboard-dim); font-size: 11px; cursor: pointer; transition: background 100ms ease, color 100ms ease; }
 #codex-dashboard-page .dashboard-filters button:hover { color: var(--dashboard-muted); }
 #codex-dashboard-page .dashboard-filters button.is-active { background: var(--dashboard-active); color: var(--dashboard-text); }
 #codex-dashboard-page .dashboard-filter-count { min-width: 14px; color: var(--dashboard-dim); font-size: 10px; text-align: center; }
 #codex-dashboard-page .dashboard-filters button.is-active .dashboard-filter-count { color: var(--dashboard-muted); }
 #codex-dashboard-page .dashboard-view-options { display: flex; align-items: center; gap: 1px; padding: 2px; border: 1px solid var(--dashboard-line); border-radius: 7px; background: var(--dashboard-control); }
-#codex-dashboard-page .dashboard-view-options { grid-area: view; }
+#codex-dashboard-page .dashboard-view-group { grid-area: view; }
 #codex-dashboard-page .dashboard-view-options button { min-height: 30px; padding: 5px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--dashboard-dim); font-size: 11px; cursor: pointer; transition: background 100ms ease, color 100ms ease; }
 #codex-dashboard-page .dashboard-view-options button:hover { color: var(--dashboard-muted); }
 #codex-dashboard-page .dashboard-view-options button.is-active { background: var(--dashboard-active); color: var(--dashboard-text); }
@@ -100,7 +102,6 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-search svg { width: 13px; flex: 0 0 13px; color: var(--dashboard-dim); }
 #codex-dashboard-page .dashboard-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--dashboard-text); font-size: 12px; }
 #codex-dashboard-page .dashboard-search input::placeholder { color: var(--dashboard-dim); }
-#codex-dashboard-page .dashboard-loaded-summary { margin: -7px 0 14px; color: var(--dashboard-muted); font-size: 11px; }
 #codex-dashboard-page .dashboard-list { display: grid; gap: 22px; }
 #codex-dashboard-page .dashboard-project-group { display: grid; gap: 8px; }
 #codex-dashboard-page .dashboard-project-heading { display: flex; min-width: 0; align-items: center; gap: 8px; }
@@ -125,6 +126,11 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-project-ignored { display: inline-flex; flex: 0 0 auto; padding: 2px 5px; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-dim); font-size: 10px; font-weight: 550; }
 #codex-dashboard-page .dashboard-project-list { display: grid; border: 1px solid var(--dashboard-line); border-radius: 9px; overflow: hidden; }
 #codex-dashboard-page .dashboard-project-list[hidden] { display: none; }
+#codex-dashboard-page .dashboard-git-project { display: flex; min-height: 66px; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px; border: 1px solid var(--dashboard-line); border-radius: 9px; background: var(--dashboard-surface); }
+#codex-dashboard-page .dashboard-git-project-copy { display: flex; min-width: 0; align-items: center; gap: 9px; }
+#codex-dashboard-page .dashboard-git-project .dashboard-project-copy { gap: 2px; }
+#codex-dashboard-page .dashboard-git-project .dashboard-git-changes { margin-left: 5px; }
+#codex-dashboard-page .dashboard-git-project .dashboard-project-commit { margin-left: auto; }
 #codex-dashboard-page .dashboard-list > .dashboard-thread { border: 1px solid var(--dashboard-line); border-radius: 9px; }
 #codex-dashboard-page .dashboard-thread { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; min-height: 84px; align-items: center; padding: 14px 16px; background: var(--dashboard-surface); cursor: pointer; transition: background 100ms ease, box-shadow 100ms ease; }
 #codex-dashboard-page .dashboard-thread + .dashboard-thread { border-top: 1px solid var(--dashboard-line); }
@@ -166,13 +172,16 @@ html.codex-dashboard-open aside.app-shell-left-panel {
   #codex-dashboard-page .dashboard-shell { width: min(100% - 28px, 620px); padding-top: 25px; }
   #codex-dashboard-page h1 { font-size: 25px; }
   #codex-dashboard-page .dashboard-running { margin-top: 21px; }
-  #codex-dashboard-page .dashboard-toolbar { grid-template-columns: 1fr; grid-template-areas: "search" "filters" "view"; }
+  #codex-dashboard-page .dashboard-toolbar { grid-template-columns: 1fr; grid-template-areas: "search" "filters" "view"; gap: 11px; }
+  #codex-dashboard-page .dashboard-toolbar-group { gap: 5px; }
   #codex-dashboard-page .dashboard-filters { overflow-x: auto; }
   #codex-dashboard-page .dashboard-filters button { flex: 1; justify-content: center; }
   #codex-dashboard-page .dashboard-view-options button { flex: 1; }
   #codex-dashboard-page .dashboard-thread { grid-template-columns: minmax(0,1fr); }
   #codex-dashboard-page .dashboard-thread-actions { justify-content: flex-end; }
   #codex-dashboard-page .dashboard-thread[data-run-state="running"] .dashboard-thread-actions { justify-content: space-between; }
+  #codex-dashboard-page .dashboard-git-project { align-items: stretch; flex-direction: column; }
+  #codex-dashboard-page .dashboard-git-project .dashboard-project-commit { justify-content: center; margin-left: 0; }
   #codex-dashboard-page .dashboard-thread p { white-space: normal; }
   #codex-dashboard-page .dashboard-project-path { display: none; }
   #codex-dashboard-page .dashboard-git-changes span { display: none; }

@@ -101,13 +101,6 @@ const threadDashboardView = (() => {
       isThreadUnread,
     });
     const displayedThreads = visibleThreads.slice(0, visibleThreadLimit);
-    const loadedSummary = page.querySelector('[data-loaded-summary]');
-    if (loadedSummary) {
-      loadedSummary.hidden = displayedThreads.length >= visibleThreads.length;
-      loadedSummary.textContent = displayedThreads.length < visibleThreads.length
-        ? `Showing ${displayedThreads.length} of ${visibleThreads.length} matching threads.`
-        : '';
-    }
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
@@ -122,6 +115,7 @@ const threadDashboardView = (() => {
       list,
       threadMarkup.list(displayedThreads, {
         viewMode,
+        filterMode,
         collapsedProjects,
         ignoredProjectPaths,
         isUnread: isThreadUnread,

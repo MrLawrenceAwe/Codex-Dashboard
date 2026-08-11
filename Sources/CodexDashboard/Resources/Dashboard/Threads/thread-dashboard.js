@@ -295,19 +295,21 @@ function mountDashboardPage() {
       </section>
       <div class="dashboard-section-header">
         <div class="dashboard-toolbar">
-          <div class="dashboard-filters" aria-label="Filter threads">
-            <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
-            <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-            <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+          <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>
+          <div class="dashboard-toolbar-group dashboard-filter-group">
+            <span class="dashboard-control-label">Show</span>
+            <div class="dashboard-filters" aria-label="Filter threads">
+              <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
+              <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
+              <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+            </div>
           </div>
-          <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
-          <div class="dashboard-view-options" aria-label="Group threads">
+          <div class="dashboard-view-options dashboard-view-group" aria-label="Thread view">
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
             <button type="button" data-view="recent" aria-pressed="false">Threads</button>
           </div>
         </div>
       </div>
-      <p class="dashboard-loaded-summary" data-loaded-summary hidden></p>
       <main class="dashboard-list" data-thread-list></main>
       <button type="button" class="dashboard-load-more" data-load-more hidden>Load more threads</button>
     </div>`;
