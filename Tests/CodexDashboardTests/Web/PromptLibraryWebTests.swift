@@ -56,6 +56,38 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         )
     }
 
+    func testPromptLauncherMountsWhenNewChatComposerAppearsAfterNavigation() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('.composer-shell').remove();
+              window.setTimeout(() => {
+                const shell = document.createElement('div');
+                shell.className = 'composer-shell';
+                shell.innerHTML = `
+                  <textarea placeholder="Do anything"></textarea>
+                  <div class="composer-toolbar">
+                    <button type="button" aria-label="Add">+</button>
+                  </div>`;
+                document.querySelector('main').append(shell);
+              }, 50);
+            })()
+            """
+        )
+
+        try await DashboardWebTestHarness.waitForJavaScript(
+            """
+            (() => {
+              const addButton = document.querySelector('button[aria-label="Add"]');
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              return Boolean(addButton && addButton.nextElementSibling === launcher);
+            })()
+            """,
+            in: webView
+        )
+    }
+
     func testSavedPromptCanBeCreatedAndInsertedIntoSupportedComposers() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let textareaResult = try await webView.evaluateJavaScript(
