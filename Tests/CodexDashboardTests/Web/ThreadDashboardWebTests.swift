@@ -137,7 +137,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         webView.loadFileURL(htmlURL, allowingReadAccessTo: directory)
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
         let preferencesStored = try await webView.evaluateJavaScript(
-            "try { localStorage.setItem('codex-dashboard.thread-preferences', JSON.stringify({ filterMode: 'unread', viewMode: 'recent', collapsedProjects: ['/tmp/project'] })); true } catch (_) { false }"
+            "try { localStorage.setItem('codex-dashboard.thread-preferences', JSON.stringify({ filterMode: 'unread', viewMode: 'recent', collapsedProjects: ['/tmp/project'], ignoredProjectPaths: ['/tmp/ignored-project'] })); true } catch (_) { false }"
         ) as? Bool
         XCTAssertEqual(preferencesStored, true)
         let injection = try DashboardInjectionPayload.load()
@@ -159,7 +159,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-filter="all"]').click();
               document.querySelector('[data-view="projects"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.thread-preferences'));
-              return JSON.stringify([restored, saved.filterMode, saved.viewMode, saved.collapsedProjects[0]]);
+              return JSON.stringify([restored, saved.filterMode, saved.viewMode, saved.collapsedProjects[0], saved.ignoredProjectPaths[0]]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }
@@ -174,6 +174,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "all")
         XCTAssertEqual(values[2] as? String, "projects")
         XCTAssertEqual(values[3] as? String, "/tmp/project")
+        XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
     }
 
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
@@ -344,6 +345,95 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let values = try XCTUnwrap(status)
         XCTAssertEqual(values[0] as? Bool, false)
         XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes")
+    }
+
+    func testIgnoredProjectIsRemovedFromChangeIndicatorsAndCanBeRestored() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+        )
+        let projectPath = "/tmp/ignored-project"
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(projectPath: projectPath, workingTreeStatus: .hasChanges),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const before = [
+                document.querySelector('[data-filter-count="changedProjects"]').textContent,
+                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelector('[data-project-ignore]').textContent.trim(),
+              ];
+              document.querySelector('[data-project-ignore]').click();
+              const ignored = [
+                document.querySelector('[data-filter-count="changedProjects"]').textContent,
+                document.querySelector('[data-navigation-changes]').hidden,
+                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelector('[data-project-ignore]').textContent.trim(),
+              ];
+              document.querySelector('[data-project-ignore]').click();
+              const restored = [
+                document.querySelector('[data-filter-count="changedProjects"]').textContent,
+                document.querySelector('[data-navigation-changes]').hidden,
+                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelector('[data-project-ignore]').textContent.trim(),
+              ];
+              return [before, ignored, restored];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Ignore"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Restore"])
+        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Ignore"])
+    }
+
+    func testUnavailableCommitActionDoesNotNavigateAwayFromDashboard() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(projectPath: "/tmp/changed", workingTreeStatus: .hasChanges),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              document.querySelector('[data-project-commit]').click();
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(100))
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+              document.querySelector('[data-dashboard-notice]').textContent,
+            ]
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(state)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(
+            values[1] as? String,
+            "Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead."
+        )
     }
 
     func testProjectCommitActionDispatchesCodexNativeGitCommand() async throws {

@@ -82,11 +82,11 @@ struct RendererCompatibilityChecker {
             id: "commit-push-handoff",
             title: "Commit or push handoff",
             expression: contractExpression(
-                "codexContracts.canDispatchCommand().then((available) => Boolean(available || codexContracts.commitOrPushButton() || codexContracts.sidePanelToggle()))"
+                "codexContracts.canDispatchCommand()"
             ),
             failureStatus: .warning,
-            compatibleDetail: "Codex exposes its native Git command or project side panel for Commit or push handoff.",
-            failureDetail: "The native Codex Git command and project side-panel controls were not found.",
+            compatibleDetail: "Codex exposes its native Git command for Commit or push handoff.",
+            failureDetail: "The native Codex Git command was not found.",
             in: target
         ))
         return checks

@@ -44,6 +44,7 @@ const threadDashboardView = (() => {
     visibleThreadLimit,
     viewMode,
     collapsedProjects,
+    ignoredProjectPaths,
     handoffError,
     isThreadUnread,
     state,
@@ -119,7 +120,12 @@ const threadDashboardView = (() => {
     }
     updateMarkup(
       list,
-      threadMarkup.list(displayedThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread }),
+      threadMarkup.list(displayedThreads, {
+        viewMode,
+        collapsedProjects,
+        ignoredProjectPaths,
+        isUnread: isThreadUnread,
+      }),
     );
     return true;
   }

@@ -9,7 +9,7 @@ let searchTerm = '';
 const threadPageSize = 60;
 let visibleThreadLimit = threadPageSize;
 let viewMode = storedPreferences.viewMode;
-const { collapsedProjects } = storedPreferences;
+const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
 let mutationObserver;
 let resizeObserver;
 let observedSidebar;
@@ -23,7 +23,12 @@ let unreadThreadIDs = new Set();
 let handoffError = '';
 
 function saveDashboardPreferences() {
-  threadDashboardState.savePreferences({ filterMode, viewMode, collapsedProjects });
+  threadDashboardState.savePreferences({
+    filterMode,
+    viewMode,
+    collapsedProjects,
+    ignoredProjectPaths,
+  });
 }
 
 function syncUnreadFromSidebar() {
@@ -90,7 +95,7 @@ function handleHostNavigation(event) {
 }
 
 function deriveDashboardState() {
-  return threadDashboardState.derive(threads, isThreadUnread);
+  return threadDashboardState.derive(threads, isThreadUnread, ignoredProjectPaths);
 }
 
 function openThread(thread) {
@@ -109,9 +114,14 @@ async function openProjectCommitOrPush(projectPath) {
     renderDashboard();
     return;
   }
+  if (!await codexHost.canOpenCommitOrPush()) {
+    handoffError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
+    renderDashboard();
+    return;
+  }
   closePage();
   if (await codexHost.openCommitOrPush(thread)) return;
-  handoffError = 'Codex’s Commit or push control could not be opened. The renderer contract may have changed.';
+  handoffError = 'The project thread opened, but Codex could not start Commit or push.';
   openPage();
 }
 
@@ -124,6 +134,7 @@ function renderDashboard() {
     visibleThreadLimit,
     viewMode,
     collapsedProjects,
+    ignoredProjectPaths,
     handoffError,
     isThreadUnread,
     state,
@@ -281,6 +292,17 @@ function mountDashboardPage() {
     renderDashboard();
   });
   page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
+    const projectIgnore = event.target.closest('[data-project-ignore]');
+    if (projectIgnore) {
+      event.preventDefault();
+      const projectPath = projectIgnore.dataset.projectIgnore;
+      if (ignoredProjectPaths.has(projectPath)) ignoredProjectPaths.delete(projectPath);
+      else ignoredProjectPaths.add(projectPath);
+      handoffError = '';
+      saveDashboardPreferences();
+      renderDashboard();
+      return;
+    }
     const projectCommit = event.target.closest('[data-project-commit]');
     if (projectCommit) {
       event.preventDefault();
