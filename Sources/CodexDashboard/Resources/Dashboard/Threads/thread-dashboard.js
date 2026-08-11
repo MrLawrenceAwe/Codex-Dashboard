@@ -303,7 +303,7 @@ function mountDashboardPage() {
           <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
           <div class="dashboard-view-options" aria-label="Group threads">
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
-            <button type="button" data-view="recent" aria-pressed="false">Recent</button>
+            <button type="button" data-view="recent" aria-pressed="false">Threads</button>
           </div>
         </div>
       </div>
