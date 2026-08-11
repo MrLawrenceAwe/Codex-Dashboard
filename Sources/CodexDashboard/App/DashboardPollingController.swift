@@ -26,7 +26,7 @@ final class DashboardPollingController {
 
     func start(
         synchronizeDashboard: @escaping @MainActor () async -> Void,
-        updateWorkingTrees: @escaping @MainActor () async -> Void,
+        updateWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void,
         updateUnreadState: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
@@ -43,7 +43,7 @@ final class DashboardPollingController {
         }
         workingTreePollingTask = Task {
             while !Task.isCancelled {
-                await updateWorkingTrees()
+                await updateWorkingTrees(nil)
                 try? await Task.sleep(for: Schedule.workingTree(active: Self.isUserActive))
             }
         }

@@ -27,8 +27,12 @@ enum CodexTestFixtures {
                 "message": String(repeating: "x", count: finalResponseMessageSize),
             ],
         ])
-        let lifecycleLines = try lifecycleEvents.map { event -> String in
+        let lifecycleLines = try lifecycleEvents.enumerated().map { index, event -> String in
+            let eventTimestamp = timestampFormatter.string(
+                from: Date(timeIntervalSince1970: TimeInterval(finalResponseAtUnixSeconds + Int64(index + 1)))
+            )
             let data = try JSONSerialization.data(withJSONObject: [
+                "timestamp": eventTimestamp,
                 "type": "event_msg",
                 "payload": ["type": event],
             ])

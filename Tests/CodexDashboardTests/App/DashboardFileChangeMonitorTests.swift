@@ -20,12 +20,16 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var workingTreeRefreshes = 0
+        var refreshedProjectPaths: Set<String> = []
         monitor.start(
             catalogURL: catalogDirectory.appendingPathComponent("state.sqlite"),
             unreadStateURL: unreadDirectory.appendingPathComponent("state.json"),
             refreshCatalog: { catalogRefreshes += 1 },
             refreshUnread: { unreadRefreshes += 1 },
-            refreshWorkingTrees: { workingTreeRefreshes += 1 }
+            refreshWorkingTrees: { paths in
+                workingTreeRefreshes += 1
+                refreshedProjectPaths.formUnion(paths ?? [])
+            }
         )
         monitor.updateProjectPaths([projectDirectory.path])
         defer { monitor.stop() }
@@ -37,6 +41,38 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
         try await waitUntil {
             catalogRefreshes > 0 && unreadRefreshes > 0 && workingTreeRefreshes > 0
         }
+        XCTAssertEqual(refreshedProjectPaths, [projectDirectory.path])
+    }
+
+    func testSharedDataDirectoryRoutesOnlyChangedFile() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-data-monitor-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("global.json")
+        try Data("initial-catalog".utf8).write(to: catalogURL)
+        try Data("initial-unread".utf8).write(to: unreadURL)
+
+        let monitor = DashboardFileChangeMonitor()
+        var catalogRefreshes = 0
+        var unreadRefreshes = 0
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            refreshCatalog: { catalogRefreshes += 1 },
+            refreshUnread: { unreadRefreshes += 1 },
+            refreshWorkingTrees: { _ in }
+        )
+        defer { monitor.stop() }
+
+        try Data("updated-catalog".utf8).write(to: catalogURL)
+        try await waitUntil { catalogRefreshes == 1 }
+        XCTAssertEqual(unreadRefreshes, 0)
+
+        try Data("updated-unread-state".utf8).write(to: unreadURL)
+        try await waitUntil { unreadRefreshes == 1 }
+        XCTAssertEqual(catalogRefreshes, 1)
     }
 
     private func waitUntil(

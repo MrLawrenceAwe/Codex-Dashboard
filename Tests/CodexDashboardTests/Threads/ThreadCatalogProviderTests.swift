@@ -8,7 +8,9 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex thread catalog.")
         }
 
-        let catalog = try await CodexThreadCatalogProvider().loadCatalog(codexLaunchDate: .distantPast)
+        let catalog = try await CodexThreadCatalogProvider().loadCatalog(
+            codexLaunchDate: Date().addingTimeInterval(-24 * 60 * 60)
+        )
         XCTAssertFalse(catalog.threads.isEmpty)
         XCTAssertGreaterThanOrEqual(catalog.totalThreadCount, catalog.threads.count)
         XCTAssertTrue(catalog.threads.contains { $0.runState == .running })
@@ -27,14 +29,14 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads.first?.title, "Running thread")
         XCTAssertEqual(catalog.threads.first?.projectName, "running")
         XCTAssertEqual(catalog.threads.first?.projectPath, "/tmp/running")
-        XCTAssertEqual(catalog.threads.first?.recencyTimestamp, now - 300)
+        XCTAssertEqual(catalog.threads.first?.recencyTimestamp, now - 30)
         XCTAssertEqual(catalog.threads.first?.workingTreeStatus, .notRepository)
         XCTAssertTrue(catalog.threads.first?.isPinned == true)
         XCTAssertEqual(catalog.threads[1].title, "Renamed thread")
         XCTAssertEqual(catalog.threads[1].recencyTimestamp, now - 600)
     }
 
-    func testOrdersThreadsByFinalResponseInsteadOfDatabaseActivity() async throws {
+    func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,
@@ -45,9 +47,9 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             stateDatabaseURL: stateDatabaseURL
         ).loadCatalog(codexLaunchDate: .distantPast)
 
-        XCTAssertEqual(catalog.threads.map(\.id), ["updated", "running", "idle"])
-        XCTAssertEqual(catalog.threads[1].runState, .running)
-        XCTAssertEqual(catalog.threads[1].recencyTimestamp, now - 1_200)
+        XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated", "idle"])
+        XCTAssertEqual(catalog.threads[0].runState, .running)
+        XCTAssertEqual(catalog.threads[0].recencyTimestamp, now - 30)
     }
 
     func testLoadsCompleteCatalogForClientSidePagingAndSearch() async throws {

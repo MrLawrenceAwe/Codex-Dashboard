@@ -32,11 +32,11 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let title: String
         let preview: String
         let projectPath: String
-        let createdAtUnixSeconds: Int64
         let pinnedValue: Int
         let model: String?
         let totalCount: Int
         let rolloutPath: String
+        let recencyAtMilliseconds: Int64
     }
 
     private struct FileSignature: Equatable {
@@ -69,10 +69,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
                cwd AS projectPath,
-               created_at AS createdAtUnixSeconds,
                is_pinned AS pinnedValue,
                model,
                rollout_path AS rolloutPath,
+               recency_at_ms AS recencyAtMilliseconds,
                COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
@@ -87,24 +87,35 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             cachedDatabaseSignature = databaseSignature
             cachedStoredThreads = threads
         }
-        rolloutActivityReader.retainCache(for: Set(threads.map(\.rolloutPath)))
+        let launchMilliseconds = codexLaunchDate.map {
+            Int64($0.timeIntervalSince1970 * 1_000)
+        }
+        let activityPaths: Set<String> = Set(threads.compactMap { thread -> String? in
+            guard
+                let launchMilliseconds,
+                thread.recencyAtMilliseconds >= launchMilliseconds
+            else { return nil }
+            return thread.rolloutPath
+        })
+        rolloutActivityReader.retainCache(for: activityPaths)
         let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
-            let threadActivity = rolloutActivityReader.load(
-                at: thread.rolloutPath,
-                codexLaunchDate: codexLaunchDate
-            )
+            let runState = activityPaths.contains(thread.rolloutPath)
+                ? rolloutActivityReader.load(
+                    at: thread.rolloutPath,
+                    codexLaunchDate: codexLaunchDate
+                )
+                : .idle
             return ThreadSummary(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
                 projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
                 projectPath: thread.projectPath,
-                recencyTimestamp: threadActivity.lastFinalResponseAtUnixSeconds
-                    ?? thread.createdAtUnixSeconds,
+                recencyTimestamp: thread.recencyAtMilliseconds / 1_000,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
-                runState: threadActivity.runState,
+                runState: runState,
                 workingTreeStatus: .notRepository
             )
         }.sorted { left, right in

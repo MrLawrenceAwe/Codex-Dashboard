@@ -70,7 +70,9 @@ final class DashboardCoordinator: ObservableObject {
         )
         pollingController.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
-            updateWorkingTrees: { [weak self] in await self?.updateWorkingTreeStatuses() },
+            updateWorkingTrees: { [weak self] paths in
+                await self?.updateWorkingTreeStatuses(projectPaths: paths)
+            },
             updateUnreadState: { [weak self] in await self?.refreshUnreadState() }
         )
         if activationObserver == nil {
@@ -258,15 +260,20 @@ final class DashboardCoordinator: ObservableObject {
         await publishSnapshotIfMaintained()
     }
 
-    private func updateWorkingTreeStatuses() async {
+    private func updateWorkingTreeStatuses(projectPaths: Set<String>? = nil) async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
         let generation = enrichmentGeneration
-        guard let statusByProjectPath = await threadSnapshots.updateWorkingTreeStatuses(in: threads) else { return }
+        guard let statusByProjectPath = await threadSnapshots.updateWorkingTreeStatuses(
+            in: threads,
+            projectPaths: projectPaths
+        ) else { return }
         guard !isPerformingAction, generation == enrichmentGeneration else { return }
         setThreads(threads.map { source in
             var thread = source
-            thread.workingTreeStatus = statusByProjectPath[thread.projectPath] ?? .notRepository
+            if let status = statusByProjectPath[thread.projectPath] {
+                thread.workingTreeStatus = status
+            }
             return thread
         })
         await publishSnapshotIfMaintained()
