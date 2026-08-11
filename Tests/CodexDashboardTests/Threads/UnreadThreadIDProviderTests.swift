@@ -76,7 +76,7 @@ final class UnreadThreadIDProviderTests: XCTestCase {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-updated-global-state-\(UUID().uuidString).json")
         let firstState = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["one"]}}}"#
-        let secondState = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["thread-two"]}}}"#
+        let secondState = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["two"]}}}"#
         try Data(firstState.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
         let provider = CodexUnreadThreadIDProvider(stateURL: stateURL)
@@ -86,6 +86,6 @@ final class UnreadThreadIDProviderTests: XCTestCase {
         try Data(secondState.utf8).write(to: stateURL)
 
         let updatedUnreadThreadIDs = try await provider.loadUnreadThreadIDs()
-        XCTAssertEqual(updatedUnreadThreadIDs, ["thread-two"])
+        XCTAssertEqual(updatedUnreadThreadIDs, ["two"])
     }
 }

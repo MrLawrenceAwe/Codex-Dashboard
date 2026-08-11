@@ -30,6 +30,25 @@ private struct FailingUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
+private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+    private var continuations: [Int: CheckedContinuation<[String: WorkingTreeStatus], Never>] = [:]
+    private var nextRequestID = 0
+
+    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+        let requestID = nextRequestID
+        nextRequestID += 1
+        return await withCheckedContinuation { continuation in
+            continuations[requestID] = continuation
+        }
+    }
+
+    func pendingRequestCount() -> Int { continuations.count }
+
+    func resume(requestID: Int, status: WorkingTreeStatus) {
+        continuations.removeValue(forKey: requestID)?.resume(returning: ["/tmp/project": status])
+    }
+}
+
 private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
     private var continuation: CheckedContinuation<ThreadCatalog, Never>?
 
@@ -90,6 +109,31 @@ final class ThreadSnapshotServiceTests: XCTestCase {
 
         XCTAssertEqual(updatedStatuses?["/tmp/project"], .hasChanges)
         XCTAssertEqual(loadCount, 1)
+    }
+
+    func testOlderWorkingTreeRefreshCannotOverwriteNewerResult() async throws {
+        let statusProvider = SequencedWorkingTreeStatusProvider()
+        let service = ThreadSnapshotService(
+            catalogProvider: CountingCatalogProvider(),
+            workingTreeStatusProvider: statusProvider,
+            unreadThreadIDProvider: EmptyUnreadIDProvider()
+        )
+        let threads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
+
+        let older = Task { await service.updateWorkingTreeStatuses(in: threads) }
+        while await statusProvider.pendingRequestCount() < 1 { await Task.yield() }
+        let newer = Task { await service.updateWorkingTreeStatuses(in: threads) }
+        while await statusProvider.pendingRequestCount() < 2 { await Task.yield() }
+
+        await statusProvider.resume(requestID: 1, status: .hasChanges)
+        let newerResult = await newer.value
+        XCTAssertEqual(newerResult?["/tmp/project"], .hasChanges)
+        await statusProvider.resume(requestID: 0, status: .clean)
+        let olderResult = await older.value
+        XCTAssertNil(olderResult)
+
+        let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
+        XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
     }
 
     func testUnreadFailureKeepsCatalogAvailableAndReportsWarning() async throws {

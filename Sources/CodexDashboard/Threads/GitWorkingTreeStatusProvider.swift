@@ -73,15 +73,23 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         let refreshed = await Self.concurrentMap(staleRoots) { root in
             (root, await Self.status(atRepositoryRoot: root, timeout: timeout))
         }
+        var statusesByRepositoryRoot: [String: WorkingTreeStatus] = [:]
+        for root in repositoryRoots {
+            guard let cached = statusByRepositoryRoot[root],
+                  now.timeIntervalSince(cached.loadedAt) < cacheLifetime
+            else { continue }
+            statusesByRepositoryRoot[root] = cached.value
+        }
         for (root, status) in refreshed {
             statusByRepositoryRoot[root] = CachedStatus(value: status, loadedAt: now)
+            statusesByRepositoryRoot[root] = status
         }
 
         return Dictionary(uniqueKeysWithValues: projectPaths.map { path in
             let status: WorkingTreeStatus
             switch resolutions[path] {
             case .repository(let root):
-                status = statusByRepositoryRoot[root]?.value ?? .unavailable
+                status = statusesByRepositoryRoot[root] ?? .unavailable
             case .terminal(let value):
                 status = value
             case nil:

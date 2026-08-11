@@ -1,17 +1,12 @@
 import Foundation
 
-struct ThreadActivity: Equatable, Sendable {
-    let runState: ThreadRunState
-    let lastFinalResponseAtUnixSeconds: Int64?
-}
-
 struct RolloutActivityReader {
     static let startedEventType = "task_started"
     static let endedEventTypes = ["task_complete", "turn_aborted"]
     static let finalResponsePhase = "final_answer"
     static let lifecycleEventTypes = [startedEventType] + endedEventTypes
 
-    private enum RunEvent {
+    private enum RunEventKind: Sendable {
         case started
         case completed
         case aborted
@@ -22,12 +17,18 @@ struct RolloutActivityReader {
 
     }
 
+    private struct RunEvent: Sendable {
+        let kind: RunEventKind
+        let timestamp: Date
+    }
+
     private struct Envelope: Decodable {
         struct Payload: Decodable {
-            let phase: String?
+            let type: String?
         }
 
         let timestamp: String?
+        let type: String?
         let payload: Payload?
     }
 
@@ -35,7 +36,7 @@ struct RolloutActivityReader {
         let size: UInt64
         let modifiedAt: Date
         let endsWithNewline: Bool
-        let status: ThreadActivity
+        let event: RunEvent?
     }
 
     private var cache: [String: CacheEntry] = [:]
@@ -49,137 +50,128 @@ struct RolloutActivityReader {
     mutating func load(
         at path: String,
         codexLaunchDate: Date?
-    ) -> ThreadActivity {
+    ) -> ThreadRunState {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return ThreadActivity(
-                runState: .idle,
-                lastFinalResponseAtUnixSeconds: nil
-            )
+            return .idle
         }
 
         let cached = cache[path]
-        let status: ThreadActivity
+        let event: RunEvent?
         let endsWithNewline: Bool
         if let cached, cached.size == size, cached.modifiedAt == modifiedAt {
-            status = cached.status
+            event = cached.event
             endsWithNewline = cached.endsWithNewline
         } else if
             let cached,
             cached.size < size,
             cached.endsWithNewline
         {
-            let appendedStatus = read(
-                in: fileURL,
-                lowerBound: cached.size,
-                fallbackRunState: cached.status.runState
-            )
-            status = ThreadActivity(
-                runState: appendedStatus.runState,
-                lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
-                    ?? cached.status.lastFinalResponseAtUnixSeconds
-            )
+            event = read(in: fileURL, lowerBound: cached.size) ?? cached.event
             endsWithNewline = fileEndsWithNewline(fileURL, size: size)
         } else {
-            status = read(in: fileURL)
+            event = read(in: fileURL)
             endsWithNewline = fileEndsWithNewline(fileURL, size: size)
         }
         cache[path] = CacheEntry(
             size: size,
             modifiedAt: modifiedAt,
             endsWithNewline: endsWithNewline,
-            status: status
+            event: event
         )
 
-        guard let codexLaunchDate, modifiedAt >= codexLaunchDate else {
-            return ThreadActivity(
-                runState: .idle,
-                lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds
-            )
-        }
-        return status
+        guard
+            let codexLaunchDate,
+            let event,
+            event.timestamp >= codexLaunchDate
+        else { return .idle }
+        return event.kind.runState
     }
 
     private func read(
         in fileURL: URL,
-        lowerBound: UInt64 = 0,
-        fallbackRunState: ThreadRunState = .idle
-    ) -> ThreadActivity {
+        lowerBound: UInt64 = 0
+    ) -> RunEvent? {
         let markers = [
-            (RunEvent.started, Self.startedEventType),
-            (RunEvent.completed, "task_complete"),
-            (RunEvent.aborted, "turn_aborted"),
+            (RunEventKind.started, Self.startedEventType),
+            (RunEventKind.completed, "task_complete"),
+            (RunEventKind.aborted, "turn_aborted"),
         ]
         let encodedMarkers = markers.map { (event: $0.0, data: Data(#""type":"\#($0.1)""#.utf8)) }
-        let finalResponseMarker = Data(#""phase":"\#(Self.finalResponsePhase)""#.utf8)
-        let timestampMarker = Data(#""timestamp":""#.utf8)
         let chunkSize: UInt64 = 64 * 1_024
+        let maximumEventLineSize = 256 * 1_024
 
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-            return ThreadActivity(
-                runState: .idle,
-                lastFinalResponseAtUnixSeconds: nil
-            )
+            return nil
         }
         defer { try? handle.close() }
         guard var cursor = try? handle.seekToEnd() else {
-            return ThreadActivity(
-                runState: .idle,
-                lastFinalResponseAtUnixSeconds: nil
-            )
+            return nil
         }
         var laterLineFragment = Data()
-        var lastEvent: RunEvent?
-        var lastFinalResponseAtUnixSeconds: Int64?
+        var discardingOversizedLine = false
 
         while cursor > lowerBound {
             let bytesToRead = min(chunkSize, cursor - lowerBound)
             cursor -= bytesToRead
             do {
                 try handle.seek(toOffset: cursor)
-                guard var data = try handle.read(upToCount: Int(bytesToRead)) else { break }
-                data.append(laterLineFragment)
+                guard let data = try handle.read(upToCount: Int(bytesToRead)) else { break }
 
                 var lineEnd = data.endIndex
+                var isLatestSegment = true
                 while let newline = data[..<lineEnd].lastIndex(of: UInt8(ascii: "\n")) {
                     let lineStart = data.index(after: newline)
-                    inspect(
-                        data[lineStart..<lineEnd],
-                        markers: encodedMarkers,
-                        finalResponseMarker: finalResponseMarker,
-                        timestampMarker: timestampMarker,
-                        lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
-                    )
+                    if isLatestSegment {
+                        if !discardingOversizedLine {
+                            var line = Data(data[lineStart..<lineEnd])
+                            if line.count + laterLineFragment.count <= maximumEventLineSize {
+                                line.append(laterLineFragment)
+                                if let event = inspect(line, markers: encodedMarkers) { return event }
+                            }
+                        }
+                        discardingOversizedLine = false
+                        laterLineFragment.removeAll(keepingCapacity: true)
+                        isLatestSegment = false
+                    } else if lineEnd - lineStart <= maximumEventLineSize,
+                              let event = inspect(data[lineStart..<lineEnd], markers: encodedMarkers) {
+                        return event
+                    }
                     lineEnd = newline
-                    if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
                 }
-                if lastEvent != nil, lastFinalResponseAtUnixSeconds != nil { break }
 
                 if cursor == lowerBound {
-                    inspect(
-                        data[..<lineEnd],
-                        markers: encodedMarkers,
-                        finalResponseMarker: finalResponseMarker,
-                        timestampMarker: timestampMarker,
-                        lastEvent: &lastEvent,
-                        lastFinalResponseAtUnixSeconds: &lastFinalResponseAtUnixSeconds
-                    )
+                    guard !discardingOversizedLine else { return nil }
+                    var line = Data(data[..<lineEnd])
+                    guard line.count + laterLineFragment.count <= maximumEventLineSize else {
+                        return nil
+                    }
+                    line.append(laterLineFragment)
+                    return inspect(line, markers: encodedMarkers)
+                } else if isLatestSegment {
+                    if !discardingOversizedLine,
+                       data.count + laterLineFragment.count <= maximumEventLineSize {
+                        laterLineFragment.insert(contentsOf: data, at: 0)
+                    } else {
+                        laterLineFragment.removeAll(keepingCapacity: true)
+                        discardingOversizedLine = true
+                    }
                 } else {
                     laterLineFragment = Data(data[..<lineEnd])
+                    discardingOversizedLine = laterLineFragment.count > maximumEventLineSize
+                    if discardingOversizedLine {
+                        laterLineFragment.removeAll(keepingCapacity: true)
+                    }
                 }
             } catch {
                 break
             }
         }
-        return ThreadActivity(
-            runState: lastEvent?.runState ?? fallbackRunState,
-            lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds
-        )
+        return nil
     }
 
     private func fileEndsWithNewline(_ fileURL: URL, size: UInt64) -> Bool {
@@ -196,32 +188,25 @@ struct RolloutActivityReader {
     }
 
     private func inspect(
-        _ line: Data.SubSequence,
-        markers: [(event: RunEvent, data: Data)],
-        finalResponseMarker: Data,
-        timestampMarker: Data,
-        lastEvent: inout RunEvent?,
-        lastFinalResponseAtUnixSeconds: inout Int64?
-    ) {
-        if lastEvent == nil {
-            let matches = markers.compactMap { marker -> (RunEvent, Data.Index)? in
-                guard let range = line.range(of: marker.data, options: .backwards) else {
-                    return nil
-                }
-                return (marker.event, range.lowerBound)
-            }
-            lastEvent = matches.max { $0.1 < $1.1 }?.0
-        }
-
+        _ line: some DataProtocol,
+        markers: [(event: RunEventKind, data: Data)]
+    ) -> RunEvent? {
+        let lineData = Data(line)
         guard
-            lastFinalResponseAtUnixSeconds == nil,
-            line.range(of: finalResponseMarker) != nil,
-            line.range(of: timestampMarker) != nil,
-            let envelope = try? JSONDecoder().decode(Envelope.self, from: Data(line)),
-            envelope.payload?.phase == Self.finalResponsePhase,
+            markers.contains(where: { lineData.range(of: $0.data) != nil }),
+            let envelope = try? JSONDecoder().decode(Envelope.self, from: lineData),
+            envelope.type == "event_msg",
+            let payloadType = envelope.payload?.type,
             let timestamp = envelope.timestamp,
             let date = try? Date(timestamp, strategy: .iso8601)
-        else { return }
-        lastFinalResponseAtUnixSeconds = Int64(date.timeIntervalSince1970)
+        else { return nil }
+        let kind: RunEventKind
+        switch payloadType {
+        case Self.startedEventType: kind = .started
+        case "task_complete": kind = .completed
+        case "turn_aborted": kind = .aborted
+        default: return nil
+        }
+        return RunEvent(kind: kind, timestamp: date)
     }
 }

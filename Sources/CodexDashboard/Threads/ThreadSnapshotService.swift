@@ -18,6 +18,7 @@ actor ThreadSnapshotService {
     private var unreadThreadIDs: Set<String> = []
     private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
+    private var workingTreeGenerationByPath: [String: UInt64] = [:]
 
     init(
         catalogProvider: any ThreadCatalogProviding,
@@ -73,13 +74,37 @@ actor ThreadSnapshotService {
         )
     }
 
-    func updateWorkingTreeStatuses(in threads: [ThreadSummary]) async -> [String: WorkingTreeStatus]? {
-        let projectPaths = Set(threads.map(\.projectPath))
+    func updateWorkingTreeStatuses(
+        in threads: [ThreadSummary],
+        projectPaths requestedPaths: Set<String>? = nil
+    ) async -> [String: WorkingTreeStatus]? {
+        let allProjectPaths = Set(threads.map(\.projectPath))
+        let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
         guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }
+
+        var requestGenerations: [String: UInt64] = [:]
+        for path in projectPaths {
+            let generation = (workingTreeGenerationByPath[path] ?? 0) &+ 1
+            workingTreeGenerationByPath[path] = generation
+            requestGenerations[path] = generation
+        }
+
         let latestStatuses = await workingTreeStatusProvider.loadStatuses(for: projectPaths)
-        guard !Task.isCancelled, latestStatuses != workingTreeStatuses else { return nil }
-        workingTreeStatuses = latestStatuses
-        return latestStatuses
+        guard !Task.isCancelled else { return nil }
+        let currentResults = latestStatuses.filter { path, _ in
+            workingTreeGenerationByPath[path] == requestGenerations[path]
+        }
+        guard !currentResults.isEmpty else { return nil }
+
+        if requestedPaths == nil {
+            workingTreeStatuses = workingTreeStatuses.filter { allProjectPaths.contains($0.key) }
+            workingTreeGenerationByPath = workingTreeGenerationByPath.filter { allProjectPaths.contains($0.key) }
+        }
+        let changedResults = currentResults.filter { workingTreeStatuses[$0.key] != $0.value }
+        for (path, status) in currentResults {
+            workingTreeStatuses[path] = status
+        }
+        return changedResults.isEmpty ? nil : changedResults
     }
 
     private func applyingUnreadState(to threads: [ThreadSummary]) -> [ThreadSummary] {
