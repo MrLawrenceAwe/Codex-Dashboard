@@ -224,17 +224,20 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               search.value = 'review';
               search.dispatchEvent(new Event('input', { bubbles: true }));
               const renderedSearch = document.querySelector('[data-prompt-search]');
+              const actionsToggle = document.querySelector('[data-prompt-actions-toggle]');
+              actionsToggle.click();
               const exportButton = document.querySelector('[data-prompt-export]');
               return {
                 names: [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent),
                 hasExport: Boolean(exportButton),
                 hasImport: Boolean(document.querySelector('[data-prompt-import-file][accept*="json"]')),
+                actionsExpanded: actionsToggle.getAttribute('aria-expanded'),
+                actionsMenuVisible: !document.querySelector('[data-prompt-actions-menu]').hidden,
+                exportLabel: exportButton.textContent,
                 searchPlaceholder: renderedSearch.getAttribute('placeholder'),
                 headerSubtitle: document.querySelector('.dashboard-prompt-header p')?.textContent || null,
                 searchHeight: getComputedStyle(renderedSearch).height,
                 searchFontSize: getComputedStyle(renderedSearch).fontSize,
-                exportHeight: getComputedStyle(exportButton).height,
-                exportFontSize: getComputedStyle(exportButton).fontSize,
               };
             })()
             """
@@ -243,12 +246,13 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["names"] as? [String], ["Review code"])
         XCTAssertEqual(values["hasExport"] as? Bool, true)
         XCTAssertEqual(values["hasImport"] as? Bool, true)
+        XCTAssertEqual(values["actionsExpanded"] as? String, "true")
+        XCTAssertEqual(values["actionsMenuVisible"] as? Bool, true)
+        XCTAssertEqual(values["exportLabel"] as? String, "Export library")
         XCTAssertNil(values["searchPlaceholder"] as? String)
         XCTAssertNil(values["headerSubtitle"] as? String)
         XCTAssertEqual(values["searchHeight"] as? String, "32px")
         XCTAssertEqual(values["searchFontSize"] as? String, "12px")
-        XCTAssertEqual(values["exportHeight"] as? String, "32px")
-        XCTAssertEqual(values["exportFontSize"] as? String, "11px")
     }
 
     func testPromptLauncherIsAdjacentToAddAndRemovedOnDestroy() async throws {

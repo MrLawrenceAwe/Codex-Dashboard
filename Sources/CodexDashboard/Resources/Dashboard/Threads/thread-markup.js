@@ -27,25 +27,25 @@ const threadMarkup = (() => {
   function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open thread: ${thread.title}`;
     return `
-      <article class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}" role="button" tabindex="0" aria-label="${dashboardDOM.escapeHTML(openLabel)}">
-        <div class="dashboard-thread-copy">
-          <div class="dashboard-thread-title-row">
+      <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}" aria-label="${dashboardDOM.escapeHTML(openLabel)}">
+        <span class="dashboard-thread-copy">
+          <span class="dashboard-thread-title-row">
             ${isUnread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
-            <h2>${dashboardDOM.escapeHTML(thread.title)}</h2>
+            <span class="dashboard-thread-heading" role="heading" aria-level="2">${dashboardDOM.escapeHTML(thread.title)}</span>
             ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${icon('pin')}</span>` : ''}
-          </div>
-          ${compact ? '' : `<p>${dashboardDOM.escapeHTML(thread.preview || 'No preview available')}</p>`}
-          <div class="dashboard-meta">
+          </span>
+          ${compact ? '' : `<span class="dashboard-thread-preview">${dashboardDOM.escapeHTML(thread.preview || 'No preview available')}</span>`}
+          <span class="dashboard-meta">
             ${showProject ? `<span>${dashboardDOM.escapeHTML(thread.projectName)}</span>` : ''}
             <span>${formatRelativeTime(thread.recencyTimestamp)}</span>
             ${!compact && thread.model ? `<span>${dashboardDOM.escapeHTML(thread.model)}</span>` : ''}
-          </div>
-        </div>
-        <div class="dashboard-thread-actions">
+          </span>
+        </span>
+        <span class="dashboard-thread-actions">
           ${thread.runState === 'running' ? '<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
-          <span class="dashboard-open-affordance" aria-hidden="true">Open ${icon('arrow')}</span>
-        </div>
-      </article>`;
+          <span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>
+        </span>
+      </button>`;
   }
 
   function list(visibleThreads, {
