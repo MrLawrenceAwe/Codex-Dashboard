@@ -251,6 +251,32 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["1", "off-sidebar-unread"])
     }
 
+    func testUnreadThreadAccessibleNameIncludesUnreadState() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "unread-thread", title: "Needs review", isUnread: true),
+        ])
+
+        let accessibleName = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              return document.querySelector('[data-thread-id="unread-thread"]').getAttribute('aria-label');
+            })()
+            """
+        ) as? String
+
+        XCTAssertEqual(accessibleName, "Unread. Open thread: Needs review")
+    }
+
     func testUnreadFallbackDetectsSilentReactStateChange() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
