@@ -23,10 +23,6 @@ const codexHost = {
     return codexContracts.threadReadStates();
   },
 
-  canSelectThread(thread) {
-    return Boolean(codexContracts.threadRow(thread.id));
-  },
-
   navigateToThread(thread) {
     const sidebarThreadButton = codexContracts.threadRow(thread.id);
     if (sidebarThreadButton) {
