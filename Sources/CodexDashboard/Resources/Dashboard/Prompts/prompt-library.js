@@ -137,16 +137,21 @@ function renderDialog() {
   content.innerHTML = `
     <div class="dashboard-prompt-tools">
       <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${dashboardDOM.escapeHTML(promptSearchTerm)}" /></label>
-      <button type="button" class="dashboard-prompt-secondary" data-prompt-export>Export</button>
-      <button type="button" class="dashboard-prompt-secondary" data-prompt-import>Import</button>
+      <div class="dashboard-prompt-overflow">
+        <button type="button" class="dashboard-prompt-secondary dashboard-prompt-overflow-toggle" data-prompt-actions-toggle aria-label="Prompt library actions" aria-expanded="false" aria-haspopup="menu">•••</button>
+        <div class="dashboard-prompt-overflow-menu" data-prompt-actions-menu role="menu" hidden>
+          <button type="button" data-prompt-export role="menuitem">Export library</button>
+          <button type="button" data-prompt-import role="menuitem">Import library</button>
+        </div>
+      </div>
       <input type="file" accept="application/json,.json" data-prompt-import-file hidden />
     </div>
     <div class="dashboard-prompt-list">
       ${sections || `<div class="dashboard-prompt-empty"><strong>${query ? 'No matching prompts' : 'No saved prompts yet'}</strong><span>${query ? 'Try a different search.' : 'Save instructions you use often, then insert them into a chat in one click.'}</span></div>`}
     </div>
     <div class="dashboard-prompt-create-actions">
-      <button type="button" class="dashboard-prompt-new" data-prompt-new>+ New prompt</button>
-      <button type="button" class="dashboard-prompt-new" data-prompt-new-section>+ New section</button>
+      <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
+      <button type="button" class="dashboard-prompt-new dashboard-prompt-new-secondary" data-prompt-new-section>+ New section</button>
     </div>`;
   content.querySelector('[data-prompt-search]')?.focus();
 }
@@ -322,6 +327,14 @@ function handlePromptKeyboard(event, dialog) {
   if (event.key === 'Escape') {
     event.preventDefault();
     event.stopImmediatePropagation();
+    const actionsMenu = dialog.querySelector('[data-prompt-actions-menu]');
+    if (actionsMenu && !actionsMenu.hidden) {
+      actionsMenu.hidden = true;
+      const actionsToggle = dialog.querySelector('[data-prompt-actions-toggle]');
+      actionsToggle?.setAttribute('aria-expanded', 'false');
+      actionsToggle?.focus();
+      return;
+    }
     close();
     return;
   }
@@ -363,6 +376,14 @@ function insertSavedPrompt(prompt) {
 
 function handlePromptClick(target) {
   if (target.closest('[data-prompt-close]')) close();
+  else if (target.closest('[data-prompt-actions-toggle]')) {
+    const toggle = target.closest('[data-prompt-actions-toggle]');
+    const menu = document.querySelector('[data-prompt-actions-menu]');
+    if (!menu) return;
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) menu.querySelector('button')?.focus();
+  }
   else if (target.closest('[data-prompt-section-toggle]')) {
     const toggle = target.closest('[data-prompt-section-toggle]');
     const section = toggle.dataset.promptSectionToggle;
@@ -417,8 +438,12 @@ function handlePromptClick(target) {
     };
     renderDialog();
   } else if (target.closest('[data-prompt-export]')) {
+    document.querySelector('[data-prompt-actions-menu]')?.setAttribute('hidden', '');
+    document.querySelector('[data-prompt-actions-toggle]')?.setAttribute('aria-expanded', 'false');
     exportLibrary();
   } else if (target.closest('[data-prompt-import]')) {
+    document.querySelector('[data-prompt-actions-menu]')?.setAttribute('hidden', '');
+    document.querySelector('[data-prompt-actions-toggle]')?.setAttribute('aria-expanded', 'false');
     document.querySelector('[data-prompt-import-file]')?.click();
   } else if (target.closest('[data-prompt-delete-confirm]')) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;

@@ -37,6 +37,26 @@ const threadDashboardView = (() => {
     }
   }
 
+  function updateHeaderSummary({ unreadCount, runningThreads, dirtyProjectPaths }) {
+    const page = document.getElementById(dashboardDOM.elementIDs.page);
+    if (!page) return;
+    const values = {
+      running: runningThreads.length,
+      unread: unreadCount,
+      changed: dirtyProjectPaths.size,
+    };
+    page.querySelectorAll('[data-summary-count]').forEach((count) => {
+      count.textContent = String(values[count.dataset.summaryCount] ?? 0);
+    });
+    const summary = page.querySelector('[data-dashboard-summary]');
+    if (summary) {
+      summary.setAttribute(
+        'aria-label',
+        `${values.running} running, ${values.unread} unread, ${values.changed} changed ${values.changed === 1 ? 'project' : 'projects'}`,
+      );
+    }
+  }
+
   function render({
     threads,
     filterMode,
@@ -50,6 +70,7 @@ const threadDashboardView = (() => {
     state,
   }) {
     updateSidebarStatus(state);
+    updateHeaderSummary(state);
     const page = document.getElementById(dashboardDOM.elementIDs.page);
     if (!page) return false;
     const notice = page.querySelector('[data-dashboard-notice]');

@@ -297,7 +297,14 @@ function mountDashboardPage() {
   page.innerHTML = `
     <div class="dashboard-shell">
       <header class="dashboard-header">
-        <h1>Thread Dashboard</h1>
+        <div>
+          <h1>Thread Dashboard</h1>
+          <div class="dashboard-summary" data-dashboard-summary aria-label="0 running, 0 unread, 0 changed projects">
+            <span><strong data-summary-count="running">0</strong> running</span>
+            <span><strong data-summary-count="unread">0</strong> unread</span>
+            <span><strong data-summary-count="changed">0</strong> changed</span>
+          </div>
+        </div>
       </header>
       <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
       <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
@@ -315,12 +322,12 @@ function mountDashboardPage() {
             <div class="dashboard-filters" aria-label="Filter threads">
               <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
               <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-              <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+              <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
             </div>
           </div>
           <div class="dashboard-view-options dashboard-view-group" aria-label="Thread view">
-            <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
-            <button type="button" data-view="recent" aria-pressed="false">Threads</button>
+            <button type="button" data-view="projects" class="is-active" aria-pressed="true" title="Group by project">${threadMarkup.icon('project')}<span class="dashboard-view-label">Projects</span></button>
+            <button type="button" data-view="recent" aria-pressed="false" title="Sort all threads by recency">${threadMarkup.icon('threads')}<span class="dashboard-view-label">Threads</span></button>
           </div>
         </div>
       </div>
@@ -379,9 +386,7 @@ function mountDashboardPage() {
     }
     openThreadFromEvent(event);
   });
-  page.querySelector('[data-thread-list]').addEventListener('keydown', openThreadFromKeyboardEvent);
   page.querySelector('[data-running-list]').addEventListener('click', openThreadFromEvent);
-  page.querySelector('[data-running-list]').addEventListener('keydown', openThreadFromKeyboardEvent);
   codexHost.pageHost().append(page);
 }
 
@@ -391,14 +396,6 @@ function openThreadFromEvent(event) {
   if (!target) return;
   const thread = threads.find((item) => item.id === target.dataset.openThread);
   if (thread) openThread(thread);
-}
-
-function openThreadFromKeyboardEvent(event) {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  const eventTarget = event.target instanceof Element ? event.target : null;
-  if (!eventTarget?.matches('[data-open-thread]')) return;
-  event.preventDefault();
-  openThreadFromEvent(event);
 }
 
 function openPage() {
