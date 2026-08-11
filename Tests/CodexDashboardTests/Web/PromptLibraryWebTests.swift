@@ -450,7 +450,10 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(25))
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-prompt-storage-error]')?.hidden === false",
+            in: webView
+        )
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
@@ -467,6 +470,48 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Int, 1)
         XCTAssertTrue((values[2] as? String)?.contains("Could not import") == true)
+        XCTAssertEqual(values[3] as? Bool, true)
+    }
+
+    func testPromptKeyboardReorderingAndSectionManagementPreservePrompts() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new-section]').click();
+              document.querySelector('[name="sectionName"]').value = 'Ops';
+              document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
+              for (const [name, content] of [['First', 'One'], ['Second', 'Two']]) {
+                document.querySelector('[data-prompt-new]').click();
+                document.querySelector('[name="name"]').value = name;
+                document.querySelector('[name="section"]').value = 'Ops';
+                document.querySelector('[name="content"]').value = content;
+                document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              }
+              document.querySelector('[data-prompt-row-id]:last-child [data-prompt-move-up]').click();
+              const orderAfterMove = [...document.querySelectorAll('[data-prompt-use] strong')]
+                .map((element) => element.textContent);
+              document.querySelector('[data-prompt-section-rename="Ops"]').click();
+              document.querySelector('[name="sectionName"]').value = 'Operations';
+              document.querySelector('[data-prompt-section-rename-form] button[type="submit"]').click();
+              const deleteButton = document.querySelector('[data-prompt-section-delete="Operations"]');
+              deleteButton.click();
+              deleteButton.click();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              return [
+                orderAfterMove.join(','),
+                stored.prompts.map((prompt) => prompt.name).join(','),
+                stored.prompts.every((prompt) => prompt.section === 'General'),
+                !stored.sections.includes('Operations'),
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "Second,First")
+        XCTAssertEqual(values[1] as? String, "Second,First")
+        XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
     }
 

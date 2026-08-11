@@ -3,10 +3,11 @@ const navigationEventTypes = ['pointerdown', 'mousedown', 'click', 'keydown'];
 const routeEventTypes = ['message', 'popstate', 'hashchange'];
 
 let threads = [];
-let totalThreadCount = 0;
 const storedPreferences = threadDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
 let searchTerm = '';
+const threadPageSize = 60;
+let visibleThreadLimit = threadPageSize;
 let viewMode = storedPreferences.viewMode;
 const { collapsedProjects } = storedPreferences;
 let mutationObserver;
@@ -118,9 +119,9 @@ function renderDashboard() {
   const state = deriveDashboardState();
   const rendered = threadDashboardView.render({
     threads,
-    totalThreadCount,
     filterMode,
     searchTerm,
+    visibleThreadLimit,
     viewMode,
     collapsedProjects,
     handoffError,
@@ -245,7 +246,7 @@ function mountDashboardPage() {
             <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
             <button type="button" data-filter="changedProjects">Changed projects <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
           </div>
-          <label class="dashboard-search" aria-label="Search loaded threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
+          <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search threads" data-dashboard-search /></label>
           <div class="dashboard-view-options" aria-label="Group threads">
             <button type="button" data-view="projects" class="is-active" aria-pressed="true">Projects</button>
             <button type="button" data-view="recent" aria-pressed="false">Recent</button>
@@ -254,6 +255,7 @@ function mountDashboardPage() {
       </div>
       <p class="dashboard-loaded-summary" data-loaded-summary hidden></p>
       <main class="dashboard-list" data-thread-list></main>
+      <button type="button" class="dashboard-load-more" data-load-more hidden>Load more threads</button>
     </div>`;
   page.querySelectorAll('[data-filter]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -271,7 +273,12 @@ function mountDashboardPage() {
   });
   page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
     searchTerm = event.target.value;
+    visibleThreadLimit = searchTerm.trim() ? Number.POSITIVE_INFINITY : threadPageSize;
     scheduleDashboardRender();
+  });
+  page.querySelector('[data-load-more]').addEventListener('click', () => {
+    visibleThreadLimit += threadPageSize;
+    renderDashboard();
   });
   page.querySelector('[data-thread-list]').addEventListener('click', (event) => {
     const projectCommit = event.target.closest('[data-project-commit]');
@@ -336,7 +343,6 @@ function closePage() {
 function applySnapshot(nextSnapshot) {
   const snapshot = threadDashboardState.normalizeSnapshot(nextSnapshot);
   threads = snapshot.threads;
-  totalThreadCount = snapshot.totalThreadCount;
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );

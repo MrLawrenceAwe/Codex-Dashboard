@@ -62,10 +62,8 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
 
 struct DashboardSnapshotPayload: Codable, Equatable, Sendable {
     let threads: [DashboardThreadPayload]
-    let totalThreadCount: Int
 
-    init(threads: [ThreadSummary], totalThreadCount: Int? = nil) {
+    init(threads: [ThreadSummary]) {
         self.threads = threads.map(DashboardThreadPayload.init)
-        self.totalThreadCount = totalThreadCount ?? threads.count
     }
 }

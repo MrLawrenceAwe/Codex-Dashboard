@@ -39,9 +39,9 @@ const threadDashboardView = (() => {
 
   function render({
     threads,
-    totalThreadCount,
     filterMode,
     searchTerm,
+    visibleThreadLimit,
     viewMode,
     collapsedProjects,
     handoffError,
@@ -51,14 +51,6 @@ const threadDashboardView = (() => {
     updateSidebarStatus(state);
     const page = document.getElementById(dashboardDOM.elementIDs.page);
     if (!page) return false;
-    const loadedSummary = page.querySelector('[data-loaded-summary]');
-    if (loadedSummary) {
-      const isPartial = totalThreadCount > threads.length;
-      loadedSummary.hidden = !isPartial;
-      loadedSummary.textContent = isPartial
-        ? `Showing ${threads.length} of ${totalThreadCount} threads. Search covers loaded threads.`
-        : '';
-    }
     const notice = page.querySelector('[data-dashboard-notice]');
     if (notice) {
       notice.textContent = handoffError;
@@ -107,6 +99,16 @@ const threadDashboardView = (() => {
       searchTerm,
       isThreadUnread,
     });
+    const displayedThreads = visibleThreads.slice(0, visibleThreadLimit);
+    const loadedSummary = page.querySelector('[data-loaded-summary]');
+    if (loadedSummary) {
+      loadedSummary.hidden = displayedThreads.length >= visibleThreads.length;
+      loadedSummary.textContent = displayedThreads.length < visibleThreads.length
+        ? `Showing ${displayedThreads.length} of ${visibleThreads.length} matching threads.`
+        : '';
+    }
+    const loadMore = page.querySelector('[data-load-more]');
+    if (loadMore) loadMore.hidden = displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
@@ -117,7 +119,7 @@ const threadDashboardView = (() => {
     }
     updateMarkup(
       list,
-      threadMarkup.list(visibleThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread }),
+      threadMarkup.list(displayedThreads, { viewMode, collapsedProjects, isUnread: isThreadUnread }),
     );
     return true;
   }

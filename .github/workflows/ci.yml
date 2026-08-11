@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate package and scripts
+        run: |
+          plutil -lint Packaging/Info.plist
+          python3 -m json.tool Sources/CodexDashboard/Resources/Dashboard/injection-manifest.json >/dev/null
+          zsh -n install.sh uninstall.sh
+      - name: Test
+        run: swift test
+      - name: Build release
+        run: swift build -c release

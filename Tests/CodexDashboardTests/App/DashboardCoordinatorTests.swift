@@ -160,6 +160,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
             runtimeFactory: { StubDashboardSession() }
         )
         await coordinator.synchronizeDashboard()
@@ -267,7 +268,7 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.statusPresentation.title, "Codex is closed")
     }
 
-    func testUnreadPollingUpdatesThread() async throws {
+    func testUnreadRefreshUpdatesThread() async throws {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let unreadThreadIDProvider = MutableUnreadIDProvider()
         let coordinator = DashboardCoordinator(
@@ -278,24 +279,21 @@ final class DashboardCoordinatorTests: XCTestCase {
             unreadThreadIDProvider: unreadThreadIDProvider,
             runtimeFactory: { StubDashboardSession() }
         )
-        coordinator.startMonitoring()
-        defer { coordinator.stopMonitoring() }
-
-        try await waitUntil { coordinator.threads.count == 1 }
+        await coordinator.synchronizeDashboard()
         await unreadThreadIDProvider.setUnreadThreadIDs([thread.id])
-        try await waitUntil { coordinator.threads.first?.isUnread == true }
+        await coordinator.refreshUnreadState()
 
         XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
-    func testUnreadPollingScheduleMatchesDocumentedLatencyBounds() {
-        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .milliseconds(500))
-        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
+    func testUnreadFallbackPollingScheduleAvoidsHotFileReads() {
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .seconds(10))
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(30))
     }
 
-    func testWorkingTreePollingScheduleClearsChangeIndicatorsPromptly() {
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(2))
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(10))
+    func testWorkingTreeFallbackPollingScheduleAvoidsRepeatedGitProcesses() {
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(30))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(120))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
@@ -321,6 +319,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
             runtimeFactory: { StubDashboardSession() }
         )
 
