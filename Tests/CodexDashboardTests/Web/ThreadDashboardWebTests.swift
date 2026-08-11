@@ -358,6 +358,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               </aside>
               <main>
                 <button type="button" aria-label="Toggle side panel">Side panel</button>
+                <div id="composer-host"><textarea placeholder="Do anything"></textarea></div>
               </main>
               <script>
                 document.documentElement.dataset.selectedThread = '';
@@ -367,6 +368,17 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                   document.documentElement.dataset.command = `${command}:${source}`;
                   return true;
                 };
+                const activeThreadProps = { conversationId: 'initial-thread' };
+                document.getElementById('composer-host').__reactFiber$test = {
+                  memoizedProps: activeThreadProps,
+                  return: null,
+                };
+                window.addEventListener('message', (event) => {
+                  if (event.data?.type !== 'navigate-to-route') return;
+                  const threadID = decodeURIComponent(event.data.path.split('/').at(-1));
+                  activeThreadProps.conversationId = threadID;
+                  document.documentElement.dataset.selectedThread = `local:${threadID}`;
+                });
                 document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
                   row.addEventListener('click', () => {
                     document.querySelectorAll('[data-app-action-sidebar-thread-id]')
@@ -458,7 +470,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(counts[0] as? Int, 1)
         XCTAssertEqual(counts[1] as? String, "Commit or push")
         let values = try XCTUnwrap(handoff)
-        XCTAssertEqual(values[0] as? String, "local:idle-thread")
+        XCTAssertEqual(values[0] as? String, "local:off-sidebar-idle-thread")
         XCTAssertEqual(values[1] as? String, "git.commit:codex_dashboard")
         XCTAssertEqual(values[2] as? String, "0")
         XCTAssertEqual(values[3] as? Bool, false)

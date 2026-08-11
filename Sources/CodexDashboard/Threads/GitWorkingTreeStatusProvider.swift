@@ -145,7 +145,11 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         do {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-                arguments: ["-C", root, "status", "--porcelain=v1", "--untracked-files=normal"],
+                arguments: [
+                    "-C", root,
+                    "status", "--porcelain=v1", "--untracked-files=normal",
+                    "--", ".", ":(exclude).DS_Store", ":(exclude)**/.DS_Store",
+                ],
                 timeout: timeout
             )
             guard result.terminationStatus == 0 else { return .unavailable }

@@ -39,7 +39,24 @@ const codexContracts = (() => {
   }
 
   function isThreadSelected(threadID) {
-    return threadRow(threadID)?.getAttribute('aria-current') === 'page';
+    return threadRow(threadID)?.getAttribute('aria-current') === 'page'
+      || activeComposerThreadID() === threadID;
+  }
+
+  function activeComposerThreadID() {
+    const activeComposer = composer();
+    let host = activeComposer?.parentElement;
+    while (host && host !== document.body) {
+      const fiberKey = Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
+      let fiber = fiberKey ? host[fiberKey] : null;
+      while (fiber) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        if (typeof props?.conversationId === 'string') return props.conversationId;
+        fiber = fiber.return;
+      }
+      host = host.parentElement;
+    }
+    return null;
   }
 
   function threadReadStates() {
@@ -162,6 +179,7 @@ const codexContracts = (() => {
     threadRows,
     threadRow,
     isThreadSelected,
+    activeComposerThreadID,
     threadReadStates,
     composer,
     composerAddButton,

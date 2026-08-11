@@ -286,14 +286,14 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
-    func testUnreadFallbackPollingScheduleAvoidsHotFileReads() {
-        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .seconds(10))
-        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(30))
+    func testUnreadPollingScheduleMatchesLatencyBounds() {
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .milliseconds(500))
+        XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
-    func testWorkingTreeFallbackPollingScheduleAvoidsRepeatedGitProcesses() {
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(30))
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(120))
+    func testWorkingTreePollingScheduleClearsIndicatorsPromptly() {
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(2))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(10))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

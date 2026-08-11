@@ -103,9 +103,9 @@ async function openProjectCommitOrPush(projectPath) {
   const candidates = threads
     .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
     .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0));
-  const thread = candidates.find((item) => codexHost.canSelectThread(item));
+  const [thread] = candidates;
   if (!thread) {
-    handoffError = 'No selectable idle thread is currently visible in Codex for this project.';
+    handoffError = 'No idle thread is available for this project.';
     renderDashboard();
     return;
   }

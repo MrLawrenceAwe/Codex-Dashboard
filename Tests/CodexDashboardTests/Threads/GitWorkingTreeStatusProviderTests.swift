@@ -49,6 +49,34 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(statuses[projectURL.path], .hasChanges)
     }
 
+    func testIgnoresTrackedAndUntrackedMacOSMetadata() async throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
+        let nestedURL = projectURL.appendingPathComponent("Assets", isDirectory: true)
+        try FileManager.default.createDirectory(at: nestedURL, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectURL.path, "init", "--quiet"],
+            timeout: 3
+        )
+        try Data("metadata".utf8).write(to: projectURL.appendingPathComponent(".DS_Store"))
+        try Data("nested metadata".utf8).write(to: nestedURL.appendingPathComponent(".DS_Store"))
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectURL.path, "add", ".DS_Store"],
+            timeout: 3
+        )
+        let provider = GitWorkingTreeStatusProvider()
+
+        let metadataOnly = await provider.loadStatuses(for: [projectURL.path])
+        try Data("meaningful".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
+        let meaningfulChange = await provider.loadStatuses(for: [projectURL.path])
+
+        XCTAssertEqual(metadataOnly[projectURL.path], .clean)
+        XCTAssertEqual(meaningfulChange[projectURL.path], .hasChanges)
+    }
+
     func testReportsUnavailablePath() async {
         let missingPath = "/tmp/codex-dashboard-missing-\(UUID().uuidString)"
         let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [missingPath])
