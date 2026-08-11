@@ -53,6 +53,46 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(matchingID, "thread-64")
     }
 
+    func testSearchResultsRemainPaged() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let threads = (0..<125).map { index in
+            ThreadSummary.fixture(id: "matching-\(index)", title: "Matching thread \(index)")
+        }
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const search = document.querySelector('[data-dashboard-search]');
+              search.value = 'Matching';
+              search.dispatchEvent(new Event('input', { bubbles: true }));
+              document.querySelector('[data-view="projects"]').click();
+              return true;
+            })()
+            """
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            [
+              document.querySelectorAll('[data-thread-list] .dashboard-thread').length,
+              !document.querySelector('[data-load-more]').hidden,
+            ]
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 60)
+        XCTAssertEqual(values[1] as? Bool, true)
+    }
+
     func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

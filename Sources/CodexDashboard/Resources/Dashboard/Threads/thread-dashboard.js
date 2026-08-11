@@ -10,13 +10,19 @@ const threadPageSize = 60;
 let visibleThreadLimit = threadPageSize;
 let viewMode = storedPreferences.viewMode;
 const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
-let mutationObserver;
+let structureObserver;
+let sidebarMutationObserver;
+let composerMutationObserver;
 let resizeObserver;
 let observedSidebar;
+let observedStructureRoot;
+let observedMutationSidebar;
+let observedComposerRoot;
 let mutationFrame;
 let unreadSyncTimer;
 let renderFrame;
 let pendingSidebarMutation = false;
+let pendingHostRebind = false;
 let dashboardIsOpen = false;
 let dashboardNeedsRender = true;
 let unreadThreadIDs = new Set();
@@ -71,11 +77,15 @@ function isThreadUnread(thread) {
 
 function handleHostNavigation(event) {
   if (event.type === 'message') {
-    if (dashboardIsOpen && event.data?.type === 'navigate-to-route') closePage();
+    if (event.data?.type === 'navigate-to-route') {
+      if (dashboardIsOpen) closePage();
+      scheduleHostSync({ rebindHosts: true });
+    }
     return;
   }
   if (event.type === 'popstate' || event.type === 'hashchange') {
     if (dashboardIsOpen) closePage();
+    scheduleHostSync({ rebindHosts: true });
     return;
   }
   if (event.type === 'keydown') {
@@ -90,8 +100,11 @@ function handleHostNavigation(event) {
     if (event.type === 'click') openPage();
     return;
   }
-  if (event.type !== 'click' || !dashboardIsOpen) return;
-  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${dashboardDOM.elementIDs.navButton}`)) closePage();
+  if (event.type !== 'click') return;
+  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${dashboardDOM.elementIDs.navButton}`)) {
+    if (dashboardIsOpen) closePage();
+    scheduleHostSync({ rebindHosts: true });
+  }
 }
 
 function deriveDashboardState() {
@@ -179,33 +192,63 @@ function attachPageToCodexContent() {
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
 }
 
-function mutationTouchesSidebar(record) {
-  if (record.target instanceof Element && record.target.closest('aside')) return true;
-  return [...record.addedNodes, ...record.removedNodes].some((node) => (
-    node instanceof Element && (node.matches('aside') || node.querySelector('aside'))
-  ));
+function composerMutationRoot() {
+  const composer = codexContracts.composer();
+  return composer?.closest('form') || composer?.parentElement || null;
 }
 
-function scheduleMutationSync(records) {
-  if (promptLauncher.mutationsCouldAffectLauncher(records)) promptLauncher.scheduleSync();
-  const sidebarMutation = records.some(mutationTouchesSidebar);
-  const dashboardMissing = !document.getElementById(dashboardDOM.elementIDs.page)
-    || !document.getElementById(dashboardDOM.elementIDs.navButton);
-  if (!sidebarMutation && !dashboardMissing) return;
-  if (sidebarMutation) pendingSidebarMutation = true;
+function observeMutationHosts() {
+  const structureRoot = codexHost.pageHost();
+  if (structureObserver && structureRoot !== observedStructureRoot) {
+    structureObserver.disconnect();
+    if (structureRoot) structureObserver.observe(structureRoot, { childList: true });
+    observedStructureRoot = structureRoot;
+  }
+  const sidebar = codexHost.sidebar();
+  if (sidebarMutationObserver && sidebar !== observedMutationSidebar) {
+    sidebarMutationObserver.disconnect();
+    if (sidebar) sidebarMutationObserver.observe(sidebar, { childList: true, subtree: true });
+    observedMutationSidebar = sidebar;
+  }
+  const composerRoot = composerMutationRoot();
+  if (composerMutationObserver && composerRoot !== observedComposerRoot) {
+    composerMutationObserver.disconnect();
+    if (composerRoot) composerMutationObserver.observe(composerRoot, { childList: true, subtree: true });
+    observedComposerRoot = composerRoot;
+  }
+}
+
+function scheduleHostSync({ syncUnread = false, rebindHosts = false } = {}) {
+  pendingSidebarMutation ||= syncUnread;
+  pendingHostRebind ||= rebindHosts;
   if (mutationFrame !== undefined) return;
   mutationFrame = requestAnimationFrame(() => {
     mutationFrame = undefined;
     const shouldSyncUnread = pendingSidebarMutation;
+    const shouldRebindHosts = pendingHostRebind;
     pendingSidebarMutation = false;
+    pendingHostRebind = false;
     const restoredPage = !document.getElementById(dashboardDOM.elementIDs.page);
     if (restoredPage) mountDashboardPage();
     if (!document.getElementById(dashboardDOM.elementIDs.navButton)) mountNavigationButton();
     if (dashboardIsOpen && restoredPage) openPage();
     attachPageToCodexContent();
     observeSidebar();
+    if (shouldRebindHosts) observeMutationHosts();
     if (shouldSyncUnread && syncUnreadFromSidebar()) requestDashboardRender();
   });
+}
+
+function handleStructureMutations() {
+  scheduleHostSync({ rebindHosts: true });
+}
+
+function handleSidebarMutations() {
+  scheduleHostSync({ syncUnread: true });
+}
+
+function handleComposerMutations() {
+  promptLauncher.scheduleSync();
 }
 
 function mountNavigationButton() {
@@ -284,7 +327,7 @@ function mountDashboardPage() {
   });
   page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
     searchTerm = event.target.value;
-    visibleThreadLimit = searchTerm.trim() ? Number.POSITIVE_INFINITY : threadPageSize;
+    visibleThreadLimit = threadPageSize;
     scheduleDashboardRender();
   });
   page.querySelector('[data-load-more]').addEventListener('click', () => {
@@ -389,9 +432,11 @@ function ensureMounted() {
   promptLibrary.mount();
   if (dashboardIsOpen && pageWasMissing) openPage();
 
-  if (!mutationObserver) {
-    mutationObserver = new MutationObserver(scheduleMutationSync);
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
+  if (!structureObserver) {
+    structureObserver = new MutationObserver(handleStructureMutations);
+    sidebarMutationObserver = new MutationObserver(handleSidebarMutations);
+    composerMutationObserver = new MutationObserver(handleComposerMutations);
+    observeMutationHosts();
   }
   if (unreadSyncTimer === undefined) {
     scheduleUnreadSync();
@@ -416,19 +461,27 @@ function ensureMounted() {
 
 function destroy() {
   dashboardIsOpen = false;
-  mutationObserver?.disconnect();
+  structureObserver?.disconnect();
+  sidebarMutationObserver?.disconnect();
+  composerMutationObserver?.disconnect();
   resizeObserver?.disconnect();
   if (mutationFrame !== undefined) cancelAnimationFrame(mutationFrame);
   if (renderFrame !== undefined) cancelAnimationFrame(renderFrame);
   if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
-  mutationObserver = undefined;
+  structureObserver = undefined;
+  sidebarMutationObserver = undefined;
+  composerMutationObserver = undefined;
   resizeObserver = undefined;
   mutationFrame = undefined;
   renderFrame = undefined;
   unreadSyncTimer = undefined;
   pendingSidebarMutation = false;
+  pendingHostRebind = false;
   dashboardNeedsRender = true;
   observedSidebar = undefined;
+  observedStructureRoot = undefined;
+  observedMutationSidebar = undefined;
+  observedComposerRoot = undefined;
   promptLibrary.unmount();
   navigationEventTypes.forEach((type) => {
     document.removeEventListener(type, handleHostNavigation, true);
