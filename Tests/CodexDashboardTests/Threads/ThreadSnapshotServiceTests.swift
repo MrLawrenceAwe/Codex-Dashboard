@@ -5,7 +5,7 @@ import XCTest
 private actor CountingCatalogProvider: ThreadCatalogProviding {
     private(set) var loadCount = 0
 
-    func loadCatalog(codexLaunchDate: Date?) -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) -> ThreadCatalog {
         loadCount += 1
         return ThreadCatalog(
             threads: [.fixture()],
@@ -52,7 +52,7 @@ private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
     private var continuation: CheckedContinuation<ThreadCatalog, Never>?
 
-    func loadCatalog(codexLaunchDate: Date?) async -> ThreadCatalog {
+    func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) async -> ThreadCatalog {
         await withCheckedContinuation { continuation in
             self.continuation = continuation
         }

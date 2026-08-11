@@ -1,7 +1,10 @@
 import Foundation
 
 protocol ThreadCatalogProviding: Sendable {
-    func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog
+    func loadCatalog(
+        codexLaunchDate: Date?,
+        requiredThreadIDs: Set<String>
+    ) async throws -> ThreadCatalog
 }
 
 enum ThreadCatalogError: LocalizedError {
@@ -54,6 +57,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private let loadedThreadLimit: Int
     private var rolloutActivityReader = RolloutActivityReader()
     private var cachedDatabaseSignature: DatabaseSignature?
+    private var cachedRequiredThreadIDs: Set<String>?
     private var cachedStoredThreads: [StoredThread]?
     private let subprocessTimeout: TimeInterval
 
@@ -67,8 +71,21 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         self.subprocessTimeout = subprocessTimeout
     }
 
-    func loadCatalog(codexLaunchDate: Date?) async throws -> ThreadCatalog {
+    func loadCatalog(
+        codexLaunchDate: Date?,
+        requiredThreadIDs: Set<String>
+    ) async throws -> ThreadCatalog {
+        let requiredThreadPredicate = requiredThreadIDs.isEmpty
+            ? "0"
+            : "id IN (\(requiredThreadIDs.sorted().map(Self.sqlStringLiteral).joined(separator: ", ")))"
         let threadSQL = """
+        WITH recent_threads AS (
+            SELECT id
+            FROM threads
+            WHERE archived = 0 AND preview <> ''
+            ORDER BY recency_at_ms DESC
+            LIMIT \(loadedThreadLimit)
+        )
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
@@ -83,17 +100,21 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                    WHERE countedThreads.archived = 0 AND countedThreads.preview <> ''
                ) AS totalCount
         FROM threads
-        WHERE archived = 0 AND preview <> ''
+        WHERE archived = 0
+          AND preview <> ''
+          AND (id IN (SELECT id FROM recent_threads) OR \(requiredThreadPredicate))
         ORDER BY recency_at_ms DESC
-        LIMIT \(loadedThreadLimit);
         """
         let databaseSignature = try signature(for: stateDatabaseURL)
         let threads: [StoredThread]
-        if databaseSignature == cachedDatabaseSignature, let cachedStoredThreads {
+        if databaseSignature == cachedDatabaseSignature,
+           requiredThreadIDs == cachedRequiredThreadIDs,
+           let cachedStoredThreads {
             threads = cachedStoredThreads
         } else {
             threads = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
             cachedDatabaseSignature = databaseSignature
+            cachedRequiredThreadIDs = requiredThreadIDs
             cachedStoredThreads = threads
         }
         let launchMilliseconds = codexLaunchDate.map {
@@ -137,6 +158,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             threads: threadSummaries,
             totalThreadCount: threads.first?.totalCount ?? 0
         )
+    }
+
+    private static func sqlStringLiteral(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "''"))'"
     }
 
     private func signature(for databaseURL: URL) throws -> DatabaseSignature {

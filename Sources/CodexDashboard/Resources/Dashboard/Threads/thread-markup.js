@@ -25,7 +25,7 @@ const threadMarkup = (() => {
   }
 
   function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
-    const openLabel = `Open thread: ${thread.title}`;
+    const openLabel = `${isUnread ? 'Unread. ' : ''}Open thread: ${thread.title}`;
     return `
       <article class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}" role="button" tabindex="0" aria-label="${dashboardDOM.escapeHTML(openLabel)}">
         <div class="dashboard-thread-copy">
