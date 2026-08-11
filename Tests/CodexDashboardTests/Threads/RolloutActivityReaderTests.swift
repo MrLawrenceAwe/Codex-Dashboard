@@ -94,6 +94,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         )
 
         XCTAssertEqual(status.runState, .idle)
+        XCTAssertEqual(status.lastRunTermination, .aborted)
     }
 
     func testAppendedEventsReuseCachedHistoryWithoutLosingStatus() throws {

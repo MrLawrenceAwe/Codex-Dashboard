@@ -15,6 +15,7 @@ extension ThreadSummary {
         isUnread: Bool = false,
         model: String? = nil,
         runState: ThreadRunState = .idle,
+        lastRunTermination: ThreadRunTermination = .unknown,
         workingTreeStatus: WorkingTreeStatus = .clean
     ) -> ThreadSummary {
         var thread = ThreadSummary(
@@ -28,6 +29,7 @@ extension ThreadSummary {
             isPinned: isPinned,
             model: model,
             runState: runState,
+            lastRunTermination: lastRunTermination,
             workingTreeStatus: workingTreeStatus
         )
         thread.isUnread = isUnread

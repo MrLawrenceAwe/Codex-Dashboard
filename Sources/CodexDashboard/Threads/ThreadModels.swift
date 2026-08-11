@@ -5,6 +5,12 @@ enum ThreadRunState: String, Codable, Equatable, Sendable {
     case idle
 }
 
+enum ThreadRunTermination: String, Codable, Equatable, Sendable {
+    case completed
+    case aborted
+    case unknown
+}
+
 enum WorkingTreeStatus: String, Codable, Equatable, Sendable {
     case notRepository
     case unavailable
@@ -24,6 +30,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var isUnread = false
     let model: String?
     let runState: ThreadRunState
+    let lastRunTermination: ThreadRunTermination
     var workingTreeStatus: WorkingTreeStatus
 }
 

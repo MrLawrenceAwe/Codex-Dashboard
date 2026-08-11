@@ -106,6 +106,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: threadActivity.runState,
+                lastRunTermination: threadActivity.lastRunTermination,
                 workingTreeStatus: .notRepository
             )
         }.sorted { left, right in

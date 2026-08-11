@@ -337,6 +337,8 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(requestCount, 2)
 
         await catalogProvider.resumeNext()
+        try await waitUntil { await catalogProvider.count() == 3 }
+        await catalogProvider.resumeNext()
         await coalescedRefresh.value
         coordinator.stopMonitoring()
     }
