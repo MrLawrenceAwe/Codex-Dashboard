@@ -123,24 +123,6 @@ const codexContracts = (() => {
     return null;
   }
 
-  function sidePanelToggle() {
-    return [...document.querySelectorAll('button[aria-label="Toggle side panel"]')]
-      .find(isVisible) || null;
-  }
-
-  function environmentToggle() {
-    return [...document.querySelectorAll('button')].find((button) => (
-      isVisible(button)
-        && button.textContent.trim() === 'Environment'
-        && button.hasAttribute('aria-expanded')
-    )) || null;
-  }
-
-  function commitOrPushButton() {
-    return [...document.querySelectorAll('button[data-slot="thread-summary-panel-item-button"]')]
-      .find((button) => isVisible(button) && button.textContent.trim() === 'Commit or push') || null;
-  }
-
   function commandModuleURL() {
     return document.querySelector(
       'link[rel="modulepreload"][href*="/assets/app-initial-"][href$=".js"]',
@@ -185,9 +167,6 @@ const codexContracts = (() => {
     composerAddButton,
     composerMutationSelector,
     composerEditorView,
-    sidePanelToggle,
-    environmentToggle,
-    commitOrPushButton,
     commandModuleURL,
     canDispatchCommand,
     dispatchCommand,

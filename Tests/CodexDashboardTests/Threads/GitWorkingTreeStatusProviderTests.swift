@@ -104,7 +104,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })
     }
 
-    func testNestedProjectPathsShareRepositoryStatusAndUseFreshCache() async throws {
+    func testNestedProjectPathsOnlyReportChangesInsideTheirOwnDirectory() async throws {
         let repositoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
         let firstProjectURL = repositoryURL.appendingPathComponent("Sources/FeatureA", isDirectory: true)
@@ -129,10 +129,11 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(cached[firstProjectURL.path], .clean)
         XCTAssertEqual(cached[secondProjectURL.path], .clean)
 
+        try Data("feature change\n".utf8).write(to: firstProjectURL.appendingPathComponent("feature.txt"))
         let uncachedProvider = GitWorkingTreeStatusProvider(cacheLifetime: 0)
         let refreshed = await uncachedProvider.loadStatuses(for: paths)
         XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
-        XCTAssertEqual(refreshed[secondProjectURL.path], .hasChanges)
+        XCTAssertEqual(refreshed[secondProjectURL.path], .clean)
     }
 
     func testTerminalRepositoryResolutionIsCachedUntilExpiry() async throws {

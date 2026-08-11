@@ -47,7 +47,7 @@ removes it.
 - Threads can be viewed by collapsible project or as one list sorted by most recently updated.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including threads not currently mounted in the sidebar.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Changed projects** filter isolates those projects.
-- Changed project groups expose **Commit or push**, which opens the most recent idle thread for that project and dispatches Codex's native Git command. The Environment-panel control is retained as a compatibility fallback.
+- Changed project groups expose **Ignore** and **Commit or push**. Ignore hides that project's change notifications until restored; Commit or push opens the most recent idle thread only when Codex's native Git command is available.
 - A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
 - Prompt search, keyboard and pointer reordering, section rename/deletion, JSON import/export, `{{selection}}` and `{{clipboard}}` placeholders, and an automatic app-owned backup under `~/Library/Application Support/Codex Dashboard/` protect and speed up reusable prompt workflows. Deleting a section moves its prompts to **General** rather than deleting them.
 - Dashboard filter, grouping, and collapsed-project preferences persist across renderer reloads.

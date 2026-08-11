@@ -19,7 +19,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     }
 
     private enum RepositoryResolution: Sendable {
-        case repository(String)
+        case repository
         case terminal(WorkingTreeStatus)
     }
 
@@ -29,7 +29,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     private let cacheLifetime: TimeInterval
     private let resolutionCacheLifetime: TimeInterval
     private var resolutionByProjectPath: [String: CachedResolution] = [:]
-    private var statusByRepositoryRoot: [String: CachedStatus] = [:]
+    private var statusByProjectPath: [String: CachedStatus] = [:]
 
     init(
         subprocessTimeout: TimeInterval = 3,
@@ -62,34 +62,34 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             resolutionByProjectPath[path] = CachedResolution(value: resolution, loadedAt: now)
         }
 
-        let repositoryRoots = Set<String>(resolutions.values.compactMap { resolution in
-            guard case .repository(let root) = resolution else { return nil }
-            return root
-        })
-        let staleRoots = repositoryRoots.filter { root in
-            guard let cached = statusByRepositoryRoot[root] else { return true }
+        let repositoryProjectPaths = projectPaths.filter { path in
+            guard case .repository = resolutions[path] else { return false }
+            return true
+        }
+        let staleProjectPaths = repositoryProjectPaths.filter { path in
+            guard let cached = statusByProjectPath[path] else { return true }
             return now.timeIntervalSince(cached.loadedAt) >= cacheLifetime
         }
-        let refreshed = await Self.concurrentMap(staleRoots) { root in
-            (root, await Self.status(atRepositoryRoot: root, timeout: timeout))
+        let refreshed = await Self.concurrentMap(staleProjectPaths) { path in
+            (path, await Self.status(atProjectPath: path, timeout: timeout))
         }
-        var statusesByRepositoryRoot: [String: WorkingTreeStatus] = [:]
-        for root in repositoryRoots {
-            guard let cached = statusByRepositoryRoot[root],
+        var statusesByProjectPath: [String: WorkingTreeStatus] = [:]
+        for path in repositoryProjectPaths {
+            guard let cached = statusByProjectPath[path],
                   now.timeIntervalSince(cached.loadedAt) < cacheLifetime
             else { continue }
-            statusesByRepositoryRoot[root] = cached.value
+            statusesByProjectPath[path] = cached.value
         }
-        for (root, status) in refreshed {
-            statusByRepositoryRoot[root] = CachedStatus(value: status, loadedAt: now)
-            statusesByRepositoryRoot[root] = status
+        for (path, status) in refreshed {
+            statusByProjectPath[path] = CachedStatus(value: status, loadedAt: now)
+            statusesByProjectPath[path] = status
         }
 
         return Dictionary(uniqueKeysWithValues: projectPaths.map { path in
             let status: WorkingTreeStatus
             switch resolutions[path] {
-            case .repository(let root):
-                status = statusesByRepositoryRoot[root] ?? .unavailable
+            case .repository:
+                status = statusesByProjectPath[path] ?? .unavailable
             case .terminal(let value):
                 status = value
             case nil:
@@ -140,21 +140,21 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             }
             let root = String(decoding: result.standardOutput, as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return root.isEmpty ? .terminal(.unavailable) : .repository(root)
+            return root.isEmpty ? .terminal(.unavailable) : .repository
         } catch {
             return .terminal(.unavailable)
         }
     }
 
     private static func status(
-        atRepositoryRoot root: String,
+        atProjectPath path: String,
         timeout: TimeInterval
     ) async -> WorkingTreeStatus {
         do {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/git"),
                 arguments: [
-                    "-C", root,
+                    "-C", path,
                     "status", "--porcelain=v1", "--untracked-files=normal",
                     "--", ".", ":(exclude).DS_Store", ":(exclude)**/.DS_Store",
                 ],

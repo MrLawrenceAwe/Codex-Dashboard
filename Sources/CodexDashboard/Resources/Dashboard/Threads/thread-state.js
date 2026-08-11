@@ -11,32 +11,37 @@ const threadDashboardState = (() => {
         ? stored.viewMode : 'projects',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
+      ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
+        ? stored.ignoredProjectPaths.filter((value) => typeof value === 'string') : []),
     };
   }
 
-  function savePreferences({ filterMode, viewMode, collapsedProjects }) {
+  function savePreferences({ filterMode, viewMode, collapsedProjects, ignoredProjectPaths }) {
     try {
       localStorage.setItem(preferencesKey, JSON.stringify({
         filterMode,
         viewMode,
         collapsedProjects: [...collapsedProjects],
+        ignoredProjectPaths: [...ignoredProjectPaths],
       }));
     } catch (_) {}
   }
 
-  function derive(threads, isThreadUnread) {
+  function derive(threads, isThreadUnread, ignoredProjectPaths) {
     return {
       runningThreads: threads.filter((thread) => thread.runState === 'running'),
       unreadCount: threads.filter(isThreadUnread).length,
       changedProjectPaths: new Set(
         threads
           .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
-          .map((thread) => String(thread.projectPath).trim()),
+          .map((thread) => String(thread.projectPath).trim())
+          .filter((path) => !ignoredProjectPaths.has(path)),
       ),
       dirtyProjectPaths: new Set(
         threads
           .filter((thread) => thread.workingTreeStatus === 'hasChanges')
-          .map((thread) => String(thread.projectPath).trim()),
+          .map((thread) => String(thread.projectPath).trim())
+          .filter((path) => !ignoredProjectPaths.has(path)),
       ),
     };
   }
