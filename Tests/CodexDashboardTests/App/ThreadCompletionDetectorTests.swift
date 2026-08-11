@@ -75,6 +75,32 @@ final class ThreadCompletionDetectorTests: XCTestCase {
         XCTAssertTrue(detector.observe([unread]).isEmpty)
     }
 
+    func testDelayedUnreadTransitionDoesNotDuplicateRunningToIdleCompletion() {
+        var detector = ThreadCompletionDetector()
+        let running = ThreadSummary.fixture(id: "thread-1", runState: .running)
+        let idle = ThreadSummary.fixture(id: "thread-1", runState: .idle)
+        var unread = idle
+        unread.isUnread = true
+
+        _ = detector.observe([running])
+        XCTAssertEqual(detector.observe([idle]).map(\.id), ["thread-1"])
+        XCTAssertTrue(detector.observe([idle]).isEmpty)
+        XCTAssertTrue(detector.observe([unread]).isEmpty)
+    }
+
+    func testAbortedTurnDoesNotProduceCompletion() {
+        var detector = ThreadCompletionDetector()
+        let running = ThreadSummary.fixture(id: "thread-1", runState: .running)
+        let aborted = ThreadSummary.fixture(
+            id: "thread-1",
+            runState: .idle,
+            lastRunTermination: .aborted
+        )
+
+        _ = detector.observe([running])
+        XCTAssertTrue(detector.observe([aborted]).isEmpty)
+    }
+
     func testReadingThreadAllowsFutureUnreadFallback() {
         var detector = ThreadCompletionDetector()
         let read = ThreadSummary.fixture(id: "thread-1", runState: .idle)

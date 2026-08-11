@@ -43,11 +43,15 @@ struct ThreadCompletionDetector {
         for thread in threads {
             guard let previous = previousThreadsByID[thread.id] else { continue }
 
-            if thread.runState == .running || !thread.isUnread {
+            if thread.runState == .running || (previous.isUnread && !thread.isUnread) {
                 deliveredUnreadThreadIDs.remove(thread.id)
             }
 
-            if previous.runState == .running, thread.runState == .idle {
+            if
+                previous.runState == .running,
+                thread.runState == .idle,
+                thread.lastRunTermination != .aborted
+            {
                 completedThreads.append(thread)
                 deliveredUnreadThreadIDs.insert(thread.id)
             } else if

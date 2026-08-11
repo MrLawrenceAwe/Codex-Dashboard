@@ -2,6 +2,7 @@ import Foundation
 
 struct ThreadActivity: Equatable, Sendable {
     let runState: ThreadRunState
+    let lastRunTermination: ThreadRunTermination
     let lastFinalResponseAtUnixSeconds: Int64?
     let lastFinalResponseMessage: String?
 }
@@ -14,7 +15,20 @@ struct RolloutActivityReader {
 
     private enum RunEvent {
         case started
-        case ended
+        case completed
+        case aborted
+
+        var runState: ThreadRunState {
+            self == .started ? .running : .idle
+        }
+
+        var termination: ThreadRunTermination {
+            switch self {
+            case .started: .unknown
+            case .completed: .completed
+            case .aborted: .aborted
+            }
+        }
     }
 
     private struct Envelope: Decodable {
@@ -54,6 +68,7 @@ struct RolloutActivityReader {
         else {
             return ThreadActivity(
                 runState: .idle,
+                lastRunTermination: .unknown,
                 lastFinalResponseAtUnixSeconds: nil,
                 lastFinalResponseMessage: nil
             )
@@ -77,6 +92,7 @@ struct RolloutActivityReader {
             )
             status = ThreadActivity(
                 runState: appendedStatus.runState,
+                lastRunTermination: appendedStatus.lastRunTermination,
                 lastFinalResponseAtUnixSeconds: appendedStatus.lastFinalResponseAtUnixSeconds
                     ?? cached.status.lastFinalResponseAtUnixSeconds,
                 lastFinalResponseMessage: appendedStatus.lastFinalResponseMessage
@@ -97,6 +113,7 @@ struct RolloutActivityReader {
         guard let codexLaunchDate, modifiedAt >= codexLaunchDate else {
             return ThreadActivity(
                 runState: .idle,
+                lastRunTermination: .unknown,
                 lastFinalResponseAtUnixSeconds: status.lastFinalResponseAtUnixSeconds,
                 lastFinalResponseMessage: status.lastFinalResponseMessage
             )
@@ -109,8 +126,11 @@ struct RolloutActivityReader {
         lowerBound: UInt64 = 0,
         fallbackRunState: ThreadRunState = .idle
     ) -> ThreadActivity {
-        let markers = [(RunEvent.started, Self.startedEventType)]
-            + Self.endedEventTypes.map { (RunEvent.ended, $0) }
+        let markers = [
+            (RunEvent.started, Self.startedEventType),
+            (RunEvent.completed, "task_complete"),
+            (RunEvent.aborted, "turn_aborted"),
+        ]
         let encodedMarkers = markers.map { (event: $0.0, data: Data(#""type":"\#($0.1)""#.utf8)) }
         let finalResponseMarker = Data(#""phase":"\#(Self.finalResponsePhase)""#.utf8)
         let timestampMarker = Data(#""timestamp":""#.utf8)
@@ -119,6 +139,7 @@ struct RolloutActivityReader {
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
             return ThreadActivity(
                 runState: .idle,
+                lastRunTermination: .unknown,
                 lastFinalResponseAtUnixSeconds: nil,
                 lastFinalResponseMessage: nil
             )
@@ -127,6 +148,7 @@ struct RolloutActivityReader {
         guard var cursor = try? handle.seekToEnd() else {
             return ThreadActivity(
                 runState: .idle,
+                lastRunTermination: .unknown,
                 lastFinalResponseAtUnixSeconds: nil,
                 lastFinalResponseMessage: nil
             )
@@ -179,8 +201,8 @@ struct RolloutActivityReader {
             }
         }
         return ThreadActivity(
-            runState: lastEvent.map { $0 == .started ? .running : .idle }
-                ?? fallbackRunState,
+            runState: lastEvent?.runState ?? fallbackRunState,
+            lastRunTermination: lastEvent?.termination ?? .unknown,
             lastFinalResponseAtUnixSeconds: lastFinalResponseAtUnixSeconds,
             lastFinalResponseMessage: lastFinalResponseMessage
         )
