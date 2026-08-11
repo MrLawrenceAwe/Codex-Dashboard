@@ -255,6 +255,33 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["searchFontSize"] as? String, "12px")
     }
 
+    func testPrimaryPromptActionsIgnoreIncompatibleHostButtonTokens() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.documentElement.style.setProperty('--color-background-button-primary', '#000000');
+              document.documentElement.style.setProperty('--color-text-button-primary', '#000000');
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              const newPrompt = document.querySelector('[data-prompt-new]');
+              const styles = getComputedStyle(newPrompt);
+              return {
+                label: newPrompt.textContent.trim(),
+                background: styles.backgroundColor,
+                foreground: styles.color,
+                textFill: styles.webkitTextFillColor,
+              };
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+
+        XCTAssertEqual(values["label"] as? String, "+ New prompt")
+        XCTAssertEqual(values["background"] as? String, "rgb(236, 236, 236)")
+        XCTAssertEqual(values["foreground"] as? String, "rgb(33, 33, 33)")
+        XCTAssertEqual(values["textFill"] as? String, "rgb(33, 33, 33)")
+    }
+
     func testPromptLauncherIsAdjacentToAddAndRemovedOnDestroy() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(

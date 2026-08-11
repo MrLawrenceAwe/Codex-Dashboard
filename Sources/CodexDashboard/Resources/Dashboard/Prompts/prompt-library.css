@@ -86,7 +86,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-empty strong { color: var(--dashboard-text); font-size: 13px; font-weight: 570; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-empty span { max-width: 330px; font-size: 11px; line-height: 1.45; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new { width: 100%; margin-top: 10px; padding: 9px 11px; border-radius: 9px; font-size: 11px; cursor: pointer; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-new-primary { border: 1px solid var(--color-background-button-primary, #f2f2f2); background: var(--color-background-button-primary, #f2f2f2); color: var(--color-text-button-primary, #202020); font-weight: 590; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-new-primary { border: 1px solid var(--dashboard-text); background: var(--dashboard-text); color: var(--dashboard-bg); -webkit-text-fill-color: var(--dashboard-bg); font-weight: 590; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new-primary:hover { filter: brightness(.94); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new-secondary { border: 1px solid var(--dashboard-line-strong); background: transparent; color: var(--dashboard-muted); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new-secondary:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
@@ -101,7 +101,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form-actions { display: flex; justify-content: flex-end; gap: 7px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form-actions button { padding: 8px 11px; border-radius: 7px; font-size: 11px; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-secondary { border: 1px solid var(--dashboard-line-strong); background: transparent; color: var(--dashboard-muted); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-primary { border: 1px solid var(--color-background-button-primary, #f2f2f2); background: var(--color-background-button-primary, #f2f2f2); color: var(--color-text-button-primary, #202020); font-weight: 580; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-primary { border: 1px solid var(--dashboard-text); background: var(--dashboard-text); color: var(--dashboard-bg); -webkit-text-fill-color: var(--dashboard-bg); font-weight: 580; }
 
 @media (hover: none) {
   #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions { opacity: 1; pointer-events: auto; }
