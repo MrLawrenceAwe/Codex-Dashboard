@@ -270,9 +270,9 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
-    func testWorkingTreePollingScheduleClearsIndicatorsPromptly() {
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(2))
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(10))
+    func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(10))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(60))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

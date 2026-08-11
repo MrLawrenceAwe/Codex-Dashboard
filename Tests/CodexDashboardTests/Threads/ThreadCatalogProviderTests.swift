@@ -67,6 +67,22 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.totalThreadCount, 63)
     }
 
+    func testBoundsLoadedCatalogWhilePreservingTotalCount() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            additionalThreadCount: 60,
+            testCase: self
+        )
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL,
+            loadedThreadLimit: 25
+        ).loadCatalog(codexLaunchDate: .distantPast)
+
+        XCTAssertEqual(catalog.threads.count, 25)
+        XCTAssertEqual(catalog.totalThreadCount, 63)
+    }
+
     func testReportsMissingStateDatabase() async throws {
         let missingDatabaseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-missing-state-\(UUID().uuidString).sqlite")

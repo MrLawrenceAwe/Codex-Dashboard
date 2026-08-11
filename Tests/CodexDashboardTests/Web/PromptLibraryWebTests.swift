@@ -11,12 +11,20 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               const original = document.querySelectorAll.bind(document);
+              const originalElementQuery = Element.prototype.querySelector;
               document.documentElement.dataset.querySelectorAllCount = '0';
+              document.documentElement.dataset.elementQuerySelectorCount = '0';
               document.querySelectorAll = (...arguments) => {
                 document.documentElement.dataset.querySelectorAllCount = String(
                   Number(document.documentElement.dataset.querySelectorAllCount) + 1
                 );
                 return original(...arguments);
+              };
+              Element.prototype.querySelector = function (...arguments) {
+                document.documentElement.dataset.elementQuerySelectorCount = String(
+                  Number(document.documentElement.dataset.elementQuerySelectorCount) + 1
+                );
+                return originalElementQuery.apply(this, arguments);
               };
               const unrelated = document.createElement('span');
               unrelated.textContent = 'Streaming response token';
@@ -27,9 +35,25 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
 
         try await Task.sleep(for: .milliseconds(100))
         let scanCount = try await webView.evaluateJavaScript(
-            "document.documentElement.dataset.querySelectorAllCount"
-        ) as? String
-        XCTAssertEqual(scanCount, "0")
+            "[document.documentElement.dataset.querySelectorAllCount, document.documentElement.dataset.elementQuerySelectorCount]"
+        ) as? [String]
+        XCTAssertEqual(scanCount, ["0", "0"])
+    }
+
+    func testComposerObserverRestoresRemovedLauncher() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').remove();
+            })()
+            """
+        )
+
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-codex-prompt-launcher]'))",
+            in: webView
+        )
     }
 
     func testSavedPromptCanBeCreatedAndInsertedIntoSupportedComposers() async throws {

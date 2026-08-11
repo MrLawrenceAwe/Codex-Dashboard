@@ -22,6 +22,7 @@ enum ThreadCatalogError: LocalizedError {
 }
 
 actor CodexThreadCatalogProvider: ThreadCatalogProviding {
+    static let defaultLoadedThreadLimit = 500
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
         "model", "rollout_path", "archived", "recency_at_ms",
@@ -50,6 +51,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     private let stateDatabaseURL: URL
+    private let loadedThreadLimit: Int
     private var rolloutActivityReader = RolloutActivityReader()
     private var cachedDatabaseSignature: DatabaseSignature?
     private var cachedStoredThreads: [StoredThread]?
@@ -57,9 +59,11 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
 
     init(
         stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL,
+        loadedThreadLimit: Int = CodexThreadCatalogProvider.defaultLoadedThreadLimit,
         subprocessTimeout: TimeInterval = 3
     ) {
         self.stateDatabaseURL = stateDatabaseURL
+        self.loadedThreadLimit = max(1, loadedThreadLimit)
         self.subprocessTimeout = subprocessTimeout
     }
 
@@ -73,10 +77,15 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                model,
                rollout_path AS rolloutPath,
                recency_at_ms AS recencyAtMilliseconds,
-               COUNT(*) OVER () AS totalCount
+               (
+                   SELECT COUNT(*)
+                   FROM threads AS countedThreads
+                   WHERE countedThreads.archived = 0 AND countedThreads.preview <> ''
+               ) AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
-        ORDER BY recency_at_ms DESC;
+        ORDER BY recency_at_ms DESC
+        LIMIT \(loadedThreadLimit);
         """
         let databaseSignature = try signature(for: stateDatabaseURL)
         let threads: [StoredThread]
