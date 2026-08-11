@@ -5,6 +5,54 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testCompleteCatalogUsesClientPagingAndSearchesBeyondFirstPage() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let threads = (0..<65).map { index in
+            ThreadSummary.fixture(
+                id: "thread-\(index)",
+                title: index == 64 ? "Needle outside first page" : "Thread \(index)",
+                recencyTimestamp: Int64(65 - index)
+            )
+        }
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+        let initial = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const initialCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
+              const loadMoreVisible = !document.querySelector('[data-load-more]').hidden;
+              document.querySelector('[data-load-more]').click();
+              const expandedCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
+              const search = document.querySelector('[data-dashboard-search]');
+              search.value = 'Needle outside';
+              search.dispatchEvent(new Event('input', { bubbles: true }));
+              document.querySelector('[data-view="projects"]').click();
+              return [
+                initialCount,
+                loadMoreVisible,
+                expandedCount,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(initial)
+        XCTAssertEqual(values[0] as? Int, 60)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Int, 65)
+        let matchingID = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId"
+        ) as? String
+        XCTAssertEqual(matchingID, "thread-64")
+    }
+
     func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

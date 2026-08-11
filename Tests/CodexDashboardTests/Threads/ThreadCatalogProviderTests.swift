@@ -50,7 +50,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads[1].recencyTimestamp, now - 1_200)
     }
 
-    func testReportsFullCountWhenInitialThreadRowsAreLimited() async throws {
+    func testLoadsCompleteCatalogForClientSidePagingAndSearch() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,
@@ -61,33 +61,8 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             stateDatabaseURL: stateDatabaseURL
         ).loadCatalog(codexLaunchDate: .distantPast)
 
-        XCTAssertEqual(catalog.threads.count, 60)
+        XCTAssertEqual(catalog.threads.count, 63)
         XCTAssertEqual(catalog.totalThreadCount, 63)
-    }
-
-    func testInitialThreadLimitUsesStableRecencyInsteadOfTransientActivity() async throws {
-        let now = Int64(Date().timeIntervalSince1970)
-        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
-            now: now,
-            additionalThreadCount: 60,
-            testCase: self
-        )
-        let update = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
-            arguments: [
-                stateDatabaseURL.path,
-                "UPDATE threads SET updated_at = \(now + 10_000), recency_at_ms = 0 WHERE id = 'running';",
-            ],
-            timeout: 3
-        )
-        XCTAssertEqual(update.terminationStatus, 0)
-
-        let catalog = try await CodexThreadCatalogProvider(
-            stateDatabaseURL: stateDatabaseURL
-        ).loadCatalog(codexLaunchDate: .distantPast)
-
-        XCTAssertEqual(Set(catalog.threads.map(\.id)), Set((0..<60).map { "extra-\($0)" }))
-        XCTAssertFalse(catalog.threads.contains { $0.id == "running" })
     }
 
     func testReportsMissingStateDatabase() async throws {

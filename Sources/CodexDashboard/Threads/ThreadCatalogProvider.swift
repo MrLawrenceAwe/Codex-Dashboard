@@ -76,8 +76,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                COUNT(*) OVER () AS totalCount
         FROM threads
         WHERE archived = 0 AND preview <> ''
-        ORDER BY recency_at_ms DESC
-        LIMIT 60;
+        ORDER BY recency_at_ms DESC;
         """
         let databaseSignature = try signature(for: stateDatabaseURL)
         let threads: [StoredThread]

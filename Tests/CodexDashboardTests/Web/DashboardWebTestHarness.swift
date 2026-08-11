@@ -92,6 +92,19 @@ enum DashboardWebTestHarness {
         }
         throw DashboardError.invalidDevToolsResponse
     }
+
+    static func waitForJavaScript(
+        _ expression: String,
+        in webView: WKWebView,
+        timeout: Duration = .seconds(2)
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if try await webView.evaluateJavaScript(expression) as? Bool == true { return }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTFail("Timed out waiting for JavaScript condition: \(expression)")
+    }
 }
 
 @MainActor

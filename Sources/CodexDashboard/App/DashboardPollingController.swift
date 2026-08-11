@@ -4,14 +4,19 @@ import Foundation
 @MainActor
 final class DashboardPollingController {
     enum Schedule {
-        static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
-        static func workingTree(active: Bool) -> Duration { active ? .seconds(2) : .seconds(10) }
-        static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
+        static func catalog(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
+        static func workingTree(active: Bool) -> Duration { active ? .seconds(30) : .seconds(120) }
+        static func unread(active: Bool) -> Duration { active ? .seconds(10) : .seconds(30) }
     }
 
     private var catalogPollingTask: Task<Void, Never>?
     private var workingTreePollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
+    private let fileChanges: DashboardFileChangeMonitor?
+
+    init(observeFileChanges: Bool = true) {
+        fileChanges = observeFileChanges ? DashboardFileChangeMonitor() : nil
+    }
 
     deinit {
         catalogPollingTask?.cancel()
@@ -48,6 +53,17 @@ final class DashboardPollingController {
                 try? await Task.sleep(for: Schedule.unread(active: Self.isUserActive))
             }
         }
+        fileChanges?.start(
+            catalogURL: CodexConfiguration.stateDatabaseURL,
+            unreadStateURL: CodexConfiguration.globalStateURL,
+            refreshCatalog: synchronizeDashboard,
+            refreshUnread: updateUnreadState,
+            refreshWorkingTrees: updateWorkingTrees
+        )
+    }
+
+    func updateProjectPaths(_ paths: Set<String>) {
+        fileChanges?.updateProjectPaths(paths)
     }
 
     private static var isUserActive: Bool {
@@ -62,5 +78,6 @@ final class DashboardPollingController {
         catalogPollingTask = nil
         workingTreePollingTask = nil
         unreadPollingTask = nil
+        fileChanges?.stop()
     }
 }

@@ -64,10 +64,7 @@ const threadDashboardState = (() => {
 
   function normalizeSnapshot(snapshot) {
     const threads = Array.isArray(snapshot?.threads) ? snapshot.threads : [];
-    const totalThreadCount = Number.isFinite(snapshot?.totalThreadCount)
-      ? Math.max(threads.length, snapshot.totalThreadCount)
-      : threads.length;
-    return { threads, totalThreadCount };
+    return { threads };
   }
 
   return { derive, filter, loadPreferences, normalizeSnapshot, savePreferences };

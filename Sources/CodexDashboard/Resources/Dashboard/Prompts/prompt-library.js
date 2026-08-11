@@ -58,6 +58,18 @@ function renderDialog() {
     content.querySelector('[name="sectionName"]')?.focus();
     return;
   }
+  if (dialogState.mode === 'renameSection') {
+    content.innerHTML = `
+      <form class="dashboard-prompt-form" data-prompt-section-rename-form>
+        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${dashboardDOM.escapeHTML(dialogState.section)}" required /></label>
+        <div class="dashboard-prompt-form-actions">
+          <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
+          <button type="submit" class="dashboard-prompt-primary">Rename section</button>
+        </div>
+      </form>`;
+    content.querySelector('[name="sectionName"]')?.focus();
+    return;
+  }
   if (dialogState.mode !== 'list') {
     const prompt = dialogState.mode === 'edit'
       ? promptStore.prompts.find((item) => item.id === dialogState.promptID)
@@ -89,6 +101,8 @@ function renderDialog() {
         <span>${dashboardDOM.escapeHTML(prompt.content)}</span>
       </button>
       <div class="dashboard-prompt-row-actions">
+        <button type="button" data-prompt-move-up="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Move ${dashboardDOM.escapeHTML(prompt.name)} up">↑</button>
+        <button type="button" data-prompt-move-down="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Move ${dashboardDOM.escapeHTML(prompt.name)} down">↓</button>
         <button type="button" data-prompt-edit="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Edit ${dashboardDOM.escapeHTML(prompt.name)}">Edit</button>
         <button type="button" data-prompt-delete="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Delete ${dashboardDOM.escapeHTML(prompt.name)}">Delete</button>
       </div>
@@ -114,6 +128,9 @@ function renderDialog() {
           <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${dashboardDOM.escapeHTML(section)}</strong></span>
           <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
         </button>
+        <div class="dashboard-prompt-section-actions">
+          ${section === 'General' ? '' : `<button type="button" data-prompt-section-rename="${dashboardDOM.escapeHTML(section)}" aria-label="Rename ${dashboardDOM.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${dashboardDOM.escapeHTML(section)}" aria-label="Delete ${dashboardDOM.escapeHTML(section)} section">Delete</button>`}
+        </div>
         <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
       </section>`;
   }).join('');
@@ -251,6 +268,52 @@ function createPromptSection(form) {
     .find((button) => button.dataset.promptSectionToggle === section)?.focus();
 }
 
+function renamePromptSection(form) {
+  const name = String(new FormData(form).get('sectionName') || '').trim();
+  if (!name) return;
+  const source = dialogState.section;
+  const destination = promptStore.normalizeSection(name);
+  if (destination !== source && promptStore.sections.includes(destination)) {
+    showStorageError('A section with that name already exists.');
+    return;
+  }
+  const nextPrompts = promptStore.prompts.map((prompt) => (
+    promptStore.normalizeSection(prompt.section) === source
+      ? { ...prompt, section: destination }
+      : prompt
+  ));
+  const nextSections = promptStore.sections.map((section) => (
+    section === source ? destination : section
+  ));
+  if (!persistLibrary(nextPrompts, nextSections)) return;
+  promptStore.prompts = nextPrompts;
+  promptStore.sections = nextSections;
+  promptStore.collapsedSections.delete(source);
+  promptStore.saveCollapsedSections();
+  dialogState = { mode: 'list' };
+  renderDialog();
+}
+
+function movePrompt(promptID, offset) {
+  const index = promptStore.prompts.findIndex((prompt) => prompt.id === promptID);
+  const prompt = promptStore.prompts[index];
+  if (!prompt) return;
+  const section = promptStore.normalizeSection(prompt.section);
+  const sectionIndexes = promptStore.prompts
+    .map((item, itemIndex) => ({ item, itemIndex }))
+    .filter(({ item }) => promptStore.normalizeSection(item.section) === section)
+    .map(({ itemIndex }) => itemIndex);
+  const position = sectionIndexes.indexOf(index);
+  const destination = sectionIndexes[position + offset];
+  if (destination === undefined) return;
+  const nextPrompts = [...promptStore.prompts];
+  [nextPrompts[index], nextPrompts[destination]] = [nextPrompts[destination], nextPrompts[index]];
+  if (!persistLibrary(nextPrompts, promptStore.sections)) return;
+  promptStore.prompts = nextPrompts;
+  renderDialog();
+  document.querySelector(`[data-prompt-row-id="${CSS.escape(promptID)}"] [data-prompt-move-${offset < 0 ? 'up' : 'down'}]`)?.focus();
+}
+
 function handlePromptKeyboard(event, dialog) {
   if (event.key === 'Escape') {
     event.preventDefault();
@@ -276,6 +339,7 @@ function handlePromptSubmit(event, form) {
   event.preventDefault();
   if (form.matches('[data-prompt-form]')) savePrompt(form);
   else if (form.matches('[data-prompt-section-form]')) createPromptSection(form);
+  else if (form.matches('[data-prompt-section-rename-form]')) renamePromptSection(form);
 }
 
 function insertSavedPrompt(prompt) {
@@ -307,6 +371,35 @@ function handlePromptClick(target) {
   } else if (target.closest('[data-prompt-new-section]')) {
     dialogState = { mode: 'createSection' };
     renderDialog();
+  } else if (target.closest('[data-prompt-section-rename]')) {
+    dialogState = {
+      mode: 'renameSection',
+      section: target.closest('[data-prompt-section-rename]').dataset.promptSectionRename,
+    };
+    renderDialog();
+  } else if (target.closest('[data-prompt-section-delete-confirm]')) {
+    const section = target.closest('[data-prompt-section-delete-confirm]').dataset.promptSectionDeleteConfirm;
+    const nextPrompts = promptStore.prompts.map((prompt) => (
+      promptStore.normalizeSection(prompt.section) === section
+        ? { ...prompt, section: 'General' }
+        : prompt
+    ));
+    const nextSections = promptStore.sections.filter((item) => item !== section);
+    if (!persistLibrary(nextPrompts, nextSections)) return;
+    promptStore.prompts = nextPrompts;
+    promptStore.sections = nextSections;
+    promptStore.collapsedSections.delete(section);
+    promptStore.saveCollapsedSections();
+    renderDialog();
+  } else if (target.closest('[data-prompt-section-delete]')) {
+    const button = target.closest('[data-prompt-section-delete]');
+    button.dataset.promptSectionDeleteConfirm = button.dataset.promptSectionDelete;
+    button.textContent = 'Confirm delete';
+    button.setAttribute('aria-label', 'Confirm section deletion; prompts will move to General');
+  } else if (target.closest('[data-prompt-move-up]')) {
+    movePrompt(target.closest('[data-prompt-move-up]').dataset.promptMoveUp, -1);
+  } else if (target.closest('[data-prompt-move-down]')) {
+    movePrompt(target.closest('[data-prompt-move-down]').dataset.promptMoveDown, 1);
   } else if (target.closest('[data-prompt-new]')) {
     dialogState = { mode: 'create' };
     renderDialog();
