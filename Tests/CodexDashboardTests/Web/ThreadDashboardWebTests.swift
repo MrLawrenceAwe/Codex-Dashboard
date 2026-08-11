@@ -322,7 +322,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(unreadCount, "0")
     }
 
-    func testChangedProjectsFilterIncludesEveryThreadFromChangedProjects() async throws {
+    func testChangedProjectsFilterShowsOneCommitActionPerChangedProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -369,6 +369,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               return [
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
+                document.querySelectorAll('[data-thread-list] .dashboard-git-project').length,
+                document.querySelectorAll('[data-thread-list] [data-project-commit]').length,
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-filter="changedProjects"]').textContent.trim(),
               ];
@@ -376,12 +378,11 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [String], [
-            "changed-project-thread-one",
-            "changed-project-thread-two",
-        ])
-        XCTAssertEqual(values[1] as? String, "1")
-        XCTAssertEqual(values[2] as? String, "Changed projects 1")
+        XCTAssertEqual(values[0] as? [String], [])
+        XCTAssertEqual(values[1] as? Int, 1)
+        XCTAssertEqual(values[2] as? Int, 1)
+        XCTAssertEqual(values[3] as? String, "1")
+        XCTAssertEqual(values[4] as? String, "Changed projects 1")
     }
 
     func testNavigationShowsUncommittedChangesIndicatorForDirtyProjects() async throws {

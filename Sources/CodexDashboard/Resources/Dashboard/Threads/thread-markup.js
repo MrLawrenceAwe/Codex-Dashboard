@@ -50,10 +50,30 @@ const threadMarkup = (() => {
 
   function list(visibleThreads, {
     viewMode,
+    filterMode,
     collapsedProjects,
     ignoredProjectPaths,
     isUnread,
   }) {
+    if (filterMode === 'changedProjects') {
+      const projects = new Map();
+      visibleThreads.forEach((item) => {
+        const projectPath = String(item.projectPath).trim();
+        if (!projects.has(projectPath)) projects.set(projectPath, item);
+      });
+      return [...projects.entries()].map(([projectPath, project]) => `
+        <article class="dashboard-git-project">
+          <div class="dashboard-git-project-copy">
+            <span class="dashboard-project-icon">${icon('project')}</span>
+            <span class="dashboard-project-copy">
+              <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project.projectName)}</span>
+              <span class="dashboard-project-path">${dashboardDOM.escapeHTML(projectPath)}</span>
+            </span>
+            <span class="dashboard-git-changes">${icon('gitChanges')}<span>Changed</span></span>
+          </div>
+          <button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>
+        </article>`).join('');
+    }
     if (viewMode === 'recent') {
       return [...visibleThreads]
         .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0))
