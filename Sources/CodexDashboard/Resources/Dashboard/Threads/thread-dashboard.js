@@ -307,20 +307,13 @@ function mountDashboardPage() {
         </div>
       </header>
       <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
-      <section class="dashboard-running" data-running-summary aria-label="Running threads" hidden>
-        <div class="dashboard-running-heading">
-          <span class="dashboard-running-spinner has-count" role="status" aria-label="0 running threads" title="0 running threads"><span data-running-count aria-hidden="true">0</span></span>
-          <h2>Running</h2>
-        </div>
-        <div class="dashboard-running-list" data-running-list></div>
-      </section>
       <div class="dashboard-section-header">
         <div class="dashboard-toolbar">
           <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>
           <div class="dashboard-toolbar-group dashboard-filter-group">
             <span class="dashboard-control-label">Show</span>
             <div class="dashboard-filters" aria-label="Filter threads">
-              <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
+              <button type="button" data-filter="running" class="is-active">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
               <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
               <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
             </div>
@@ -386,7 +379,6 @@ function mountDashboardPage() {
     }
     openThreadFromEvent(event);
   });
-  page.querySelector('[data-running-list]').addEventListener('click', openThreadFromEvent);
   codexHost.pageHost().append(page);
 }
 

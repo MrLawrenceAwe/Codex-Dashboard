@@ -79,12 +79,6 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-notice { margin-top: 16px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 30%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--dashboard-amber) 8%, transparent); color: var(--dashboard-muted); font-size: 11px; }
 #codex-dashboard-page .dashboard-notice[hidden] { display: none; }
 
-#codex-dashboard-page .dashboard-running { display: grid; gap: 9px; margin: 26px 0 24px; padding-block: 12px; border-block: 1px solid var(--dashboard-line); }
-#codex-dashboard-page .dashboard-running[hidden] { display: none; }
-#codex-dashboard-page .dashboard-running-heading { display: flex; align-items: center; gap: 7px; padding-inline: 3px; }
-#codex-dashboard-page .dashboard-running-heading h2 { margin: 0; color: var(--dashboard-muted); font-size: 12px; font-weight: 570; }
-#codex-dashboard-page .dashboard-running-list { display: grid; border: 1px solid var(--dashboard-line); border-radius: 9px; overflow: hidden; }
-
 #codex-dashboard-page .dashboard-section-header { position: sticky; z-index: 4; top: -1px; margin: 14px 0 0; padding: 12px 0 15px; background: color-mix(in srgb, var(--dashboard-bg) 92%, transparent); backdrop-filter: blur(14px); }
 #codex-dashboard-page .dashboard-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; grid-template-areas: "search filters view"; align-items: end; gap: 14px; }
 #codex-dashboard-page .dashboard-toolbar-group { display: grid; gap: 6px; }
@@ -160,9 +154,6 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 #codex-dashboard-page .dashboard-thread-actions { display: flex; align-items: center; gap: 9px; }
 #codex-dashboard-page .dashboard-run-spinner { position: relative; display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; border-radius: 50%; color: var(--dashboard-green); }
 #codex-dashboard-page .dashboard-run-spinner::before { width: 12px; height: 12px; box-sizing: border-box; content: ""; border: 1.5px solid color-mix(in srgb, var(--dashboard-green) 20%, transparent); border-top-color: currentColor; border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
-#codex-dashboard-page .dashboard-running-spinner { position: relative; display: inline-grid; width: 12px; height: 12px; flex: 0 0 12px; place-items: center; color: var(--dashboard-muted); font-size: 7px; font-variant-numeric: tabular-nums; font-weight: 650; line-height: 1; }
-#codex-dashboard-page .dashboard-running-spinner::before { position: absolute; inset: 0; box-sizing: border-box; content: ""; border: 1.5px solid var(--dashboard-line-strong); border-top-color: var(--dashboard-green); border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
-#codex-dashboard-page .dashboard-running-spinner.has-count { width: 16px; height: 16px; flex-basis: 16px; }
 #codex-dashboard-page .dashboard-open-affordance { display: flex; width: 22px; height: 28px; align-items: center; justify-content: center; color: var(--dashboard-dim); opacity: .35; transform: translateX(-2px); transition: color 100ms ease, opacity 100ms ease, transform 100ms ease; }
 #codex-dashboard-page .dashboard-thread:hover .dashboard-open-affordance, #codex-dashboard-page .dashboard-thread:focus-visible .dashboard-open-affordance { color: var(--dashboard-text); opacity: 1; transform: none; }
 #codex-dashboard-page .dashboard-open-affordance svg { width: 13px; height: 13px; }
@@ -182,7 +173,6 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 @container dashboard-page (max-width: 560px) {
   #codex-dashboard-page .dashboard-shell { width: min(100% - 28px, 620px); padding-top: 25px; }
   #codex-dashboard-page h1 { font-size: 25px; }
-  #codex-dashboard-page .dashboard-running { margin-top: 21px; }
   #codex-dashboard-page .dashboard-toolbar { grid-template-columns: 1fr; grid-template-areas: "search" "filters" "view"; gap: 11px; }
   #codex-dashboard-page .dashboard-toolbar-group { gap: 5px; }
   #codex-dashboard-page .dashboard-filters { overflow-x: auto; }
@@ -202,5 +192,5 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 
 @media (prefers-reduced-motion: reduce) {
   #codex-dashboard-page, #codex-dashboard-page .dashboard-thread, #codex-dashboard-page .dashboard-open-affordance, #codex-dashboard-page .dashboard-project-chevron { transition: none; }
-  #codex-dashboard-navigation .dashboard-nav-spinner::before, #codex-dashboard-page .dashboard-running-spinner::before, #codex-dashboard-page .dashboard-run-spinner::before { animation: none; }
+  #codex-dashboard-navigation .dashboard-nav-spinner::before, #codex-dashboard-page .dashboard-run-spinner::before { animation: none; }
 }

@@ -71,7 +71,10 @@ const threadMarkup = (() => {
             </span>
             <span class="dashboard-git-changes">${icon('gitChanges')}<span>Changed</span></span>
           </div>
-          <button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>
+          <span class="dashboard-project-summary">
+            <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardDOM.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Restore' : 'Ignore'}</span></button>
+            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
+          </span>
         </article>`).join('');
     }
     if (viewMode === 'recent') {

@@ -78,30 +78,13 @@ const threadDashboardView = (() => {
       notice.textContent = handoffError;
       notice.hidden = !handoffError;
     }
-    const runningSummary = page.querySelector('[data-running-summary]');
-    if (runningSummary) runningSummary.hidden = state.runningThreads.length === 0;
-    const runningCount = page.querySelector('[data-running-count]');
-    if (runningCount) {
-      runningCount.textContent = String(state.runningThreads.length);
-      const runningLabel = `${state.runningThreads.length} running ${state.runningThreads.length === 1 ? 'thread' : 'threads'}`;
-      runningCount.parentElement?.setAttribute('aria-label', runningLabel);
-      runningCount.parentElement?.setAttribute('title', runningLabel);
-    }
-    const runningList = page.querySelector('[data-running-list]');
-    if (runningList) updateMarkup(runningList, state.runningThreads
-      .map((thread) => threadMarkup.thread(thread, {
-        showProject: true,
-        isUnread: isThreadUnread(thread),
-        compact: true,
-      }))
-      .join(''));
     page.querySelectorAll('[data-filter]').forEach((button) => {
       const isActive = button.dataset.filter === filterMode;
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
-      all: threads.length - state.runningThreads.length,
+      running: state.runningThreads.length,
       unread: state.unreadCount,
       changedProjects: state.changedProjectPaths.size,
     };
@@ -116,7 +99,7 @@ const threadDashboardView = (() => {
 
     const visibleThreads = threadDashboardState.filter({
       threads,
-      changedProjectPaths: state.changedProjectPaths,
+      allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
       searchTerm,
       isThreadUnread,

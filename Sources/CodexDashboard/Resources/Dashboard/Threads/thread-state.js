@@ -5,8 +5,8 @@ const threadDashboardState = (() => {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(preferencesKey) || '{}'); } catch (_) {}
     return {
-      filterMode: ['all', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'all',
+      filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'running',
       viewMode: ['projects', 'recent'].includes(stored.viewMode)
         ? stored.viewMode : 'projects',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
@@ -37,6 +37,11 @@ const threadDashboardState = (() => {
           .map((thread) => String(thread.projectPath).trim())
           .filter((path) => !ignoredProjectPaths.has(path)),
       ),
+      allChangedProjectPaths: new Set(
+        threads
+          .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
+          .map((thread) => String(thread.projectPath).trim()),
+      ),
       dirtyProjectPaths: new Set(
         threads
           .filter((thread) => thread.workingTreeStatus === 'hasChanges')
@@ -48,18 +53,17 @@ const threadDashboardState = (() => {
 
   function filter({
     threads,
-    changedProjectPaths,
+    allChangedProjectPaths,
     filterMode,
     searchTerm,
     isThreadUnread,
   }) {
     const query = searchTerm.trim().toLowerCase();
     return threads.filter((thread) => {
-      if (thread.runState === 'running') return false;
-      const matchesFilter = filterMode === 'all'
+      const matchesFilter = (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
-          && changedProjectPaths.has(String(thread.projectPath).trim()));
+          && allChangedProjectPaths.has(String(thread.projectPath).trim()));
       const matchesSearch = !query
         || `${thread.title} ${thread.preview} ${thread.projectName} ${thread.projectPath}`
           .toLowerCase().includes(query);
