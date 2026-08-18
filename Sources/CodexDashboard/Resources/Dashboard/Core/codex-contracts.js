@@ -119,36 +119,71 @@ const codexContracts = (() => {
     return null;
   }
 
-  function commandModuleURL() {
-    return document.querySelector(
-      'link[rel="modulepreload"][href*="/assets/app-initial-"][href$=".js"]',
-    )?.href || null;
+  function sidePanelToggle() {
+    return [...document.querySelectorAll('button[aria-label="Toggle side panel"]')]
+      .filter(isVisible)
+      .sort((left, right) => right.getBoundingClientRect().left - left.getBoundingClientRect().left)[0]
+      || null;
   }
 
-  async function commandDispatcher() {
-    let dispatcher = window.__codexDashboardCommandDispatcher;
-    if (typeof dispatcher !== 'function') {
-      const moduleURL = commandModuleURL();
-      if (!moduleURL) return null;
-      try {
-        const appModule = await import(moduleURL);
-        dispatcher = Object.values(appModule).find((candidate) => (
-          typeof candidate === 'function' && candidate.name === 'xM' && candidate.length === 3
-        )) || appModule.k8;
-      } catch (_) {
-        return null;
+  function environmentToggle() {
+    return [...document.querySelectorAll('button[aria-expanded]')].find((button) => (
+      isVisible(button) && button.textContent.trim() === 'Environment'
+    )) || null;
+  }
+
+  function commitOrPushButton() {
+    return [...document.querySelectorAll('button[data-slot="thread-summary-panel-item-button"]')]
+      .find((button) => (
+        isVisible(button)
+          && !button.disabled
+          && button.textContent.trim() === 'Commit or push'
+      )) || null;
+  }
+
+  async function probeCommitOrPushControls(timeout = 3000) {
+    const waitFor = async (value) => {
+      const deadline = performance.now() + timeout;
+      while (performance.now() < deadline) {
+        const result = value();
+        if (result) return result;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return null;
+    };
+
+    if (commitOrPushButton()) return true;
+
+    let openedSidePanel = false;
+    let expandedEnvironment = false;
+    try {
+      let environment = environmentToggle();
+      if (!environment) {
+        const panelToggle = sidePanelToggle();
+        if (!panelToggle) return false;
+        panelToggle.click();
+        openedSidePanel = true;
+        await waitFor(() => commitOrPushButton() || environmentToggle());
+      }
+
+      if (commitOrPushButton()) return true;
+      environment = environmentToggle();
+      if (!environment) return false;
+      if (environment.getAttribute('aria-expanded') !== 'true') {
+        environment.click();
+        expandedEnvironment = true;
+      }
+      return Boolean(await waitFor(() => commitOrPushButton()));
+    } finally {
+      if (expandedEnvironment) {
+        const environment = environmentToggle();
+        if (environment?.getAttribute('aria-expanded') === 'true') environment.click();
+      }
+      if (openedSidePanel) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        sidePanelToggle()?.click();
       }
     }
-    return typeof dispatcher === 'function' ? dispatcher : null;
-  }
-
-  async function canDispatchCommand() {
-    return Boolean(await commandDispatcher());
-  }
-
-  async function dispatchCommand(commandID) {
-    const dispatcher = await commandDispatcher();
-    return dispatcher?.(commandID, 'codex_dashboard') === true;
   }
 
   return {
@@ -162,8 +197,9 @@ const codexContracts = (() => {
     composer,
     composerAddButton,
     composerEditorView,
-    commandModuleURL,
-    canDispatchCommand,
-    dispatchCommand,
+    sidePanelToggle,
+    environmentToggle,
+    commitOrPushButton,
+    probeCommitOrPushControls,
   };
 })();

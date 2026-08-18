@@ -503,7 +503,137 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         )
     }
 
-    func testProjectCommitActionDispatchesCodexNativeGitCommand() async throws {
+    func testCommitCompatibilityProbeVerifiesFullControlPathAndRestoresUI() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <button type="button" aria-label="Toggle side panel">Panel</button>
+              <script>
+                document.documentElement.dataset.panelClicks = '0';
+                document.documentElement.dataset.environmentClicks = '0';
+                document.documentElement.dataset.commitClicks = '0';
+                const panel = document.querySelector('[aria-label="Toggle side panel"]');
+                panel.addEventListener('click', () => {
+                  document.documentElement.dataset.panelClicks = String(
+                    Number(document.documentElement.dataset.panelClicks) + 1
+                  );
+                  const existing = document.querySelector('[data-test-environment]');
+                  if (existing) {
+                    existing.remove();
+                    document.querySelector('[data-test-native-commit]')?.remove();
+                    return;
+                  }
+                  const environment = document.createElement('button');
+                  environment.type = 'button';
+                  environment.dataset.testEnvironment = '';
+                  environment.textContent = 'Environment';
+                  environment.setAttribute('aria-expanded', 'false');
+                  environment.addEventListener('click', () => {
+                    document.documentElement.dataset.environmentClicks = String(
+                      Number(document.documentElement.dataset.environmentClicks) + 1
+                    );
+                    const expanded = environment.getAttribute('aria-expanded') === 'true';
+                    environment.setAttribute('aria-expanded', String(!expanded));
+                    if (expanded) {
+                      document.querySelector('[data-test-native-commit]')?.remove();
+                      return;
+                    }
+                    const commit = document.createElement('button');
+                    commit.type = 'button';
+                    commit.dataset.slot = 'thread-summary-panel-item-button';
+                    commit.dataset.testNativeCommit = '';
+                    commit.textContent = 'Commit or push';
+                    commit.addEventListener('click', () => {
+                      document.documentElement.dataset.commitClicks = String(
+                        Number(document.documentElement.dataset.commitClicks) + 1
+                      );
+                    });
+                    document.body.append(commit);
+                  });
+                  document.body.append(environment);
+                });
+              </script>
+            </body></html>
+            """
+        )
+        let contractSource = try DashboardInjectionPayload.loadRendererContractSource()
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              \(contractSource)
+              codexContracts.probeCommitOrPushControls(500).then((result) => {
+                document.documentElement.dataset.probeResult = String(result);
+              });
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.documentElement.dataset.probeResult !== undefined",
+            in: webView
+        )
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              document.documentElement.dataset.probeResult,
+              document.documentElement.dataset.panelClicks,
+              document.documentElement.dataset.environmentClicks,
+              document.documentElement.dataset.commitClicks,
+              Boolean(document.querySelector('[data-test-environment]')),
+              Boolean(document.querySelector('[data-test-native-commit]')),
+            ]
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], ["true", "2", "2", "0", false, false])
+    }
+
+    func testCommitCompatibilityProbeRejectsIncompleteControlPathAndRestoresUI() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <button type="button" aria-label="Toggle side panel">Panel</button>
+              <script>
+                document.documentElement.dataset.panelClicks = '0';
+                const panel = document.querySelector('[aria-label="Toggle side panel"]');
+                panel.addEventListener('click', () => {
+                  document.documentElement.dataset.panelClicks = String(
+                    Number(document.documentElement.dataset.panelClicks) + 1
+                  );
+                });
+              </script>
+            </body></html>
+            """
+        )
+        let contractSource = try DashboardInjectionPayload.loadRendererContractSource()
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              \(contractSource)
+              codexContracts.probeCommitOrPushControls(100).then((result) => {
+                document.documentElement.dataset.probeResult = String(result);
+              });
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.documentElement.dataset.probeResult !== undefined",
+            in: webView
+        )
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              document.documentElement.dataset.probeResult,
+              document.documentElement.dataset.panelClicks,
+            ]
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], ["false", "2"])
+    }
+
+    func testProjectCommitActionUsesCodexNativeGitControls() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -519,12 +649,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               </main>
               <script>
                 document.documentElement.dataset.selectedThread = '';
-                document.documentElement.dataset.command = '';
                 document.documentElement.dataset.sidePanelCount = '0';
-                window.__codexDashboardCommandDispatcher = (command, source) => {
-                  document.documentElement.dataset.command = `${command}:${source}`;
-                  return true;
-                };
+                document.documentElement.dataset.commitCount = '0';
                 const activeThreadProps = { conversationId: 'initial-thread' };
                 document.getElementById('composer-host').__reactFiber$test = {
                   memoizedProps: activeThreadProps,
@@ -558,6 +684,11 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                     commit.type = 'button';
                     commit.dataset.slot = 'thread-summary-panel-item-button';
                     commit.textContent = 'Commit or push';
+                    commit.addEventListener('click', () => {
+                      document.documentElement.dataset.commitCount = String(
+                        Number(document.documentElement.dataset.commitCount) + 1
+                      );
+                    });
                     document.body.append(commit);
                   });
                   document.body.append(environment);
@@ -616,8 +747,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
             [
               document.documentElement.dataset.selectedThread,
-              document.documentElement.dataset.command,
               document.documentElement.dataset.sidePanelCount,
+              document.documentElement.dataset.commitCount,
               document.getElementById('codex-dashboard-page').classList.contains('is-open'),
             ]
             """
@@ -628,8 +759,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(counts[1] as? String, "Commit or push")
         let values = try XCTUnwrap(handoff)
         XCTAssertEqual(values[0] as? String, "local:off-sidebar-idle-thread")
-        XCTAssertEqual(values[1] as? String, "git.commit:codex_dashboard")
-        XCTAssertEqual(values[2] as? String, "0")
+        XCTAssertEqual(values[1] as? String, "1")
+        XCTAssertEqual(values[2] as? String, "1")
         XCTAssertEqual(values[3] as? Bool, false)
     }
 
