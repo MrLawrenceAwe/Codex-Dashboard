@@ -18,7 +18,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             ThreadSummary.fixture(
                 id: "thread-\(index)",
                 title: index == 64 ? "Needle outside first page" : "Thread \(index)",
-                recencyTimestamp: Int64(65 - index)
+                recencyTimestamp: Int64(65 - index),
+                runState: .running
             )
         }
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -63,7 +64,11 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
         )
         let threads = (0..<125).map { index in
-            ThreadSummary.fixture(id: "matching-\(index)", title: "Matching thread \(index)")
+            ThreadSummary.fixture(
+                id: "matching-\(index)",
+                title: "Matching thread \(index)",
+                runState: .running
+            )
         }
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
         _ = try await webView.evaluateJavaScript(
@@ -131,7 +136,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "deferred-thread", isUnread: true),
+            .fixture(id: "deferred-thread", isUnread: true, runState: .running),
         ])
 
         let closedState = try await webView.evaluateJavaScript(
@@ -196,7 +201,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 document.querySelector('[data-filter="unread"]').classList.contains('is-active'),
                 document.querySelector('[data-view="recent"]').classList.contains('is-active'),
               ];
-              document.querySelector('[data-filter="all"]').click();
+              document.querySelector('[data-filter="running"]').click();
               document.querySelector('[data-view="projects"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.thread-preferences'));
               return JSON.stringify([restored, saved.filterMode, saved.viewMode, saved.collapsedProjects[0], saved.ignoredProjectPaths[0]]);
@@ -211,7 +216,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
         XCTAssertEqual(values[0] as? [Bool], [true, true])
-        XCTAssertEqual(values[1] as? String, "all")
+        XCTAssertEqual(values[1] as? String, "running")
         XCTAssertEqual(values[2] as? String, "projects")
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
@@ -269,6 +274,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               return document.querySelector('[data-thread-id="unread-thread"]').getAttribute('aria-label');
             })()
             """
@@ -433,6 +439,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
               const before = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelectorAll('[data-project-commit]').length,
@@ -481,6 +488,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
               document.querySelector('[data-project-commit]').click();
             })()
             """
@@ -764,7 +772,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? Bool, false)
     }
 
-    func testRunningThreadsUseCompactSummaryAndAreNotDuplicatedInMainList() async throws {
+    func testRunningFilterShowsOnlyRunningThreads() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -822,14 +830,13 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
               return [
-                document.querySelector('[data-running-count]').textContent,
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
-                document.querySelectorAll('[data-running-list] .dashboard-thread.is-compact').length,
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-running-list] .dashboard-thread p') === null,
-                document.querySelector('[data-filter-count="all"]').textContent,
+                document.querySelector('[data-filter="running"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="running"]').textContent.trim(),
+                document.querySelector('[data-filter-count="running"]').textContent,
                 document.querySelector('[data-dashboard-summary]').getAttribute('aria-label'),
               ];
             })()
@@ -837,13 +844,15 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? String, "3")
-        XCTAssertEqual(values[1] as? String, "3")
-        XCTAssertEqual(values[2] as? String, "3 running threads")
-        XCTAssertEqual(values[3] as? Int, 3)
-        XCTAssertEqual(values[4] as? [String], ["project-a-idle"])
-        XCTAssertEqual(values[5] as? Bool, true)
-        XCTAssertEqual(values[6] as? String, "1")
-        XCTAssertEqual(values[7] as? String, "3 running, 0 unread, 0 changed projects")
+        XCTAssertEqual(values[1] as? String, "3 running threads")
+        XCTAssertEqual(
+            values[2] as? [String],
+            ["project-a-running-one", "project-a-running-two", "project-b-running"]
+        )
+        XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertEqual(values[4] as? String, "Running 3")
+        XCTAssertEqual(values[5] as? String, "3")
+        XCTAssertEqual(values[6] as? String, "3 running, 0 unread, 0 changed projects")
     }
 
     func testThreadRowUsesNativeButtonAndOpensFromActivation() async throws {
@@ -867,7 +876,11 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             </body></html>
             """,
         )
-        let thread = ThreadSummary.fixture(id: "thread-one", title: "Keyboard target")
+        let thread = ThreadSummary.fixture(
+            id: "thread-one",
+            title: "Keyboard target",
+            runState: .running
+        )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [thread])
 
         let result = try await webView.evaluateJavaScript(
