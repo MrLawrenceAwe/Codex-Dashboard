@@ -268,6 +268,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             expressions.first { $0.contains("Boolean(codexContracts.composerAddButton())") }
         )
         XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-launcher"))
+        XCTAssertTrue(
+            expressions.contains { $0.contains("codexContracts.probeCommitOrPushControls()") }
+        )
     }
 
     func testPreparingForRestartRestoresMaintenance() async throws {

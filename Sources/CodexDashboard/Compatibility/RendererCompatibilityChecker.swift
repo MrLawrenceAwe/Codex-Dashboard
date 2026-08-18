@@ -82,11 +82,11 @@ struct RendererCompatibilityChecker {
             id: "commit-push-handoff",
             title: "Commit or push handoff",
             expression: contractExpression(
-                "codexContracts.canDispatchCommand()"
+                "codexContracts.probeCommitOrPushControls()"
             ),
             failureStatus: .warning,
-            compatibleDetail: "Codex exposes its native Git command for Commit or push handoff.",
-            failureDetail: "The native Codex Git command was not found.",
+            compatibleDetail: "Codex exposes the complete native Git control path for Commit or push handoff.",
+            failureDetail: "The complete native Codex Git control path was not found.",
             in: target
         ))
         return checks

@@ -39,7 +39,7 @@ const codexHost = {
   },
 
   async canOpenCommitOrPush() {
-    return codexContracts.canDispatchCommand();
+    return Boolean(codexContracts.commitOrPushButton() || codexContracts.sidePanelToggle());
   },
 
   async openCommitOrPush(thread) {
@@ -58,6 +58,25 @@ const codexHost = {
     if (!selected) return false;
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    return codexContracts.dispatchCommand('git.commit');
+    let commitButton = codexContracts.commitOrPushButton();
+    if (!commitButton) {
+      const sidePanelToggle = codexContracts.sidePanelToggle();
+      if (!sidePanelToggle) return false;
+      sidePanelToggle.click();
+
+      const panelControl = await waitFor(() => (
+        codexContracts.commitOrPushButton() || codexContracts.environmentToggle()
+      ));
+      if (!panelControl) return false;
+
+      commitButton = codexContracts.commitOrPushButton();
+      if (!commitButton) {
+        if (panelControl.getAttribute('aria-expanded') !== 'true') panelControl.click();
+        commitButton = await waitFor(() => codexContracts.commitOrPushButton());
+      }
+    }
+    if (!commitButton) return false;
+    commitButton.click();
+    return true;
   },
 };
