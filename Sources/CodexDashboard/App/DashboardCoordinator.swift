@@ -81,7 +81,7 @@ final class DashboardCoordinator: ObservableObject {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in await self?.synchronizeDashboard() }
+                Task { @MainActor in await self?.refreshAfterActivation() }
             }
         }
         Task { await checkCompatibility() }
@@ -258,6 +258,11 @@ final class DashboardCoordinator: ObservableObject {
             return thread
         })
         await publishSnapshotIfMaintained()
+    }
+
+    func refreshAfterActivation() async {
+        await synchronizeDashboard()
+        await updateWorkingTreeStatuses()
     }
 
     private func updateWorkingTreeStatuses(projectPaths: Set<String>? = nil) async {

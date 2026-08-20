@@ -17,6 +17,22 @@ private struct StubWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     }
 }
 
+private actor MutableWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+    private var status: WorkingTreeStatus
+
+    init(status: WorkingTreeStatus) {
+        self.status = status
+    }
+
+    func loadStatuses(for projectPaths: Set<String>) -> [String: WorkingTreeStatus] {
+        Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, status) })
+    }
+
+    func setStatus(_ status: WorkingTreeStatus) {
+        self.status = status
+    }
+}
+
 private struct StubUnreadIDProvider: UnreadThreadIDProviding {
     let unreadThreadIDs: Set<String>
 
@@ -265,14 +281,35 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
+    func testActivationRefreshesWorkingTreeStatusImmediately() async {
+        let thread = ThreadSummary.fixture(id: "thread-1", workingTreeStatus: .notRepository)
+        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: workingTreeStatusProvider,
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            runtimeFactory: { StubDashboardSession() }
+        )
+
+        await coordinator.refreshAfterActivation()
+        XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .hasChanges)
+
+        await workingTreeStatusProvider.setStatus(.clean)
+        await coordinator.refreshAfterActivation()
+        XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .clean)
+    }
+
     func testUnreadPollingScheduleMatchesLatencyBounds() {
         XCTAssertEqual(DashboardPollingController.Schedule.unread(active: true), .milliseconds(500))
         XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
     func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(60))
-        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(300))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(15))
+        XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(60))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
