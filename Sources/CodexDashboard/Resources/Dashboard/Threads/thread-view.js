@@ -30,7 +30,10 @@ const threadDashboardView = (() => {
     const changes = document.querySelector('[data-navigation-changes]');
     if (changes) {
       const changedProjectCount = dirtyProjectPaths.size;
-      const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes`;
+      const changedProjectNames = [...dirtyProjectPaths]
+        .map((path) => path.split('/').filter(Boolean).at(-1) || path)
+        .slice(0, 3);
+      const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
       changes.hidden = changedProjectCount === 0;
       changes.setAttribute('aria-label', changedProjectLabel);
       changes.setAttribute('title', changedProjectLabel);

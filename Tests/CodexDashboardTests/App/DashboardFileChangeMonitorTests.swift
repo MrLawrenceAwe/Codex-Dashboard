@@ -75,6 +75,55 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
         XCTAssertEqual(catalogRefreshes, 1)
     }
 
+    func testLinkedWorktreeResolvesActualGitMetadataDirectory() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-worktree-monitor-\(UUID().uuidString)", isDirectory: true)
+        let repositoryURL = root.appendingPathComponent("repository", isDirectory: true)
+        let worktreeURL = root.appendingPathComponent("worktree", isDirectory: true)
+        try FileManager.default.createDirectory(at: repositoryURL, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", repositoryURL.path, "init", "--quiet"],
+            timeout: 3
+        )
+        try Data("initial\n".utf8).write(to: repositoryURL.appendingPathComponent("tracked.txt"))
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: [
+                "-C", repositoryURL.path,
+                "-c", "user.name=Codex Dashboard Tests",
+                "-c", "user.email=tests@example.invalid",
+                "add", "tracked.txt",
+            ],
+            timeout: 3
+        )
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: [
+                "-C", repositoryURL.path,
+                "-c", "user.name=Codex Dashboard Tests",
+                "-c", "user.email=tests@example.invalid",
+                "commit", "--quiet", "-m", "Initial",
+            ],
+            timeout: 3
+        )
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", repositoryURL.path, "worktree", "add", "--quiet", worktreeURL.path],
+            timeout: 3
+        )
+
+        let metadataURL = try XCTUnwrap(DashboardFileChangeMonitor.gitMetadataURL(for: worktreeURL))
+        let pointerURL = worktreeURL.appendingPathComponent(".git")
+
+        XCTAssertNotEqual(metadataURL, pointerURL)
+        XCTAssertTrue(metadataURL.path.contains("/.git/worktrees/"))
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: metadataURL.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+    }
+
     private func waitUntil(
         timeout: Duration = .seconds(2),
         condition: () -> Bool

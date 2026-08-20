@@ -417,7 +417,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
 
         let values = try XCTUnwrap(status)
         XCTAssertEqual(values[0] as? Bool, false)
-        XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes")
+        XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes: dirty")
     }
 
     func testIgnoredProjectIsRemovedFromChangeIndicatorsAndCanBeRestored() async throws {
