@@ -422,6 +422,8 @@ function applySnapshot(nextSnapshot) {
 }
 
 function activeProject() {
+  const selectedProject = codexContracts.activeComposerProject();
+  if (selectedProject) return selectedProject;
   const activeThreadID = codexContracts.activeComposerThreadID();
   const thread = threads.find((item) => item.id === activeThreadID);
   const projectPath = String(thread?.projectPath || '').trim();

@@ -274,6 +274,65 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         )
     }
 
+    func testProjectPromptCanBeCreatedFromProjectNewChatBeforeThreadExists() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const projectID = 'project-a-id';
+              const projectRow = document.createElement('div');
+              projectRow.dataset.appActionSidebarProjectId = projectID;
+              projectRow.__reactFiber$test = {
+                memoizedProps: {},
+                return: {
+                  memoizedProps: {
+                    group: {
+                      projectId: projectID,
+                      projectKind: 'local',
+                      label: 'Project A',
+                      path: '/tmp/project-a',
+                    },
+                  },
+                  return: null,
+                },
+              };
+              document.querySelector('aside').append(projectRow);
+
+              const composerShell = document.querySelector('.composer-shell');
+              composerShell.__reactFiber$test = {
+                memoizedProps: {
+                  selectedProject: { projectId: projectID, type: 'local' },
+                },
+                return: null,
+              };
+
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              const scopeOptions = [...document.querySelector('[name="scope"]').options]
+                .map((option) => option.textContent);
+              document.querySelector('[name="name"]').value = 'New chat project prompt';
+              document.querySelector('[name="content"]').value = 'Project-only content';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              return {
+                headings: [...document.querySelectorAll('.dashboard-prompt-scope > h3')]
+                  .map((heading) => heading.textContent),
+                scopeOptions,
+                scope: stored.prompts[0].scope,
+              };
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+
+        XCTAssertEqual(values["headings"] as? [String], ["This project · Project A", "Global"])
+        XCTAssertEqual(values["scopeOptions"] as? [String], ["All projects", "This project · Project A"])
+        XCTAssertEqual(
+            values["scope"] as? [String: String],
+            ["type": "project", "projectPath": "/tmp/project-a"]
+        )
+    }
+
     private func decodeJSONObject(_ json: String) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: Data(json.utf8))
         return try XCTUnwrap(object as? [String: Any])

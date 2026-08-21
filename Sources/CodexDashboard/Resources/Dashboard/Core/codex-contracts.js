@@ -59,6 +59,53 @@ const codexContracts = (() => {
     return null;
   }
 
+  function activeComposerProject() {
+    const activeComposer = composer();
+    let host = activeComposer?.parentElement;
+    let projectID;
+    while (host && host !== document.body && !projectID) {
+      const fiberKey = Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
+      let fiber = fiberKey ? host[fiberKey] : null;
+      while (fiber) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        const selectedProject = props?.selectedProject;
+        if (
+          selectedProject?.type === 'local'
+            && typeof selectedProject.projectId === 'string'
+            && selectedProject.projectId.trim()
+        ) {
+          projectID = selectedProject.projectId.trim();
+          break;
+        }
+        fiber = fiber.return;
+      }
+      host = host.parentElement;
+    }
+    if (!projectID) return null;
+
+    const projectRow = document.querySelector(
+      `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
+    );
+    const fiberKey = projectRow
+      && Object.keys(projectRow).find((key) => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? projectRow[fiberKey] : null;
+    while (fiber) {
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      const group = props?.group;
+      const path = String(group?.path || '').trim();
+      if (group?.projectId === projectID && group?.projectKind === 'local' && path) {
+        return {
+          name: String(group.label || '').trim()
+            || path.split('/').filter(Boolean).at(-1)
+            || path,
+          path,
+        };
+      }
+      fiber = fiber.return;
+    }
+    return null;
+  }
+
   function threadReadStates() {
     const readStates = new Map();
     threadRows().forEach((row) => {
@@ -193,6 +240,7 @@ const codexContracts = (() => {
     threadRow,
     isThreadSelected,
     activeComposerThreadID,
+    activeComposerProject,
     threadReadStates,
     composer,
     composerAddButton,
