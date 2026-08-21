@@ -12,10 +12,10 @@ final class DashboardPollingController {
     private var catalogPollingTask: Task<Void, Never>?
     private var workingTreePollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
-    private let fileChanges: DashboardFileChangeMonitor?
+    private let fileChanges: DashboardDataChangeMonitor?
 
     init(observeFileChanges: Bool = true) {
-        fileChanges = observeFileChanges ? DashboardFileChangeMonitor() : nil
+        fileChanges = observeFileChanges ? DashboardDataChangeMonitor() : nil
     }
 
     deinit {

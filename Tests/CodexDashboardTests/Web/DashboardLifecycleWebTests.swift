@@ -26,7 +26,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             baseURL: nil
         )
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try DashboardInjectionPayload.load()
+        let injection = try DashboardInjectionResources.load()
         let mounted = try await webView.evaluateJavaScript(injection.mountExpression) as? Bool
         XCTAssertEqual(mounted, true)
         let healthy = try await webView.evaluateJavaScript(injection.healthCheckExpression) as? Bool

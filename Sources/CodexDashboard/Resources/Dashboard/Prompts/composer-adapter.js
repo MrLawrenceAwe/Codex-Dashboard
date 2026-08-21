@@ -17,7 +17,7 @@ const composerAdapter = (() => {
   }
 
   function insert(content) {
-    const composer = codexContracts.composer(dashboardDOM.elementIDs.promptDialog);
+    const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
     if (!composer) return false;
     if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
       const start = composer.selectionStart ?? composer.value.length;
@@ -39,7 +39,7 @@ const composerAdapter = (() => {
     const selection = window.getSelection();
     const needsSeparator = Boolean(composer.textContent && !/\s$/.test(composer.textContent));
     const insertedContent = `${needsSeparator ? '\n\n' : ''}${content}`;
-    const editorView = codexContracts.composerEditorView(composer);
+    const editorView = codexUIContracts.composerEditorView(composer);
     if (editorView) {
       return insertIntoEditor(editorView, content, needsSeparator);
     }

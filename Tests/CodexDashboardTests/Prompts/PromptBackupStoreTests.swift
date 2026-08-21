@@ -130,7 +130,7 @@ final class PromptBackupStoreTests: XCTestCase {
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: false)
         let synchronizer = PromptLibraryBackupSynchronizer(
             store: store,
-            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+            contractSource: try DashboardInjectionResources.loadPromptLibraryContractSource()
         )
 
         try await synchronizer.restoreIfNeeded(in: target, using: devTools)
@@ -152,7 +152,7 @@ final class PromptBackupStoreTests: XCTestCase {
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: true)
         let synchronizer = PromptLibraryBackupSynchronizer(
             store: store,
-            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+            contractSource: try DashboardInjectionResources.loadPromptLibraryContractSource()
         )
 
         try await synchronizer.restoreIfNeeded(in: target, using: devTools)
@@ -171,7 +171,7 @@ final class PromptBackupStoreTests: XCTestCase {
         let devTools = PromptRestoreDevTools(storedLibraryIsValid: false, restoreSucceeds: false)
         let synchronizer = PromptLibraryBackupSynchronizer(
             store: store,
-            contractSource: try DashboardInjectionPayload.loadPromptLibraryContractSource()
+            contractSource: try DashboardInjectionResources.loadPromptLibraryContractSource()
         )
 
         do {

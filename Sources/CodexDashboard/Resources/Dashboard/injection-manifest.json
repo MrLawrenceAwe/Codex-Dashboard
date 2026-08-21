@@ -1,7 +1,7 @@
 {
   "scripts": [
-    "Core/dashboard-dom",
-    "Core/codex-contracts",
+    "Core/dashboard-elements",
+    "Core/codex-ui-contracts",
     "Core/codex-host",
     "Prompts/prompt-library-contract",
     "Prompts/prompt-store",
@@ -12,11 +12,11 @@
     "Threads/thread-markup",
     "Threads/thread-state",
     "Threads/thread-view",
-    "Threads/thread-dashboard",
+    "Threads/thread-dashboard-controller",
     "Core/dashboard-host"
   ],
   "stylesheets": [
-    "Threads/dashboard",
+    "Threads/thread-dashboard",
     "Prompts/prompt-library"
   ]
 }

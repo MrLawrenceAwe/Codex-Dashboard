@@ -21,12 +21,12 @@ let observedComposerRoot;
 let mutationFrame;
 let unreadSyncTimer;
 let renderFrame;
-let pendingSidebarMutation = false;
-let pendingHostRebind = false;
+let pendingUnreadStateSync = false;
+let pendingHostReconciliation = false;
 let dashboardIsOpen = false;
 let dashboardNeedsRender = true;
 let unreadThreadIDs = new Set();
-let handoffError = '';
+let commitOrPushError = '';
 
 function saveDashboardPreferences() {
   threadDashboardState.savePreferences({
@@ -78,32 +78,32 @@ function isThreadUnread(thread) {
 function handleHostNavigation(event) {
   if (event.type === 'message') {
     if (event.data?.type === 'navigate-to-route') {
-      if (dashboardIsOpen) closePage();
-      scheduleHostSync({ rebindHosts: true });
+      if (dashboardIsOpen) closeDashboard();
+      scheduleHostReconciliation({ rebindHosts: true });
     }
     return;
   }
   if (event.type === 'popstate' || event.type === 'hashchange') {
-    if (dashboardIsOpen) closePage();
-    scheduleHostSync({ rebindHosts: true });
+    if (dashboardIsOpen) closeDashboard();
+    scheduleHostReconciliation({ rebindHosts: true });
     return;
   }
   if (event.type === 'keydown') {
     const opensNewChat = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n';
-    if (dashboardIsOpen && opensNewChat) closePage();
+    if (dashboardIsOpen && opensNewChat) closeDashboard();
     return;
   }
   const eventTarget = event.target instanceof Element ? event.target : null;
-  if (eventTarget?.closest(`#${dashboardDOM.elementIDs.navButton}`)) {
+  if (eventTarget?.closest(`#${dashboardElements.elementIDs.navButton}`)) {
     event.preventDefault();
     event.stopPropagation();
-    if (event.type === 'click') openPage();
+    if (event.type === 'click') openDashboard();
     return;
   }
   if (event.type !== 'click') return;
-  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${dashboardDOM.elementIDs.navButton}`)) {
-    if (dashboardIsOpen) closePage();
-    scheduleHostSync({ rebindHosts: true });
+  if (eventTarget?.closest('aside') && !eventTarget.closest(`#${dashboardElements.elementIDs.navButton}`)) {
+    if (dashboardIsOpen) closeDashboard();
+    scheduleHostReconciliation({ rebindHosts: true });
   }
 }
 
@@ -112,30 +112,30 @@ function deriveDashboardState() {
 }
 
 function openThread(thread) {
-  closePage();
+  closeDashboard();
   codexHost.navigateToThread(thread);
 }
 
 async function openProjectCommitOrPush(projectPath) {
-  handoffError = '';
+  commitOrPushError = '';
   const candidates = threads
     .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
     .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0));
   const [thread] = candidates;
   if (!thread) {
-    handoffError = 'No idle thread is available for this project.';
+    commitOrPushError = 'No idle thread is available for this project.';
     renderDashboard();
     return;
   }
   if (!await codexHost.canOpenCommitOrPush()) {
-    handoffError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
+    commitOrPushError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
     renderDashboard();
     return;
   }
-  closePage();
+  closeDashboard();
   if (await codexHost.openCommitOrPush(thread)) return;
-  handoffError = 'The project thread opened, but Codex could not start Commit or push.';
-  openPage();
+  commitOrPushError = 'The project thread opened, but Codex could not start Commit or push.';
+  openDashboard();
 }
 
 function renderDashboard() {
@@ -148,7 +148,7 @@ function renderDashboard() {
     viewMode,
     collapsedProjects,
     ignoredProjectPaths,
-    handoffError,
+    commitOrPushError,
     isThreadUnread,
     state,
   });
@@ -187,13 +187,13 @@ function observeSidebar() {
 }
 
 function attachPageToCodexContent() {
-  const page = document.getElementById(dashboardDOM.elementIDs.page);
+  const page = document.getElementById(dashboardElements.elementIDs.page);
   const pageHost = codexHost.pageHost();
   if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
 }
 
 function composerMutationRoot() {
-  const composer = codexContracts.composer();
+  const composer = codexUIContracts.composer();
   return composer?.closest('form') || composer?.parentElement || null;
 }
 
@@ -218,20 +218,20 @@ function observeMutationHosts() {
   }
 }
 
-function scheduleHostSync({ syncUnread = false, rebindHosts = false } = {}) {
-  pendingSidebarMutation ||= syncUnread;
-  pendingHostRebind ||= rebindHosts;
+function scheduleHostReconciliation({ syncUnread = false, rebindHosts = false } = {}) {
+  pendingUnreadStateSync ||= syncUnread;
+  pendingHostReconciliation ||= rebindHosts;
   if (mutationFrame !== undefined) return;
   mutationFrame = requestAnimationFrame(() => {
     mutationFrame = undefined;
-    const shouldSyncUnread = pendingSidebarMutation;
-    const shouldRebindHosts = pendingHostRebind;
-    pendingSidebarMutation = false;
-    pendingHostRebind = false;
-    const restoredPage = !document.getElementById(dashboardDOM.elementIDs.page);
+    const shouldSyncUnread = pendingUnreadStateSync;
+    const shouldRebindHosts = pendingHostReconciliation;
+    pendingUnreadStateSync = false;
+    pendingHostReconciliation = false;
+    const restoredPage = !document.getElementById(dashboardElements.elementIDs.page);
     if (restoredPage) mountDashboardPage();
-    if (!document.getElementById(dashboardDOM.elementIDs.navButton)) mountNavigationButton();
-    if (dashboardIsOpen && restoredPage) openPage();
+    if (!document.getElementById(dashboardElements.elementIDs.navButton)) mountNavigationButton();
+    if (dashboardIsOpen && restoredPage) openDashboard();
     attachPageToCodexContent();
     observeSidebar();
     if (shouldRebindHosts) {
@@ -245,21 +245,21 @@ function scheduleHostSync({ syncUnread = false, rebindHosts = false } = {}) {
 function handleStructureMutations() {
   const launcher = document.querySelector('[data-codex-prompt-launcher]');
   if (
-    document.getElementById(dashboardDOM.elementIDs.page)
-      && document.getElementById(dashboardDOM.elementIDs.navButton)
+    document.getElementById(dashboardElements.elementIDs.page)
+      && document.getElementById(dashboardElements.elementIDs.navButton)
       && launcher?.isConnected
       && observedComposerRoot?.isConnected
   ) return;
-  scheduleHostSync({ rebindHosts: true });
+  scheduleHostReconciliation({ rebindHosts: true });
 }
 
 function handleSidebarMutations() {
-  scheduleHostSync({ syncUnread: true });
+  scheduleHostReconciliation({ syncUnread: true });
 }
 
 function handleComposerMutations() {
   if (composerMutationRoot() !== observedComposerRoot) {
-    scheduleHostSync({ rebindHosts: true });
+    scheduleHostReconciliation({ rebindHosts: true });
     return;
   }
   promptLauncher.scheduleSync();
@@ -269,7 +269,7 @@ function mountNavigationButton() {
   const insertionPoint = codexHost.navigationInsertionPoint();
   if (!insertionPoint?.element?.parentElement) return false;
   const button = document.createElement('button');
-  button.id = dashboardDOM.elementIDs.navButton;
+  button.id = dashboardElements.elementIDs.navButton;
   button.type = 'button';
   button.className = insertionPoint.element.className;
   button.setAttribute('aria-label', 'Thread Dashboard');
@@ -292,7 +292,7 @@ function mountNavigationButton() {
 function mountDashboardPage() {
   dashboardNeedsRender = true;
   const page = document.createElement('section');
-  page.id = dashboardDOM.elementIDs.page;
+  page.id = dashboardElements.elementIDs.page;
   page.setAttribute('aria-label', 'Codex Thread Dashboard');
   page.innerHTML = `
     <div class="dashboard-shell">
@@ -357,7 +357,7 @@ function mountDashboardPage() {
       const projectPath = projectIgnore.dataset.projectIgnore;
       if (ignoredProjectPaths.has(projectPath)) ignoredProjectPaths.delete(projectPath);
       else ignoredProjectPaths.add(projectPath);
-      handoffError = '';
+      commitOrPushError = '';
       saveDashboardPreferences();
       renderDashboard();
       return;
@@ -390,23 +390,23 @@ function openThreadFromEvent(event) {
   if (thread) openThread(thread);
 }
 
-function openPage() {
-  const page = document.getElementById(dashboardDOM.elementIDs.page);
+function openDashboard() {
+  const page = document.getElementById(dashboardElements.elementIDs.page);
   if (!page) return;
   dashboardIsOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
-  document.getElementById(dashboardDOM.elementIDs.navButton)?.setAttribute('aria-current', 'page');
+  document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
   if (dashboardNeedsRender) renderDashboard();
   else threadDashboardView.updateSidebarStatus(deriveDashboardState());
   scheduleUnreadSync(1500);
 }
 
-function closePage() {
+function closeDashboard() {
   dashboardIsOpen = false;
-  document.getElementById(dashboardDOM.elementIDs.page)?.classList.remove('is-open');
+  document.getElementById(dashboardElements.elementIDs.page)?.classList.remove('is-open');
   document.documentElement.classList.remove('codex-dashboard-open');
-  document.getElementById(dashboardDOM.elementIDs.navButton)?.removeAttribute('aria-current');
+  document.getElementById(dashboardElements.elementIDs.navButton)?.removeAttribute('aria-current');
   scheduleUnreadSync();
 }
 
@@ -422,9 +422,9 @@ function applySnapshot(nextSnapshot) {
 }
 
 function activeProject() {
-  const selectedProject = codexContracts.activeComposerProject();
+  const selectedProject = codexUIContracts.activeComposerProject();
   if (selectedProject) return selectedProject;
-  const activeThreadID = codexContracts.activeComposerThreadID();
+  const activeThreadID = codexUIContracts.activeComposerThreadID();
   const thread = threads.find((item) => item.id === activeThreadID);
   const projectPath = String(thread?.projectPath || '').trim();
   if (!projectPath) return null;
@@ -436,19 +436,19 @@ function activeProject() {
 
 function ensureMounted() {
   if (!document.body) return false;
-  if (!document.getElementById(dashboardDOM.elementIDs.style)) {
+  if (!document.getElementById(dashboardElements.elementIDs.style)) {
     const style = document.createElement('style');
-    style.id = dashboardDOM.elementIDs.style;
+    style.id = dashboardElements.elementIDs.style;
     style.textContent = DASHBOARD_CSS;
     document.head.append(style);
   }
-  const pageWasMissing = !document.getElementById(dashboardDOM.elementIDs.page);
+  const pageWasMissing = !document.getElementById(dashboardElements.elementIDs.page);
   if (pageWasMissing) mountDashboardPage();
-  if (!document.getElementById(dashboardDOM.elementIDs.navButton)) mountNavigationButton();
+  if (!document.getElementById(dashboardElements.elementIDs.navButton)) mountNavigationButton();
   attachPageToCodexContent();
   syncContentInset();
   promptLibrary.mount();
-  if (dashboardIsOpen && pageWasMissing) openPage();
+  if (dashboardIsOpen && pageWasMissing) openDashboard();
 
   if (!structureObserver) {
     structureObserver = new MutationObserver(handleStructureMutations);
@@ -471,9 +471,9 @@ function ensureMounted() {
   });
   document.addEventListener('visibilitychange', handleVisibilityChange);
   return Boolean(
-    document.getElementById(dashboardDOM.elementIDs.style)
-      && document.getElementById(dashboardDOM.elementIDs.page)
-      && document.getElementById(dashboardDOM.elementIDs.navButton)
+    document.getElementById(dashboardElements.elementIDs.style)
+      && document.getElementById(dashboardElements.elementIDs.page)
+      && document.getElementById(dashboardElements.elementIDs.navButton)
   );
 }
 
@@ -493,8 +493,8 @@ function destroy() {
   mutationFrame = undefined;
   renderFrame = undefined;
   unreadSyncTimer = undefined;
-  pendingSidebarMutation = false;
-  pendingHostRebind = false;
+  pendingUnreadStateSync = false;
+  pendingHostReconciliation = false;
   dashboardNeedsRender = true;
   observedSidebar = undefined;
   observedStructureRoot = undefined;
@@ -510,14 +510,14 @@ function destroy() {
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   document.documentElement.classList.remove('codex-dashboard-open');
   document.documentElement.style.removeProperty('--codex-dashboard-content-left');
-  Object.values(dashboardDOM.elementIDs).forEach((id) => document.getElementById(id)?.remove());
+  Object.values(dashboardElements.elementIDs).forEach((id) => document.getElementById(id)?.remove());
   delete window.__codexDashboard;
 }
 
 return {
   ensureMounted,
   destroy,
-  open: openPage,
+  open: openDashboard,
   applySnapshot,
   activeProject,
 };

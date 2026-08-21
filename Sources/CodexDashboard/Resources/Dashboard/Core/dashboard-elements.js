@@ -4,7 +4,7 @@ if (existing?.version === DASHBOARD_VERSION) {
 }
 existing?.destroy?.();
 
-const dashboardDOM = {
+const dashboardElements = {
   elementIDs: {
     style: 'codex-dashboard-style',
     navButton: 'codex-dashboard-navigation',

@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class DashboardFileChangeMonitorTests: XCTestCase {
+final class DashboardDataChangeMonitorTests: XCTestCase {
     func testFileAndProjectChangesTriggerTargetedRefreshes() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-file-monitor-\(UUID().uuidString)", isDirectory: true)
@@ -16,7 +16,7 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DashboardFileChangeMonitor()
+        let monitor = DashboardDataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var workingTreeRefreshes = 0
@@ -54,7 +54,7 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
         try Data("initial-catalog".utf8).write(to: catalogURL)
         try Data("initial-unread".utf8).write(to: unreadURL)
 
-        let monitor = DashboardFileChangeMonitor()
+        let monitor = DashboardDataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         monitor.start(
@@ -114,7 +114,7 @@ final class DashboardFileChangeMonitorTests: XCTestCase {
             timeout: 3
         )
 
-        let metadataURL = try XCTUnwrap(DashboardFileChangeMonitor.gitMetadataURL(for: worktreeURL))
+        let metadataURL = try XCTUnwrap(GitMetadataLocator.metadataURL(for: worktreeURL))
         let pointerURL = worktreeURL.appendingPathComponent(".git")
 
         XCTAssertNotEqual(metadataURL, pointerURL)

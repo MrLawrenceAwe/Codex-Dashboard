@@ -91,7 +91,7 @@ private struct StubCompatibilityChecker: LocalCompatibilityChecking {
 }
 
 @MainActor
-private final class StubDashboardSession: DashboardSession {
+private final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning = false
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
@@ -129,7 +129,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             status: .incompatible,
             detail: "Missing sidebar"
         )
-        let runtime = StubDashboardSession()
+        let runtime = StubDashboardRuntime()
         let coordinator = DashboardCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
@@ -156,7 +156,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
         var publicationCount = 0
@@ -182,7 +182,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
 
         await coordinator.checkCompatibility()
@@ -212,7 +212,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             userDefaults: defaults,
             installedCodexVersion: { "2.0" },
             runtimeFactory: {
-                StubDashboardSession(compatibilityChecks: [unavailableRenderer])
+                StubDashboardRuntime(compatibilityChecks: [unavailableRenderer])
             }
         )
 
@@ -235,7 +235,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             userDefaults: defaults,
             installedCodexVersion: { "2.0" },
             runtimeFactory: {
-                StubDashboardSession(compatibilityChecks: [compatibleRenderer])
+                StubDashboardRuntime(compatibilityChecks: [compatibleRenderer])
             }
         )
 
@@ -251,7 +251,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
 
         XCTAssertEqual(coordinator.connectionState, .checking)
@@ -272,7 +272,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: unreadThreadIDProvider,
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
         await unreadThreadIDProvider.setUnreadThreadIDs([thread.id])
@@ -291,7 +291,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: workingTreeStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
 
         await coordinator.refreshAfterActivation()
@@ -320,7 +320,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: FailingViewModelUnreadIDProvider(),
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
@@ -336,7 +336,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
-            runtimeFactory: { StubDashboardSession() }
+            runtimeFactory: { StubDashboardRuntime() }
         )
 
         coordinator.startMonitoring()

@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-struct DashboardInjectionPayload: Sendable {
+struct DashboardInjectionResources: Sendable {
     private struct ResourceManifest: Decodable {
         let scripts: [String]
         let stylesheets: [String]
@@ -20,7 +20,7 @@ struct DashboardInjectionPayload: Sendable {
         """
     }
 
-    static func load(bundle: Bundle? = nil) throws -> DashboardInjectionPayload {
+    static func load(bundle: Bundle? = nil) throws -> DashboardInjectionResources {
         let resourceBundle = bundle ?? defaultResourceBundle
         let manifest = try loadManifest(from: resourceBundle)
         let script = try loadResources(
@@ -46,12 +46,12 @@ struct DashboardInjectionPayload: Sendable {
           \(script)
         })()
         """
-        return DashboardInjectionPayload(version: version, mountExpression: mountExpression)
+        return DashboardInjectionResources(version: version, mountExpression: mountExpression)
     }
 
     static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
         try loadResources(
-            named: ["Core/codex-contracts"],
+            named: ["Core/codex-ui-contracts"],
             withExtension: "js",
             from: bundle ?? defaultResourceBundle
         )
