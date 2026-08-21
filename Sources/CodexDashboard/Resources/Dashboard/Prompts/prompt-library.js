@@ -120,7 +120,7 @@ const promptLibrary = (() => {
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
         <fieldset class="dashboard-prompt-preset-fields">
           <legend>Composer preset</legend>
-          <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="usePreset"${usePreset ? ' checked' : ''} />Use this preset when inserting <span>Off keeps your current model, effort, and speed.</span></label>
+          <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="usePreset"${usePreset ? ' checked' : ''} />Use model preset <span>Off keeps your current model, effort, and speed.</span></label>
           <label>Model<select name="presetModel" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetModelOptions, prompt?.preset?.model || '')}</select></label>
           <label>Effort<select name="presetReasoningEffort" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || '')}</select></label>
           <label>Speed<select name="presetSpeed" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetSpeedOptions, prompt?.preset?.speed || '')}</select></label>
