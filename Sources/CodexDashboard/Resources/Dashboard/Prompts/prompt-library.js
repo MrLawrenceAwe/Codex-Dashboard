@@ -230,6 +230,21 @@ const promptLibrary = (() => {
   }
 }
 
+function presentDialog() {
+  const dialog = promptLibraryDialog.create(dialogOwner);
+  document.body.append(dialog);
+  renderDialog();
+}
+
+function hideDialog() {
+  document.getElementById(dashboardElements.elementIDs.promptDialog)?.remove();
+}
+
+function restoreDialog(message) {
+  presentDialog();
+  showStorageError(message);
+}
+
 function open() {
   const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
   if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
@@ -242,16 +257,14 @@ function open() {
       ? selection.toString()
       : '';
   }
-  document.getElementById(dashboardElements.elementIDs.promptDialog)?.remove();
+  hideDialog();
   returnFocusElement = document.activeElement instanceof HTMLElement
     ? document.activeElement
     : undefined;
   dialogModeState = { mode: 'list' };
   promptSearchTerm = '';
   activeProject = threadDashboard.activeProject();
-  const dialog = promptLibraryDialog.create(dialogOwner);
-  document.body.append(dialog);
-  renderDialog();
+  presentDialog();
 }
 
 function exportLibrary() {
@@ -425,8 +438,9 @@ function insertSavedPrompt(prompt) {
     if (prompt.content.includes('{{clipboard}}')) {
       try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
     }
+    hideDialog();
     if (!await composerAdapter.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
-      showStorageError('Could not apply this prompt’s composer preset. The prompt was not inserted.');
+      restoreDialog('Could not apply this prompt’s composer preset. The prompt was not inserted.');
       return false;
     }
     return insert(clipboardText);

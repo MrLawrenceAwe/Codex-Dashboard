@@ -818,6 +818,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               trigger.textContent = 'Current model';
               shell.append(trigger);
               const applied = [];
+              const promptDialogStates = [];
+              const triggerDialogStates = [];
               const optionSets = {
                 Model: ['5.6 Sol', '5.6 Terra', '5.6 Luna'],
                 Effort: ['Low', 'Medium', 'High', 'Extra High'],
@@ -827,7 +829,14 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 document.querySelectorAll('[role="menu"]').forEach((menu) => menu.remove());
                 trigger.setAttribute('aria-expanded', 'false');
               };
+              document.body.addEventListener('click', (event) => {
+                if (event.target === document.body) removeMenus();
+              });
               trigger.addEventListener('click', () => {
+                triggerDialogStates.push(Boolean(document.getElementById(
+                  'codex-dashboard-prompt-library-dialog'
+                )));
+                if (document.getElementById('codex-dashboard-prompt-library-dialog')) return;
                 if (trigger.getAttribute('aria-expanded') === 'true') return;
                 trigger.setAttribute('aria-expanded', 'true');
                 const menu = document.createElement('div');
@@ -853,7 +862,12 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                       option.textContent = label;
                       option.addEventListener('click', () => {
                         applied.push(`${kind}:${label}`);
-                        removeMenus();
+                        promptDialogStates.push(Boolean(document.getElementById(
+                          'codex-dashboard-prompt-library-dialog'
+                        )));
+                        viewToggle.remove();
+                        menu.style.display = 'none';
+                        setTimeout(() => { menu.style.display = ''; }, 75);
                       });
                       submenu.append(option);
                     });
@@ -886,8 +900,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               usePresetCheckbox.click();
               const storedWithPresetEnabled = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
               document.querySelector('[data-prompt-use]').click();
-              const deadline = performance.now() + 2000;
-              while (document.getElementById('codex-dashboard-prompt-library-dialog')
+              const deadline = performance.now() + 4000;
+              while (document.querySelector('textarea').value !== 'Review this change'
                 && performance.now() < deadline) {
                 await new Promise((resolve) => setTimeout(resolve, 20));
               }
@@ -899,6 +913,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 usesPresetAfterToggle: storedWithPresetEnabled.prompts[0].usePreset,
                 summary,
                 applied,
+                promptDialogStates,
+                triggerDialogStates,
                 content: document.querySelector('textarea').value,
                 dialogClosed: !document.getElementById('codex-dashboard-prompt-library-dialog'),
               };
@@ -933,8 +949,65 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             values["applied"] as? [String],
             ["Model:5.6 Luna", "Effort:Medium", "Speed:Fast"]
         )
+        XCTAssertEqual(values["promptDialogStates"] as? [Bool], [false, false, false])
+        XCTAssertEqual(values["triggerDialogStates"] as? [Bool], [false])
         XCTAssertEqual(values["content"] as? String, "Review this change")
         XCTAssertEqual(values["dialogClosed"] as? Bool, true)
+    }
+
+    func testFailedPromptPresetRestoresLibraryWithoutInsertingPrompt() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            void (async () => {
+              const trigger = document.createElement('button');
+              trigger.dataset.codexIntelligenceTrigger = 'true';
+              trigger.setAttribute('aria-expanded', 'false');
+              trigger.textContent = 'Current model';
+              document.querySelector('.composer-shell').append(trigger);
+
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Unavailable preset';
+              document.querySelector('[name="content"]').value = 'Do not insert this';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              document.querySelector('[data-prompt-use-preset]').click();
+              document.querySelector('[data-prompt-use]').click();
+
+              const deadline = performance.now() + 4000;
+              while (performance.now() < deadline) {
+                const error = document.querySelector('[data-prompt-storage-error]');
+                if (error && !error.hidden) break;
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+              const error = document.querySelector('[data-prompt-storage-error]');
+              window.__failedPromptPresetResult = {
+                dialogOpen: Boolean(document.getElementById(
+                  'codex-dashboard-prompt-library-dialog'
+                )),
+                error: error && !error.hidden ? error.textContent : null,
+                content: document.querySelector('textarea').value,
+              };
+            })();
+            true
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(window.__failedPromptPresetResult)",
+            in: webView,
+            timeout: .seconds(5)
+        )
+        let result = try await webView.evaluateJavaScript(
+            "JSON.stringify(window.__failedPromptPresetResult)"
+        ) as? String
+        let values = try decodeJSONObject(try XCTUnwrap(result))
+
+        XCTAssertEqual(values["dialogOpen"] as? Bool, true)
+        XCTAssertEqual(
+            values["error"] as? String,
+            "Could not apply this prompt’s composer preset. The prompt was not inserted."
+        )
+        XCTAssertEqual(values["content"] as? String, "")
     }
 
 }
