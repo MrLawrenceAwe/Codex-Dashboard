@@ -6,6 +6,7 @@ const promptStore = (() => {
 
   const {
     normalizePrompts,
+    normalizePreset,
     normalizeScope,
     normalizeSection,
     normalizeSections,
@@ -33,11 +34,12 @@ const promptStore = (() => {
     if (storedLibrary && typeof storedLibrary === 'object') {
       const prompts = normalizePrompts(storedLibrary.prompts);
       const migratedLibrary = {
-        version: 2,
+        version: 3,
         prompts,
         sections: normalizeSections(storedLibrary.sections, prompts),
       };
-      if (storedLibrary.version !== 2 || storedLibrary.prompts?.some((prompt) => !prompt.scope)) {
+      // Version 1/2 libraries are migrated in place so existing user prompts are not lost.
+      if (storedLibrary.version !== 3 || storedLibrary.prompts?.some((prompt) => !prompt.scope)) {
         writeJSON(libraryStorageKey, migratedLibrary);
       }
       return migratedLibrary;
@@ -46,7 +48,7 @@ const promptStore = (() => {
     // Retained to prevent users of the previous storage contract from losing prompts.
     const legacyPrompts = normalizePrompts(readJSON(legacyPromptStorageKey, []));
     const migratedLibrary = {
-      version: 2,
+      version: 3,
       prompts: legacyPrompts,
       sections: normalizeSections(readJSON(legacySectionsStorageKey, []), legacyPrompts),
     };
@@ -67,6 +69,7 @@ const promptStore = (() => {
 
     normalizeSection,
     normalizePrompts,
+    normalizePreset,
     normalizeScope,
     normalizeSections,
 
@@ -79,7 +82,7 @@ const promptStore = (() => {
 
     saveLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
       return writeJSON(libraryStorageKey, {
-        version: 2,
+        version: 3,
         prompts: nextPrompts,
         sections: normalizeSections(nextSections, nextPrompts),
       });

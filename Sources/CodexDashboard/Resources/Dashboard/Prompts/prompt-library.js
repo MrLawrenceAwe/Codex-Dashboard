@@ -6,6 +6,37 @@ const promptLibrary = (() => {
   let promptSearchTerm = '';
   let capturedSelectionText = '';
   let activeProject;
+  const presetModelOptions = [
+    ['', 'Keep current model'],
+    ['gpt-5.6-sol', '5.6 Sol'],
+    ['gpt-5.6-terra', '5.6 Terra'],
+    ['gpt-5.6-luna', '5.6 Luna'],
+    ['gpt-5.5', '5.5'],
+    ['gpt-5.4', '5.4'],
+    ['gpt-5.4-mini', '5.4 Mini'],
+  ];
+  const presetReasoningOptions = [
+    ['', 'Keep current effort'], ['low', 'Low'], ['medium', 'Medium'],
+    ['high', 'High'], ['xhigh', 'Extra High'],
+  ];
+  const presetSpeedOptions = [
+    ['', 'Keep current speed'], ['standard', 'Standard'], ['fast', 'Fast'],
+  ];
+
+  function selectOptions(options, selectedValue) {
+    return options.map(([value, label]) => (
+      `<option value="${value}"${value === selectedValue ? ' selected' : ''}>${label}</option>`
+    )).join('');
+  }
+
+  function presetSummary(preset) {
+    if (!preset) return [];
+    return [
+      presetModelOptions.find(([value]) => value === preset.model)?.[1],
+      presetReasoningOptions.find(([value]) => value === preset.reasoningEffort)?.[1],
+      presetSpeedOptions.find(([value]) => value === preset.speed)?.[1],
+    ].filter(Boolean);
+  }
 
   function scopeKey(scope) {
     const normalized = promptStore.normalizeScope(scope);
@@ -80,6 +111,12 @@ function renderDialog() {
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
+        <fieldset class="dashboard-prompt-preset-fields">
+          <legend>Composer preset <span>Optional</span></legend>
+          <label>Model<select name="presetModel">${selectOptions(presetModelOptions, prompt?.preset?.model || '')}</select></label>
+          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || '')}</select></label>
+          <label>Speed<select name="presetSpeed">${selectOptions(presetSpeedOptions, prompt?.preset?.speed || '')}</select></label>
+        </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardElements.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
@@ -91,7 +128,8 @@ function renderDialog() {
   }
   const query = promptSearchTerm.trim().toLowerCase();
   const matchingPrompts = query ? promptStore.prompts.filter((prompt) => (
-    `${prompt.name} ${prompt.section} ${prompt.content}`.toLowerCase().includes(query)
+    `${prompt.name} ${prompt.section} ${prompt.content} ${presetSummary(prompt.preset).join(' ')}`
+      .toLowerCase().includes(query)
   )) : promptStore.prompts;
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
     <article class="dashboard-prompt-row" data-prompt-row-id="${dashboardElements.escapeHTML(prompt.id)}" draggable="true">
@@ -99,6 +137,7 @@ function renderDialog() {
       <button type="button" class="dashboard-prompt-use" data-prompt-use="${dashboardElements.escapeHTML(prompt.id)}">
         <strong>${dashboardElements.escapeHTML(prompt.name)}</strong>
         <span>${dashboardElements.escapeHTML(prompt.content)}</span>
+        ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${dashboardElements.escapeHTML(item)}</em>`).join('')}</span>` : ''}
       </button>
       <div class="dashboard-prompt-row-actions">
         <button type="button" data-prompt-move-up="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Move ${dashboardElements.escapeHTML(prompt.name)} up">↑</button>
@@ -211,7 +250,7 @@ function open() {
 
 function exportLibrary() {
   const payload = JSON.stringify({
-    version: 2,
+    version: 3,
     prompts: promptStore.prompts,
     sections: promptStore.sections,
   }, null, 2);
@@ -261,10 +300,18 @@ function savePrompt(form) {
   const scope = values.get('scope') === 'project' && activeProject
     ? { type: 'project', projectPath: activeProject.path }
     : { type: 'global' };
+  const preset = promptStore.normalizePreset({
+    model: String(values.get('presetModel') || '') || undefined,
+    reasoningEffort: String(values.get('presetReasoningEffort') || '') || undefined,
+    speed: String(values.get('presetSpeed') || '') || undefined,
+  });
+  const presetFields = preset ? { preset } : {};
   let nextPrompts;
   if (dialogModeState.mode === 'edit') {
     nextPrompts = promptStore.prompts.map((prompt) => (
-      prompt.id === dialogModeState.promptID ? { ...prompt, name, section, scope, content } : prompt
+      prompt.id === dialogModeState.promptID
+        ? { ...prompt, name, section, scope, content, preset: undefined, ...presetFields }
+        : prompt
     ));
   } else {
     nextPrompts = [...promptStore.prompts, {
@@ -273,6 +320,7 @@ function savePrompt(form) {
       section,
       scope,
       content,
+      ...presetFields,
     }];
   }
   const nextSections = promptStore.sections.includes(section)
@@ -362,17 +410,22 @@ function handlePromptSubmit(event, form) {
 
 function insertSavedPrompt(prompt) {
   const insert = (clipboardText = '') => {
-    if (composerAdapter.insert(expandedPromptContent(prompt.content, clipboardText))) {
-      close({ restoreFocus: false });
-      return true;
-    }
-    return false;
+    if (!composerAdapter.insert(expandedPromptContent(prompt.content, clipboardText))) return false;
+    close({ restoreFocus: false });
+    return true;
   };
-  if (!prompt.content.includes('{{clipboard}}')) return insert();
-  navigator.clipboard.readText()
-    .then(insert)
-    .catch(() => insert(''));
-  return true;
+  if (!prompt.preset && !prompt.content.includes('{{clipboard}}')) return insert();
+  return (async () => {
+    let clipboardText = '';
+    if (prompt.content.includes('{{clipboard}}')) {
+      try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
+    }
+    if (!await composerAdapter.applyPreset(prompt.preset)) {
+      showStorageError('Could not apply this prompt’s composer preset. The prompt was not inserted.');
+      return false;
+    }
+    return insert(clipboardText);
+  })();
 }
 
 function handlePromptClick(target) {
@@ -464,9 +517,16 @@ function handlePromptClick(target) {
         && now - previousInsertion.timestamp < 500
     ) return;
     window[insertionGuard] = { promptID: id, timestamp: now };
-    if (!prompt || !insertSavedPrompt(prompt)) {
+    if (!prompt) {
       delete window[insertionGuard];
+      return;
     }
+    const insertion = insertSavedPrompt(prompt);
+    if (insertion && typeof insertion.then === 'function') {
+      void insertion.then((inserted) => {
+        if (!inserted) delete window[insertionGuard];
+      });
+    } else if (!insertion) delete window[insertionGuard];
   }
 }
 

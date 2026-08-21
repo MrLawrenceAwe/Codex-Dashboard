@@ -32,7 +32,7 @@ const promptLibraryDialog = (() => {
       return;
     }
     if (event.key !== 'Tab') return;
-    const focusable = [...dialog.querySelectorAll('button, input, textarea, [tabindex]:not([tabindex="-1"])')]
+    const focusable = [...dialog.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
       .filter((element) => !element.disabled && element.getClientRects().length > 0);
     const first = focusable[0];
     const last = focusable.at(-1);
