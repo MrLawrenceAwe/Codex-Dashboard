@@ -866,8 +866,15 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
 
               document.querySelector('[data-codex-prompt-launcher]').click();
               document.querySelector('[data-prompt-new]').click();
+              const presetDefaults = {
+                checked: document.querySelector('[name="usePreset"]').checked,
+                modelValue: document.querySelector('[name="presetModel"]').value,
+                controlsDisabled: [...document.querySelectorAll('[data-prompt-preset-control]')]
+                  .every((control) => control.disabled),
+              };
               document.querySelector('[name="name"]').value = 'Luna fast review';
               document.querySelector('[name="content"]').value = 'Review this change';
+              document.querySelector('[name="usePreset"]').click();
               document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
               document.querySelector('[name="presetReasoningEffort"]').value = 'medium';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
@@ -883,6 +890,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               }
               window.__promptPresetTestResult = {
                 version: stored.version,
+                presetDefaults,
                 preset: stored.prompts[0].preset,
                 summary,
                 applied,
@@ -902,8 +910,12 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             "JSON.stringify(window.__promptPresetTestResult)"
         ) as? String
         let values = try decodeJSONObject(try XCTUnwrap(result))
+        let presetDefaults = try XCTUnwrap(values["presetDefaults"] as? [String: Any])
 
         XCTAssertEqual(values["version"] as? Int, 3)
+        XCTAssertEqual(presetDefaults["checked"] as? Bool, false)
+        XCTAssertEqual(presetDefaults["modelValue"] as? String, "")
+        XCTAssertEqual(presetDefaults["controlsDisabled"] as? Bool, true)
         XCTAssertEqual(
             values["preset"] as? [String: String],
             ["model": "gpt-5.6-luna", "reasoningEffort": "medium", "speed": "fast"]

@@ -38,6 +38,12 @@ const promptLibrary = (() => {
     ].filter(Boolean);
   }
 
+  function setPresetControlsEnabled(form, enabled) {
+    form.querySelectorAll('[data-prompt-preset-control]').forEach((control) => {
+      control.disabled = !enabled;
+    });
+  }
+
   function scopeKey(scope) {
     const normalized = promptStore.normalizeScope(scope);
     return normalized.type === 'project'
@@ -106,16 +112,18 @@ const promptLibrary = (() => {
     const selectedScope = prompt
       ? promptScope.type
       : (activeProject ? 'project' : 'global');
+    const usePreset = Boolean(prompt?.preset);
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
         <fieldset class="dashboard-prompt-preset-fields">
-          <legend>Composer preset <span>Optional</span></legend>
-          <label>Model<select name="presetModel">${selectOptions(presetModelOptions, prompt?.preset?.model || '')}</select></label>
-          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || '')}</select></label>
-          <label>Speed<select name="presetSpeed">${selectOptions(presetSpeedOptions, prompt?.preset?.speed || '')}</select></label>
+          <legend>Composer preset</legend>
+          <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="usePreset"${usePreset ? ' checked' : ''} />Use this preset when inserting <span>Off keeps your current model, effort, and speed.</span></label>
+          <label>Model<select name="presetModel" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetModelOptions, prompt?.preset?.model || '')}</select></label>
+          <label>Effort<select name="presetReasoningEffort" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || '')}</select></label>
+          <label>Speed<select name="presetSpeed" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetSpeedOptions, prompt?.preset?.speed || '')}</select></label>
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardElements.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
@@ -304,11 +312,13 @@ function savePrompt(form) {
   const scope = values.get('scope') === 'project' && activeProject
     ? { type: 'project', projectPath: activeProject.path }
     : { type: 'global' };
-  const preset = promptStore.normalizePreset({
-    model: String(values.get('presetModel') || '') || undefined,
-    reasoningEffort: String(values.get('presetReasoningEffort') || '') || undefined,
-    speed: String(values.get('presetSpeed') || '') || undefined,
-  });
+  const preset = values.get('usePreset') === 'on'
+    ? promptStore.normalizePreset({
+      model: String(values.get('presetModel') || '') || undefined,
+      reasoningEffort: String(values.get('presetReasoningEffort') || '') || undefined,
+      speed: String(values.get('presetSpeed') || '') || undefined,
+    })
+    : undefined;
   const presetFields = preset ? { preset } : {};
   let nextPrompts;
   if (dialogModeState.mode === 'edit') {
@@ -568,6 +578,9 @@ function handlePromptInteraction(event) {
   else if (event.type === 'change' && event.target.matches('[data-prompt-import-file]')) {
     const [file] = event.target.files || [];
     if (file) void importLibrary(file);
+  }
+  else if (event.type === 'change' && event.target.matches('[name="usePreset"]')) {
+    setPresetControlsEnabled(event.target.form, event.target.checked);
   }
   else if (event.type === 'submit') handlePromptSubmit(event, target);
   else if (event.type === 'click') handlePromptClick(target);
