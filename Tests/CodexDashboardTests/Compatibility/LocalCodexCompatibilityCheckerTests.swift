@@ -57,6 +57,22 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
         XCTAssertEqual(status("rollout-events", in: checks), .unavailable)
     }
 
+    func testDatabaseInspectionFailureIsNonBlocking() async throws {
+        let invalidDatabaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-invalid-database-\(UUID().uuidString).sqlite")
+        try Data("not a sqlite database".utf8).write(to: invalidDatabaseURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: invalidDatabaseURL) }
+        let checker = LocalCodexCompatibilityChecker(
+            applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
+            stateDatabaseURL: invalidDatabaseURL,
+            globalStateURL: URL(fileURLWithPath: "/missing/global-state.json")
+        )
+
+        let checks = await checker.checkLocalContracts()
+
+        XCTAssertEqual(status("thread-database", in: checks), .unavailable)
+    }
+
     func testRejectsUnreadArraysThatProductionDecoderCannotRead() async throws {
         let globalStateURL = try makeGlobalState(
             #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":[42]}}}"#

@@ -90,6 +90,19 @@ private struct StubCompatibilityChecker: LocalCompatibilityChecking {
     }
 }
 
+private actor SequencedCompatibilityChecker: LocalCompatibilityChecking {
+    private var results: [[CompatibilityCheck]]
+
+    init(results: [[CompatibilityCheck]]) {
+        self.results = results
+    }
+
+    func checkLocalContracts() async -> [CompatibilityCheck] {
+        guard results.count > 1 else { return results.first ?? [] }
+        return results.removeFirst()
+    }
+}
+
 @MainActor
 private final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning = false
@@ -145,6 +158,39 @@ final class DashboardCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertTrue(coordinator.connectionError?.contains("incompatible") == true)
+    }
+
+    func testRestartRechecksAndClearsStaleBlockingCompatibilityReport() async {
+        let incompatible = CompatibilityCheck(
+            id: "thread-database",
+            title: "Thread catalog",
+            status: .incompatible,
+            detail: "Temporary inspection failure"
+        )
+        let compatible = CompatibilityCheck(
+            id: "thread-database",
+            title: "Thread catalog",
+            status: .compatible,
+            detail: "Healthy"
+        )
+        let checker = SequencedCompatibilityChecker(results: [[incompatible], [compatible]])
+        let runtime = StubDashboardRuntime()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: checker,
+            runtimeFactory: { runtime }
+        )
+        await coordinator.checkCompatibility()
+
+        await coordinator.restartCodexAndEnableThreadDashboard()
+
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertEqual(coordinator.compatibilityReport?.blockingCount, 0)
+        XCTAssertNil(coordinator.connectionError)
     }
 
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {

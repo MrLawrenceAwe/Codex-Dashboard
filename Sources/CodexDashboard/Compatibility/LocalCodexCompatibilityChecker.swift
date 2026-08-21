@@ -74,7 +74,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             )
             guard result.terminationStatus == 0 else {
                 return check(
-                    "thread-database", "Thread catalog", .incompatible,
+                    "thread-database", "Thread catalog", .unavailable,
                     "Codex's thread database could not be inspected."
                 )
             }
@@ -93,7 +93,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             )
         } catch {
             return check(
-                "thread-database", "Thread catalog", .incompatible,
+                "thread-database", "Thread catalog", .unavailable,
                 "The thread schema check failed: \(error.localizedDescription)"
             )
         }

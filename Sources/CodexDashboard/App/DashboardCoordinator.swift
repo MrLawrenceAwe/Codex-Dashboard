@@ -102,6 +102,7 @@ final class DashboardCoordinator: ObservableObject {
 
     func restartCodexAndEnableThreadDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
+        await checkCompatibility()
         guard compatibilityReport?.blockingCount ?? 0 == 0 else {
             setConnectionError(Self.incompatibleContractMessage)
             return
