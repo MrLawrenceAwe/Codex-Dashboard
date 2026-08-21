@@ -81,6 +81,10 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row.is-drop-after::after { bottom: -5px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section.is-drop-target { border-radius: 8px; outline: 1px dashed rgba(121, 201, 140, .62); outline-offset: 3px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-row-main { display: grid; min-width: 0; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-use-preset { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px 6px; color: var(--dashboard-dim); font-size: 10px; cursor: pointer; user-select: none; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-use-preset input { margin: 0; accent-color: var(--dashboard-green); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-use-preset:has(input:disabled) { cursor: not-allowed; opacity: .55; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use strong { overflow: hidden; font-size: 12px; font-weight: 570; text-overflow: ellipsis; white-space: nowrap; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use span { overflow: hidden; color: var(--dashboard-muted); font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use .dashboard-prompt-preset-summary { display: flex; gap: 4px; overflow: visible; }
@@ -102,9 +106,6 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form label { display: grid; gap: 7px; color: var(--dashboard-muted); font-size: 11px; font-weight: 540; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; min-width: 0; margin: 0; padding: 11px; border: 1px solid var(--dashboard-line); border-radius: 10px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields legend { padding: 0 5px; color: var(--dashboard-muted); font-size: 11px; font-weight: 570; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-toggle { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: var(--dashboard-text); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-toggle input { width: auto; margin: 0; accent-color: var(--dashboard-green); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-toggle span { color: var(--dashboard-dim); font-size: 10px; font-weight: 400; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form input,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form select { width: 100%; padding: 9px 10px; border: 1px solid var(--dashboard-line-strong); border-radius: 8px; outline: 0; background: var(--dashboard-control); color: var(--dashboard-text); font-size: 12px; line-height: 1.45; }

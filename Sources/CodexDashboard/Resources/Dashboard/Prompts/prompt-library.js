@@ -7,7 +7,6 @@ const promptLibrary = (() => {
   let capturedSelectionText = '';
   let activeProject;
   const presetModelOptions = [
-    ['', 'Keep current model'],
     ['gpt-5.6-sol', '5.6 Sol'],
     ['gpt-5.6-terra', '5.6 Terra'],
     ['gpt-5.6-luna', '5.6 Luna'],
@@ -16,11 +15,11 @@ const promptLibrary = (() => {
     ['gpt-5.4-mini', '5.4 Mini'],
   ];
   const presetReasoningOptions = [
-    ['', 'Keep current effort'], ['low', 'Low'], ['medium', 'Medium'],
+    ['low', 'Low'], ['medium', 'Medium'],
     ['high', 'High'], ['xhigh', 'Extra High'],
   ];
   const presetSpeedOptions = [
-    ['', 'Keep current speed'], ['standard', 'Standard'], ['fast', 'Fast'],
+    ['standard', 'Standard'], ['fast', 'Fast'],
   ];
 
   function selectOptions(options, selectedValue) {
@@ -36,12 +35,6 @@ const promptLibrary = (() => {
       presetReasoningOptions.find(([value]) => value === preset.reasoningEffort)?.[1],
       presetSpeedOptions.find(([value]) => value === preset.speed)?.[1],
     ].filter(Boolean);
-  }
-
-  function setPresetControlsEnabled(form, enabled) {
-    form.querySelectorAll('[data-prompt-preset-control]').forEach((control) => {
-      control.disabled = !enabled;
-    });
   }
 
   function scopeKey(scope) {
@@ -112,18 +105,16 @@ const promptLibrary = (() => {
     const selectedScope = prompt
       ? promptScope.type
       : (activeProject ? 'project' : 'global');
-    const usePreset = Boolean(prompt?.preset);
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
         <fieldset class="dashboard-prompt-preset-fields">
-          <legend>Composer preset</legend>
-          <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="usePreset"${usePreset ? ' checked' : ''} />Use model preset <span>Off keeps your current model, effort, and speed.</span></label>
-          <label>Model<select name="presetModel" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetModelOptions, prompt?.preset?.model || '')}</select></label>
-          <label>Effort<select name="presetReasoningEffort" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || '')}</select></label>
-          <label>Speed<select name="presetSpeed" data-prompt-preset-control${usePreset ? '' : ' disabled'}>${selectOptions(presetSpeedOptions, prompt?.preset?.speed || '')}</select></label>
+          <legend>Model preset</legend>
+          <label>Model<select name="presetModel">${selectOptions(presetModelOptions, prompt?.preset?.model || 'gpt-5.6-sol')}</select></label>
+          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || 'medium')}</select></label>
+          <label>Speed<select name="presetSpeed">${selectOptions(presetSpeedOptions, prompt?.preset?.speed || 'standard')}</select></label>
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardElements.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
@@ -142,11 +133,14 @@ const promptLibrary = (() => {
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
     <article class="dashboard-prompt-row" data-prompt-row-id="${dashboardElements.escapeHTML(prompt.id)}" draggable="true">
       <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
-      <button type="button" class="dashboard-prompt-use" data-prompt-use="${dashboardElements.escapeHTML(prompt.id)}">
-        <strong>${dashboardElements.escapeHTML(prompt.name)}</strong>
-        <span>${dashboardElements.escapeHTML(prompt.content)}</span>
-        ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${dashboardElements.escapeHTML(item)}</em>`).join('')}</span>` : ''}
-      </button>
+      <div class="dashboard-prompt-row-main">
+        <button type="button" class="dashboard-prompt-use" data-prompt-use="${dashboardElements.escapeHTML(prompt.id)}">
+          <strong>${dashboardElements.escapeHTML(prompt.name)}</strong>
+          <span>${dashboardElements.escapeHTML(prompt.content)}</span>
+          ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${dashboardElements.escapeHTML(item)}</em>`).join('')}</span>` : ''}
+        </button>
+        <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${dashboardElements.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use model preset</label>
+      </div>
       <div class="dashboard-prompt-row-actions">
         <button type="button" data-prompt-move-up="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Move ${dashboardElements.escapeHTML(prompt.name)} up">↑</button>
         <button type="button" data-prompt-move-down="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Move ${dashboardElements.escapeHTML(prompt.name)} down">↓</button>
@@ -312,19 +306,16 @@ function savePrompt(form) {
   const scope = values.get('scope') === 'project' && activeProject
     ? { type: 'project', projectPath: activeProject.path }
     : { type: 'global' };
-  const preset = values.get('usePreset') === 'on'
-    ? promptStore.normalizePreset({
-      model: String(values.get('presetModel') || '') || undefined,
-      reasoningEffort: String(values.get('presetReasoningEffort') || '') || undefined,
-      speed: String(values.get('presetSpeed') || '') || undefined,
-    })
-    : undefined;
-  const presetFields = preset ? { preset } : {};
+  const preset = promptStore.normalizePreset({
+    model: String(values.get('presetModel') || ''),
+    reasoningEffort: String(values.get('presetReasoningEffort') || ''),
+    speed: String(values.get('presetSpeed') || ''),
+  });
   let nextPrompts;
   if (dialogModeState.mode === 'edit') {
     nextPrompts = promptStore.prompts.map((prompt) => (
       prompt.id === dialogModeState.promptID
-        ? { ...prompt, name, section, scope, content, preset: undefined, ...presetFields }
+        ? { ...prompt, name, section, scope, content, preset }
         : prompt
     ));
   } else {
@@ -334,7 +325,7 @@ function savePrompt(form) {
       section,
       scope,
       content,
-      ...presetFields,
+      preset,
     }];
   }
   const nextSections = promptStore.sections.includes(section)
@@ -428,13 +419,13 @@ function insertSavedPrompt(prompt) {
     close({ restoreFocus: false });
     return true;
   };
-  if (!prompt.preset && !prompt.content.includes('{{clipboard}}')) return insert();
+  if ((!prompt.usePreset || !prompt.preset) && !prompt.content.includes('{{clipboard}}')) return insert();
   return (async () => {
     let clipboardText = '';
     if (prompt.content.includes('{{clipboard}}')) {
       try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
     }
-    if (!await composerAdapter.applyPreset(prompt.preset)) {
+    if (!await composerAdapter.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
       showStorageError('Could not apply this prompt’s composer preset. The prompt was not inserted.');
       return false;
     }
@@ -521,6 +512,14 @@ function handlePromptClick(target) {
     button.dataset.promptDeleteConfirm = button.dataset.promptDelete;
     button.textContent = 'Confirm delete';
     button.setAttribute('aria-label', 'Confirm prompt deletion');
+  } else if (target.closest('[data-prompt-use-preset]')) {
+    const checkbox = target.closest('[data-prompt-use-preset]');
+    const nextPrompts = promptStore.prompts.map((prompt) => (
+      prompt.id === checkbox.dataset.promptUsePreset
+        ? { ...prompt, usePreset: checkbox.checked || undefined }
+        : prompt
+    ));
+    if (!persistLibrary(nextPrompts, promptStore.sections)) checkbox.checked = !checkbox.checked;
   } else if (target.closest('[data-prompt-use]')) {
     const id = target.closest('[data-prompt-use]').dataset.promptUse;
     const prompt = promptStore.prompts.find((item) => item.id === id);
@@ -578,9 +577,6 @@ function handlePromptInteraction(event) {
   else if (event.type === 'change' && event.target.matches('[data-prompt-import-file]')) {
     const [file] = event.target.files || [];
     if (file) void importLibrary(file);
-  }
-  else if (event.type === 'change' && event.target.matches('[name="usePreset"]')) {
-    setPresetControlsEnabled(event.target.form, event.target.checked);
   }
   else if (event.type === 'submit') handlePromptSubmit(event, target);
   else if (event.type === 'click') handlePromptClick(target);

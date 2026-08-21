@@ -867,14 +867,13 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-codex-prompt-launcher]').click();
               document.querySelector('[data-prompt-new]').click();
               const presetDefaults = {
-                checked: document.querySelector('[name="usePreset"]').checked,
                 modelValue: document.querySelector('[name="presetModel"]').value,
-                controlsDisabled: [...document.querySelectorAll('[data-prompt-preset-control]')]
-                  .every((control) => control.disabled),
+                effortValue: document.querySelector('[name="presetReasoningEffort"]').value,
+                speedValue: document.querySelector('[name="presetSpeed"]').value,
+                hasUsePresetCheckbox: Boolean(document.querySelector('[name="usePreset"]')),
               };
               document.querySelector('[name="name"]').value = 'Luna fast review';
               document.querySelector('[name="content"]').value = 'Review this change';
-              document.querySelector('[name="usePreset"]').click();
               document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
               document.querySelector('[name="presetReasoningEffort"]').value = 'medium';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
@@ -882,6 +881,10 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
                 .map((item) => item.textContent);
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const usePresetCheckbox = document.querySelector('[data-prompt-use-preset]');
+              const usesPresetByDefault = usePresetCheckbox.checked;
+              usePresetCheckbox.click();
+              const storedWithPresetEnabled = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
               document.querySelector('[data-prompt-use]').click();
               const deadline = performance.now() + 2000;
               while (document.getElementById('codex-dashboard-prompt-library-dialog')
@@ -892,6 +895,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 version: stored.version,
                 presetDefaults,
                 preset: stored.prompts[0].preset,
+                usesPresetByDefault,
+                usesPresetAfterToggle: storedWithPresetEnabled.prompts[0].usePreset,
                 summary,
                 applied,
                 content: document.querySelector('textarea').value,
@@ -913,14 +918,17 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let presetDefaults = try XCTUnwrap(values["presetDefaults"] as? [String: Any])
 
         XCTAssertEqual(values["version"] as? Int, 3)
-        XCTAssertEqual(presetDefaults["checked"] as? Bool, false)
-        XCTAssertEqual(presetDefaults["modelValue"] as? String, "")
-        XCTAssertEqual(presetDefaults["controlsDisabled"] as? Bool, true)
+        XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-5.6-sol")
+        XCTAssertEqual(presetDefaults["effortValue"] as? String, "medium")
+        XCTAssertEqual(presetDefaults["speedValue"] as? String, "standard")
+        XCTAssertEqual(presetDefaults["hasUsePresetCheckbox"] as? Bool, false)
         XCTAssertEqual(
             values["preset"] as? [String: String],
             ["model": "gpt-5.6-luna", "reasoningEffort": "medium", "speed": "fast"]
         )
         XCTAssertEqual(values["summary"] as? [String], ["5.6 Luna", "Medium", "Fast"])
+        XCTAssertEqual(values["usesPresetByDefault"] as? Bool, false)
+        XCTAssertEqual(values["usesPresetAfterToggle"] as? Bool, true)
         XCTAssertEqual(
             values["applied"] as? [String],
             ["Model:5.6 Luna", "Effort:Medium", "Speed:Fast"]

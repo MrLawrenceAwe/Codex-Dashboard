@@ -37,7 +37,8 @@ const promptLibraryContract = (() => {
       && (prompt.section === undefined || typeof prompt.section === 'string')
       // A missing scope is the version-one storage contract and migrates to Global.
       && (prompt.scope === undefined || isValidScope(prompt.scope))
-      && (prompt.preset === undefined || isValidPreset(prompt.preset));
+      && (prompt.preset === undefined || isValidPreset(prompt.preset))
+      && (prompt.usePreset === undefined || typeof prompt.usePreset === 'boolean');
   }
 
   function isValidPreset(preset) {
@@ -82,13 +83,14 @@ const promptLibraryContract = (() => {
   function normalizePrompts(storedPrompts) {
     if (!Array.isArray(storedPrompts)) return [];
     return storedPrompts.filter(isValidPrompt).map((prompt) => {
-      const { preset: storedPreset, ...storedPrompt } = prompt;
+      const { preset: storedPreset, usePreset: storedUsePreset, ...storedPrompt } = prompt;
       const preset = normalizePreset(storedPreset);
       return {
         ...storedPrompt,
         section: normalizeSection(prompt.section),
         scope: normalizeScope(prompt.scope),
         ...(preset ? { preset } : {}),
+        ...(preset && storedUsePreset === true ? { usePreset: true } : {}),
       };
     });
   }

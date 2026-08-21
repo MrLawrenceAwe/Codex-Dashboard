@@ -20,6 +20,7 @@ actor PromptBackupStore {
         let section: String?
         let scope: Scope?
         let preset: Preset?
+        let usePreset: Bool?
     }
 
     private struct Preset: Decodable {
