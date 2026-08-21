@@ -54,7 +54,7 @@ private struct DashboardMenu: View {
         Button("Open Thread Dashboard") { Task { await coordinator.openThreadDashboard() } }
             .disabled(!coordinator.connectionState.dashboardIsMounted)
         Button("Restart & Enable") { Task { await coordinator.restartCodexAndEnableThreadDashboard() } }
-            .disabled(coordinator.isPerformingAction)
+            .disabled(coordinator.isPerformingAction || coordinator.isCheckingCompatibility)
         Button("Disable Thread Dashboard") { Task { await coordinator.disableThreadDashboard() } }
             .disabled(!coordinator.connectionState.rendererIsAvailable || coordinator.isPerformingAction)
         Divider()

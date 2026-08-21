@@ -165,7 +165,7 @@ struct DiagnosticsWindowView: View {
                     Task { await coordinator.restartCodexAndEnableThreadDashboard() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(coordinator.isPerformingAction)
+                .disabled(coordinator.isPerformingAction || coordinator.isCheckingCompatibility)
 
                 if coordinator.connectionState.rendererIsAvailable {
                     Button("Disable") {
