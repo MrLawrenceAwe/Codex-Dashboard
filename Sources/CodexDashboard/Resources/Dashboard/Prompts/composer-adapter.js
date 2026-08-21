@@ -1,4 +1,113 @@
 const composerAdapter = (() => {
+  const modelLabels = {
+    'gpt-5.6-sol': '5.6 Sol',
+    'gpt-5.6-terra': '5.6 Terra',
+    'gpt-5.6-luna': '5.6 Luna',
+    'gpt-5.5': '5.5',
+    'gpt-5.4': '5.4',
+    'gpt-5.4-mini': '5.4 Mini',
+  };
+  const reasoningEffortLabels = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    xhigh: 'Extra High',
+  };
+  const speedLabels = { standard: 'Standard', fast: 'Fast' };
+
+  function isVisible(element) {
+    return Boolean(element?.getClientRects().length)
+      && getComputedStyle(element).visibility !== 'hidden';
+  }
+
+  async function waitFor(value, timeout = 1200) {
+    const deadline = performance.now() + timeout;
+    while (performance.now() < deadline) {
+      const result = value();
+      if (result) return result;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return null;
+  }
+
+  function intelligenceTrigger() {
+    const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
+    let container = composer?.parentElement;
+    while (container && container !== document.body) {
+      const trigger = [...container.querySelectorAll('[data-codex-intelligence-trigger]')]
+        .find(isVisible);
+      if (trigger) return trigger;
+      container = container.parentElement;
+    }
+    return [...document.querySelectorAll('[data-codex-intelligence-trigger]')].find(isVisible) || null;
+  }
+
+  async function openIntelligenceMenu() {
+    const trigger = intelligenceTrigger();
+    if (!trigger) return null;
+    if (trigger.getAttribute('aria-expanded') !== 'true') {
+      trigger.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, button: 0, pointerType: 'mouse',
+      }));
+      trigger.click();
+    }
+    return waitFor(() => [...document.querySelectorAll('[role="menu"]')]
+      .find((menu) => isVisible(menu) && menu.querySelector('[data-model-picker-view-toggle]')));
+  }
+
+  async function advancedMenuItem(prefix) {
+    const menu = await openIntelligenceMenu();
+    if (!menu) return null;
+    let item = [...menu.querySelectorAll('[role="menuitem"]')].find((candidate) => (
+      candidate.getAttribute('aria-label')?.startsWith(`${prefix} `)
+    ));
+    if (item) return item;
+    menu.querySelector('[data-model-picker-view-toggle]')?.click();
+    item = await waitFor(() => [...menu.querySelectorAll('[role="menuitem"]')].find((candidate) => (
+      candidate.getAttribute('aria-label')?.startsWith(`${prefix} `)
+    )));
+    return item;
+  }
+
+  async function selectPresetValue(prefix, label) {
+    const item = await advancedMenuItem(prefix);
+    if (!item) return false;
+    item.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' }));
+    const submenu = await waitFor(() => {
+      const menus = [...document.querySelectorAll('[role="menu"]')].filter(isVisible);
+      return item.getAttribute('aria-expanded') === 'true' ? menus.at(-1) : null;
+    });
+    if (!submenu) return false;
+    const options = [...submenu.querySelectorAll('[role^="menuitem"]')].filter(isVisible);
+    const option = options.find((candidate) => {
+      const text = candidate.textContent.trim().replace(/\s+/g, ' ');
+      return text === label || candidate.getAttribute('aria-label') === label;
+    }) || options.find((candidate) => (
+      candidate.textContent.trim().replace(/\s+/g, ' ').startsWith(label)
+    ));
+    if (!option) return false;
+    option.click();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    return true;
+  }
+
+  async function applyPreset(preset) {
+    if (!preset) return true;
+    const selections = [
+      ['Model', modelLabels[preset.model]],
+      ['Effort', reasoningEffortLabels[preset.reasoningEffort]],
+      ['Speed', speedLabels[preset.speed]],
+    ].filter(([, label]) => label);
+    for (const [prefix, label] of selections) {
+      if (!await selectPresetValue(prefix, label)) {
+        document.body.click();
+        return false;
+      }
+    }
+    document.body.click();
+    return true;
+  }
+
   function insertIntoEditor(view, content, separateFromExistingContent) {
     const schema = view.state.schema;
     const lines = `${separateFromExistingContent ? '\n' : ''}${content}`.split('\n');
@@ -63,5 +172,5 @@ const composerAdapter = (() => {
     return true;
   }
 
-  return { insert };
+  return { applyPreset, insert };
 })();

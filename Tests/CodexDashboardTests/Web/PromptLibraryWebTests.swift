@@ -264,7 +264,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["projectANames"] as? [String], ["Project A prompt", "Global prompt"])
         XCTAssertEqual(values["projectBHeadings"] as? [String], ["This project · Project B", "Global"])
         XCTAssertEqual(values["projectBNames"] as? [String], ["Global prompt"])
-        XCTAssertEqual(values["version"] as? Int, 2)
+        XCTAssertEqual(values["version"] as? Int, 3)
         XCTAssertEqual(
             values["scopes"] as? [[String: String]],
             [
@@ -638,7 +638,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Int, 1)
         XCTAssertEqual(values[3] as? Int, 2)
-        XCTAssertEqual(values[4] as? Int, 2)
+        XCTAssertEqual(values[4] as? Int, 3)
         XCTAssertEqual(values[5] as? String, "global")
     }
 
@@ -795,6 +795,117 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         ) as? String
 
         XCTAssertEqual(result, "alpha Selected: beta gamma")
+    }
+
+    func testPromptPresetIsStoredDisplayedAndAppliedBeforeInsertion() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript(
+            """
+            void (async () => {
+              const shell = document.querySelector('.composer-shell');
+              const trigger = document.createElement('button');
+              trigger.dataset.codexIntelligenceTrigger = 'true';
+              trigger.setAttribute('aria-expanded', 'false');
+              trigger.textContent = 'Current model';
+              shell.append(trigger);
+              const applied = [];
+              const optionSets = {
+                Model: ['5.6 Sol', '5.6 Terra', '5.6 Luna'],
+                Effort: ['Low', 'Medium', 'High', 'Extra High'],
+                Speed: ['Standard', 'Fast'],
+              };
+              const removeMenus = () => {
+                document.querySelectorAll('[role="menu"]').forEach((menu) => menu.remove());
+                trigger.setAttribute('aria-expanded', 'false');
+              };
+              trigger.addEventListener('click', () => {
+                if (trigger.getAttribute('aria-expanded') === 'true') return;
+                trigger.setAttribute('aria-expanded', 'true');
+                const menu = document.createElement('div');
+                menu.setAttribute('role', 'menu');
+                const viewToggle = document.createElement('div');
+                viewToggle.dataset.modelPickerViewToggle = 'true';
+                viewToggle.setAttribute('role', 'menuitem');
+                menu.append(viewToggle);
+                Object.entries(optionSets).forEach(([kind, labels]) => {
+                  const item = document.createElement('div');
+                  item.setAttribute('role', 'menuitem');
+                  item.setAttribute('aria-label', `${kind} Current`);
+                  item.setAttribute('aria-expanded', 'false');
+                  item.addEventListener('pointermove', () => {
+                    document.querySelectorAll('[data-test-preset-submenu]').forEach((node) => node.remove());
+                    item.setAttribute('aria-expanded', 'true');
+                    const submenu = document.createElement('div');
+                    submenu.setAttribute('role', 'menu');
+                    submenu.dataset.testPresetSubmenu = kind;
+                    labels.forEach((label) => {
+                      const option = document.createElement('div');
+                      option.setAttribute('role', 'menuitemradio');
+                      option.textContent = label;
+                      option.addEventListener('click', () => {
+                        applied.push(`${kind}:${label}`);
+                        removeMenus();
+                      });
+                      submenu.append(option);
+                    });
+                    document.body.append(submenu);
+                  });
+                  menu.append(item);
+                });
+                document.body.append(menu);
+              });
+
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              document.querySelector('[name="name"]').value = 'Luna fast review';
+              document.querySelector('[name="content"]').value = 'Review this change';
+              document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
+              document.querySelector('[name="presetReasoningEffort"]').value = 'medium';
+              document.querySelector('[name="presetSpeed"]').value = 'fast';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
+                .map((item) => item.textContent);
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              document.querySelector('[data-prompt-use]').click();
+              const deadline = performance.now() + 2000;
+              while (document.getElementById('codex-dashboard-prompt-library-dialog')
+                && performance.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              }
+              window.__promptPresetTestResult = {
+                version: stored.version,
+                preset: stored.prompts[0].preset,
+                summary,
+                applied,
+                content: document.querySelector('textarea').value,
+                dialogClosed: !document.getElementById('codex-dashboard-prompt-library-dialog'),
+              };
+            })();
+            true
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(window.__promptPresetTestResult)",
+            in: webView,
+            timeout: .seconds(3)
+        )
+        let result = try await webView.evaluateJavaScript(
+            "JSON.stringify(window.__promptPresetTestResult)"
+        ) as? String
+        let values = try decodeJSONObject(try XCTUnwrap(result))
+
+        XCTAssertEqual(values["version"] as? Int, 3)
+        XCTAssertEqual(
+            values["preset"] as? [String: String],
+            ["model": "gpt-5.6-luna", "reasoningEffort": "medium", "speed": "fast"]
+        )
+        XCTAssertEqual(values["summary"] as? [String], ["5.6 Luna", "Medium", "Fast"])
+        XCTAssertEqual(
+            values["applied"] as? [String],
+            ["Model:5.6 Luna", "Effort:Medium", "Speed:Fast"]
+        )
+        XCTAssertEqual(values["content"] as? String, "Review this change")
+        XCTAssertEqual(values["dialogClosed"] as? Bool, true)
     }
 
 }

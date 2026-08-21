@@ -76,6 +76,24 @@ final class PromptBackupStoreTests: XCTestCase {
         }
     }
 
+    func testValidatesPromptComposerPreset() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-prompt-preset-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
+        let validLibrary = #"{"version":3,"prompts":[{"id":"one","name":"Review","content":"Review this","scope":{"type":"global"},"preset":{"model":"gpt-5.6-luna","reasoningEffort":"medium","speed":"fast"}}],"sections":["General"]}"#
+        let invalidLibrary = #"{"version":3,"prompts":[{"id":"one","name":"Review","content":"Review this","preset":{"model":"unknown"}}],"sections":["General"]}"#
+
+        let wasSaved = try await store.save(validLibrary)
+        XCTAssertTrue(wasSaved)
+        do {
+            try await store.save(invalidLibrary)
+            XCTFail("Expected an unknown preset model to be rejected")
+        } catch DashboardError.invalidPromptLibrary {
+            // Expected.
+        }
+    }
+
     func testRejectsNonObjectBackup() async {
         let store = PromptBackupStore(
             backupURL: FileManager.default.temporaryDirectory

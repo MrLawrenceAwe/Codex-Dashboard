@@ -19,6 +19,25 @@ actor PromptBackupStore {
         let content: String
         let section: String?
         let scope: Scope?
+        let preset: Preset?
+    }
+
+    private struct Preset: Decodable {
+        let model: String?
+        let reasoningEffort: String?
+        let speed: String?
+
+        var isValid: Bool {
+            (model.map(Self.models.contains) ?? true)
+                && (reasoningEffort.map(Self.reasoningEfforts.contains) ?? true)
+                && (speed.map(Self.speeds.contains) ?? true)
+        }
+
+        private static let models: Set<String> = [
+            "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+        ]
+        private static let reasoningEfforts: Set<String> = ["low", "medium", "high", "xhigh"]
+        private static let speeds: Set<String> = ["standard", "fast"]
     }
 
     private struct Scope: Decodable {
@@ -80,8 +99,10 @@ actor PromptBackupStore {
         guard let data = json.data(using: .utf8),
               let library = try? JSONDecoder().decode(Library.self, from: data)
         else { return false }
-        return (library.version == nil || library.version == 2)
+        // Version 2 remains readable so an on-disk backup cannot strand user prompts during migration.
+        return (library.version == nil || library.version == 2 || library.version == 3)
             && Set(library.prompts.map(\.id)).count == library.prompts.count
             && library.prompts.allSatisfy { $0.scope?.isValid ?? true }
+            && library.prompts.allSatisfy { $0.preset?.isValid ?? true }
     }
 }
