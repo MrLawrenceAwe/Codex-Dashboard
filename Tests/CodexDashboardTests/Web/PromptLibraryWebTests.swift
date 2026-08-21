@@ -356,11 +356,14 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               search.value = 'review';
               search.dispatchEvent(new Event('input', { bubbles: true }));
               const renderedSearch = document.querySelector('[data-prompt-search]');
+              const searchSelection = [renderedSearch.selectionStart, renderedSearch.selectionEnd];
+              const filteredNames = [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent);
               const actionsToggle = document.querySelector('[data-prompt-actions-toggle]');
               actionsToggle.click();
               const exportButton = document.querySelector('[data-prompt-export]');
-              return {
-                names: [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent),
+              const values = {
+                filteredNames,
+                searchSelection,
                 hasExport: Boolean(exportButton),
                 hasImport: Boolean(document.querySelector('[data-prompt-import-file][accept*="json"]')),
                 actionsExpanded: actionsToggle.getAttribute('aria-expanded'),
@@ -371,11 +374,17 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 searchHeight: getComputedStyle(renderedSearch).height,
                 searchFontSize: getComputedStyle(renderedSearch).fontSize,
               };
+              renderedSearch.value = '';
+              renderedSearch.dispatchEvent(new Event('search', { bubbles: true }));
+              values.namesAfterClear = [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent);
+              return values;
             })()
             """
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values["names"] as? [String], ["Review code"])
+        XCTAssertEqual(values["filteredNames"] as? [String], ["Review code"])
+        XCTAssertEqual(values["searchSelection"] as? [Int], [6, 6])
+        XCTAssertEqual(values["namesAfterClear"] as? [String], ["Review code", "Write summary"])
         XCTAssertEqual(values["hasExport"] as? Bool, true)
         XCTAssertEqual(values["hasImport"] as? Bool, true)
         XCTAssertEqual(values["actionsExpanded"] as? String, "true")
