@@ -155,6 +155,26 @@ struct DiagnosticsWindowView: View {
 
             ConnectionStatusCard(coordinator: coordinator)
 
+            HStack(spacing: 10) {
+                Button("Open Thread Dashboard") {
+                    Task { await coordinator.openThreadDashboard() }
+                }
+                .disabled(!coordinator.connectionState.dashboardIsMounted)
+
+                Button("Restart & Enable") {
+                    Task { await coordinator.restartCodexAndEnableThreadDashboard() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(coordinator.isPerformingAction)
+
+                if coordinator.connectionState.rendererIsAvailable {
+                    Button("Disable") {
+                        Task { await coordinator.disableThreadDashboard() }
+                    }
+                    .disabled(coordinator.isPerformingAction)
+                }
+            }
+
             CompatibilityCard(coordinator: coordinator)
 
             VStack(alignment: .leading, spacing: 5) {
