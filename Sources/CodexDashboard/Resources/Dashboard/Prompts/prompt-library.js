@@ -5,6 +5,18 @@ const promptLibrary = (() => {
   let returnFocusElement;
   let promptSearchTerm = '';
   let capturedSelectionText = '';
+  let activeProject;
+
+  function scopeKey(scope) {
+    const normalized = promptStore.normalizeScope(scope);
+    return normalized.type === 'project'
+      ? `project:${normalized.projectPath}`
+      : 'global';
+  }
+
+  function promptMatchesScope(prompt, scope) {
+    return scopeKey(prompt.scope) === scopeKey(scope);
+  }
 
   function showStorageError(message) {
     const error = document.querySelector('[data-prompt-storage-error]');
@@ -76,10 +88,15 @@ function renderDialog() {
       : undefined;
     const sectionNames = [...promptStore.sections]
       .sort((left, right) => left.localeCompare(right));
+    const promptScope = promptStore.normalizeScope(prompt?.scope);
+    const selectedScope = prompt
+      ? promptScope.type
+      : (activeProject ? 'project' : 'global');
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardDOM.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardDOM.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardDOM.escapeHTML(section)}"></option>`).join('')}</datalist></label>
+        <label>Available in<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardDOM.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardDOM.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
@@ -90,7 +107,7 @@ function renderDialog() {
     return;
   }
   const query = promptSearchTerm.trim().toLowerCase();
-  const visiblePrompts = query ? promptStore.prompts.filter((prompt) => (
+  const matchingPrompts = query ? promptStore.prompts.filter((prompt) => (
     `${prompt.name} ${prompt.section} ${prompt.content}`.toLowerCase().includes(query)
   )) : promptStore.prompts;
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
@@ -107,31 +124,60 @@ function renderDialog() {
         <button type="button" data-prompt-delete="${dashboardDOM.escapeHTML(prompt.id)}" aria-label="Delete ${dashboardDOM.escapeHTML(prompt.name)}">Delete</button>
       </div>
     </article>`).join('');
-  const groupedPrompts = new Map();
-  promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
-  visiblePrompts.forEach((prompt) => {
-    const section = promptStore.normalizeSection(prompt.section);
-    if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
-    groupedPrompts.get(section).push(prompt);
+  const scopeGroups = [];
+  if (activeProject) {
+    scopeGroups.push({
+      title: `This project · ${activeProject.name}`,
+      scope: { type: 'project', projectPath: activeProject.path },
+      prompts: matchingPrompts.filter((prompt) => promptMatchesScope(
+        prompt,
+        { type: 'project', projectPath: activeProject.path },
+      )),
+      includeEmptySections: false,
+    });
+  }
+  scopeGroups.push({
+    title: 'Global',
+    scope: { type: 'global' },
+    prompts: matchingPrompts.filter((prompt) => promptMatchesScope(prompt, { type: 'global' })),
+    includeEmptySections: true,
   });
-  const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
-    if (left === 'General') return -1;
-    if (right === 'General') return 1;
-    return left.localeCompare(right);
-  });
-  const sections = orderedSections.map(([section, sectionPrompts], index) => {
-    const collapsed = promptStore.collapsedSections.has(section);
-    const sectionBodyID = `dashboard-prompt-section-${index}`;
+  const groups = scopeGroups.map((group, groupIndex) => {
+    const groupedPrompts = new Map();
+    if (group.includeEmptySections && !query) {
+      promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
+    }
+    group.prompts.forEach((prompt) => {
+      const section = promptStore.normalizeSection(prompt.section);
+      if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
+      groupedPrompts.get(section).push(prompt);
+    });
+    const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
+      if (left === 'General') return -1;
+      if (right === 'General') return 1;
+      return left.localeCompare(right);
+    });
+    const sections = orderedSections.map(([section, sectionPrompts], sectionIndex) => {
+      const collapsed = promptStore.collapsedSections.has(section);
+      const sectionBodyID = `dashboard-prompt-section-${groupIndex}-${sectionIndex}`;
+      const canManageSection = group.scope.type === 'global' && section !== 'General';
+      return `
+        <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${dashboardDOM.escapeHTML(section)}" data-prompt-scope-key="${dashboardDOM.escapeHTML(scopeKey(group.scope))}">
+          <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${dashboardDOM.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
+            <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${dashboardDOM.escapeHTML(section)}</strong></span>
+            <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
+          </button>
+          <div class="dashboard-prompt-section-actions">
+            ${canManageSection ? `<button type="button" data-prompt-section-rename="${dashboardDOM.escapeHTML(section)}" aria-label="Rename ${dashboardDOM.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${dashboardDOM.escapeHTML(section)}" aria-label="Delete ${dashboardDOM.escapeHTML(section)} section">Delete</button>` : ''}
+          </div>
+          <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
+        </section>`;
+    }).join('');
+    const emptyMessage = query ? 'No matching prompts' : 'No prompts saved here yet';
     return `
-      <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${dashboardDOM.escapeHTML(section)}">
-        <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${dashboardDOM.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
-          <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${dashboardDOM.escapeHTML(section)}</strong></span>
-          <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
-        </button>
-        <div class="dashboard-prompt-section-actions">
-          ${section === 'General' ? '' : `<button type="button" data-prompt-section-rename="${dashboardDOM.escapeHTML(section)}" aria-label="Rename ${dashboardDOM.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${dashboardDOM.escapeHTML(section)}" aria-label="Delete ${dashboardDOM.escapeHTML(section)} section">Delete</button>`}
-        </div>
-        <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
+      <section class="dashboard-prompt-scope" data-prompt-scope="${dashboardDOM.escapeHTML(scopeKey(group.scope))}">
+        <h3>${dashboardDOM.escapeHTML(group.title)}</h3>
+        ${sections || `<div class="dashboard-prompt-scope-empty">${emptyMessage}</div>`}
       </section>`;
   }).join('');
   content.innerHTML = `
@@ -147,7 +193,7 @@ function renderDialog() {
       <input type="file" accept="application/json,.json" data-prompt-import-file hidden />
     </div>
     <div class="dashboard-prompt-list">
-      ${sections || `<div class="dashboard-prompt-empty"><strong>${query ? 'No matching prompts' : 'No saved prompts yet'}</strong><span>${query ? 'Try a different search.' : 'Save instructions you use often, then insert them into a chat in one click.'}</span></div>`}
+      ${groups}
     </div>
     <div class="dashboard-prompt-create-actions">
       <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
@@ -174,6 +220,7 @@ function open() {
     : undefined;
   dialogState = { mode: 'list' };
   promptSearchTerm = '';
+  activeProject = threadDashboard.activeProject();
   const dialog = createDialogElement();
   document.body.append(dialog);
   renderDialog();
@@ -181,7 +228,7 @@ function open() {
 
 function exportLibrary() {
   const payload = JSON.stringify({
-    version: 1,
+    version: 2,
     prompts: promptStore.prompts,
     sections: promptStore.sections,
   }, null, 2);
@@ -230,16 +277,20 @@ function savePrompt(form) {
   const content = String(values.get('content') || '').trim();
   if (!name || !content) return;
   const section = promptStore.resolveSection(values.get('section'));
+  const scope = values.get('scope') === 'project' && activeProject
+    ? { type: 'project', projectPath: activeProject.path }
+    : { type: 'global' };
   let nextPrompts;
   if (dialogState.mode === 'edit') {
     nextPrompts = promptStore.prompts.map((prompt) => (
-      prompt.id === dialogState.promptID ? { ...prompt, name, section, content } : prompt
+      prompt.id === dialogState.promptID ? { ...prompt, name, section, scope, content } : prompt
     ));
   } else {
     nextPrompts = [...promptStore.prompts, {
       id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
       name,
       section,
+      scope,
       content,
     }];
   }
@@ -308,9 +359,13 @@ function movePrompt(promptID, offset) {
   const prompt = promptStore.prompts[index];
   if (!prompt) return;
   const section = promptStore.normalizeSection(prompt.section);
+  const promptScopeKey = scopeKey(prompt.scope);
   const sectionIndexes = promptStore.prompts
     .map((item, itemIndex) => ({ item, itemIndex }))
-    .filter(({ item }) => promptStore.normalizeSection(item.section) === section)
+    .filter(({ item }) => (
+      promptStore.normalizeSection(item.section) === section
+        && scopeKey(item.scope) === promptScopeKey
+    ))
     .map(({ itemIndex }) => itemIndex);
   const position = sectionIndexes.indexOf(index);
   const destination = sectionIndexes[position + offset];

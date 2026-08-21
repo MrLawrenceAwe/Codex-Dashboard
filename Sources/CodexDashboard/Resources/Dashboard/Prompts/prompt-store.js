@@ -6,6 +6,7 @@ const promptStore = (() => {
 
   const {
     normalizePrompts,
+    normalizeScope,
     normalizeSection,
     normalizeSections,
   } = promptLibraryContract;
@@ -31,15 +32,21 @@ const promptStore = (() => {
     const storedLibrary = readJSON(libraryStorageKey, null);
     if (storedLibrary && typeof storedLibrary === 'object') {
       const prompts = normalizePrompts(storedLibrary.prompts);
-      return {
+      const migratedLibrary = {
+        version: 2,
         prompts,
         sections: normalizeSections(storedLibrary.sections, prompts),
       };
+      if (storedLibrary.version !== 2 || storedLibrary.prompts?.some((prompt) => !prompt.scope)) {
+        writeJSON(libraryStorageKey, migratedLibrary);
+      }
+      return migratedLibrary;
     }
 
     // Retained to prevent users of the previous storage contract from losing prompts.
     const legacyPrompts = normalizePrompts(readJSON(legacyPromptStorageKey, []));
     const migratedLibrary = {
+      version: 2,
       prompts: legacyPrompts,
       sections: normalizeSections(readJSON(legacySectionsStorageKey, []), legacyPrompts),
     };
@@ -60,6 +67,7 @@ const promptStore = (() => {
 
     normalizeSection,
     normalizePrompts,
+    normalizeScope,
     normalizeSections,
 
     resolveSection(section) {
@@ -71,6 +79,7 @@ const promptStore = (() => {
 
     saveLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
       return writeJSON(libraryStorageKey, {
+        version: 2,
         prompts: nextPrompts,
         sections: normalizeSections(nextSections, nextPrompts),
       });

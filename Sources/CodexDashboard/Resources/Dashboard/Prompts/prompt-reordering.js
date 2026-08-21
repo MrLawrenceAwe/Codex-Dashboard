@@ -13,6 +13,7 @@ const promptReordering = (() => {
     return sectionElement ? {
       row,
       section: sectionElement.dataset.promptSection,
+      scopeKey: sectionElement.dataset.promptScopeKey,
       sectionElement,
     } : null;
   }
@@ -20,6 +21,11 @@ const promptReordering = (() => {
   function reorder(destination, dropAfter, persist) {
     const movingPrompt = promptStore.prompts.find((prompt) => prompt.id === draggedPromptID);
     if (!movingPrompt || !destination?.section) return false;
+    const movingScope = promptStore.normalizeScope(movingPrompt.scope);
+    const movingScopeKey = movingScope.type === 'project'
+      ? `project:${movingScope.projectPath}`
+      : 'global';
+    if (movingScopeKey !== destination.scopeKey) return false;
     if (destination.row?.dataset.promptRowId === draggedPromptID) return false;
 
     const remainingPrompts = promptStore.prompts.filter((prompt) => prompt.id !== draggedPromptID);
@@ -32,7 +38,10 @@ const promptReordering = (() => {
       else if (dropAfter) insertionIndex += 1;
     } else {
       insertionIndex = remainingPrompts.reduce((lastIndex, prompt, index) => (
-        promptStore.normalizeSection(prompt.section) === movedPrompt.section ? index + 1 : lastIndex
+        promptStore.normalizeSection(prompt.section) === movedPrompt.section
+          && promptStore.normalizeScope(prompt.scope).type === movingScope.type
+          && promptStore.normalizeScope(prompt.scope).projectPath === movingScope.projectPath
+          ? index + 1 : lastIndex
       ), remainingPrompts.length);
     }
     remainingPrompts.splice(insertionIndex, 0, movedPrompt);
