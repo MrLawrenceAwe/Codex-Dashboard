@@ -43,16 +43,32 @@ const composerAdapter = (() => {
   }
 
   async function openIntelligenceMenu() {
-    const trigger = intelligenceTrigger();
+    const isIntelligenceMenu = (menu) => {
+      if (menu.querySelector('[data-model-picker-view-toggle]')) return true;
+      const labels = [...menu.querySelectorAll('[role="menuitem"]')]
+        .map((item) => item.getAttribute('aria-label') || '');
+      return ['Model', 'Effort', 'Speed']
+        .every((prefix) => labels.some((label) => label.startsWith(`${prefix} `)));
+    };
+    const visibleMenu = () => [...document.querySelectorAll('[role="menu"]')]
+      .find((menu) => isVisible(menu) && isIntelligenceMenu(menu));
+    let openMenu = visibleMenu();
+    if (openMenu) return openMenu;
+    let trigger = intelligenceTrigger();
     if (!trigger) return null;
-    if (trigger.getAttribute('aria-expanded') !== 'true') {
-      trigger.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, button: 0, pointerType: 'mouse',
-      }));
-      trigger.click();
+    if (trigger.getAttribute('aria-expanded') === 'true') {
+      openMenu = await waitFor(visibleMenu, 400);
+      if (openMenu) return openMenu;
+      document.body.click();
+      await waitFor(() => intelligenceTrigger()?.getAttribute('aria-expanded') !== 'true', 300);
+      trigger = intelligenceTrigger();
+      if (!trigger) return null;
     }
-    return waitFor(() => [...document.querySelectorAll('[role="menu"]')]
-      .find((menu) => isVisible(menu) && menu.querySelector('[data-model-picker-view-toggle]')));
+    trigger.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, button: 0, pointerType: 'mouse',
+    }));
+    trigger.click();
+    return waitFor(visibleMenu);
   }
 
   async function advancedMenuItem(prefix) {
