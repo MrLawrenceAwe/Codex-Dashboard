@@ -49,11 +49,11 @@ removes it.
 - Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Changed projects** filter isolates those projects.
 - Changed project groups expose **Ignore** and **Commit or push**. Ignore hides that project's change notifications until restored; Commit or push opens the most recent idle thread only when Codex's native Git command is available.
 - A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be global or limited to the active project, organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex.
-- Prompt search, keyboard and pointer reordering, section rename/deletion, JSON import/export, `{{selection}}` and `{{clipboard}}` placeholders, and an automatic app-owned backup under `~/Library/Application Support/Codex Dashboard/` protect and speed up reusable prompt workflows. Prompts can optionally apply saved model, reasoning-effort, and Standard/Fast speed settings before insertion. Deleting a section moves its prompts to **General** rather than deleting them.
+- Prompt search, keyboard and pointer reordering, section rename/deletion, and `{{selection}}` and `{{clipboard}}` placeholders speed up reusable prompt workflows. Prompts can optionally apply saved model, reasoning-effort, and Standard/Fast speed settings before insertion. Deleting a section moves its prompts to **General** rather than deleting them.
 - Dashboard filter, grouping, and collapsed-project preferences persist across renderer reloads.
 - The menu bar provides dashboard, restart, disable, compatibility, diagnostics, and launch-at-login actions.
 - Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
-- Diagnostics show versions, refresh state, thread counts, renderer targets, warnings, and the prompt-backup location, and can be copied in one action.
+- Diagnostics show versions, refresh state, thread counts, renderer targets, and warnings, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Thread Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.

@@ -35,8 +35,7 @@ const promptLibraryContract = (() => {
       && typeof prompt.name === 'string'
       && typeof prompt.content === 'string'
       && (prompt.section === undefined || typeof prompt.section === 'string')
-      // A missing scope is the version-one storage contract and migrates to Global.
-      && (prompt.scope === undefined || isValidScope(prompt.scope))
+      && isValidScope(prompt.scope)
       && (prompt.preset === undefined || isValidPreset(prompt.preset))
       && (prompt.usePreset === undefined || typeof prompt.usePreset === 'boolean');
   }
@@ -66,18 +65,9 @@ const promptLibraryContract = (() => {
   }
 
   function isValidLibrary(library) {
-    // Version 2 must validate until mount migrates it; rejecting it could restore an older backup
-    // over newer user prompts before the prompt store gets a chance to upgrade the library.
     return hasValidContents(library)
-      && (library.version === undefined || library.version === 2 || library.version === 3);
-  }
-
-  function isValidExport(payload) {
-    if (!hasValidContents(payload)) return false;
-    if (payload.version === 1) return true;
-    if (payload.version === 2) return payload.prompts.every((prompt) => isValidScope(prompt.scope));
-    return payload.version === 3
-      && payload.prompts.every((prompt) => isValidScope(prompt.scope));
+      && library.version === 3
+      && library.prompts.every((prompt) => isValidScope(prompt.scope));
   }
 
   function normalizePrompts(storedPrompts) {
@@ -106,7 +96,6 @@ const promptLibraryContract = (() => {
   }
 
   return {
-    isValidExport,
     isValidLibrary,
     normalizePrompts,
     normalizePreset,

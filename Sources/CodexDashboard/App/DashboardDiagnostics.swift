@@ -12,7 +12,6 @@ struct DashboardDiagnostics {
     let compatibilitySummary: String
     let connectionError: String?
     let threadWarning: String?
-    let promptBackupPath: String
 
     var text: String {
         let formatter = ISO8601DateFormatter()
@@ -27,7 +26,6 @@ struct DashboardDiagnostics {
             "Compatibility: \(compatibilitySummary)",
             "Connection error: \(connectionError ?? "none")",
             "Thread warning: \(threadWarning ?? "none")",
-            "Prompt backup: \(promptBackupPath)",
         ].joined(separator: "\n")
     }
 }

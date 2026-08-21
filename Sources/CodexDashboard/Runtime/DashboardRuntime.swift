@@ -36,7 +36,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         renderer: DashboardRenderer? = nil
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? DashboardRenderer(promptBackupStore: .shared)
+        self.renderer = try renderer ?? DashboardRenderer()
     }
 
     var codexIsRunning: Bool { codex.isRunning }

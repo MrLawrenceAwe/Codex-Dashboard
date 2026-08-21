@@ -20,14 +20,6 @@ const promptLibraryDialog = (() => {
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopImmediatePropagation();
-      const actionsMenu = dialog.querySelector('[data-prompt-actions-menu]');
-      if (actionsMenu && !actionsMenu.hidden) {
-        actionsMenu.hidden = true;
-        const actionsToggle = dialog.querySelector('[data-prompt-actions-toggle]');
-        actionsToggle?.setAttribute('aria-expanded', 'false');
-        actionsToggle?.focus();
-        return;
-      }
       close();
       return;
     }

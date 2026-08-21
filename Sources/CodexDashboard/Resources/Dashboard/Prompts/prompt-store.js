@@ -1,8 +1,6 @@
 const promptStore = (() => {
   const libraryStorageKey = 'codex-dashboard.prompt-library';
-  const legacyPromptStorageKey = 'codex-dashboard.saved-prompts';
   const collapsedSectionsStorageKey = 'codex-dashboard.collapsed-prompt-sections';
-  const legacySectionsStorageKey = 'codex-dashboard.prompt-sections';
 
   const {
     normalizePrompts,
@@ -31,29 +29,14 @@ const promptStore = (() => {
 
   function loadLibrary() {
     const storedLibrary = readJSON(libraryStorageKey, null);
-    if (storedLibrary && typeof storedLibrary === 'object') {
-      const prompts = normalizePrompts(storedLibrary.prompts);
-      const migratedLibrary = {
-        version: 3,
-        prompts,
-        sections: normalizeSections(storedLibrary.sections, prompts),
-      };
-      // Version 1/2 libraries are migrated in place so existing user prompts are not lost.
-      if (storedLibrary.version !== 3 || storedLibrary.prompts?.some((prompt) => !prompt.scope)) {
-        writeJSON(libraryStorageKey, migratedLibrary);
-      }
-      return migratedLibrary;
+    if (!promptLibraryContract.isValidLibrary(storedLibrary)) {
+      return { version: 3, prompts: [], sections: [] };
     }
-
-    // Retained to prevent users of the previous storage contract from losing prompts.
-    const legacyPrompts = normalizePrompts(readJSON(legacyPromptStorageKey, []));
-    const migratedLibrary = {
+    return {
       version: 3,
-      prompts: legacyPrompts,
-      sections: normalizeSections(readJSON(legacySectionsStorageKey, []), legacyPrompts),
+      prompts: normalizePrompts(storedLibrary.prompts),
+      sections: normalizeSections(storedLibrary.sections, storedLibrary.prompts),
     };
-    writeJSON(libraryStorageKey, migratedLibrary);
-    return migratedLibrary;
   }
 
   const library = loadLibrary();
