@@ -174,7 +174,7 @@ private actor FailingRendererDevTools: DevToolsServing {
 }
 
 @MainActor
-final class RendererDashboardSessionTests: XCTestCase {
+final class DashboardRendererTests: XCTestCase {
     func testOpeningThreadDispatchesItsRoute() async throws {
         let target = DevToolsTarget(
             id: "main",
@@ -184,9 +184,9 @@ final class RendererDashboardSessionTests: XCTestCase {
         )
         let devTools = StubRendererDevTools(targets: [target])
         await devTools.setEvaluationResult(true)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
 
         await renderer.openThread("thread/with spaces")
@@ -214,9 +214,9 @@ final class RendererDashboardSessionTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with Codex on port 47832.")
         }
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: DevToolsClient(),
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -228,9 +228,9 @@ final class RendererDashboardSessionTests: XCTestCase {
     }
 
     func testCompatibilityCheckExplainsUnavailableRenderer() async throws {
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -248,9 +248,9 @@ final class RendererDashboardSessionTests: XCTestCase {
         )
         let devTools = StubRendererDevTools(targets: [target])
         await devTools.setEvaluationResult(true)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
 
         let checks = await renderer.compatibilityChecks()
@@ -265,18 +265,18 @@ final class RendererDashboardSessionTests: XCTestCase {
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
         let expressions = await devTools.expressions()
         let composerControlsExpression = try XCTUnwrap(
-            expressions.first { $0.contains("Boolean(codexContracts.composerAddButton())") }
+            expressions.first { $0.contains("Boolean(codexUIContracts.composerAddButton())") }
         )
         XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-launcher"))
         XCTAssertTrue(
-            expressions.contains { $0.contains("codexContracts.probeCommitOrPushControls()") }
+            expressions.contains { $0.contains("codexUIContracts.probeCommitOrPushControls()") }
         )
     }
 
     func testPreparingForRestartRestoresMaintenance() async throws {
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: StubRendererDevTools(targets: []),
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
         _ = try await renderer.disable()
         XCTAssertFalse(renderer.maintainsDashboard)
@@ -294,9 +294,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let devTools = StubRendererDevTools(targets: [target])
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "true")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "true")
         )
 
         do {
@@ -320,9 +320,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let devTools = SuspendedMountDevTools(target: target)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount")
         )
         let synchronization = Task { @MainActor in
             try await renderer.synchronize(
@@ -356,9 +356,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let devTools = OrderedSnapshotDevTools(target: target)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount")
         )
         let oldSnapshot = DashboardSnapshotPayload(threads: [.fixture(title: "Old snapshot")])
         let newSnapshot = DashboardSnapshotPayload(threads: [.fixture(title: "New snapshot")])
@@ -391,9 +391,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let devTools = OrderedSnapshotDevTools(target: target)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount")
         )
 
         let oldSynchronization = Task { @MainActor in
@@ -439,9 +439,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-renderer-backup-\(UUID().uuidString)", isDirectory: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let devTools = BackupCountingDevTools()
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount"),
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount"),
             promptBackupStore: PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
         )
         let snapshot = DashboardSnapshotPayload(threads: [])
@@ -462,9 +462,9 @@ final class RendererDashboardSessionTests: XCTestCase {
         )
         let devTools = RendererPollingDevTools(target: target)
         var currentDate = Date(timeIntervalSince1970: 1_000)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount"),
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount"),
             healthCheckInterval: 30,
             now: { currentDate }
         )
@@ -500,9 +500,9 @@ final class RendererDashboardSessionTests: XCTestCase {
             webSocketURL: "ws://127.0.0.1/fresh"
         )
         let devTools = FailingRendererDevTools(staleTarget: staleTarget, freshTarget: freshTarget)
-        let renderer = try RendererDashboardSession(
+        let renderer = try DashboardRenderer(
             devTools: devTools,
-            injectionPayload: DashboardInjectionPayload(version: "test", mountExpression: "mount")
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount")
         )
 
         let initialTargets = await renderer.targets()

@@ -6,7 +6,7 @@ enum DashboardDisableOutcome {
 }
 
 @MainActor
-protocol DashboardSession: AnyObject {
+protocol DashboardRuntime: AnyObject {
     var codexIsRunning: Bool { get }
     var codexLaunchDate: Date? { get }
     var maintainsDashboard: Bool { get }
@@ -26,17 +26,17 @@ protocol DashboardSession: AnyObject {
 }
 
 @MainActor
-final class LiveDashboardSession: DashboardSession {
-    private let codex: CodexAppController
-    private let renderer: RendererDashboardSession
+final class LocalCodexDashboardRuntime: DashboardRuntime {
+    private let codex: CodexProcessController
+    private let renderer: DashboardRenderer
     private var lastObservedCodexLaunchDate: Date?
 
     init(
-        codex: CodexAppController = CodexAppController(),
-        renderer: RendererDashboardSession? = nil
+        codex: CodexProcessController = CodexProcessController(),
+        renderer: DashboardRenderer? = nil
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? RendererDashboardSession(promptBackupStore: .shared)
+        self.renderer = try renderer ?? DashboardRenderer(promptBackupStore: .shared)
     }
 
     var codexIsRunning: Bool { codex.isRunning }

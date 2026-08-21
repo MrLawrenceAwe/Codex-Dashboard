@@ -1,6 +1,6 @@
 const codexHost = {
   sidebar() {
-    return codexContracts.sidebar();
+    return codexUIContracts.sidebar();
   },
 
   pageHost() {
@@ -8,7 +8,7 @@ const codexHost = {
   },
 
   navigationInsertionPoint() {
-    const navigation = codexContracts.navigation();
+    const navigation = codexUIContracts.navigation();
     if (!navigation) return null;
     const buttons = [...navigation.querySelectorAll('button')];
     const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
@@ -20,11 +20,11 @@ const codexHost = {
   },
 
   threadReadStates() {
-    return codexContracts.threadReadStates();
+    return codexUIContracts.threadReadStates();
   },
 
   navigateToThread(thread) {
-    const sidebarThreadButton = codexContracts.threadRow(thread.id);
+    const sidebarThreadButton = codexUIContracts.threadRow(thread.id);
     if (sidebarThreadButton) {
       sidebarThreadButton.click();
       return;
@@ -39,7 +39,7 @@ const codexHost = {
   },
 
   async canOpenCommitOrPush() {
-    return Boolean(codexContracts.commitOrPushButton() || codexContracts.sidePanelToggle());
+    return Boolean(codexUIContracts.commitOrPushButton() || codexUIContracts.sidePanelToggle());
   },
 
   async openCommitOrPush(thread) {
@@ -54,25 +54,25 @@ const codexHost = {
     };
 
     this.navigateToThread(thread);
-    const selected = await waitFor(() => codexContracts.isThreadSelected(thread.id), 5000);
+    const selected = await waitFor(() => codexUIContracts.isThreadSelected(thread.id), 5000);
     if (!selected) return false;
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    let commitButton = codexContracts.commitOrPushButton();
+    let commitButton = codexUIContracts.commitOrPushButton();
     if (!commitButton) {
-      const sidePanelToggle = codexContracts.sidePanelToggle();
+      const sidePanelToggle = codexUIContracts.sidePanelToggle();
       if (!sidePanelToggle) return false;
       sidePanelToggle.click();
 
       const panelControl = await waitFor(() => (
-        codexContracts.commitOrPushButton() || codexContracts.environmentToggle()
+        codexUIContracts.commitOrPushButton() || codexUIContracts.environmentToggle()
       ));
       if (!panelControl) return false;
 
-      commitButton = codexContracts.commitOrPushButton();
+      commitButton = codexUIContracts.commitOrPushButton();
       if (!commitButton) {
         if (panelControl.getAttribute('aria-expanded') !== 'true') panelControl.click();
-        commitButton = await waitFor(() => codexContracts.commitOrPushButton());
+        commitButton = await waitFor(() => codexUIContracts.commitOrPushButton());
       }
     }
     if (!commitButton) return false;

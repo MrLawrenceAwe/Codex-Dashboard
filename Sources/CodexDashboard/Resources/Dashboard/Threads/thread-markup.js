@@ -27,18 +27,18 @@ const threadMarkup = (() => {
   function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open thread: ${thread.title}`;
     return `
-      <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardDOM.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardDOM.escapeHTML(thread.id)}" data-open-thread="${dashboardDOM.escapeHTML(thread.id)}" aria-label="${dashboardDOM.escapeHTML(openLabel)}">
+      <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardElements.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardElements.escapeHTML(thread.id)}" data-open-thread="${dashboardElements.escapeHTML(thread.id)}" aria-label="${dashboardElements.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">
           <span class="dashboard-thread-title-row">
             ${isUnread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
-            <span class="dashboard-thread-heading" role="heading" aria-level="2">${dashboardDOM.escapeHTML(thread.title)}</span>
+            <span class="dashboard-thread-heading" role="heading" aria-level="2">${dashboardElements.escapeHTML(thread.title)}</span>
             ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${icon('pin')}</span>` : ''}
           </span>
-          ${compact ? '' : `<span class="dashboard-thread-preview">${dashboardDOM.escapeHTML(thread.preview || 'No preview available')}</span>`}
+          ${compact ? '' : `<span class="dashboard-thread-preview">${dashboardElements.escapeHTML(thread.preview || 'No preview available')}</span>`}
           <span class="dashboard-meta">
-            ${showProject ? `<span>${dashboardDOM.escapeHTML(thread.projectName)}</span>` : ''}
+            ${showProject ? `<span>${dashboardElements.escapeHTML(thread.projectName)}</span>` : ''}
             <span>${formatRelativeTime(thread.recencyTimestamp)}</span>
-            ${!compact && thread.model ? `<span>${dashboardDOM.escapeHTML(thread.model)}</span>` : ''}
+            ${!compact && thread.model ? `<span>${dashboardElements.escapeHTML(thread.model)}</span>` : ''}
           </span>
         </span>
         <span class="dashboard-thread-actions">
@@ -66,14 +66,14 @@ const threadMarkup = (() => {
           <div class="dashboard-git-project-copy">
             <span class="dashboard-project-icon">${icon('project')}</span>
             <span class="dashboard-project-copy">
-              <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project.projectName)}</span>
-              <span class="dashboard-project-path">${dashboardDOM.escapeHTML(projectPath)}</span>
+              <span class="dashboard-project-name">${dashboardElements.escapeHTML(project.projectName)}</span>
+              <span class="dashboard-project-path">${dashboardElements.escapeHTML(projectPath)}</span>
             </span>
             <span class="dashboard-git-changes">${icon('gitChanges')}<span>Changed</span></span>
           </div>
           <span class="dashboard-project-summary">
-            <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardDOM.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Restore' : 'Ignore'}</span></button>
-            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
+            <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Restore' : 'Ignore'}</span></button>
+            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
           </span>
         </article>`).join('');
     }
@@ -97,15 +97,15 @@ const threadMarkup = (() => {
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
       const isIgnored = ignoredProjectPaths.has(projectPath);
       return `
-      <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${dashboardDOM.escapeHTML(project)} project">
+      <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${dashboardElements.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
-          <button type="button" class="dashboard-project-toggle" data-project-toggle="${dashboardDOM.escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
+          <button type="button" class="dashboard-project-toggle" data-project-toggle="${dashboardElements.escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
             <span class="dashboard-project-title">
               <span class="dashboard-project-chevron">${icon('chevron')}</span>
               <span class="dashboard-project-icon">${icon('project')}</span>
               <span class="dashboard-project-copy">
-                <span class="dashboard-project-name">${dashboardDOM.escapeHTML(project)}</span>
-                <span class="dashboard-project-path">${dashboardDOM.escapeHTML(projectPath)}</span>
+                <span class="dashboard-project-name">${dashboardElements.escapeHTML(project)}</span>
+                <span class="dashboard-project-path">${dashboardElements.escapeHTML(projectPath)}</span>
               </span>
               ${hasChanges && !isIgnored ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${icon('gitChanges')}<span>Changed</span></span>` : ''}
               ${hasChanges && isIgnored ? '<span class="dashboard-project-ignored" title="Change notifications are ignored for this project">Ignored</span>' : ''}
@@ -113,8 +113,8 @@ const threadMarkup = (() => {
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
-            ${hasChanges ? `<button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardDOM.escapeHTML(projectPath)}" title="${isIgnored ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(isIgnored ? 'restore' : 'ignore')}<span>${isIgnored ? 'Restore' : 'Ignore'}</span></button>` : ''}
-            ${hasChanges && !isIgnored ? `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardDOM.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>` : ''}
+            ${hasChanges ? `<button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${isIgnored ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(isIgnored ? 'restore' : 'ignore')}<span>${isIgnored ? 'Restore' : 'Ignore'}</span></button>` : ''}
+            ${hasChanges && !isIgnored ? `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>` : ''}
           </span>
         </header>
         <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item) })).join('')}</div>

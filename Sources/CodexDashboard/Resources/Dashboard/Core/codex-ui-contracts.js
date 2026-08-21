@@ -1,4 +1,4 @@
-const codexContracts = (() => {
+const codexUIContracts = (() => {
   const composerSelectors = [
     'textarea[placeholder="Do anything"]',
     '[contenteditable="true"][data-placeholder="Do anything"]',

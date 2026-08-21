@@ -41,7 +41,7 @@ const threadDashboardView = (() => {
   }
 
   function updateHeaderSummary({ unreadCount, runningThreads, dirtyProjectPaths }) {
-    const page = document.getElementById(dashboardDOM.elementIDs.page);
+    const page = document.getElementById(dashboardElements.elementIDs.page);
     if (!page) return;
     const values = {
       running: runningThreads.length,
@@ -68,18 +68,18 @@ const threadDashboardView = (() => {
     viewMode,
     collapsedProjects,
     ignoredProjectPaths,
-    handoffError,
+    commitOrPushError,
     isThreadUnread,
     state,
   }) {
     updateSidebarStatus(state);
     updateHeaderSummary(state);
-    const page = document.getElementById(dashboardDOM.elementIDs.page);
+    const page = document.getElementById(dashboardElements.elementIDs.page);
     if (!page) return false;
     const notice = page.querySelector('[data-dashboard-notice]');
     if (notice) {
-      notice.textContent = handoffError;
-      notice.hidden = !handoffError;
+      notice.textContent = commitOrPushError;
+      notice.hidden = !commitOrPushError;
     }
     page.querySelectorAll('[data-filter]').forEach((button) => {
       const isActive = button.dataset.filter === filterMode;

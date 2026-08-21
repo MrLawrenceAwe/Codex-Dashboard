@@ -547,7 +547,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             """
         )
 
-        let injection = try DashboardInjectionPayload.load()
+        let injection = try DashboardInjectionResources.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let sectionSurvived = try await webView.evaluateJavaScript(
             """
@@ -615,7 +615,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
             """
         )
 
-        let injection = try DashboardInjectionPayload.load()
+        let injection = try DashboardInjectionResources.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let migrated = try await webView.evaluateJavaScript(
             """

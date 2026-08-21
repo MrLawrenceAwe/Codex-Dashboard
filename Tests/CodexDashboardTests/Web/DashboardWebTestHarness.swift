@@ -38,7 +38,7 @@ enum DashboardWebTestHarness {
                 "try { localStorage.clear(); true } catch (_) { false }"
             )
         }
-        let injection = try DashboardInjectionPayload.load()
+        let injection = try DashboardInjectionResources.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         return webView
     }

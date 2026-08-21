@@ -55,7 +55,7 @@ final class PromptLibraryBackupSynchronizer {
         }
     }
 
-    func backUpIfDue(
+    func backupIfDue(
         afterMounting mountedDashboard: Bool,
         from target: DevToolsTarget?,
         using devTools: any DevToolsServing

@@ -26,7 +26,7 @@ const promptLauncher = (() => {
 
   function synchronize() {
     syncQueued = false;
-    const addButton = codexContracts.composerAddButton(dashboardDOM.elementIDs.promptDialog);
+    const addButton = codexUIContracts.composerAddButton(dashboardElements.elementIDs.promptDialog);
     const currentButton = document.querySelector('[data-codex-prompt-launcher]');
     if (!addButton) {
       currentButton?.remove();

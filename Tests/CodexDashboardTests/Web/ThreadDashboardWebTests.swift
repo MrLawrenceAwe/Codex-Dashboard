@@ -185,7 +185,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             "try { localStorage.setItem('codex-dashboard.thread-preferences', JSON.stringify({ filterMode: 'unread', viewMode: 'recent', collapsedProjects: ['/tmp/project'], ignoredProjectPaths: ['/tmp/ignored-project'] })); true } catch (_) { false }"
         ) as? Bool
         XCTAssertEqual(preferencesStored, true)
-        let injection = try DashboardInjectionPayload.load()
+        let injection = try DashboardInjectionResources.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             ThreadSummary.fixture(id: "one", isUnread: true),
@@ -564,13 +564,13 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             </body></html>
             """
         )
-        let contractSource = try DashboardInjectionPayload.loadRendererContractSource()
+        let contractSource = try DashboardInjectionResources.loadRendererContractSource()
 
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
               \(contractSource)
-              codexContracts.probeCommitOrPushControls(500).then((result) => {
+              codexUIContracts.probeCommitOrPushControls(500).then((result) => {
                 document.documentElement.dataset.probeResult = String(result);
               });
             })()
@@ -613,13 +613,13 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             </body></html>
             """
         )
-        let contractSource = try DashboardInjectionPayload.loadRendererContractSource()
+        let contractSource = try DashboardInjectionResources.loadRendererContractSource()
 
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
               \(contractSource)
-              codexContracts.probeCommitOrPushControls(100).then((result) => {
+              codexUIContracts.probeCommitOrPushControls(100).then((result) => {
                 document.documentElement.dataset.probeResult = String(result);
               });
             })()

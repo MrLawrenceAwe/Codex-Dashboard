@@ -30,7 +30,7 @@ struct RendererCompatibilityChecker {
             id: "sidebar-host",
             title: "Sidebar integration",
             expression: contractExpression(
-                "Boolean(codexContracts.sidebar() && codexContracts.navigation())"
+                "Boolean(codexUIContracts.sidebar() && codexUIContracts.navigation())"
             ),
             failureStatus: .incompatible,
             compatibleDetail: "The dashboard sidebar host and navigation container are available.",
@@ -40,7 +40,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "thread-navigation",
             title: "Thread navigation",
-            expression: contractExpression("codexContracts.threadRows().length > 0"),
+            expression: contractExpression("codexUIContracts.threadRows().length > 0"),
             failureStatus: .warning,
             compatibleDetail: "Codex exposes sidebar thread actions used for direct navigation.",
             failureDetail: "No sidebar thread action is currently mounted; route fallback remains available.",
@@ -49,7 +49,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "sidebar-unread",
             title: "Sidebar unread sync",
-            expression: contractExpression("codexContracts.threadReadStates().size > 0"),
+            expression: contractExpression("codexUIContracts.threadReadStates().size > 0"),
             failureStatus: .warning,
             compatibleDetail: "Codex's mounted thread rows expose the unread state used for immediate synchronization.",
             failureDetail: "The React unread-state contract was not found; persisted unread state remains available.",
@@ -59,7 +59,7 @@ struct RendererCompatibilityChecker {
             id: "composer",
             title: "Composer integration",
             expression: contractExpression(
-                "(() => { const composer = codexContracts.composer(); return Boolean(composer && (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement || codexContracts.composerEditorView(composer))); })()"
+                "(() => { const composer = codexUIContracts.composer(); return Boolean(composer && (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement || codexUIContracts.composerEditorView(composer))); })()"
             ),
             failureStatus: .warning,
             compatibleDetail: "A supported Codex composer and insertion contract are available for saved prompts.",
@@ -71,7 +71,7 @@ struct RendererCompatibilityChecker {
             id: "composer-controls",
             title: "Composer controls",
             expression: contractExpression(
-                "Boolean(codexContracts.composerAddButton())"
+                "Boolean(codexUIContracts.composerAddButton())"
             ),
             failureStatus: .warning,
             compatibleDetail: "Codex exposes an Add button beside the active composer for prompt-library integration.",
@@ -82,7 +82,7 @@ struct RendererCompatibilityChecker {
             id: "commit-push-handoff",
             title: "Commit or push handoff",
             expression: contractExpression(
-                "codexContracts.probeCommitOrPushControls()"
+                "codexUIContracts.probeCommitOrPushControls()"
             ),
             failureStatus: .warning,
             compatibleDetail: "Codex exposes the complete native Git control path for Commit or push handoff.",

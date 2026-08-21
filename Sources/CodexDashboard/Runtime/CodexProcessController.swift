@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 @MainActor
-final class CodexAppController {
+final class CodexProcessController {
     var isRunning: Bool {
         !runningApplications.isEmpty
     }
