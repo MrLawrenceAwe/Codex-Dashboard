@@ -64,11 +64,11 @@ const promptLibrary = (() => {
   }
 
   const promptInteractionEventTypes = [
-  'pointerdown', 'mousedown', 'click', 'keydown', 'input', 'change', 'submit',
+  'pointerdown', 'mousedown', 'click', 'keydown', 'input', 'search', 'change', 'submit',
   'dragstart', 'dragover', 'dragleave', 'drop', 'dragend',
 ];
 
-function renderDialog() {
+  function renderDialog({ searchSelection } = {}) {
   const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
   const content = dialog?.querySelector('[data-prompt-content]');
   if (!content) return;
@@ -221,7 +221,11 @@ function renderDialog() {
       <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
       <button type="button" class="dashboard-prompt-new dashboard-prompt-new-secondary" data-prompt-new-section>+ New section</button>
     </div>`;
-  content.querySelector('[data-prompt-search]')?.focus();
+  const search = content.querySelector('[data-prompt-search]');
+  search?.focus();
+  if (searchSelection) {
+    search?.setSelectionRange(searchSelection.start, searchSelection.end);
+  }
 }
 
 function open() {
@@ -549,9 +553,17 @@ function handlePromptInteraction(event) {
       dialog.querySelector('[data-prompt-use]')?.focus();
     } else promptLibraryDialog.handleKeyboard(event, dialog, close);
   }
-  else if (event.type === 'input' && event.target.matches('[data-prompt-search]')) {
+  else if (
+    (event.type === 'input' || event.type === 'search')
+      && event.target.matches('[data-prompt-search]')
+  ) {
     promptSearchTerm = event.target.value;
-    renderDialog();
+    renderDialog({
+      searchSelection: {
+        start: event.target.selectionStart ?? promptSearchTerm.length,
+        end: event.target.selectionEnd ?? promptSearchTerm.length,
+      },
+    });
   }
   else if (event.type === 'change' && event.target.matches('[data-prompt-import-file]')) {
     const [file] = event.target.files || [];
