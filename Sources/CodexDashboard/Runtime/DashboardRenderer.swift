@@ -12,7 +12,6 @@ final class DashboardRenderer {
     private let devTools: any DevToolsServing
     private let injectionPayload: DashboardInjectionResources
     private let compatibilityChecker: RendererCompatibilityChecker
-    private let promptBackup: PromptLibraryBackupSynchronizer
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshotPayload?
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
@@ -29,17 +28,11 @@ final class DashboardRenderer {
     init(
         devTools: any DevToolsServing = DevToolsClient(),
         injectionPayload: DashboardInjectionResources? = nil,
-        promptBackupStore: PromptBackupStore? = nil,
         healthCheckInterval: TimeInterval = 30,
         now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionResources.load()
-        promptBackup = PromptLibraryBackupSynchronizer(
-            store: promptBackupStore,
-            contractSource: try DashboardInjectionResources.loadPromptLibraryContractSource(),
-            now: now
-        )
         self.healthCheckInterval = healthCheckInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
@@ -170,7 +163,6 @@ final class DashboardRenderer {
             }
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
-                try await promptBackup.restoreIfNeeded(in: target, using: devTools)
                 guard try await devTools.evaluateBoolean(injectionPayload.mountExpression, in: target) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."
@@ -190,11 +182,6 @@ final class DashboardRenderer {
         }
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
-        await promptBackup.backupIfDue(
-            afterMounting: mountedDashboard,
-            from: targets.first,
-            using: devTools
-        )
     }
 
     func disable() async throws -> Bool {
@@ -254,7 +241,6 @@ final class DashboardRenderer {
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
-        promptBackup.reset()
         lastHealthCheckByTargetID = [:]
         invalidateTargetCache()
     }

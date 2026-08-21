@@ -208,14 +208,6 @@ const promptLibrary = (() => {
   content.innerHTML = `
     <div class="dashboard-prompt-tools">
       <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${dashboardElements.escapeHTML(promptSearchTerm)}" /></label>
-      <div class="dashboard-prompt-overflow">
-        <button type="button" class="dashboard-prompt-secondary dashboard-prompt-overflow-toggle" data-prompt-actions-toggle aria-label="Prompt library actions" aria-expanded="false" aria-haspopup="menu">•••</button>
-        <div class="dashboard-prompt-overflow-menu" data-prompt-actions-menu role="menu" hidden>
-          <button type="button" data-prompt-export role="menuitem">Export library</button>
-          <button type="button" data-prompt-import role="menuitem">Import library</button>
-        </div>
-      </div>
-      <input type="file" accept="application/json,.json" data-prompt-import-file hidden />
     </div>
     <div class="dashboard-prompt-list">
       ${groups}
@@ -266,35 +258,6 @@ function open() {
   promptSearchTerm = '';
   activeProject = threadDashboard.activeProject();
   presentDialog();
-}
-
-function exportLibrary() {
-  const payload = JSON.stringify({
-    version: 3,
-    prompts: promptStore.prompts,
-    sections: promptStore.sections,
-  }, null, 2);
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
-  link.download = `codex-dashboard-prompts-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 0);
-}
-
-async function importLibrary(file) {
-  try {
-    const payload = JSON.parse(await file.text());
-    if (!promptLibraryContract.isValidExport(payload)) {
-      throw new Error('invalid prompt library');
-    }
-    const prompts = promptStore.normalizePrompts(payload?.prompts);
-    const sections = promptStore.normalizeSections(payload?.sections, prompts);
-    if (!persistLibrary(prompts, sections)) return;
-    promptSearchTerm = '';
-    renderDialog();
-  } catch (_) {
-    showStorageError('Could not import this file. Choose an unmodified Codex Dashboard prompt export.');
-  }
 }
 
 function expandedPromptContent(content, clipboardText = '') {
@@ -452,14 +415,6 @@ function insertSavedPrompt(prompt) {
 
 function handlePromptClick(target) {
   if (target.closest('[data-prompt-close]')) close();
-  else if (target.closest('[data-prompt-actions-toggle]')) {
-    const toggle = target.closest('[data-prompt-actions-toggle]');
-    const menu = document.querySelector('[data-prompt-actions-menu]');
-    if (!menu) return;
-    menu.hidden = !menu.hidden;
-    toggle.setAttribute('aria-expanded', String(!menu.hidden));
-    if (!menu.hidden) menu.querySelector('button')?.focus();
-  }
   else if (target.closest('[data-prompt-section-toggle]')) {
     const toggle = target.closest('[data-prompt-section-toggle]');
     const section = toggle.dataset.promptSectionToggle;
@@ -511,14 +466,6 @@ function handlePromptClick(target) {
       promptID: target.closest('[data-prompt-edit]').dataset.promptEdit,
     };
     renderDialog();
-  } else if (target.closest('[data-prompt-export]')) {
-    document.querySelector('[data-prompt-actions-menu]')?.setAttribute('hidden', '');
-    document.querySelector('[data-prompt-actions-toggle]')?.setAttribute('aria-expanded', 'false');
-    exportLibrary();
-  } else if (target.closest('[data-prompt-import]')) {
-    document.querySelector('[data-prompt-actions-menu]')?.setAttribute('hidden', '');
-    document.querySelector('[data-prompt-actions-toggle]')?.setAttribute('aria-expanded', 'false');
-    document.querySelector('[data-prompt-import-file]')?.click();
   } else if (target.closest('[data-prompt-delete-confirm]')) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
     const nextPrompts = promptStore.prompts.filter((prompt) => prompt.id !== id);
@@ -592,10 +539,7 @@ function handlePromptInteraction(event) {
     });
   }
   else if (event.type === 'change') {
-    if (event.target.matches('[data-prompt-import-file]')) {
-      const [file] = event.target.files || [];
-      if (file) void importLibrary(file);
-    } else if (event.target.matches('[name="hasPreset"]')) {
+    if (event.target.matches('[name="hasPreset"]')) {
       const form = event.target.closest('[data-prompt-form]');
       const fields = form?.querySelector('[data-prompt-preset-fields]');
       if (fields) fields.disabled = !event.target.checked;

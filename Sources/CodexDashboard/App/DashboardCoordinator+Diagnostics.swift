@@ -16,8 +16,7 @@ extension DashboardCoordinator {
             lastCompatibilityCheck: lastCompatibilityCheck,
             compatibilitySummary: compatibilityReport?.summary ?? "not checked",
             connectionError: connectionError,
-            threadWarning: threadDataWarning,
-            promptBackupPath: "~/Library/Application Support/Codex Dashboard/prompt-library.json"
+            threadWarning: threadDataWarning
         )
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(diagnostics.text, forType: .string)

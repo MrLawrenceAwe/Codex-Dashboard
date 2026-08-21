@@ -358,17 +358,10 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               const renderedSearch = document.querySelector('[data-prompt-search]');
               const searchSelection = [renderedSearch.selectionStart, renderedSearch.selectionEnd];
               const filteredNames = [...document.querySelectorAll('[data-prompt-use] strong')].map((item) => item.textContent);
-              const actionsToggle = document.querySelector('[data-prompt-actions-toggle]');
-              actionsToggle.click();
-              const exportButton = document.querySelector('[data-prompt-export]');
               const values = {
                 filteredNames,
                 searchSelection,
-                hasExport: Boolean(exportButton),
-                hasImport: Boolean(document.querySelector('[data-prompt-import-file][accept*="json"]')),
-                actionsExpanded: actionsToggle.getAttribute('aria-expanded'),
-                actionsMenuVisible: !document.querySelector('[data-prompt-actions-menu]').hidden,
-                exportLabel: exportButton.textContent,
+                hasTransferActions: Boolean(document.querySelector('[data-prompt-actions-toggle]')),
                 searchPlaceholder: renderedSearch.getAttribute('placeholder'),
                 headerSubtitle: document.querySelector('.dashboard-prompt-header p')?.textContent || null,
                 searchHeight: getComputedStyle(renderedSearch).height,
@@ -385,11 +378,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["filteredNames"] as? [String], ["Review code"])
         XCTAssertEqual(values["searchSelection"] as? [Int], [6, 6])
         XCTAssertEqual(values["namesAfterClear"] as? [String], ["Review code", "Write summary"])
-        XCTAssertEqual(values["hasExport"] as? Bool, true)
-        XCTAssertEqual(values["hasImport"] as? Bool, true)
-        XCTAssertEqual(values["actionsExpanded"] as? String, "true")
-        XCTAssertEqual(values["actionsMenuVisible"] as? Bool, true)
-        XCTAssertEqual(values["exportLabel"] as? String, "Export library")
+        XCTAssertEqual(values["hasTransferActions"] as? Bool, false)
         XCTAssertNil(values["searchPlaceholder"] as? String)
         XCTAssertNil(values["headerSubtitle"] as? String)
         XCTAssertEqual(values["searchHeight"] as? String, "32px")
@@ -606,51 +595,6 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["storedSections"] as? [String], ["General", "Code review"])
     }
 
-    func testLegacyPromptStorageMigratesWithoutDataLoss() async throws {
-        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
-        _ = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              window.__codexDashboard.destroy();
-              localStorage.removeItem('codex-dashboard.prompt-library');
-              localStorage.setItem('codex-dashboard.saved-prompts', JSON.stringify([{
-                id: 'legacy-prompt',
-                name: 'Legacy prompt',
-                content: 'Preserve me',
-                section: 'Legacy section',
-              }]));
-              localStorage.setItem('codex-dashboard.prompt-sections', JSON.stringify(['Empty legacy section']));
-            })()
-            """
-        )
-
-        let injection = try DashboardInjectionResources.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let migrated = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
-              const state = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
-              return [
-                document.querySelector('[data-prompt-use] strong').textContent,
-                Boolean(document.querySelector('[data-prompt-section="Empty legacy section"]')),
-                state.prompts.length,
-                state.sections.length,
-                state.version,
-                state.prompts[0].scope.type,
-              ];
-            })()
-            """
-        ) as? [Any]
-        let values = try XCTUnwrap(migrated)
-        XCTAssertEqual(values[0] as? String, "Legacy prompt")
-        XCTAssertEqual(values[1] as? Bool, true)
-        XCTAssertEqual(values[2] as? Int, 1)
-        XCTAssertEqual(values[3] as? Int, 2)
-        XCTAssertEqual(values[4] as? Int, 3)
-        XCTAssertEqual(values[5] as? String, "global")
-    }
-
     func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
 
@@ -699,46 +643,39 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? Bool, true)
     }
 
-    func testInvalidPromptImportPreservesExistingLibrary() async throws {
+    func testPromptStoreIgnoresObsoleteStorageKeys() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
-              document.querySelector('[data-prompt-new]').click();
-              document.querySelector('[name="name"]').value = 'Keep me';
-              document.querySelector('[name="content"]').value = 'Existing prompt';
-              document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              window.__promptLibraryBeforeInvalidImport = localStorage.getItem('codex-dashboard.prompt-library');
-              const input = document.querySelector('[data-prompt-import-file]');
-              const transfer = new DataTransfer();
-              transfer.items.add(new File(['{}'], 'unrelated.json', { type: 'application/json' }));
-              input.files = transfer.files;
-              input.dispatchEvent(new Event('change', { bubbles: true }));
+              window.__codexDashboard.destroy();
+              localStorage.removeItem('codex-dashboard.prompt-library');
+              localStorage.setItem('codex-dashboard.saved-prompts', JSON.stringify([{
+                id: 'obsolete-prompt', name: 'Obsolete prompt', content: 'Ignore me', section: 'Old',
+              }]));
+              localStorage.setItem('codex-dashboard.prompt-sections', JSON.stringify(['Old']));
             })()
             """
         )
-        try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-prompt-storage-error]')?.hidden === false",
-            in: webView
-        )
+
+        let injection = try DashboardInjectionResources.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
               return [
-                localStorage.getItem('codex-dashboard.prompt-library') === window.__promptLibraryBeforeInvalidImport,
                 document.querySelectorAll('[data-prompt-use]').length,
-                document.querySelector('[data-prompt-storage-error]').textContent,
-                !document.querySelector('[data-prompt-storage-error]').hidden,
+                Boolean(document.querySelector('[data-prompt-section="Old"]')),
+                localStorage.getItem('codex-dashboard.prompt-library'),
               ];
             })()
             """
         ) as? [Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? Int, 1)
-        XCTAssertTrue((values[2] as? String)?.contains("Could not import") == true)
-        XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertEqual(values[0] as? Int, 0)
+        XCTAssertEqual(values[1] as? Bool, false)
+        XCTAssertNil(values[2] as? String)
     }
 
     func testPromptKeyboardReorderingAndSectionManagementPreservePrompts() async throws {
