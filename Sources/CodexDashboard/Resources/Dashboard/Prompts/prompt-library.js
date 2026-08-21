@@ -110,7 +110,8 @@ const promptLibrary = (() => {
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${activeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(activeProject.name)}</option>` : ''}</select></label>
-        <fieldset class="dashboard-prompt-preset-fields">
+        <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a model preset</label>
+        <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
           <legend>Model preset</legend>
           <label>Model<select name="presetModel">${selectOptions(presetModelOptions, prompt?.preset?.model || 'gpt-5.6-sol')}</select></label>
           <label>Effort<select name="presetReasoningEffort">${selectOptions(presetReasoningOptions, prompt?.preset?.reasoningEffort || 'medium')}</select></label>
@@ -319,11 +320,13 @@ function savePrompt(form) {
   const scope = values.get('scope') === 'project' && activeProject
     ? { type: 'project', projectPath: activeProject.path }
     : { type: 'global' };
-  const preset = promptStore.normalizePreset({
-    model: String(values.get('presetModel') || ''),
-    reasoningEffort: String(values.get('presetReasoningEffort') || ''),
-    speed: String(values.get('presetSpeed') || ''),
-  });
+  const preset = values.has('hasPreset')
+    ? promptStore.normalizePreset({
+      model: String(values.get('presetModel') || ''),
+      reasoningEffort: String(values.get('presetReasoningEffort') || ''),
+      speed: String(values.get('presetSpeed') || ''),
+    })
+    : undefined;
   let nextPrompts;
   if (dialogModeState.mode === 'edit') {
     nextPrompts = promptStore.prompts.map((prompt) => (
@@ -588,9 +591,15 @@ function handlePromptInteraction(event) {
       },
     });
   }
-  else if (event.type === 'change' && event.target.matches('[data-prompt-import-file]')) {
-    const [file] = event.target.files || [];
-    if (file) void importLibrary(file);
+  else if (event.type === 'change') {
+    if (event.target.matches('[data-prompt-import-file]')) {
+      const [file] = event.target.files || [];
+      if (file) void importLibrary(file);
+    } else if (event.target.matches('[name="hasPreset"]')) {
+      const form = event.target.closest('[data-prompt-form]');
+      const fields = form?.querySelector('[data-prompt-preset-fields]');
+      if (fields) fields.disabled = !event.target.checked;
+    }
   }
   else if (event.type === 'submit') handlePromptSubmit(event, target);
   else if (event.type === 'click') handlePromptClick(target);

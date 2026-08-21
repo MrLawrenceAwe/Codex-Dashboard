@@ -884,10 +884,12 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 modelValue: document.querySelector('[name="presetModel"]').value,
                 effortValue: document.querySelector('[name="presetReasoningEffort"]').value,
                 speedValue: document.querySelector('[name="presetSpeed"]').value,
-                hasUsePresetCheckbox: Boolean(document.querySelector('[name="usePreset"]')),
+                hasPresetChecked: document.querySelector('[name="hasPreset"]').checked,
+                presetFieldsDisabled: document.querySelector('[data-prompt-preset-fields]').disabled,
               };
               document.querySelector('[name="name"]').value = 'Luna fast review';
               document.querySelector('[name="content"]').value = 'Review this change';
+              document.querySelector('[name="hasPreset"]').click();
               document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
               document.querySelector('[name="presetReasoningEffort"]').value = 'medium';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
@@ -937,7 +939,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-5.6-sol")
         XCTAssertEqual(presetDefaults["effortValue"] as? String, "medium")
         XCTAssertEqual(presetDefaults["speedValue"] as? String, "standard")
-        XCTAssertEqual(presetDefaults["hasUsePresetCheckbox"] as? Bool, false)
+        XCTAssertEqual(presetDefaults["hasPresetChecked"] as? Bool, false)
+        XCTAssertEqual(presetDefaults["presetFieldsDisabled"] as? Bool, true)
         XCTAssertEqual(
             values["preset"] as? [String: String],
             ["model": "gpt-5.6-luna", "reasoningEffort": "medium", "speed": "fast"]
@@ -955,6 +958,44 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["dialogClosed"] as? Bool, true)
     }
 
+    func testNewPromptCanBeSavedWithoutModelPreset() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-new]').click();
+              const fields = document.querySelector('[data-prompt-preset-fields]');
+              const defaults = {
+                hasPreset: document.querySelector('[name="hasPreset"]').checked,
+                fieldsDisabled: fields.disabled,
+              };
+              document.querySelector('[name="name"]').value = 'Plain prompt';
+              document.querySelector('[name="content"]').value = 'Insert without changing my model';
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const row = document.querySelector('[data-prompt-use]');
+              return JSON.stringify({
+                defaults,
+                storedPrompt: stored.prompts[0],
+                hasPresetSummary: Boolean(document.querySelector('.dashboard-prompt-preset-summary')),
+                usePresetDisabled: row.parentElement.querySelector('[data-prompt-use-preset]').disabled,
+              });
+            })()
+            """
+        ) as? String
+        let values = try decodeJSONObject(try XCTUnwrap(result))
+        let defaults = try XCTUnwrap(values["defaults"] as? [String: Any])
+        let storedPrompt = try XCTUnwrap(values["storedPrompt"] as? [String: Any])
+
+        XCTAssertEqual(defaults["hasPreset"] as? Bool, false)
+        XCTAssertEqual(defaults["fieldsDisabled"] as? Bool, true)
+        XCTAssertNil(storedPrompt["preset"])
+        XCTAssertNil(storedPrompt["usePreset"])
+        XCTAssertEqual(values["hasPresetSummary"] as? Bool, false)
+        XCTAssertEqual(values["usePresetDisabled"] as? Bool, true)
+    }
+
     func testFailedPromptPresetRestoresLibraryWithoutInsertingPrompt() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
@@ -970,6 +1011,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Unavailable preset';
               document.querySelector('[name="content"]').value = 'Do not insert this';
+              document.querySelector('[name="hasPreset"]').click();
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               document.querySelector('[data-prompt-use-preset]').click();
               document.querySelector('[data-prompt-use]').click();

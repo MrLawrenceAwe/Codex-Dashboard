@@ -104,7 +104,10 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-create-actions { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 8px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form { display: grid; gap: 14px; padding: 4px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form label { display: grid; gap: 7px; color: var(--dashboard-muted); font-size: 11px; font-weight: 540; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-form .dashboard-prompt-preset-toggle { display: inline-flex; align-items: center; gap: 7px; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-form .dashboard-prompt-preset-toggle input { width: auto; margin: 0; accent-color: var(--dashboard-green); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; min-width: 0; margin: 0; padding: 11px; border: 1px solid var(--dashboard-line); border-radius: 10px; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields:disabled { opacity: .55; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields legend { padding: 0 5px; color: var(--dashboard-muted); font-size: 11px; font-weight: 570; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form input,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea,
