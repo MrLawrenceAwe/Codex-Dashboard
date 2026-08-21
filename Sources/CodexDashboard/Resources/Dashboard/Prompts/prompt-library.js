@@ -27,7 +27,7 @@ const promptLibrary = (() => {
   }
 
   function persistLibrary(nextPrompts = promptStore.prompts, nextSections = promptStore.sections) {
-    if (promptStore.saveLibrary(nextPrompts, nextSections)) return true;
+    if (promptStore.commitLibrary(nextPrompts, nextSections)) return true;
     showStorageError();
     return false;
   }
@@ -36,23 +36,6 @@ const promptLibrary = (() => {
   'pointerdown', 'mousedown', 'click', 'keydown', 'input', 'change', 'submit',
   'dragstart', 'dragover', 'dragleave', 'drop', 'dragend',
 ];
-
-function createDialogElement() {
-  const dialog = document.createElement('div');
-  dialog[dialogOwner] = true;
-  dialog.id = dashboardElements.elementIDs.promptDialog;
-  dialog.innerHTML = `
-    <div class="dashboard-prompt-backdrop" data-prompt-close></div>
-    <section class="dashboard-prompt-panel" role="dialog" aria-modal="true" aria-labelledby="dashboard-prompt-title">
-      <header class="dashboard-prompt-header">
-        <h2 id="dashboard-prompt-title">Prompts</h2>
-        <button type="button" class="dashboard-prompt-icon-button" data-prompt-close aria-label="Close prompts">×</button>
-      </header>
-      <p class="dashboard-prompt-storage-error" data-prompt-storage-error role="alert" hidden>Could not save this prompt change. Reloading Codex will restore the last successfully saved version.</p>
-      <div data-prompt-content></div>
-    </section>`;
-  return dialog;
-}
 
 function renderDialog() {
   const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
@@ -221,7 +204,7 @@ function open() {
   dialogModeState = { mode: 'list' };
   promptSearchTerm = '';
   activeProject = threadDashboard.activeProject();
-  const dialog = createDialogElement();
+  const dialog = promptLibraryDialog.create(dialogOwner);
   document.body.append(dialog);
   renderDialog();
 }
@@ -248,8 +231,6 @@ async function importLibrary(file) {
     const prompts = promptStore.normalizePrompts(payload?.prompts);
     const sections = promptStore.normalizeSections(payload?.sections, prompts);
     if (!persistLibrary(prompts, sections)) return;
-    promptStore.prompts = prompts;
-    promptStore.sections = sections;
     promptSearchTerm = '';
     renderDialog();
   } catch (_) {
@@ -298,8 +279,6 @@ function savePrompt(form) {
     ? promptStore.sections
     : [...promptStore.sections, section];
   if (!persistLibrary(nextPrompts, nextSections)) return;
-  promptStore.prompts = nextPrompts;
-  promptStore.sections = nextSections;
   dialogModeState = { mode: 'list' };
   renderDialog();
 }
@@ -313,7 +292,6 @@ function createPromptSection(form) {
     ? promptStore.sections
     : [...promptStore.sections, section];
   if (!persistLibrary(promptStore.prompts, nextSections)) return;
-  promptStore.sections = nextSections;
   const nextCollapsedSections = new Set(promptStore.collapsedSections);
   nextCollapsedSections.delete(section);
   promptStore.saveCollapsedSections(nextCollapsedSections);
@@ -346,8 +324,6 @@ function renamePromptSection(form) {
     section === source ? destination : section
   ));
   if (!persistLibrary(nextPrompts, nextSections)) return;
-  promptStore.prompts = nextPrompts;
-  promptStore.sections = nextSections;
   promptStore.collapsedSections.delete(source);
   promptStore.saveCollapsedSections();
   dialogModeState = { mode: 'list' };
@@ -373,38 +349,8 @@ function movePrompt(promptID, offset) {
   const nextPrompts = [...promptStore.prompts];
   [nextPrompts[index], nextPrompts[destination]] = [nextPrompts[destination], nextPrompts[index]];
   if (!persistLibrary(nextPrompts, promptStore.sections)) return;
-  promptStore.prompts = nextPrompts;
   renderDialog();
   document.querySelector(`[data-prompt-row-id="${CSS.escape(promptID)}"] [data-prompt-move-${offset < 0 ? 'up' : 'down'}]`)?.focus();
-}
-
-function handlePromptKeyboard(event, dialog) {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const actionsMenu = dialog.querySelector('[data-prompt-actions-menu]');
-    if (actionsMenu && !actionsMenu.hidden) {
-      actionsMenu.hidden = true;
-      const actionsToggle = dialog.querySelector('[data-prompt-actions-toggle]');
-      actionsToggle?.setAttribute('aria-expanded', 'false');
-      actionsToggle?.focus();
-      return;
-    }
-    close();
-    return;
-  }
-  if (event.key !== 'Tab') return;
-  const focusable = [...dialog.querySelectorAll('button, input, textarea, [tabindex]:not([tabindex="-1"])')]
-    .filter((element) => !element.disabled && element.getClientRects().length > 0);
-  const first = focusable[0];
-  const last = focusable.at(-1);
-  if (first && last && event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (first && last && !event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
 }
 
 function handlePromptSubmit(event, form) {
@@ -466,8 +412,6 @@ function handlePromptClick(target) {
     ));
     const nextSections = promptStore.sections.filter((item) => item !== section);
     if (!persistLibrary(nextPrompts, nextSections)) return;
-    promptStore.prompts = nextPrompts;
-    promptStore.sections = nextSections;
     promptStore.collapsedSections.delete(section);
     promptStore.saveCollapsedSections();
     renderDialog();
@@ -504,7 +448,6 @@ function handlePromptClick(target) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
     const nextPrompts = promptStore.prompts.filter((prompt) => prompt.id !== id);
     if (!persistLibrary(nextPrompts, promptStore.sections)) return;
-    promptStore.prompts = nextPrompts;
     renderDialog();
   } else if (target.closest('[data-prompt-delete]')) {
     const button = target.closest('[data-prompt-delete]');
@@ -534,7 +477,7 @@ function handlePromptInteraction(event) {
       && event.key === 'Escape'
       && document.getElementById(dashboardElements.elementIDs.promptDialog)
   ) {
-    handlePromptKeyboard(event, document.getElementById(dashboardElements.elementIDs.promptDialog));
+    promptLibraryDialog.handleKeyboard(event, document.getElementById(dashboardElements.elementIDs.promptDialog), close);
     return;
   }
   const dialog = target?.closest(`#${dashboardElements.elementIDs.promptDialog}`);
@@ -544,7 +487,7 @@ function handlePromptInteraction(event) {
     if (event.target.matches('[data-prompt-search]') && event.key === 'ArrowDown') {
       event.preventDefault();
       dialog.querySelector('[data-prompt-use]')?.focus();
-    } else handlePromptKeyboard(event, dialog);
+    } else promptLibraryDialog.handleKeyboard(event, dialog, close);
   }
   else if (event.type === 'input' && event.target.matches('[data-prompt-search]')) {
     promptSearchTerm = event.target.value;

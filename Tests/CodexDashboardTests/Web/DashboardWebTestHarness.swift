@@ -74,6 +74,15 @@ enum DashboardWebTestHarness {
         )
     }
 
+    static func threadDashboardWebView() async throws -> WKWebView {
+        try await mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+          <main>Conversation surface</main>
+        </body></html>
+        """)
+    }
+
     static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {
         let data = try JSONEncoder().encode(DashboardSnapshotPayload(threads: threads))
         return try XCTUnwrap(String(data: data, encoding: .utf8))

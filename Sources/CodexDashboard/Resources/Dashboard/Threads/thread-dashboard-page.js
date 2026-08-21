@@ -1,0 +1,57 @@
+const threadDashboardPage = (() => {
+  function mount({ onFilter, onView, onSearch, onLoadMore, onListClick }) {
+    const pageHost = codexHost.pageHost();
+    if (!pageHost) return false;
+    const page = document.createElement('section');
+    page.id = dashboardElements.elementIDs.page;
+    page.setAttribute('aria-label', 'Codex Thread Dashboard');
+    page.innerHTML = `
+      <div class="dashboard-shell">
+        <header class="dashboard-header">
+          <div>
+            <h1>Thread Dashboard</h1>
+            <div class="dashboard-summary" data-dashboard-summary aria-label="0 running, 0 unread, 0 changed projects">
+              <span><strong data-summary-count="running">0</strong> running</span>
+              <span><strong data-summary-count="unread">0</strong> unread</span>
+              <span><strong data-summary-count="changed">0</strong> changed</span>
+            </div>
+          </div>
+        </header>
+        <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
+        <div class="dashboard-section-header">
+          <div class="dashboard-toolbar">
+            <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>
+            <div class="dashboard-toolbar-group dashboard-filter-group">
+              <span class="dashboard-control-label">Show</span>
+              <div class="dashboard-filters" aria-label="Filter threads">
+                <button type="button" data-filter="running" class="is-active">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
+                <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
+                <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
+              </div>
+            </div>
+            <div class="dashboard-view-options dashboard-view-group" aria-label="Thread view">
+              <button type="button" data-view="projects" class="is-active" aria-pressed="true" title="Group by project">${threadMarkup.icon('project')}<span class="dashboard-view-label">Projects</span></button>
+              <button type="button" data-view="recent" aria-pressed="false" title="Sort all threads by recency">${threadMarkup.icon('threads')}<span class="dashboard-view-label">Threads</span></button>
+            </div>
+          </div>
+        </div>
+        <main class="dashboard-list" data-thread-list></main>
+        <button type="button" class="dashboard-load-more" data-load-more hidden>Load more threads</button>
+      </div>`;
+    page.querySelectorAll('[data-filter]').forEach((button) => {
+      button.addEventListener('click', () => onFilter(button.dataset.filter));
+    });
+    page.querySelectorAll('[data-view]').forEach((button) => {
+      button.addEventListener('click', () => onView(button.dataset.view));
+    });
+    page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
+      onSearch(event.target.value);
+    });
+    page.querySelector('[data-load-more]').addEventListener('click', onLoadMore);
+    page.querySelector('[data-thread-list]').addEventListener('click', onListClick);
+    pageHost.append(page);
+    return true;
+  }
+
+  return { mount };
+})();

@@ -210,10 +210,7 @@ final class DashboardRenderer {
             }
 
             for target in targets {
-                let disabled = try await devTools.evaluateBoolean(
-                    "(() => { window.__codexDashboard?.destroy?.(); return typeof window.__codexDashboard === 'undefined'; })()",
-                    in: target
-                )
+                let disabled = try await devTools.evaluateBoolean(DashboardRendererScript.destroy, in: target)
                 guard disabled else {
                     throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
                 }
@@ -228,27 +225,12 @@ final class DashboardRenderer {
 
     func open() async {
         for target in await targets(forceRefresh: true) {
-            _ = try? await devTools.evaluateBoolean(
-                "(() => { window.__codexDashboard?.open?.(); return true; })()",
-                in: target
-            )
+            _ = try? await devTools.evaluateBoolean(DashboardRendererScript.open, in: target)
         }
     }
 
     func openThread(_ threadID: String) async {
-        guard
-            let data = try? JSONSerialization.data(withJSONObject: threadID, options: .fragmentsAllowed),
-            let encodedThreadID = String(data: data, encoding: .utf8)
-        else { return }
-        let expression = """
-        (() => {
-          window.dispatchEvent(new MessageEvent('message', {
-            data: { type: 'navigate-to-route', path: `/local/${encodeURIComponent(\(encodedThreadID))}` },
-            source: null,
-          }));
-          return true;
-        })()
-        """
+        guard let expression = DashboardRendererScript.openThread(threadID) else { return }
         for target in await targets(forceRefresh: true) {
             _ = try? await devTools.evaluateBoolean(expression, in: target)
         }
@@ -259,18 +241,7 @@ final class DashboardRenderer {
     }
 
     private func deliver(_ snapshot: DashboardSnapshotPayload, to targets: [DevToolsTarget]) async throws {
-        let data = try JSONEncoder().encode(snapshot)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")
-        }
-        let expression = """
-        (() => {
-          const dashboard = window.__codexDashboard;
-          if (typeof dashboard?.applySnapshot !== 'function') return false;
-          dashboard.applySnapshot(\(json));
-          return true;
-        })()
-        """
+        let expression = try DashboardRendererScript.deliver(snapshot)
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
                 throw DashboardError.enableFailed(

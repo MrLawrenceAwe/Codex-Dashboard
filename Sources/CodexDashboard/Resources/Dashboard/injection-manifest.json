@@ -8,10 +8,12 @@
     "Prompts/composer-adapter",
     "Prompts/prompt-reordering",
     "Prompts/prompt-launcher",
+    "Prompts/prompt-library-dialog",
     "Prompts/prompt-library",
     "Threads/thread-markup",
     "Threads/thread-state",
     "Threads/thread-view",
+    "Threads/thread-dashboard-page",
     "Threads/thread-dashboard-controller",
     "Core/dashboard-host"
   ],

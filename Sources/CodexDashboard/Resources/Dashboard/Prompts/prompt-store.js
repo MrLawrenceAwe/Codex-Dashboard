@@ -85,6 +85,14 @@ const promptStore = (() => {
       });
     },
 
+    commitLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
+      const sections = normalizeSections(nextSections, nextPrompts);
+      if (!store.saveLibrary(nextPrompts, sections)) return false;
+      store.prompts = nextPrompts;
+      store.sections = sections;
+      return true;
+    },
+
     saveCollapsedSections(sections = store.collapsedSections) {
       return writeJSON(collapsedSectionsStorageKey, [...sections]);
     },

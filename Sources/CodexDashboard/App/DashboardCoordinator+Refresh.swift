@@ -26,9 +26,7 @@ extension DashboardCoordinator {
         }
         if dashboardRuntime.maintainsDashboard, !targets.isEmpty {
             do {
-                try await dashboardRuntime.synchronizeDashboard(
-                    with: DashboardSnapshotPayload(threads: threads), on: targets, forceRemount: false
-                )
+                try await publishSnapshot(to: targets, using: dashboardRuntime)
                 setConnectionState(.dashboardMounted)
                 setConnectionError(nil)
             } catch {
@@ -99,7 +97,14 @@ extension DashboardCoordinator {
         guard !Task.isCancelled, !isPerformingAction, let dashboardRuntime, dashboardRuntime.maintainsDashboard else { return }
         let targets = await dashboardRuntime.rendererTargets()
         guard !Task.isCancelled, !targets.isEmpty else { return }
-        try? await dashboardRuntime.synchronizeDashboard(
+        try? await publishSnapshot(to: targets, using: dashboardRuntime)
+    }
+
+    private func publishSnapshot(
+        to targets: [DevToolsTarget],
+        using runtime: any DashboardRuntime
+    ) async throws {
+        try await runtime.synchronizeDashboard(
             with: DashboardSnapshotPayload(threads: threads), on: targets, forceRemount: false
         )
     }
