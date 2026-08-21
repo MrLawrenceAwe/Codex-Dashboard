@@ -46,7 +46,6 @@ const promptReordering = (() => {
     }
     remainingPrompts.splice(insertionIndex, 0, movedPrompt);
     if (!persist(remainingPrompts, promptStore.sections)) return false;
-    promptStore.prompts = remainingPrompts;
     return true;
   }
 

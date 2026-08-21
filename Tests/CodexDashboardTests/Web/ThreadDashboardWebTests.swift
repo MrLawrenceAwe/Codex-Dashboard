@@ -6,14 +6,7 @@ import XCTest
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     func testCompleteCatalogUsesClientPagingAndSearchesBeyondFirstPage() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html:
-            """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """
-        )
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let threads = (0..<65).map { index in
             ThreadSummary.fixture(
                 id: "thread-\(index)",
@@ -55,14 +48,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testSearchResultsRemainPaged() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html:
-            """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """
-        )
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let threads = (0..<125).map { index in
             ThreadSummary.fixture(
                 id: "matching-\(index)",
@@ -99,14 +85,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html:
-            """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """
-        )
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "stable")])
         _ = try await webView.evaluateJavaScript(
             """
@@ -127,14 +106,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html:
-            """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """
-        )
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "deferred-thread", isUnread: true, runState: .running),
         ])
