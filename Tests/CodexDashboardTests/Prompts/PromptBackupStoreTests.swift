@@ -58,6 +58,24 @@ final class PromptBackupStoreTests: XCTestCase {
         XCTAssertFalse(repeatedSave)
     }
 
+    func testValidatesProjectPromptScope() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-prompt-scope-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptBackupStore(backupURL: directory.appendingPathComponent("prompts.json"))
+        let validLibrary = #"{"version":2,"prompts":[{"id":"one","name":"Review","content":"Review this","scope":{"type":"project","projectPath":"/tmp/project"}}],"sections":["General"]}"#
+        let invalidLibrary = #"{"version":2,"prompts":[{"id":"one","name":"Review","content":"Review this","scope":{"type":"project","projectPath":""}}],"sections":["General"]}"#
+
+        let wasSaved = try await store.save(validLibrary)
+        XCTAssertTrue(wasSaved)
+        do {
+            try await store.save(invalidLibrary)
+            XCTFail("Expected an empty project path to be rejected")
+        } catch DashboardError.invalidPromptLibrary {
+            // Expected.
+        }
+    }
+
     func testRejectsNonObjectBackup() async {
         let store = PromptBackupStore(
             backupURL: FileManager.default.temporaryDirectory

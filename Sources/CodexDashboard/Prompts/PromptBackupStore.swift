@@ -8,6 +8,7 @@ actor PromptBackupStore {
     private var hasLoadedCache = false
 
     private struct Library: Decodable {
+        let version: Int?
         let prompts: [Prompt]
         let sections: [String]
     }
@@ -17,6 +18,23 @@ actor PromptBackupStore {
         let name: String
         let content: String
         let section: String?
+        let scope: Scope?
+    }
+
+    private struct Scope: Decodable {
+        let type: String
+        let projectPath: String?
+
+        var isValid: Bool {
+            switch type {
+            case "global":
+                return true
+            case "project":
+                return !(projectPath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            default:
+                return false
+            }
+        }
     }
 
     init(fileManager: FileManager = .default) {
@@ -62,6 +80,8 @@ actor PromptBackupStore {
         guard let data = json.data(using: .utf8),
               let library = try? JSONDecoder().decode(Library.self, from: data)
         else { return false }
-        return Set(library.prompts.map(\.id)).count == library.prompts.count
+        return (library.version == nil || library.version == 2)
+            && Set(library.prompts.map(\.id)).count == library.prompts.count
+            && library.prompts.allSatisfy { $0.scope?.isValid ?? true }
     }
 }

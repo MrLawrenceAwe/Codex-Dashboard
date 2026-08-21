@@ -421,6 +421,17 @@ function applySnapshot(nextSnapshot) {
   requestDashboardRender();
 }
 
+function activeProject() {
+  const activeThreadID = codexContracts.activeComposerThreadID();
+  const thread = threads.find((item) => item.id === activeThreadID);
+  const projectPath = String(thread?.projectPath || '').trim();
+  if (!projectPath) return null;
+  return {
+    name: String(thread?.projectName || '').trim() || projectPath.split('/').filter(Boolean).at(-1) || projectPath,
+    path: projectPath,
+  };
+}
+
 function ensureMounted() {
   if (!document.body) return false;
   if (!document.getElementById(dashboardDOM.elementIDs.style)) {
@@ -506,5 +517,6 @@ return {
   destroy,
   open: openPage,
   applySnapshot,
+  activeProject,
 };
 })();

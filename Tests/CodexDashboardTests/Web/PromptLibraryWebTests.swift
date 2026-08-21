@@ -201,6 +201,79 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(richTextValues["closedAfterInsertion"] as? Bool, true)
     }
 
+    func testProjectPromptsAreScopedToActiveComposerProjectAlongsideGlobals() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let snapshot = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "project-a-thread",
+                projectName: "Project A",
+                projectPath: "/tmp/project-a"
+            ),
+            .fixture(
+                id: "project-b-thread",
+                projectName: "Project B",
+                projectPath: "/tmp/project-b"
+            ),
+        ])
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(snapshot));
+              const composerShell = document.querySelector('.composer-shell');
+              const activeThreadProps = { conversationId: 'project-a-thread' };
+              composerShell.__reactFiber$test = { memoizedProps: activeThreadProps, return: null };
+              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const createPrompt = (name, scope) => {
+                document.querySelector('[data-prompt-new]').click();
+                document.querySelector('[name="name"]').value = name;
+                document.querySelector('[name="content"]').value = `${name} content`;
+                document.querySelector('[name="scope"]').value = scope;
+                document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              };
+
+              launcher.click();
+              createPrompt('Project A prompt', 'project');
+              createPrompt('Global prompt', 'global');
+              const projectAHeadings = [...document.querySelectorAll('.dashboard-prompt-scope > h3')]
+                .map((heading) => heading.textContent);
+              const projectANames = [...document.querySelectorAll('[data-prompt-use] strong')]
+                .map((name) => name.textContent);
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+
+              document.querySelector('.dashboard-prompt-icon-button').click();
+              activeThreadProps.conversationId = 'project-b-thread';
+              launcher.click();
+              const projectBHeadings = [...document.querySelectorAll('.dashboard-prompt-scope > h3')]
+                .map((heading) => heading.textContent);
+              const projectBNames = [...document.querySelectorAll('[data-prompt-use] strong')]
+                .map((name) => name.textContent);
+              return JSON.stringify({
+                projectAHeadings,
+                projectANames,
+                projectBHeadings,
+                projectBNames,
+                version: stored.version,
+                scopes: stored.prompts.map((prompt) => prompt.scope),
+              });
+            })()
+            """
+        ) as? String
+        let values = try decodeJSONObject(try XCTUnwrap(result))
+
+        XCTAssertEqual(values["projectAHeadings"] as? [String], ["This project · Project A", "Global"])
+        XCTAssertEqual(values["projectANames"] as? [String], ["Project A prompt", "Global prompt"])
+        XCTAssertEqual(values["projectBHeadings"] as? [String], ["This project · Project B", "Global"])
+        XCTAssertEqual(values["projectBNames"] as? [String], ["Global prompt"])
+        XCTAssertEqual(values["version"] as? Int, 2)
+        XCTAssertEqual(
+            values["scopes"] as? [[String: String]],
+            [
+                ["type": "project", "projectPath": "/tmp/project-a"],
+                ["type": "global"],
+            ]
+        )
+    }
+
     private func decodeJSONObject(_ json: String) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: Data(json.utf8))
         return try XCTUnwrap(object as? [String: Any])
@@ -495,6 +568,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 Boolean(document.querySelector('[data-prompt-section="Empty legacy section"]')),
                 state.prompts.length,
                 state.sections.length,
+                state.version,
+                state.prompts[0].scope.type,
               ];
             })()
             """
@@ -504,6 +579,8 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Int, 1)
         XCTAssertEqual(values[3] as? Int, 2)
+        XCTAssertEqual(values[4] as? Int, 2)
+        XCTAssertEqual(values[5] as? String, "global")
     }
 
     func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
