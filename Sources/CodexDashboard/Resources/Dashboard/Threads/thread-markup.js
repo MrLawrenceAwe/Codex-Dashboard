@@ -60,7 +60,7 @@ const threadMarkup = (() => {
         const projectPath = String(item.projectPath).trim();
         if (!projects.has(projectPath)) projects.set(projectPath, item);
       });
-      return [...projects.entries()].map(([projectPath, project]) => `
+      const projectCard = ([projectPath, project]) => `
         <article class="dashboard-git-project">
           <div class="dashboard-git-project-copy">
             <span class="dashboard-project-icon">${icon('project')}</span>
@@ -74,7 +74,19 @@ const threadMarkup = (() => {
             <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Unignore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Unignore' : 'Ignore'}</span></button>
             ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
           </span>
-        </article>`).join('');
+        </article>`;
+      const activeProjects = [];
+      const ignoredProjects = [];
+      projects.forEach((project, projectPath) => {
+        (ignoredProjectPaths.has(projectPath) ? ignoredProjects : activeProjects).push([projectPath, project]);
+      });
+      return `
+        ${activeProjects.map(projectCard).join('')}
+        ${ignoredProjects.length ? `
+          <details class="dashboard-ignored-projects">
+            <summary><span class="dashboard-ignored-project-label">Ignored</span><span class="dashboard-ignored-project-count">${ignoredProjects.length}</span></summary>
+            <div class="dashboard-ignored-project-list">${ignoredProjects.map(projectCard).join('')}</div>
+          </details>` : ''}`;
     }
     const groups = new Map();
     visibleThreads.forEach((item) => {
