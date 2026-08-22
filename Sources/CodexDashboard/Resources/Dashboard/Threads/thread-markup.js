@@ -49,7 +49,6 @@ const threadMarkup = (() => {
   }
 
   function list(visibleThreads, {
-    viewMode,
     filterMode,
     collapsedProjects,
     ignoredProjectPaths,
@@ -76,12 +75,6 @@ const threadMarkup = (() => {
             ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
           </span>
         </article>`).join('');
-    }
-    if (viewMode === 'recent') {
-      return [...visibleThreads]
-        .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0))
-        .map((item) => thread(item, { showProject: true, isUnread: isUnread(item) }))
-        .join('');
     }
     const groups = new Map();
     visibleThreads.forEach((item) => {

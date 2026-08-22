@@ -1,5 +1,5 @@
 const threadDashboardPage = (() => {
-  function mount({ onFilter, onView, onSearch, onLoadMore, onListClick }) {
+  function mount({ onFilter, onSearch, onLoadMore, onListClick }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = document.createElement('section');
@@ -29,10 +29,6 @@ const threadDashboardPage = (() => {
                 <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
               </div>
             </div>
-            <div class="dashboard-view-options dashboard-view-group" aria-label="Thread view">
-              <button type="button" data-view="projects" class="is-active" aria-pressed="true" title="Group by project">${threadMarkup.icon('project')}<span class="dashboard-view-label">Projects</span></button>
-              <button type="button" data-view="recent" aria-pressed="false" title="Sort all threads by recency">${threadMarkup.icon('threads')}<span class="dashboard-view-label">Threads</span></button>
-            </div>
           </div>
         </div>
         <main class="dashboard-list" data-thread-list></main>
@@ -40,9 +36,6 @@ const threadDashboardPage = (() => {
       </div>`;
     page.querySelectorAll('[data-filter]').forEach((button) => {
       button.addEventListener('click', () => onFilter(button.dataset.filter));
-    });
-    page.querySelectorAll('[data-view]').forEach((button) => {
-      button.addEventListener('click', () => onView(button.dataset.view));
     });
     page.querySelector('[data-dashboard-search]').addEventListener('input', (event) => {
       onSearch(event.target.value);

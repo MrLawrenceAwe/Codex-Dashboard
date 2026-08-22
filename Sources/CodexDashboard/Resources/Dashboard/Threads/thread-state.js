@@ -7,8 +7,6 @@ const threadDashboardState = (() => {
     return {
       filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
         ? stored.filterMode : 'running',
-      viewMode: ['projects', 'recent'].includes(stored.viewMode)
-        ? stored.viewMode : 'projects',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
@@ -16,11 +14,10 @@ const threadDashboardState = (() => {
     };
   }
 
-  function savePreferences({ filterMode, viewMode, collapsedProjects, ignoredProjectPaths }) {
+  function savePreferences({ filterMode, collapsedProjects, ignoredProjectPaths }) {
     try {
       localStorage.setItem(preferencesKey, JSON.stringify({
         filterMode,
-        viewMode,
         collapsedProjects: [...collapsedProjects],
         ignoredProjectPaths: [...ignoredProjectPaths],
       }));

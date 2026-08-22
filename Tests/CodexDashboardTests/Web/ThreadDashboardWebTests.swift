@@ -28,7 +28,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               const search = document.querySelector('[data-dashboard-search]');
               search.value = 'Needle outside';
               search.dispatchEvent(new Event('input', { bubbles: true }));
-              document.querySelector('[data-view="projects"]').click();
+              document.querySelector('[data-filter="running"]').click();
               return [
                 initialCount,
                 loadMoreVisible,
@@ -65,7 +65,6 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               const search = document.querySelector('[data-dashboard-search]');
               search.value = 'Matching';
               search.dispatchEvent(new Event('input', { bubbles: true }));
-              document.querySelector('[data-view="projects"]').click();
               return true;
             })()
             """
@@ -137,7 +136,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(openedThreadID, "deferred-thread")
     }
 
-    func testRestoresAndSavesDashboardPreferences() async throws {
+    func testRestoresAndSavesDashboardPreferencesWithoutViewMode() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-preferences-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -169,14 +168,10 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               try {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
-              const restored = [
-                document.querySelector('[data-filter="unread"]').classList.contains('is-active'),
-                document.querySelector('[data-view="recent"]').classList.contains('is-active'),
-              ];
+              const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
               document.querySelector('[data-filter="running"]').click();
-              document.querySelector('[data-view="projects"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.thread-preferences'));
-              return JSON.stringify([restored, saved.filterMode, saved.viewMode, saved.collapsedProjects[0], saved.ignoredProjectPaths[0]]);
+              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.ignoredProjectPaths[0], document.querySelector('[data-view]') === null]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }
@@ -187,11 +182,12 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let values = try XCTUnwrap(
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
-        XCTAssertEqual(values[0] as? [Bool], [true, true])
+        XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? String, "running")
-        XCTAssertEqual(values[2] as? String, "projects")
+        XCTAssertEqual(values[2] as? Bool, false)
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
+        XCTAssertEqual(values[5] as? Bool, true)
     }
 
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
