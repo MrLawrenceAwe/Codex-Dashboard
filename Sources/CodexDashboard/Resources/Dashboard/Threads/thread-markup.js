@@ -71,7 +71,7 @@ const threadMarkup = (() => {
             <span class="dashboard-git-changes">${icon('gitChanges')}<span>Changed</span></span>
           </div>
           <span class="dashboard-project-summary">
-            <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Restore' : 'Ignore'}</span></button>
+            <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Unignore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Unignore' : 'Ignore'}</span></button>
             ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
           </span>
         </article>`).join('');
@@ -106,7 +106,7 @@ const threadMarkup = (() => {
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'thread' : 'threads'}</span>
-            ${hasChanges ? `<button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${isIgnored ? 'Restore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(isIgnored ? 'restore' : 'ignore')}<span>${isIgnored ? 'Restore' : 'Ignore'}</span></button>` : ''}
+            ${hasChanges ? `<button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${isIgnored ? 'Unignore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(isIgnored ? 'restore' : 'ignore')}<span>${isIgnored ? 'Unignore' : 'Ignore'}</span></button>` : ''}
             ${hasChanges && !isIgnored ? `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>` : ''}
           </span>
         </header>

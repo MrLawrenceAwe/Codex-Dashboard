@@ -434,7 +434,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Ignore"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Restore"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unignore"])
         XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Ignore"])
     }
 
