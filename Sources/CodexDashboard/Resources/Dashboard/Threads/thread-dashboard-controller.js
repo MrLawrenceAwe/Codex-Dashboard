@@ -8,7 +8,6 @@ let filterMode = storedPreferences.filterMode;
 let searchTerm = '';
 const threadPageSize = 60;
 let visibleThreadLimit = threadPageSize;
-let viewMode = storedPreferences.viewMode;
 const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
 let structureObserver;
 let sidebarMutationObserver;
@@ -31,7 +30,6 @@ let commitOrPushError = '';
 function saveDashboardPreferences() {
   threadDashboardState.savePreferences({
     filterMode,
-    viewMode,
     collapsedProjects,
     ignoredProjectPaths,
   });
@@ -145,7 +143,6 @@ function renderDashboard() {
     filterMode,
     searchTerm,
     visibleThreadLimit,
-    viewMode,
     collapsedProjects,
     ignoredProjectPaths,
     commitOrPushError,
@@ -294,11 +291,6 @@ function mountDashboardPage() {
   return threadDashboardPage.mount({
     onFilter: (nextFilterMode) => {
       filterMode = nextFilterMode;
-      saveDashboardPreferences();
-      renderDashboard();
-    },
-    onView: (nextViewMode) => {
-      viewMode = nextViewMode;
       saveDashboardPreferences();
       renderDashboard();
     },

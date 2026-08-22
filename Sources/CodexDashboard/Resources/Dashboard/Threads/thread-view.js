@@ -65,7 +65,6 @@ const threadDashboardView = (() => {
     filterMode,
     searchTerm,
     visibleThreadLimit,
-    viewMode,
     collapsedProjects,
     ignoredProjectPaths,
     commitOrPushError,
@@ -94,12 +93,6 @@ const threadDashboardView = (() => {
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    page.querySelectorAll('[data-view]').forEach((button) => {
-      const isActive = button.dataset.view === viewMode;
-      button.classList.toggle('is-active', isActive);
-      button.setAttribute('aria-pressed', String(isActive));
-    });
-
     const visibleThreads = threadDashboardState.filter({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
@@ -121,7 +114,6 @@ const threadDashboardView = (() => {
     updateMarkup(
       list,
       threadMarkup.list(displayedThreads, {
-        viewMode,
         filterMode,
         collapsedProjects,
         ignoredProjectPaths,
