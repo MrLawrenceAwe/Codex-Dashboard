@@ -388,7 +388,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes: dirty")
     }
 
-    func testIgnoredProjectIsRemovedFromChangeIndicatorsAndCanBeRestored() async throws {
+    func testIgnoredProjectIsRemovedFromChangeIndicatorsAndCanBeUnignored() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -419,6 +419,8 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
                 document.querySelector('[data-project-ignore]').textContent.trim(),
+                document.querySelector('.dashboard-ignored-projects')?.open,
+                document.querySelector('.dashboard-ignored-projects summary')?.textContent.trim(),
               ];
               document.querySelector('[data-project-ignore]').click();
               const restored = [
@@ -434,7 +436,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Ignore"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unignore"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unignore", false, "Ignored1"])
         XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Ignore"])
     }
 
