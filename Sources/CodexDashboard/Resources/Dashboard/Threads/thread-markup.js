@@ -42,7 +42,7 @@ const threadMarkup = (() => {
           </span>
         </span>
         <span class="dashboard-thread-actions">
-          ${thread.runState === 'running' ? '<span class="dashboard-run-status" role="status" aria-label="Running"><span class="dashboard-run-spinner" aria-hidden="true"></span><span>Running</span></span>' : ''}
+          ${thread.runState === 'running' ? '<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
           <span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>
         </span>
       </button>`;
