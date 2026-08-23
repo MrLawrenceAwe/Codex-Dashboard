@@ -6,22 +6,6 @@ struct RolloutActivityReader {
     static let finalResponsePhase = "final_answer"
     static let lifecycleEventTypes = [startedEventType] + endedEventTypes
 
-    private enum RunEventKind: Sendable {
-        case started
-        case completed
-        case aborted
-
-        var runState: ThreadRunState {
-            self == .started ? .running : .idle
-        }
-
-    }
-
-    private struct RunEvent: Sendable {
-        let kind: RunEventKind
-        let timestamp: Date
-    }
-
     private struct Envelope: Decodable {
         struct Payload: Decodable {
             let type: String?
@@ -36,7 +20,7 @@ struct RolloutActivityReader {
         let size: UInt64
         let modifiedAt: Date
         let endsWithNewline: Bool
-        let event: RunEvent?
+        let event: ThreadLifecycleEvent?
     }
 
     private var cache: [String: CacheEntry] = [:]
@@ -61,7 +45,7 @@ struct RolloutActivityReader {
         }
 
         let cached = cache[path]
-        let event: RunEvent?
+        let event: ThreadLifecycleEvent?
         let endsWithNewline: Bool
         if let cached, cached.size == size, cached.modifiedAt == modifiedAt {
             event = cached.event
@@ -89,17 +73,30 @@ struct RolloutActivityReader {
             let event,
             event.timestamp >= codexLaunchDate
         else { return .idle }
-        return event.kind.runState
+        return event.kind == .started ? .running : .idle
+    }
+
+    mutating func latestEvent(
+        at path: String,
+        codexLaunchDate: Date?
+    ) -> ThreadLifecycleEvent? {
+        _ = load(at: path, codexLaunchDate: codexLaunchDate)
+        guard
+            let codexLaunchDate,
+            let event = cache[path]?.event,
+            event.timestamp >= codexLaunchDate
+        else { return nil }
+        return event
     }
 
     private func read(
         in fileURL: URL,
         lowerBound: UInt64 = 0
-    ) -> RunEvent? {
+    ) -> ThreadLifecycleEvent? {
         let markers = [
-            (RunEventKind.started, Self.startedEventType),
-            (RunEventKind.completed, "task_complete"),
-            (RunEventKind.aborted, "turn_aborted"),
+            (ThreadLifecycleEventKind.started, Self.startedEventType),
+            (ThreadLifecycleEventKind.completed, "task_complete"),
+            (ThreadLifecycleEventKind.aborted, "turn_aborted"),
         ]
         let encodedMarkers = markers.map { (event: $0.0, data: Data(#""type":"\#($0.1)""#.utf8)) }
         let chunkSize: UInt64 = 64 * 1_024
@@ -189,8 +186,8 @@ struct RolloutActivityReader {
 
     private func inspect(
         _ line: some DataProtocol,
-        markers: [(event: RunEventKind, data: Data)]
-    ) -> RunEvent? {
+        markers: [(event: ThreadLifecycleEventKind, data: Data)]
+    ) -> ThreadLifecycleEvent? {
         let lineData = Data(line)
         guard
             markers.contains(where: { lineData.range(of: $0.data) != nil }),
@@ -200,13 +197,13 @@ struct RolloutActivityReader {
             let timestamp = envelope.timestamp,
             let date = try? Date(timestamp, strategy: .iso8601)
         else { return nil }
-        let kind: RunEventKind
+        let kind: ThreadLifecycleEventKind
         switch payloadType {
         case Self.startedEventType: kind = .started
         case "task_complete": kind = .completed
         case "turn_aborted": kind = .aborted
         default: return nil
         }
-        return RunEvent(kind: kind, timestamp: date)
+        return ThreadLifecycleEvent(kind: kind, timestamp: date)
     }
 }

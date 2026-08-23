@@ -83,6 +83,7 @@ extension DashboardCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
+        observeTaskCompletions(in: snapshot.catalog.threads)
         setThreads(snapshot.catalog.threads)
         if totalThreadCount != snapshot.catalog.totalThreadCount {
             totalThreadCount = snapshot.catalog.totalThreadCount
@@ -91,6 +92,30 @@ extension DashboardCoordinator {
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
         lastSuccessfulRefresh = .now
+    }
+
+    private func observeTaskCompletions(in updatedThreads: [ThreadSummary]) {
+        let observationDate = Date()
+        let latestEvents = Dictionary(uniqueKeysWithValues: updatedThreads.compactMap { thread in
+            thread.latestLifecycleEvent.map { (thread.id, $0) }
+        })
+        defer {
+            observedLifecycleEventsByThreadID = latestEvents
+            lastLifecycleObservationDate = observationDate
+        }
+        guard
+            foregroundOnTaskCompletion,
+            let previousEvents = observedLifecycleEventsByThreadID,
+            let lastLifecycleObservationDate
+        else { return }
+
+        let observedNewCompletion = latestEvents.contains { threadID, event in
+            guard event.kind == .completed, previousEvents[threadID] != event else { return false }
+            return previousEvents[threadID] != nil || event.timestamp > lastLifecycleObservationDate
+        }
+        if observedNewCompletion {
+            codexForegrounder.foregroundCodex()
+        }
     }
 
     private func publishSnapshotIfMaintained() async {

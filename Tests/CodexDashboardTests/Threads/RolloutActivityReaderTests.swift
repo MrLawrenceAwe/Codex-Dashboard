@@ -87,6 +87,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         var reader = RolloutActivityReader()
 
         XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
+        XCTAssertEqual(reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind, .aborted)
     }
 
     func testAppendedCompletionReusesCachedHistoryAndClearsRunningState() throws {
@@ -109,6 +110,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         try appendHandle.close()
 
         XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
+        XCTAssertEqual(reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind, .completed)
     }
 
     private func makeRollout(lines: [String]) throws -> URL {

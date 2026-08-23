@@ -5,6 +5,17 @@ enum ThreadRunState: String, Codable, Equatable, Sendable {
     case idle
 }
 
+enum ThreadLifecycleEventKind: String, Codable, Equatable, Sendable {
+    case started
+    case completed
+    case aborted
+}
+
+struct ThreadLifecycleEvent: Codable, Equatable, Sendable {
+    let kind: ThreadLifecycleEventKind
+    let timestamp: Date
+}
+
 enum WorkingTreeStatus: String, Codable, Equatable, Sendable {
     case notRepository
     case unavailable
@@ -23,6 +34,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var isUnread = false
     let model: String?
     let runState: ThreadRunState
+    let latestLifecycleEvent: ThreadLifecycleEvent?
     var workingTreeStatus: WorkingTreeStatus
 }
 

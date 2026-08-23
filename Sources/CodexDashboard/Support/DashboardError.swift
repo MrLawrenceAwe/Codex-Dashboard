@@ -16,7 +16,7 @@ enum DashboardError: LocalizedError {
         case .missingCodexApplication:
             return "The Codex app was not found in /Applications."
         case .codexQuitTimedOut:
-            return "Codex did not close. Finish any open prompt and quit it manually, then try again."
+            return "Codex could not be closed for restart. Quit it manually, then try again."
         case .rendererTimedOut:
             return "Codex reopened, but its local renderer did not become available."
         case .missingResources:
