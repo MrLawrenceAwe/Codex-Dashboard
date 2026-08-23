@@ -5,6 +5,41 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row aria-expanded="true">Expanded project</div>
+                <div data-app-action-sidebar-project-row aria-expanded="false">Collapsed project</div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const rows = [...document.querySelectorAll('[data-app-action-sidebar-project-row]')];
+              return rows.map((row) => {
+                const style = getComputedStyle(row, '::before');
+                return [style.content, style.transform, style.width, style.height];
+              });
+            })()
+            """
+        ) as? [[String]]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values.count, 2)
+        XCTAssertEqual(values[0][0], #""""#)
+        XCTAssertEqual(values[1][0], #""""#)
+        XCTAssertNotEqual(values[0][1], values[1][1])
+        XCTAssertEqual(values[0][2], "6px")
+        XCTAssertEqual(values[0][3], "6px")
+    }
+
     func testCompleteCatalogUsesClientPagingAndSearchesBeyondFirstPage() async throws {
         let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let threads = (0..<65).map { index in
