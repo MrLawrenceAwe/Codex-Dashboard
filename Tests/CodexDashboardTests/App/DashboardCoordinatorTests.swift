@@ -413,13 +413,14 @@ final class DashboardCoordinatorTests: XCTestCase {
             ),
         ])
         let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
         let coordinator = DashboardCoordinator(
             catalogProvider: provider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { runtime }
         )
 
         await coordinator.synchronizeDashboard()
@@ -427,6 +428,53 @@ final class DashboardCoordinatorTests: XCTestCase {
         await coordinator.synchronizeDashboard()
 
         XCTAssertEqual(foregrounder.callCount, 1)
+        XCTAssertEqual(runtime.openedThreadIDs, ["thread-1"])
+    }
+
+    func testNewestSimultaneousCompletionIsOpened() async {
+        let startedAt = Date().addingTimeInterval(-3)
+        let olderCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(1))
+        let newerCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(2))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [
+                    .fixture(
+                        id: "older",
+                        runState: .running,
+                        latestLifecycleEvent: ThreadLifecycleEvent(kind: .started, timestamp: startedAt)
+                    ),
+                    .fixture(
+                        id: "newer",
+                        runState: .running,
+                        latestLifecycleEvent: ThreadLifecycleEvent(kind: .started, timestamp: startedAt)
+                    ),
+                ],
+                totalThreadCount: 2
+            ),
+            ThreadCatalog(
+                threads: [
+                    .fixture(id: "older", latestLifecycleEvent: olderCompletion),
+                    .fixture(id: "newer", latestLifecycleEvent: newerCompletion),
+                ],
+                totalThreadCount: 2
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 1)
+        XCTAssertEqual(runtime.openedThreadIDs, ["newer"])
     }
 
     func testInitialCompletedSnapshotDoesNotForegroundCodex() async {
