@@ -130,12 +130,13 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         rolloutActivityReader.retainCache(for: activityPaths)
         let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
-            let runState = activityPaths.contains(thread.rolloutPath)
-                ? rolloutActivityReader.load(
+            let latestLifecycleEvent = activityPaths.contains(thread.rolloutPath)
+                ? rolloutActivityReader.latestEvent(
                     at: thread.rolloutPath,
                     codexLaunchDate: codexLaunchDate
                 )
-                : .idle
+                : nil
+            let runState: ThreadRunState = latestLifecycleEvent?.kind == .started ? .running : .idle
             return ThreadSummary(
                 id: thread.id,
                 title: thread.title,
@@ -146,6 +147,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: runState,
+                latestLifecycleEvent: latestLifecycleEvent,
                 workingTreeStatus: .notRepository
             )
         }.sorted { left, right in

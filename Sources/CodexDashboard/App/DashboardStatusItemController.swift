@@ -70,6 +70,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let launchItem = actionItem("Launch at Login", action: #selector(toggleLaunchAtLogin))
         launchItem.state = launchAtLogin.isEnabled ? .on : .off
         menu.addItem(launchItem)
+        let foregroundItem = actionItem(
+            "Bring Codex to Front on Task Completion",
+            action: #selector(toggleForegroundOnTaskCompletion)
+        )
+        foregroundItem.state = coordinator.foregroundOnTaskCompletion ? .on : .off
+        menu.addItem(foregroundItem)
         menu.addItem(actionItem("Copy Diagnostics", action: #selector(copyDiagnostics)))
         menu.addItem(.separator())
         menu.addItem(actionItem("Quit Codex Dashboard", action: #selector(quit)))
@@ -113,6 +119,10 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func toggleLaunchAtLogin() {
         launchAtLogin.setEnabled(!launchAtLogin.isEnabled)
+    }
+
+    @objc private func toggleForegroundOnTaskCompletion() {
+        coordinator.foregroundOnTaskCompletion.toggle()
     }
 
     @objc private func copyDiagnostics() {

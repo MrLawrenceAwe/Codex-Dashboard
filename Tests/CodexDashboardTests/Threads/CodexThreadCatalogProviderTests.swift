@@ -27,6 +27,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.totalThreadCount, 3)
         XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated", "idle"])
         XCTAssertEqual(catalog.threads.map(\.runState), [.running, .idle, .idle])
+        XCTAssertEqual(catalog.threads.map { $0.latestLifecycleEvent?.kind }, [.started, .completed, .completed])
         XCTAssertEqual(catalog.threads.first?.title, "Running thread")
         XCTAssertEqual(catalog.threads.first?.projectName, "running")
         XCTAssertEqual(catalog.threads.first?.projectPath, "/tmp/running")

@@ -3,6 +3,8 @@ import Foundation
 
 @MainActor
 final class DashboardCoordinator: ObservableObject {
+    static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
+
     @Published private(set) var connectionState: DashboardConnectionState = .checking
     @Published private(set) var connectionError: String?
     @Published private(set) var isPerformingAction = false
@@ -16,18 +18,25 @@ final class DashboardCoordinator: ObservableObject {
     @Published private(set) var lastErrorDate: Date?
     @Published var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
+    @Published var foregroundOnTaskCompletion: Bool {
+        didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
+    }
 
     let threadSnapshotService: ThreadSnapshotService
     let compatibilityChecker: any LocalCompatibilityChecking
     let versionTracker: CodexVersionCompatibilityTracker
     let installedCodexVersion: () -> String?
     let pollingController: DashboardPollingController
+    private let userDefaults: UserDefaults
+    let codexForegrounder: any CodexForegrounding
     private let synchronizationGate = DashboardSynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
     var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
+    var observedLifecycleEventsByThreadID: [String: ThreadLifecycleEvent]?
+    var lastLifecycleObservationDate: Date?
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -44,6 +53,7 @@ final class DashboardCoordinator: ObservableObject {
         userDefaults: UserDefaults = .standard,
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
+        codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -52,6 +62,9 @@ final class DashboardCoordinator: ObservableObject {
             unreadThreadIDProvider: unreadThreadIDProvider
         )
         self.compatibilityChecker = compatibilityChecker
+        self.userDefaults = userDefaults
+        self.codexForegrounder = codexForegrounder
+        foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion
         versionTracker = CodexVersionCompatibilityTracker(userDefaults: userDefaults)

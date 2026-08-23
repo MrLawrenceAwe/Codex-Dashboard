@@ -82,6 +82,30 @@ private actor SuspendedCatalogProvider: ThreadCatalogProviding {
     }
 }
 
+private actor SequencedCatalogProvider: ThreadCatalogProviding {
+    private var catalogs: [ThreadCatalog]
+
+    init(catalogs: [ThreadCatalog]) {
+        self.catalogs = catalogs
+    }
+
+    func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) async -> ThreadCatalog {
+        guard catalogs.count > 1 else {
+            return catalogs.first ?? ThreadCatalog(threads: [], totalThreadCount: 0)
+        }
+        return catalogs.removeFirst()
+    }
+}
+
+@MainActor
+private final class RecordingCodexForegrounder: CodexForegrounding {
+    private(set) var callCount = 0
+
+    func foregroundCodex() {
+        callCount += 1
+    }
+}
+
 private struct StubCompatibilityChecker: LocalCompatibilityChecking {
     let checks: [CompatibilityCheck]
 
@@ -373,6 +397,123 @@ final class DashboardCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.threads.map(\.id), [thread.id])
         XCTAssertTrue(coordinator.threadDataWarning?.contains("Unread state could not be refreshed") == true)
+    }
+
+    func testNewTaskCompletionForegroundsCodexAfterInitialSnapshot() async {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.synchronizeDashboard()
+        XCTAssertEqual(foregrounder.callCount, 0)
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 1)
+    }
+
+    func testInitialCompletedSnapshotDoesNotForegroundCodex() async {
+        let foregrounder = RecordingCodexForegrounder()
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: .now)
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(
+                    threads: [.fixture(latestLifecycleEvent: completed)],
+                    totalThreadCount: 1
+                )
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+    }
+
+    func testAbortedTaskDoesNotForegroundCodex() async {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let aborted = ThreadLifecycleEvent(kind: .aborted, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(latestLifecycleEvent: aborted)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+    }
+
+    func testForegroundPreferencePersistsAndSuppressesCompletionActivation() async throws {
+        let suiteName = "DashboardCoordinatorForegroundTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            userDefaults: defaults,
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+        await coordinator.synchronizeDashboard()
+
+        coordinator.foregroundOnTaskCompletion = false
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertFalse(defaults.bool(forKey: DashboardCoordinator.foregroundOnTaskCompletionKey))
+        XCTAssertEqual(foregrounder.callCount, 0)
     }
 
     func testCancelledSynchronizationCannotClearNewSynchronizationTask() async throws {
