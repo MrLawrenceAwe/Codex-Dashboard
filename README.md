@@ -29,7 +29,7 @@ It moves the installed app to the Trash.
    the main content pane while the rest of Codex navigation stays available.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
-All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground on task completion; this can be disabled from the menu bar. Use
+All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion; this can be disabled from the menu bar. Use
 **Disable Thread Dashboard** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 

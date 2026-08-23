@@ -83,7 +83,7 @@ extension DashboardCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        observeTaskCompletions(in: snapshot.catalog.threads)
+        let completedThreadID = observeTaskCompletions(in: snapshot.catalog.threads)
         setThreads(snapshot.catalog.threads)
         if totalThreadCount != snapshot.catalog.totalThreadCount {
             totalThreadCount = snapshot.catalog.totalThreadCount
@@ -92,30 +92,41 @@ extension DashboardCoordinator {
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
         lastSuccessfulRefresh = .now
+        if let completedThreadID {
+            codexForegrounder.foregroundCodex()
+            await dashboardRuntime?.openThread(completedThreadID)
+        }
     }
 
-    private func observeTaskCompletions(in updatedThreads: [ThreadSummary]) {
+    private func observeTaskCompletions(in updatedThreads: [ThreadSummary]) -> String? {
         let observationDate = Date()
         let latestEvents = Dictionary(uniqueKeysWithValues: updatedThreads.compactMap { thread in
             thread.latestLifecycleEvent.map { (thread.id, $0) }
         })
-        defer {
-            observedLifecycleEventsByThreadID = latestEvents
-            lastLifecycleObservationDate = observationDate
-        }
+        let previousEvents = observedLifecycleEventsByThreadID
+        let previousObservationDate = lastLifecycleObservationDate
+        observedLifecycleEventsByThreadID = latestEvents
+        lastLifecycleObservationDate = observationDate
         guard
             foregroundOnTaskCompletion,
-            let previousEvents = observedLifecycleEventsByThreadID,
-            let lastLifecycleObservationDate
-        else { return }
+            let previousEvents,
+            let previousObservationDate
+        else { return nil }
 
-        let observedNewCompletion = latestEvents.contains { threadID, event in
-            guard event.kind == .completed, previousEvents[threadID] != event else { return false }
-            return previousEvents[threadID] != nil || event.timestamp > lastLifecycleObservationDate
+        let newCompletions = latestEvents.compactMap { threadID, event -> (threadID: String, event: ThreadLifecycleEvent)? in
+            guard
+                event.kind == .completed,
+                previousEvents[threadID] != event,
+                previousEvents[threadID] != nil || event.timestamp > previousObservationDate
+            else { return nil }
+            return (threadID, event)
         }
-        if observedNewCompletion {
-            codexForegrounder.foregroundCodex()
-        }
+        return newCompletions.max { left, right in
+            if left.event.timestamp == right.event.timestamp {
+                return left.threadID < right.threadID
+            }
+            return left.event.timestamp < right.event.timestamp
+        }?.threadID
     }
 
     private func publishSnapshotIfMaintained() async {
