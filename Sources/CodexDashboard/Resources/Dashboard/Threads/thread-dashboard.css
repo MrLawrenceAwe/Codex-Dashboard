@@ -49,6 +49,24 @@ html.codex-dashboard-open aside.app-shell-left-panel {
   z-index: 2147483645;
 }
 
+/* Keep Codex's native project toggle behavior, but make it discoverable. */
+aside [data-app-action-sidebar-project-row][aria-expanded]::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  margin-inline: 8px -2px;
+  content: "";
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  opacity: .62;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
+  transform: rotate(45deg);
+}
+
 #codex-dashboard-page {
   position: fixed;
   z-index: 2147483644;
@@ -191,6 +209,7 @@ html.codex-dashboard-open aside.app-shell-left-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  aside [data-app-action-sidebar-project-row][aria-expanded]::before,
   #codex-dashboard-page, #codex-dashboard-page .dashboard-thread, #codex-dashboard-page .dashboard-open-affordance, #codex-dashboard-page .dashboard-project-chevron { transition: none; }
   #codex-dashboard-navigation .dashboard-nav-spinner::before, #codex-dashboard-page .dashboard-run-spinner::before { animation: none; }
 }
