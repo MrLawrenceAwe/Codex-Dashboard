@@ -177,6 +177,21 @@ struct DiagnosticsWindowView: View {
 
             CompatibilityCard(coordinator: coordinator)
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Prompt library")
+                    .font(.system(size: 12, weight: .medium))
+                HStack(spacing: 8) {
+                    Button("Import…") { Task { await coordinator.importPromptLibrary() } }
+                    Button("Export…") { coordinator.exportPromptLibrary() }
+                    Button("Show File") { coordinator.revealPromptLibrary() }
+                }
+                if let message = coordinator.promptLibraryStatusMessage {
+                    Text(message)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             VStack(alignment: .leading, spacing: 5) {
                 Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
                 Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total threads")
@@ -210,6 +225,6 @@ struct DiagnosticsWindowView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
-        .frame(width: 620, height: 560, alignment: .topLeading)
+        .frame(width: 620, height: 620, alignment: .topLeading)
     }
 }

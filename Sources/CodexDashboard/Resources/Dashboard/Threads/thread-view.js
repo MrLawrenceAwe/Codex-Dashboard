@@ -86,6 +86,7 @@ const threadDashboardView = (() => {
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
+      all: threads.length,
       running: state.runningThreads.length,
       unread: state.unreadCount,
       changedProjects: state.changedProjectPaths.size,

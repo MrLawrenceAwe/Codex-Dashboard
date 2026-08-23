@@ -58,9 +58,13 @@ const threadMarkup = (() => {
       const projects = new Map();
       visibleThreads.forEach((item) => {
         const projectPath = String(item.projectPath).trim();
-        if (!projects.has(projectPath)) projects.set(projectPath, item);
+        if (!projects.has(projectPath)) projects.set(projectPath, []);
+        projects.get(projectPath).push(item);
       });
-      const projectCard = ([projectPath, project]) => `
+      const projectCard = ([projectPath, projectThreads]) => {
+        const project = projectThreads[0];
+        const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
+        return `
         <article class="dashboard-git-project">
           <div class="dashboard-git-project-copy">
             <span class="dashboard-project-icon">${icon('project')}</span>
@@ -72,9 +76,10 @@ const threadMarkup = (() => {
           </div>
           <span class="dashboard-project-summary">
             <button type="button" class="dashboard-project-ignore" data-project-ignore="${dashboardElements.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Unignore change notifications for this project' : 'Ignore change notifications for this project'}">${icon(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Unignore' : 'Ignore'}</span></button>
-            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>`}
+            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle thread'}"${hasIdleThread ? '' : ' disabled'}>${icon('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`}
           </span>
         </article>`;
+      };
       const activeProjects = [];
       const ignoredProjects = [];
       projects.forEach((project, projectPath) => {

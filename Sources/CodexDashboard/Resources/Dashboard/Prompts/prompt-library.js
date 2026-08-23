@@ -23,7 +23,10 @@ const promptLibrary = (() => {
   ];
 
   function selectOptions(options, selectedValue) {
-    return options.map(([value, label]) => (
+    const availableOptions = options.some(([value]) => value === selectedValue) || !selectedValue
+      ? options
+      : [[selectedValue, `Saved model · ${selectedValue}`], ...options];
+    return availableOptions.map(([value, label]) => (
       `<option value="${value}"${value === selectedValue ? ' selected' : ''}>${label}</option>`
     )).join('');
   }
@@ -31,7 +34,8 @@ const promptLibrary = (() => {
   function presetSummary(preset) {
     if (!preset) return [];
     return [
-      presetModelOptions.find(([value]) => value === preset.model)?.[1],
+      presetModelOptions.find(([value]) => value === preset.model)?.[1]
+        || (preset.model ? `Saved model · ${preset.model}` : undefined),
       presetReasoningOptions.find(([value]) => value === preset.reasoningEffort)?.[1],
       presetSpeedOptions.find(([value]) => value === preset.speed)?.[1],
     ].filter(Boolean);
@@ -564,5 +568,9 @@ function unmount() {
   close({ restoreFocus: false });
 }
 
-  return { mount, unmount };
+function refresh() {
+  if (document.getElementById(dashboardElements.elementIDs.promptDialog)) renderDialog();
+}
+
+  return { mount, refresh, unmount };
 })();

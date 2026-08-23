@@ -33,10 +33,11 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
 
     init(
         codex: CodexProcessController = CodexProcessController(),
-        renderer: DashboardRenderer? = nil
+        renderer: DashboardRenderer? = nil,
+        promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore()
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? DashboardRenderer()
+        self.renderer = try renderer ?? DashboardRenderer(promptLibraryStore: promptLibraryStore)
     }
 
     var codexIsRunning: Bool { codex.isRunning }

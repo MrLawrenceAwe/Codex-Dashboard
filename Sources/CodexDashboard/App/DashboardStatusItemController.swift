@@ -77,6 +77,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         foregroundItem.state = coordinator.foregroundOnTaskCompletion ? .on : .off
         menu.addItem(foregroundItem)
         menu.addItem(actionItem("Copy Diagnostics", action: #selector(copyDiagnostics)))
+        menu.addItem(actionItem("Export Prompt Library…", action: #selector(exportPromptLibrary)))
         menu.addItem(.separator())
         menu.addItem(actionItem("Quit Codex Dashboard", action: #selector(quit)))
     }
@@ -127,6 +128,10 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func copyDiagnostics() {
         coordinator.copyDiagnostics()
+    }
+
+    @objc private func exportPromptLibrary() {
+        coordinator.exportPromptLibrary()
     }
 
     @objc private func quit() {

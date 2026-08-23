@@ -27,7 +27,7 @@ const promptStore = (() => {
     }
   }
 
-  function loadLibrary() {
+  function loadLegacyLibrary() {
     const storedLibrary = readJSON(libraryStorageKey, null);
     if (!promptLibraryContract.isValidLibrary(storedLibrary)) {
       return { version: 3, prompts: [], sections: [] };
@@ -39,7 +39,7 @@ const promptStore = (() => {
     };
   }
 
-  const library = loadLibrary();
+  const library = loadLegacyLibrary();
   const storedCollapsedSections = readJSON(collapsedSectionsStorageKey, []);
   const store = {
     prompts: library.prompts,
@@ -63,17 +63,8 @@ const promptStore = (() => {
       ) || normalizedSection;
     },
 
-    saveLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
-      return writeJSON(libraryStorageKey, {
-        version: 3,
-        prompts: nextPrompts,
-        sections: normalizeSections(nextSections, nextPrompts),
-      });
-    },
-
     commitLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);
-      if (!store.saveLibrary(nextPrompts, sections)) return false;
       store.prompts = nextPrompts;
       store.sections = sections;
       return true;
@@ -81,6 +72,22 @@ const promptStore = (() => {
 
     saveCollapsedSections(sections = store.collapsedSections) {
       return writeJSON(collapsedSectionsStorageKey, [...sections]);
+    },
+
+    exportLibrary() {
+      return {
+        version: 3,
+        prompts: store.prompts,
+        sections: normalizeSections(store.sections, store.prompts),
+      };
+    },
+
+    applyLibrary(library) {
+      if (!promptLibraryContract.isValidLibrary(library)) return false;
+      store.prompts = normalizePrompts(library.prompts);
+      store.sections = normalizeSections(library.sections, library.prompts);
+      try { localStorage.removeItem(libraryStorageKey); } catch (_) {}
+      return true;
     },
   };
   return store;
