@@ -4,5 +4,11 @@ window.__codexDashboard = {
   destroy: threadDashboard.destroy,
   open: threadDashboard.open,
   applySnapshot: threadDashboard.applySnapshot,
+  exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
+  applyPromptLibrary: (library) => {
+    const applied = promptStore.applyLibrary(library);
+    if (applied) promptLibrary.refresh();
+    return applied;
+  },
 };
 return threadDashboard.ensureMounted();

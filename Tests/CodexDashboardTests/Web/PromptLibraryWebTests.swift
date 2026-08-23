@@ -238,7 +238,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 .map((heading) => heading.textContent);
               const projectANames = [...document.querySelectorAll('[data-prompt-use] strong')]
                 .map((name) => name.textContent);
-              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
 
               document.querySelector('.dashboard-prompt-icon-button').click();
               activeThreadProps.conversationId = 'project-b-thread';
@@ -313,7 +313,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[name="name"]').value = 'New chat project prompt';
               document.querySelector('[name="content"]').value = 'Project-only content';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
               return {
                 headings: [...document.querySelectorAll('.dashboard-prompt-scope > h3')]
                   .map((heading) => heading.textContent),
@@ -529,7 +529,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
 
     func testPromptSectionSurvivesAfterItsLastPromptIsDeleted() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
-        _ = try await webView.evaluateJavaScript(
+        let exportedLibrary = try await webView.evaluateJavaScript(
             """
             (() => {
               document.querySelector('[data-codex-prompt-launcher]').click();
@@ -540,16 +540,20 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               document.querySelector('[data-prompt-delete]').click();
               document.querySelector('[data-prompt-delete-confirm]').click();
+              const exported = window.__codexDashboard.exportPromptLibrary();
               window.__codexDashboard.destroy();
+              return exported;
             })()
             """
-        )
+        ) as? String
 
         let injection = try DashboardInjectionResources.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let library = try XCTUnwrap(exportedLibrary)
         let sectionSurvived = try await webView.evaluateJavaScript(
             """
             (() => {
+              window.__codexDashboard.applyPromptLibrary(\(library));
               document.querySelector('[data-codex-prompt-launcher]').click();
               return Boolean(document.querySelector('[data-prompt-section="Keep me"]'));
             })()
@@ -582,7 +586,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 hasError,
                 general: Boolean(document.querySelector('[data-prompt-section="General"]')),
                 codeReview: Boolean(document.querySelector('[data-prompt-section="Code review"]')),
-                storedSections: JSON.parse(localStorage.getItem('codex-dashboard.prompt-library')).sections,
+                storedSections: JSON.parse(window.__codexDashboard.exportPromptLibrary()).sections,
               };
             })()
             """
@@ -595,7 +599,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["storedSections"] as? [String], ["General", "Code review"])
     }
 
-    func testPromptStorageFailureAndDialogKeyboardBehavior() async throws {
+    func testPromptDialogKeyboardBehaviorAndInMemorySave() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
 
         let result = try await webView.evaluateJavaScript(
@@ -621,16 +625,13 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Unsaved prompt';
               document.querySelector('[name="content"]').value = 'This must not appear as saved.';
-              const originalSetItem = Storage.prototype.setItem;
-              Storage.prototype.setItem = function setItem() { throw new Error('storage unavailable'); };
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              Storage.prototype.setItem = originalSetItem;
               return [
                 tabWrapped,
                 escapeClosedFromOutside,
-                Boolean(document.querySelector('[data-prompt-form]')),
-                !document.querySelector('[data-prompt-storage-error]').hidden,
-                !document.querySelector('[data-prompt-use]'),
+                !document.querySelector('[data-prompt-form]'),
+                document.querySelector('[data-prompt-storage-error]').hidden,
+                Boolean(document.querySelector('[data-prompt-use]')),
               ];
             })()
             """
@@ -703,7 +704,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               const deleteButton = document.querySelector('[data-prompt-section-delete="Operations"]');
               deleteButton.click();
               deleteButton.click();
-              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
               return [
                 orderAfterMove.join(','),
                 stored.prompts.map((prompt) => prompt.name).join(','),
@@ -833,11 +834,11 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
                 .map((item) => item.textContent);
-              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
               const usePresetCheckbox = document.querySelector('[data-prompt-use-preset]');
               const usesPresetByDefault = usePresetCheckbox.checked;
               usePresetCheckbox.click();
-              const storedWithPresetEnabled = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const storedWithPresetEnabled = JSON.parse(window.__codexDashboard.exportPromptLibrary());
               document.querySelector('[data-prompt-use]').click();
               const deadline = performance.now() + 4000;
               while (document.querySelector('textarea').value !== 'Review this change'
@@ -895,6 +896,43 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values["dialogClosed"] as? Bool, true)
     }
 
+    func testUnknownSavedModelRemainsVisibleAndRoundTrips() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyPromptLibrary({
+                version: 3,
+                sections: ['General'],
+                prompts: [{
+                  id: 'future-model',
+                  name: 'Future model prompt',
+                  content: 'Keep the model identifier',
+                  section: 'General',
+                  scope: { type: 'global' },
+                  preset: { model: 'gpt-7-preview', reasoningEffort: 'high', speed: 'fast' },
+                  usePreset: true,
+                }],
+              });
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
+                .map((item) => item.textContent);
+              document.querySelector('[data-prompt-edit]').click();
+              const selectedLabel = document.querySelector('[name="presetModel"]')
+                .selectedOptions[0].textContent;
+              document.querySelector('[data-prompt-form] button[type="submit"]').click();
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
+              return [summary, selectedLabel, stored.prompts[0].preset.model];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["Saved model · gpt-7-preview", "High", "Fast"])
+        XCTAssertEqual(values[1] as? String, "Saved model · gpt-7-preview")
+        XCTAssertEqual(values[2] as? String, "gpt-7-preview")
+    }
+
     func testNewPromptCanBeSavedWithoutModelPreset() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
@@ -910,7 +948,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[name="name"]').value = 'Plain prompt';
               document.querySelector('[name="content"]').value = 'Insert without changing my model';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
-              const stored = JSON.parse(localStorage.getItem('codex-dashboard.prompt-library'));
+              const stored = JSON.parse(window.__codexDashboard.exportPromptLibrary());
               const row = document.querySelector('[data-prompt-use]');
               return JSON.stringify({
                 defaults,

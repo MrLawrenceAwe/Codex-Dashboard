@@ -834,6 +834,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="running"]').click();
               return [
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
@@ -858,6 +859,75 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? String, "Running 3")
         XCTAssertEqual(values[5] as? String, "3")
         XCTAssertEqual(values[6] as? String, "3 running, 0 unread, 0 changed projects")
+    }
+
+    func testAllFilterIsDefaultAndSearchesIdleCleanThreads() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "running", title: "Active work", runState: .running),
+            .fixture(id: "idle", title: "Archived needle", runState: .idle),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const allIsActive = document.querySelector('[data-filter="all"]').classList.contains('is-active');
+              const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                .map((thread) => thread.dataset.threadId);
+              const search = document.querySelector('[data-dashboard-search]');
+              search.value = 'Archived needle';
+              search.dispatchEvent(new Event('input', { bubbles: true }));
+              document.querySelector('[data-filter="all"]').click();
+              return [
+                allIsActive,
+                initialIDs,
+                [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                  .map((thread) => thread.dataset.threadId),
+                document.querySelector('[data-filter-count="all"]').textContent,
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? [String], ["running", "idle"])
+        XCTAssertEqual(values[2] as? [String], ["idle"])
+        XCTAssertEqual(values[3] as? String, "2")
+    }
+
+    func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "running-dirty",
+                projectPath: "/tmp/running-dirty",
+                runState: .running,
+                workingTreeStatus: .hasChanges
+            ),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              const commit = document.querySelector('[data-project-commit]');
+              return [
+                document.querySelector('[data-summary-count="changed"]').textContent,
+                document.querySelector('[data-filter-count="changedProjects"]').textContent,
+                Boolean(document.querySelector('.dashboard-git-project')),
+                commit.disabled,
+                commit.textContent.trim(),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", "1", true, true, "Task running"])
     }
 
     func testThreadRowUsesNativeButtonAndOpensFromActivation() async throws {

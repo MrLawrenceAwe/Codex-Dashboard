@@ -12,8 +12,10 @@ final class DashboardRenderer {
     private let devTools: any DevToolsServing
     private let injectionPayload: DashboardInjectionResources
     private let compatibilityChecker: RendererCompatibilityChecker
+    private let promptLibraryStore: PromptLibraryFileStore?
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshotPayload?
+    private var lastDeliveredPromptLibrary: PromptLibraryDocument?
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var pendingSynchronization: PendingSynchronization?
@@ -28,11 +30,13 @@ final class DashboardRenderer {
     init(
         devTools: any DevToolsServing = DevToolsClient(),
         injectionPayload: DashboardInjectionResources? = nil,
+        promptLibraryStore: PromptLibraryFileStore? = nil,
         healthCheckInterval: TimeInterval = 30,
         now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
         self.injectionPayload = try injectionPayload ?? DashboardInjectionResources.load()
+        self.promptLibraryStore = promptLibraryStore
         self.healthCheckInterval = healthCheckInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
@@ -144,6 +148,7 @@ final class DashboardRenderer {
         let targetIDs = Set(targets.map(\.id))
         let snapshotChanged = snapshot != lastSnapshot || targetIDs != mountedTargetIDs
         var mountedDashboard = false
+        var healthyTargets: [DevToolsTarget] = []
 
         for target in targets {
             try Task.checkCancellation()
@@ -171,10 +176,17 @@ final class DashboardRenderer {
                 guard !Task.isCancelled, maintainsDashboard else { return }
                 mountedDashboard = true
                 lastHealthCheckByTargetID[target.id] = now()
+            } else {
+                healthyTargets.append(target)
             }
         }
 
         guard !Task.isCancelled, maintainsDashboard else { return }
+        try await synchronizePromptLibrary(
+            on: targets,
+            healthyTargets: healthyTargets,
+            mountedDashboard: mountedDashboard
+        )
         if mountedDashboard || snapshotChanged {
             try await deliver(snapshot, to: targets)
             guard !Task.isCancelled, maintainsDashboard else { return }
@@ -238,9 +250,43 @@ final class DashboardRenderer {
         }
     }
 
+    private func synchronizePromptLibrary(
+        on targets: [DevToolsTarget],
+        healthyTargets: [DevToolsTarget],
+        mountedDashboard: Bool
+    ) async throws {
+        guard let promptLibraryStore, let firstTarget = targets.first else { return }
+        let storedBeforeSynchronization = try promptLibraryStore.load()
+        let nativeLibraryChanged = storedBeforeSynchronization != lastDeliveredPromptLibrary
+        let sourceTarget = healthyTargets.first ?? (storedBeforeSynchronization == nil ? firstTarget : nil)
+
+        if !nativeLibraryChanged, let sourceTarget,
+           let serialized = try await devTools.evaluateString(
+               DashboardRendererScript.exportPromptLibrary,
+               in: sourceTarget
+           ),
+           let data = serialized.data(using: .utf8),
+           let rendererLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
+           rendererLibrary.isValid
+        {
+            _ = try promptLibraryStore.save(rendererLibrary)
+        }
+
+        guard let nativeLibrary = try promptLibraryStore.load() else { return }
+        guard mountedDashboard || nativeLibrary != lastDeliveredPromptLibrary else { return }
+        let expression = try DashboardRendererScript.deliverPromptLibrary(nativeLibrary)
+        for target in targets {
+            guard try await devTools.evaluateBoolean(expression, in: target) else {
+                throw DashboardError.enableFailed("The prompt library was unavailable in the Codex renderer.")
+            }
+        }
+        lastDeliveredPromptLibrary = nativeLibrary
+    }
+
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
+        lastDeliveredPromptLibrary = nil
         lastHealthCheckByTargetID = [:]
         invalidateTargetCache()
     }

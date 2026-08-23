@@ -18,6 +18,7 @@ final class DashboardCoordinator: ObservableObject {
     @Published private(set) var lastErrorDate: Date?
     @Published var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
+    @Published var promptLibraryStatusMessage: String?
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -29,6 +30,7 @@ final class DashboardCoordinator: ObservableObject {
     let pollingController: DashboardPollingController
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
+    let promptLibraryStore: PromptLibraryFileStore
     private let synchronizationGate = DashboardSynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -54,6 +56,7 @@ final class DashboardCoordinator: ObservableObject {
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
+        promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -64,6 +67,7 @@ final class DashboardCoordinator: ObservableObject {
         self.compatibilityChecker = compatibilityChecker
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
+        self.promptLibraryStore = promptLibraryStore
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion

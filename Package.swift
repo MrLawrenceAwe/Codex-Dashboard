@@ -15,7 +15,8 @@ let package = Package(
         .testTarget(
             name: "CodexDashboardTests",
             dependencies: ["CodexDashboard"],
-            path: "Tests/CodexDashboardTests"
+            path: "Tests/CodexDashboardTests",
+            resources: [.copy("VisualBaselines")]
         ),
     ]
 )

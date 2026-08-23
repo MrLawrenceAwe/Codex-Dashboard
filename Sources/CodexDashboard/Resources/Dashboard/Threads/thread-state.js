@@ -5,8 +5,8 @@ const threadDashboardState = (() => {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(preferencesKey) || '{}'); } catch (_) {}
     return {
-      filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'running',
+      filterMode: ['all', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'all',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
@@ -30,13 +30,13 @@ const threadDashboardState = (() => {
       unreadCount: threads.filter(isThreadUnread).length,
       changedProjectPaths: new Set(
         threads
-          .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
+          .filter((thread) => thread.workingTreeStatus === 'hasChanges')
           .map((thread) => String(thread.projectPath).trim())
           .filter((path) => !ignoredProjectPaths.has(path)),
       ),
       allChangedProjectPaths: new Set(
         threads
-          .filter((thread) => thread.runState !== 'running' && thread.workingTreeStatus === 'hasChanges')
+          .filter((thread) => thread.workingTreeStatus === 'hasChanges')
           .map((thread) => String(thread.projectPath).trim()),
       ),
       dirtyProjectPaths: new Set(
@@ -57,7 +57,8 @@ const threadDashboardState = (() => {
   }) {
     const query = searchTerm.trim().toLowerCase();
     return threads.filter((thread) => {
-      const matchesFilter = (filterMode === 'running' && thread.runState === 'running')
+      const matchesFilter = filterMode === 'all'
+        || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));

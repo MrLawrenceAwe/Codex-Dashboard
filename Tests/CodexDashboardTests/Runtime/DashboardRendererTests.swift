@@ -154,8 +154,77 @@ private actor FailingRendererDevTools: DevToolsServing {
     func requests() -> Int { targetRequestCount }
 }
 
+private actor PromptLibraryRendererDevTools: DevToolsServing {
+    private let target: DevToolsTarget
+    private var exportedLibrary: String
+    private var booleanExpressions: [String] = []
+
+    init(target: DevToolsTarget, exportedLibrary: String) {
+        self.target = target
+        self.exportedLibrary = exportedLibrary
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] { [target] }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool {
+        booleanExpressions.append(expression)
+        return true
+    }
+
+    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+        exportedLibrary
+    }
+
+    func expressions() -> [String] { booleanExpressions }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testPromptLibraryMigratesToNativeStoreAndExternalImportWins() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let rendererLibrary = #"{"version":3,"prompts":[{"id":"old","name":"Old","content":"Old content","scope":{"type":"global"},"preset":{"model":"gpt-future"}}],"sections":[]}"#
+        let devTools = PromptLibraryRendererDevTools(target: target, exportedLibrary: rendererLibrary)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("renderer-prompts-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount"),
+            promptLibraryStore: store
+        )
+        let snapshot = DashboardSnapshotPayload(threads: [])
+
+        try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
+        XCTAssertEqual(try store.load()?.prompts.first?.preset?.model, "gpt-future")
+
+        let imported = PromptLibraryDocument(
+            version: 3,
+            prompts: [SavedPrompt(
+                id: "imported",
+                name: "Imported",
+                content: "Imported content",
+                section: "General",
+                scope: SavedPromptScope(type: "global", projectPath: nil),
+                preset: nil,
+                usePreset: nil
+            )],
+            sections: ["General"]
+        )
+        try store.save(imported)
+        try await renderer.synchronize(snapshot, on: [target])
+
+        XCTAssertEqual(try store.load(), imported)
+        let expressions = await devTools.expressions()
+        XCTAssertTrue(expressions.contains { $0.contains("Imported content") })
+    }
+
     func testOpeningThreadDispatchesItsRoute() async throws {
         let target = DevToolsTarget(
             id: "main",

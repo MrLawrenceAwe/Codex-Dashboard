@@ -1,7 +1,4 @@
 const promptLibraryContract = (() => {
-  const modelValues = new Set([
-    'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini',
-  ]);
   const reasoningEffortValues = new Set(['low', 'medium', 'high', 'xhigh']);
   const speedValues = new Set(['standard', 'fast']);
 
@@ -42,7 +39,7 @@ const promptLibraryContract = (() => {
 
   function isValidPreset(preset) {
     if (!preset || typeof preset !== 'object' || Array.isArray(preset)) return false;
-    return (preset.model === undefined || modelValues.has(preset.model))
+    return (preset.model === undefined || (typeof preset.model === 'string' && Boolean(preset.model.trim())))
       && (preset.reasoningEffort === undefined || reasoningEffortValues.has(preset.reasoningEffort))
       && (preset.speed === undefined || speedValues.has(preset.speed));
   }
