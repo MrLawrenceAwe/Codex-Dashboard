@@ -171,7 +171,13 @@ function requestDashboardRender() {
 
 function syncContentInset() {
   const sidebar = codexHost.sidebar();
-  const width = sidebar ? Math.max(0, sidebar.getBoundingClientRect().right) : 0;
+  const pageHost = codexHost.pageHost();
+  const sidebarRect = sidebar?.getBoundingClientRect();
+  const hostRect = pageHost?.getBoundingClientRect();
+  const hostScale = pageHost?.offsetWidth > 0 ? hostRect.width / pageHost.offsetWidth : 1;
+  const width = sidebarRect && hostRect && Number.isFinite(hostScale) && hostScale > 0
+    ? Math.max(0, (sidebarRect.right - hostRect.left) / hostScale)
+    : 0;
   document.documentElement.style.setProperty('--codex-dashboard-content-left', `${Math.round(width)}px`);
 }
 
