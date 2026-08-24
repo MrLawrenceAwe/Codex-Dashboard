@@ -49,6 +49,11 @@ html.codex-dashboard-open aside.app-shell-left-panel {
   z-index: 2147483645;
 }
 
+/* The raised sidebar also exposes Codex's otherwise-hidden resize hit area. */
+html.codex-dashboard-open aside.app-shell-left-panel > .cursor-col-resize {
+  display: none;
+}
+
 /* Keep Codex's native project toggle behavior, but make it discoverable. */
 aside [data-app-action-sidebar-project-row][aria-expanded]::before {
   width: 6px;
