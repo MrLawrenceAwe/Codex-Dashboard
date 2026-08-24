@@ -176,6 +176,8 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-thread-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
 #codex-dashboard-page .dashboard-run-spinner { position: relative; display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; border-radius: 50%; color: var(--dashboard-green); }
 #codex-dashboard-page .dashboard-run-spinner::before { width: 12px; height: 12px; box-sizing: border-box; content: ""; border: 1.5px solid color-mix(in srgb, var(--dashboard-green) 20%, transparent); border-top-color: currentColor; border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
+#codex-dashboard-page .dashboard-completed-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; color: var(--dashboard-green); }
+#codex-dashboard-page .dashboard-completed-status svg { width: 18px; height: 18px; stroke-width: 2; }
 #codex-dashboard-page .dashboard-open-affordance { display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--dashboard-dim); opacity: .58; transition: color 100ms ease, opacity 100ms ease; }
 #codex-dashboard-page .dashboard-thread:hover .dashboard-open-affordance, #codex-dashboard-page .dashboard-thread:focus-visible .dashboard-open-affordance { color: var(--dashboard-text); opacity: 1; }
 #codex-dashboard-page .dashboard-open-affordance svg { width: 15px; height: 15px; }

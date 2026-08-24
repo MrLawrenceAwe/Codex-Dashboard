@@ -369,6 +369,10 @@ function closeDashboard() {
   scheduleUnreadSync();
 }
 
+function isOpen() {
+  return dashboardIsOpen;
+}
+
 function applySnapshot(nextSnapshot) {
   const snapshot = threadDashboardState.normalizeSnapshot(nextSnapshot);
   threads = snapshot.threads;
@@ -477,6 +481,7 @@ return {
   ensureMounted,
   destroy,
   open: openDashboard,
+  isOpen,
   applySnapshot,
   activeProject,
 };

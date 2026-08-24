@@ -10,6 +10,7 @@ const threadMarkup = (() => {
       chevron: '<path d="m9 18 6-6-6-6"/>',
       ignore: '<path d="M4 4l16 16M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.6 10.6 0 0 1 21 12a12.7 12.7 0 0 1-3.1 4.2M6.2 6.2A12.8 12.8 0 0 0 3 12a10.7 10.7 0 0 0 6.1 6.9"/>',
       restore: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
+      completed: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/>',
     };
     return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
   }
@@ -26,6 +27,12 @@ const threadMarkup = (() => {
 
   function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open thread: ${thread.title}`;
+    const isCompleted = thread.latestLifecycleEventKind === 'completed';
+    const statusMarkup = thread.runState === 'running'
+      ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>`
+      : isCompleted
+        ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${icon('completed')}</span>`
+        : `<span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>`;
     return `
       <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${dashboardElements.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${dashboardElements.escapeHTML(thread.id)}" data-open-thread="${dashboardElements.escapeHTML(thread.id)}" aria-label="${dashboardElements.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">
@@ -42,8 +49,7 @@ const threadMarkup = (() => {
           </span>
         </span>
         <span class="dashboard-thread-actions">
-          ${thread.runState === 'running' ? '<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span>' : ''}
-          <span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>
+          ${statusMarkup}
         </span>
       </button>`;
   }

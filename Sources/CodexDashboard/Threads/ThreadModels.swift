@@ -54,6 +54,7 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
     let isUnread: Bool
     let model: String?
     let runState: ThreadRunState
+    let latestLifecycleEventKind: ThreadLifecycleEventKind?
     let workingTreeStatus: WorkingTreeStatus
 
     init(_ thread: ThreadSummary) {
@@ -67,6 +68,7 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
         isUnread = thread.isUnread
         model = thread.model
         runState = thread.runState
+        latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
         workingTreeStatus = thread.workingTreeStatus
     }
 }

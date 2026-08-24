@@ -1012,4 +1012,60 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "2")
     }
 
+    func testCompletedThreadShowsTickInsteadOfOpenArrow() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "completed",
+                title: "Finished work",
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: .now)
+            ),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const row = document.querySelector('[data-thread-id="completed"]');
+              return [
+                Boolean(row.querySelector('.dashboard-completed-status')),
+                Boolean(row.querySelector('.dashboard-open-affordance')),
+                row.querySelector('.dashboard-completed-status')?.getAttribute('aria-label'),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], [true, false, "Completed"])
+    }
+
+    func testCompletionRouteDoesNotReplaceOpenDashboard() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let expression = try XCTUnwrap(DashboardRendererScript.openThread("completed-thread"))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.documentElement.dataset.routeCount = '0';
+              window.addEventListener('message', (event) => {
+                if (event.data?.type === 'navigate-to-route') {
+                  document.documentElement.dataset.routeCount = String(
+                    Number(document.documentElement.dataset.routeCount) + 1
+                  );
+                }
+              });
+              window.__codexDashboard.open();
+              \(expression);
+              return [
+                document.documentElement.dataset.routeCount,
+                window.__codexDashboard.isOpen(),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["0", true])
+    }
+
 }
