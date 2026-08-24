@@ -1,5 +1,5 @@
 const promptLibraryContract = (() => {
-  const reasoningEffortValues = new Set(['low', 'medium', 'high', 'xhigh']);
+  const reasoningEffortValues = new Set(['light', 'medium', 'high', 'xhigh']);
   const speedValues = new Set(['standard', 'fast']);
 
   function normalizeSection(value) {
