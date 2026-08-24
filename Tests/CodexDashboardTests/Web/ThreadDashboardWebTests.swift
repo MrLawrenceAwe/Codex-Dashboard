@@ -5,13 +5,19 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
-    func testDashboardHidesSidebarResizeHandleOnlyWhileOpen() async throws {
+    func testDashboardInsetAccountsForScaledCodexShell() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside class="app-shell-left-panel" role="navigation">
-                <div class="cursor-col-resize"></div>
-              </aside>
+            <!doctype html><html><head><meta charset="utf-8"><style>
+              body { margin: 0; }
+              .shell { display: flex; width: 1000px; zoom: .6; }
+              aside { width: 275px; flex: 0 0 275px; }
+              main { flex: 1; }
+            </style></head><body>
+              <div class="shell">
+                <aside class="app-shell-left-panel" role="navigation"></aside>
+                <main>Conversation surface</main>
+              </div>
             </body></html>
             """
         )
@@ -19,18 +25,19 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              const handle = document.querySelector('.cursor-col-resize');
-              const closedDisplay = getComputedStyle(handle).display;
-              document.documentElement.classList.add('codex-dashboard-open');
-              const openDisplay = getComputedStyle(handle).display;
-              return [closedDisplay, openDisplay];
+              const sidebarRight = document.querySelector('aside').getBoundingClientRect().right;
+              const pageLeft = document.querySelector('#codex-dashboard-page').getBoundingClientRect().left;
+              const inset = getComputedStyle(document.documentElement)
+                .getPropertyValue('--codex-dashboard-content-left');
+              return [sidebarRight, pageLeft, inset];
             })()
             """
-        ) as? [String]
+        ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertNotEqual(values[0], "none")
-        XCTAssertEqual(values[1], "none")
+        XCTAssertEqual(try XCTUnwrap(values[0] as? Double), 165, accuracy: 0.5)
+        XCTAssertEqual(try XCTUnwrap(values[1] as? Double), 165, accuracy: 0.5)
+        XCTAssertEqual(values[2] as? String, "275px")
     }
 
     func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
