@@ -3,6 +3,7 @@ window.__codexDashboard = {
   ensureMounted: threadDashboard.ensureMounted,
   destroy: threadDashboard.destroy,
   open: threadDashboard.open,
+  isOpen: threadDashboard.isOpen,
   applySnapshot: threadDashboard.applySnapshot,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   applyPromptLibrary: (library) => {

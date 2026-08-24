@@ -245,11 +245,14 @@ final class DashboardRendererTests: XCTestCase {
         let expression = try XCTUnwrap(expressions.last)
         XCTAssertTrue(expression.contains("navigate-to-route"))
         XCTAssertTrue(expression.contains("encodeURIComponent"))
+        XCTAssertTrue(expression.contains("isOpen"))
         XCTAssertTrue(expression.contains("thread"))
     }
 
     func testDashboardSnapshotPayloadContainsOnlyDashboardFields() throws {
-        let snapshot = DashboardSnapshotPayload(threads: [.fixture()])
+        let snapshot = DashboardSnapshotPayload(threads: [
+            .fixture(latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: .now))
+        ])
 
         let data = try JSONEncoder().encode(snapshot)
         let object = try XCTUnwrap(
@@ -258,6 +261,7 @@ final class DashboardRendererTests: XCTestCase {
         let threads = try XCTUnwrap(object["threads"] as? [[String: Any]])
 
         XCTAssertEqual(threads.first?["title"] as? String, "Thread")
+        XCTAssertEqual(threads.first?["latestLifecycleEventKind"] as? String, "completed")
     }
 
     func testLiveRendererCompatibilityWhenEnabled() async throws {
