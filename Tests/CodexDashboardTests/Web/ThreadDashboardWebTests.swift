@@ -5,6 +5,34 @@ import XCTest
 
 @MainActor
 final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+    func testDashboardHidesSidebarResizeHandleOnlyWhileOpen() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside class="app-shell-left-panel" role="navigation">
+                <div class="cursor-col-resize"></div>
+              </aside>
+            </body></html>
+            """
+        )
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const handle = document.querySelector('.cursor-col-resize');
+              const closedDisplay = getComputedStyle(handle).display;
+              document.documentElement.classList.add('codex-dashboard-open');
+              const openDisplay = getComputedStyle(handle).display;
+              return [closedDisplay, openDisplay];
+            })()
+            """
+        ) as? [String]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertNotEqual(values[0], "none")
+        XCTAssertEqual(values[1], "none")
+    }
+
     func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
