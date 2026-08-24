@@ -760,7 +760,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               const triggerDialogStates = [];
               const optionSets = {
                 Model: ['5.6 Sol', '5.6 Terra', '5.6 Luna'],
-                Effort: ['Low', 'Medium', 'High', 'Extra High'],
+                Effort: ['Light', 'Medium', 'High', 'Extra High'],
                 Speed: ['Standard', 'Fast'],
               };
               const removeMenus = () => {
@@ -829,7 +829,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[name="content"]').value = 'Review this change';
               document.querySelector('[name="hasPreset"]').click();
               document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
-              document.querySelector('[name="presetReasoningEffort"]').value = 'medium';
+              document.querySelector('[name="presetReasoningEffort"]').value = 'light';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
@@ -881,14 +881,14 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(presetDefaults["presetFieldsDisabled"] as? Bool, true)
         XCTAssertEqual(
             values["preset"] as? [String: String],
-            ["model": "gpt-5.6-luna", "reasoningEffort": "medium", "speed": "fast"]
+            ["model": "gpt-5.6-luna", "reasoningEffort": "light", "speed": "fast"]
         )
-        XCTAssertEqual(values["summary"] as? [String], ["5.6 Luna", "Medium", "Fast"])
+        XCTAssertEqual(values["summary"] as? [String], ["5.6 Luna", "Light", "Fast"])
         XCTAssertEqual(values["usesPresetByDefault"] as? Bool, false)
         XCTAssertEqual(values["usesPresetAfterToggle"] as? Bool, true)
         XCTAssertEqual(
             values["applied"] as? [String],
-            ["Model:5.6 Luna", "Effort:Medium", "Speed:Fast"]
+            ["Model:5.6 Luna", "Effort:Light", "Speed:Fast"]
         )
         XCTAssertEqual(values["promptDialogStates"] as? [Bool], [false, false, false])
         XCTAssertEqual(values["triggerDialogStates"] as? [Bool], [false])

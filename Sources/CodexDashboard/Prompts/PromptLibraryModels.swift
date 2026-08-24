@@ -12,6 +12,14 @@ struct PromptLibraryDocument: Codable, Equatable, Sendable {
             && Set(prompts.map(\.id)).count == prompts.count
             && prompts.allSatisfy(\.isValid)
     }
+
+    var migratingLegacyReasoningEffort: PromptLibraryDocument {
+        PromptLibraryDocument(
+            version: version,
+            prompts: prompts.map(\.migratingLegacyReasoningEffort),
+            sections: sections
+        )
+    }
 }
 
 struct SavedPrompt: Codable, Equatable, Sendable {
@@ -25,6 +33,18 @@ struct SavedPrompt: Codable, Equatable, Sendable {
 
     var isValid: Bool {
         !id.isEmpty && !name.isEmpty && !content.isEmpty && scope.isValid && (preset?.isValid ?? true)
+    }
+
+    var migratingLegacyReasoningEffort: SavedPrompt {
+        SavedPrompt(
+            id: id,
+            name: name,
+            content: content,
+            section: section,
+            scope: scope,
+            preset: preset?.migratingLegacyReasoningEffort,
+            usePreset: usePreset
+        )
     }
 }
 
@@ -44,5 +64,13 @@ struct SavedPromptPreset: Codable, Equatable, Sendable {
 
     var isValid: Bool {
         model.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? true
+    }
+
+    var migratingLegacyReasoningEffort: SavedPromptPreset {
+        SavedPromptPreset(
+            model: model,
+            reasoningEffort: reasoningEffort == "low" ? "light" : reasoningEffort,
+            speed: speed
+        )
     }
 }

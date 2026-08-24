@@ -15,7 +15,7 @@ const promptLibrary = (() => {
     ['gpt-5.4-mini', '5.4 Mini'],
   ];
   const presetReasoningOptions = [
-    ['low', 'Low'], ['medium', 'Medium'],
+    ['light', 'Light'], ['medium', 'Medium'],
     ['high', 'High'], ['xhigh', 'Extra High'],
   ];
   const presetSpeedOptions = [

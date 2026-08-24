@@ -8,7 +8,7 @@ const composerAdapter = (() => {
     'gpt-5.4-mini': '5.4 Mini',
   };
   const reasoningEffortLabels = {
-    low: 'Low',
+    light: 'Light',
     medium: 'Medium',
     high: 'High',
     xhigh: 'Extra High',
