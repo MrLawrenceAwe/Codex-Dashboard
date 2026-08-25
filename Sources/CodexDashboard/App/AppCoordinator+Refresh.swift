@@ -5,14 +5,14 @@ extension AppCoordinator {
         do {
             try await loadThreadSnapshot()
         } catch {
-            catalogWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
+            setCatalogWarning("Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)")
             refreshThreadDataWarning()
         }
 
         guard !Task.isCancelled, !isPerformingAction, let dashboardRuntime else { return }
         let codexIsRunning = dashboardRuntime.codexIsRunning
         let targets = await dashboardRuntime.rendererTargets()
-        if rendererTargetCount != targets.count { rendererTargetCount = targets.count }
+        setRendererTargetCount(targets.count)
         guard !Task.isCancelled, !isPerformingAction else { return }
 
         if compatibilityWasTriggeredByUpdate && isCheckingCompatibility {
@@ -49,10 +49,10 @@ extension AppCoordinator {
         let generation = refreshGeneration
         let refresh = await threadSnapshotService.updateUnreadState()
         guard !isPerformingAction, generation == refreshGeneration else { return }
-        unreadStateWarning = refresh.warning
+        setUnreadStateWarning(refresh.warning)
         refreshThreadDataWarning()
         guard let unreadThreadIDs = refresh.unreadThreadIDs else { return }
-        setThreads(threads.map { thread in
+        setThreadSnapshot(threads.map { thread in
             var updatedThread = thread
             updatedThread.isUnread = unreadThreadIDs.contains(updatedThread.id)
             return updatedThread
@@ -73,7 +73,7 @@ extension AppCoordinator {
             in: threads, projectPaths: projectPaths
         ) else { return }
         guard !isPerformingAction, generation == refreshGeneration else { return }
-        setThreads(threads.map { thread in
+        setThreadSnapshot(threads.map { thread in
             var updatedThread = thread
             if let status = statusByProjectPath[updatedThread.projectPath] {
                 updatedThread.workingTreeStatus = status
@@ -86,15 +86,15 @@ extension AppCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        let completedThreadID = taskCompletionObserver.newestCompletion(in: snapshot.catalog.threads)
-        setThreads(snapshot.catalog.threads)
-        if totalThreadCount != snapshot.catalog.totalThreadCount {
-            totalThreadCount = snapshot.catalog.totalThreadCount
-        }
-        catalogWarning = nil
-        unreadStateWarning = snapshot.unreadStateWarning
+        let completedThreadID = newestCompletedThreadID(in: snapshot.catalog.threads)
+        setThreadSnapshot(
+            snapshot.catalog.threads,
+            totalCount: snapshot.catalog.totalThreadCount,
+            refreshedAt: .now
+        )
+        setCatalogWarning(nil)
+        setUnreadStateWarning(snapshot.unreadStateWarning)
         refreshThreadDataWarning()
-        lastSuccessfulRefresh = .now
         if let completedThreadID {
             Task { await self.refreshAccountUsage() }
             if foregroundOnTaskCompletion {
@@ -120,15 +120,10 @@ extension AppCoordinator {
         )
     }
 
-    private func setThreads(_ updatedThreads: [ThreadSummary]) {
-        pollingController.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
-        if threads != updatedThreads { threads = updatedThreads }
-    }
-
     private func refreshThreadDataWarning() {
         let warnings = [catalogWarning, unreadStateWarning].compactMap { $0 }
         let warning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
-        if threadDataWarning != warning { threadDataWarning = warning }
+        setThreadDataWarning(warning)
     }
 
     var connectionSummary: String {

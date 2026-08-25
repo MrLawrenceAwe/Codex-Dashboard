@@ -7,23 +7,23 @@ final class AppCoordinator: ObservableObject {
 
     @Published private(set) var connectionState: DashboardConnectionState = .checking
     @Published private(set) var connectionError: String?
-    @Published var isPerformingAction = false
-    @Published var threadDataWarning: String?
-    @Published var threads: [ThreadSummary] = []
-    @Published var totalThreadCount = 0
-    @Published var compatibilityReport: CompatibilityReport?
-    @Published var isCheckingCompatibility = false
-    var lastSuccessfulRefresh: Date?
-    @Published var lastCompatibilityCheck: Date?
+    @Published private(set) var isPerformingAction = false
+    @Published private(set) var threadDataWarning: String?
+    @Published private(set) var threads: [ThreadSummary] = []
+    @Published private(set) var totalThreadCount = 0
+    @Published private(set) var compatibilityReport: CompatibilityReport?
+    @Published private(set) var isCheckingCompatibility = false
+    private(set) var lastSuccessfulRefresh: Date?
+    @Published private(set) var lastCompatibilityCheck: Date?
     @Published private(set) var lastErrorDate: Date?
-    @Published var rendererTargetCount = 0
+    @Published private(set) var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
-    @Published var promptLibraryStatusMessage: String?
-    @Published var savedAccounts: [SavedAccount] = []
-    @Published var activeAccountID: UUID?
-    @Published var accountStatusMessage: String?
-    @Published var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
-    @Published var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
+    @Published private(set) var promptLibraryStatusMessage: String?
+    @Published private(set) var savedAccounts: [SavedAccount] = []
+    @Published private(set) var activeAccountID: UUID?
+    @Published private(set) var accountStatusMessage: String?
+    @Published private(set) var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
+    @Published private(set) var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -37,17 +37,25 @@ final class AppCoordinator: ObservableObject {
     let accountManager: CodexAccountManager
     let accountUsageSession: AccountUsageSession
     let synchronizationGate = SynchronizationGate()
-    var dashboardRuntime: (any DashboardRuntime)?
-    var refreshGeneration = 0
-    var catalogWarning: String?
-    var unreadStateWarning: String?
+    private(set) var dashboardRuntime: (any DashboardRuntime)?
+    private(set) var refreshGeneration = 0
+    private(set) var catalogWarning: String?
+    private(set) var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
-    var taskCompletionObserver = TaskCompletionObserver()
+    private var taskCompletionObserver = TaskCompletionObserver()
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
             hasError: connectionError != nil,
             mountedSummary: connectionSummary
+        )
+    }
+
+    var dashboardActions: DashboardActionPresentation {
+        DashboardActionPresentation(
+            connectionState: connectionState,
+            isPerformingAction: isPerformingAction,
+            isCheckingCompatibility: isCheckingCompatibility
         )
     }
 
@@ -216,6 +224,75 @@ final class AppCoordinator: ObservableObject {
         if connectionError != error {
             connectionError = error
         }
+    }
+
+    func setPerformingAction(_ value: Bool) {
+        isPerformingAction = value
+    }
+
+    func advanceRefreshGeneration() {
+        refreshGeneration += 1
+    }
+
+    func setCompatibilityChecking(_ value: Bool) {
+        isCheckingCompatibility = value
+    }
+
+    func setCompatibilityReport(_ report: CompatibilityReport, checkedAt: Date = .now) {
+        compatibilityReport = report
+        lastCompatibilityCheck = checkedAt
+    }
+
+    func setRendererTargetCount(_ count: Int) {
+        if rendererTargetCount != count { rendererTargetCount = count }
+    }
+
+    func setPromptLibraryStatus(_ message: String?) {
+        promptLibraryStatusMessage = message
+    }
+
+    func setAccountStatus(_ message: String?) {
+        accountStatusMessage = message
+    }
+
+    func setAccountState(accounts: [SavedAccount], activeAccountID: UUID?) {
+        if savedAccounts != accounts { savedAccounts = accounts }
+        if self.activeAccountID != activeAccountID { self.activeAccountID = activeAccountID }
+    }
+
+    func updateUsage(_ snapshot: CodexAccountUsageSnapshot?, for accountID: UUID) {
+        usageByAccountID[accountID] = snapshot
+    }
+
+    func setActiveAccountUsageStatus(_ status: CodexAccountUsageStatus) {
+        activeAccountUsageStatus = status
+    }
+
+    func setCatalogWarning(_ warning: String?) {
+        catalogWarning = warning
+    }
+
+    func setUnreadStateWarning(_ warning: String?) {
+        unreadStateWarning = warning
+    }
+
+    func setThreadSnapshot(
+        _ updatedThreads: [ThreadSummary],
+        totalCount: Int? = nil,
+        refreshedAt: Date? = nil
+    ) {
+        pollingController.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
+        if threads != updatedThreads { threads = updatedThreads }
+        if let totalCount, totalThreadCount != totalCount { totalThreadCount = totalCount }
+        if let refreshedAt { lastSuccessfulRefresh = refreshedAt }
+    }
+
+    func setThreadDataWarning(_ warning: String?) {
+        if threadDataWarning != warning { threadDataWarning = warning }
+    }
+
+    func newestCompletedThreadID(in threads: [ThreadSummary]) -> String? {
+        taskCompletionObserver.newestCompletion(in: threads)
     }
 
     static let incompatibleContractMessage =

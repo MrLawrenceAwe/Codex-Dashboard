@@ -256,7 +256,7 @@ function handlePromptClick(target) {
     const section = target.closest('[data-prompt-section-delete-confirm]').dataset.promptSectionDeleteConfirm;
     const nextPrompts = promptStore.prompts.map((prompt) => (
       promptStore.normalizeSection(prompt.section) === section
-        ? { ...prompt, section: 'General' }
+        ? { ...prompt, section: promptLibraryContract.defaultSection }
         : prompt
     ));
     const nextSections = promptStore.sections.filter((item) => item !== section);
@@ -268,7 +268,10 @@ function handlePromptClick(target) {
     const button = target.closest('[data-prompt-section-delete]');
     button.dataset.promptSectionDeleteConfirm = button.dataset.promptSectionDelete;
     button.textContent = 'Confirm delete';
-    button.setAttribute('aria-label', 'Confirm section deletion; prompts will move to General');
+    button.setAttribute(
+      'aria-label',
+      `Confirm section deletion; prompts will move to ${promptLibraryContract.defaultSection}`,
+    );
   } else if (target.closest('[data-prompt-move-up]')) {
     movePrompt(target.closest('[data-prompt-move-up]').dataset.promptMoveUp, -1);
   } else if (target.closest('[data-prompt-move-down]')) {

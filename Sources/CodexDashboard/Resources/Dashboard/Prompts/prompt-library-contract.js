@@ -1,9 +1,9 @@
 const promptLibraryContract = (() => {
-  const reasoningEffortValues = new Set(['light', 'medium', 'high', 'xhigh']);
-  const speedValues = new Set(['standard', 'fast']);
+  const reasoningEffortValues = new Set(PROMPT_LIBRARY_SCHEMA.reasoningEfforts);
+  const speedValues = new Set(PROMPT_LIBRARY_SCHEMA.speeds);
 
   function normalizeSection(value) {
-    return String(value || '').trim() || 'General';
+    return String(value || '').trim() || PROMPT_LIBRARY_SCHEMA.defaultSection;
   }
 
   function normalizeScope(scope) {
@@ -63,7 +63,7 @@ const promptLibraryContract = (() => {
 
   function isValidLibrary(library) {
     return hasValidContents(library)
-      && library.version === 3
+      && library.version === PROMPT_LIBRARY_SCHEMA.version
       && library.prompts.every((prompt) => isValidScope(prompt.scope));
   }
 
@@ -93,11 +93,14 @@ const promptLibraryContract = (() => {
   }
 
   return {
+    defaultSection: PROMPT_LIBRARY_SCHEMA.defaultSection,
+    defaults: PROMPT_LIBRARY_SCHEMA.defaults,
     isValidLibrary,
     normalizePrompts,
     normalizePreset,
     normalizeScope,
     normalizeSection,
     normalizeSections,
+    version: PROMPT_LIBRARY_SCHEMA.version,
   };
 })();

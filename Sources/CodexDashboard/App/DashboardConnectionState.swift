@@ -34,3 +34,23 @@ enum DashboardConnectionState: Equatable {
         }
     }
 }
+
+struct DashboardActionPresentation: Equatable {
+    static let openTitle = "Open Task Dashboard"
+    static let restartTitle = "Restart & Enable"
+    static let disableTitle = "Disable Task Dashboard"
+
+    let canOpen: Bool
+    let canRestart: Bool
+    let canDisable: Bool
+
+    init(
+        connectionState: DashboardConnectionState,
+        isPerformingAction: Bool,
+        isCheckingCompatibility: Bool
+    ) {
+        canOpen = connectionState.dashboardIsMounted
+        canRestart = !isPerformingAction && !isCheckingCompatibility
+        canDisable = connectionState.rendererIsAvailable && !isPerformingAction
+    }
+}

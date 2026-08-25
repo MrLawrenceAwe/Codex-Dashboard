@@ -53,16 +53,26 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(actionItem("Open Diagnostics…", action: #selector(openDiagnostics)))
         menu.addItem(.separator())
 
-        let openDashboard = actionItem("Open Task Dashboard", action: #selector(openThreadDashboard))
-        openDashboard.isEnabled = coordinator.connectionState.dashboardIsMounted
+        let actions = coordinator.dashboardActions
+        let openDashboard = actionItem(
+            DashboardActionPresentation.openTitle,
+            action: #selector(openThreadDashboard)
+        )
+        openDashboard.isEnabled = actions.canOpen
         menu.addItem(openDashboard)
 
-        let restart = actionItem("Restart & Enable", action: #selector(restartAndEnable))
-        restart.isEnabled = !coordinator.isPerformingAction && !coordinator.isCheckingCompatibility
+        let restart = actionItem(
+            DashboardActionPresentation.restartTitle,
+            action: #selector(restartAndEnable)
+        )
+        restart.isEnabled = actions.canRestart
         menu.addItem(restart)
 
-        let disable = actionItem("Disable Task Dashboard", action: #selector(disableThreadDashboard))
-        disable.isEnabled = coordinator.connectionState.rendererIsAvailable && !coordinator.isPerformingAction
+        let disable = actionItem(
+            DashboardActionPresentation.disableTitle,
+            action: #selector(disableThreadDashboard)
+        )
+        disable.isEnabled = actions.canDisable
         menu.addItem(disable)
         menu.addItem(.separator())
 

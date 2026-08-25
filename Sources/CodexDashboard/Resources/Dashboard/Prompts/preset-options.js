@@ -7,13 +7,17 @@ const presetOptions = (() => {
     ['gpt-5.4', '5.4'],
     ['gpt-5.4-mini', '5.4 Mini'],
   ];
-  const reasoningEfforts = [
-    ['light', 'Light'],
-    ['medium', 'Medium'],
-    ['high', 'High'],
-    ['xhigh', 'Extra High'],
-  ];
-  const speeds = [['standard', 'Standard'], ['fast', 'Fast']];
+  const optionLabels = {
+    light: 'Light',
+    medium: 'Medium',
+    high: 'High',
+    xhigh: 'Extra High',
+    standard: 'Standard',
+    fast: 'Fast',
+  };
+  const reasoningEfforts = PROMPT_LIBRARY_SCHEMA.reasoningEfforts
+    .map((value) => [value, optionLabels[value]]);
+  const speeds = PROMPT_LIBRARY_SCHEMA.speeds.map((value) => [value, optionLabels[value]]);
 
   function label(options, value) {
     return options.find(([option]) => option === value)?.[1];

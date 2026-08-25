@@ -10,6 +10,7 @@ const promptStore = (() => {
     normalizeSection,
     normalizeSections,
   } = promptLibraryContract;
+  const { version } = promptLibraryContract;
 
   function readJSON(key, fallback) {
     try {
@@ -31,10 +32,10 @@ const promptStore = (() => {
   function loadLegacyLibrary() {
     const storedLibrary = readJSON(libraryStorageKey, null);
     if (!promptLibraryContract.isValidLibrary(storedLibrary)) {
-      return { version: 3, prompts: [], sections: [] };
+      return { version, prompts: [], sections: [] };
     }
     return {
-      version: 3,
+      version,
       prompts: normalizePrompts(storedLibrary.prompts),
       sections: normalizeSections(storedLibrary.sections, storedLibrary.prompts),
     };
@@ -43,7 +44,7 @@ const promptStore = (() => {
   function normalizedLibrary(library) {
     if (!promptLibraryContract.isValidLibrary(library)) return null;
     return {
-      version: 3,
+      version,
       prompts: normalizePrompts(library.prompts),
       sections: normalizeSections(library.sections, library.prompts),
     };
@@ -91,7 +92,7 @@ const promptStore = (() => {
 
     commitLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);
-      const library = { version: 3, prompts: nextPrompts, sections };
+      const library = { version, prompts: nextPrompts, sections };
       if (!writeJSON(pendingLibraryStorageKey, library)) return false;
       store.prompts = nextPrompts;
       store.sections = sections;
@@ -104,7 +105,7 @@ const promptStore = (() => {
 
     exportLibrary() {
       return {
-        version: 3,
+        version,
         prompts: store.prompts,
         sections: normalizeSections(store.sections, store.prompts),
       };

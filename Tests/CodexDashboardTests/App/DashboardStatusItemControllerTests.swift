@@ -103,6 +103,35 @@ final class DashboardStatusItemControllerTests: XCTestCase {
         )
     }
 
+    func testDashboardActionAvailabilityIsSharedAcrossPresentations() {
+        let mounted = DashboardActionPresentation(
+            connectionState: .dashboardMounted,
+            isPerformingAction: false,
+            isCheckingCompatibility: false
+        )
+        XCTAssertTrue(mounted.canOpen)
+        XCTAssertTrue(mounted.canRestart)
+        XCTAssertTrue(mounted.canDisable)
+
+        let checking = DashboardActionPresentation(
+            connectionState: .codexClosed,
+            isPerformingAction: false,
+            isCheckingCompatibility: true
+        )
+        XCTAssertFalse(checking.canOpen)
+        XCTAssertFalse(checking.canRestart)
+        XCTAssertFalse(checking.canDisable)
+
+        let busy = DashboardActionPresentation(
+            connectionState: .rendererAvailable,
+            isPerformingAction: true,
+            isCheckingCompatibility: false
+        )
+        XCTAssertFalse(busy.canOpen)
+        XCTAssertFalse(busy.canRestart)
+        XCTAssertFalse(busy.canDisable)
+    }
+
     private func makeDefaults() throws -> UserDefaults {
         let suiteName = "DashboardStatusItemControllerTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
