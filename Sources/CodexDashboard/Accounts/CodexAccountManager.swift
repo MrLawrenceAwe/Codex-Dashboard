@@ -1,8 +1,8 @@
 import Foundation
 
-struct CodexAccountTransaction: Sendable {
+struct AccountTransition: Sendable {
     fileprivate let previousCredential: Data?
-    fileprivate let previousDocument: CodexAccountDocument
+    fileprivate let previousDocument: SavedAccountsDocument
 }
 
 final class CodexAccountManager: @unchecked Sendable {
@@ -12,21 +12,21 @@ final class CodexAccountManager: @unchecked Sendable {
     private let fileManager: FileManager
     private let now: () -> Date
     private let lock = NSLock()
-    let usageCacheStore: CodexAccountUsageCacheStore
+    let usageCacheStore: UsageCache
 
     init(
         metadataURL: URL = CodexConfiguration.accountMetadataURL,
         authenticationURL: URL = CodexConfiguration.authenticationURL,
         vault: any AccountCredentialVault = KeychainAccountCredentialVault(),
         fileManager: FileManager = .default,
-        usageCacheStore: CodexAccountUsageCacheStore? = nil,
+        usageCacheStore: UsageCache? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.metadataURL = metadataURL
         self.authenticationURL = authenticationURL
         self.vault = vault
         self.fileManager = fileManager
-        self.usageCacheStore = usageCacheStore ?? CodexAccountUsageCacheStore(
+        self.usageCacheStore = usageCacheStore ?? UsageCache(
             cacheURL: metadataURL.deletingLastPathComponent()
                 .appendingPathComponent("account-usage.json"),
             fileManager: fileManager
@@ -34,12 +34,12 @@ final class CodexAccountManager: @unchecked Sendable {
         self.now = now
     }
 
-    func document() throws -> CodexAccountDocument {
+    func document() throws -> SavedAccountsDocument {
         try lock.withLock { try loadDocument() }
     }
 
     @discardableResult
-    func saveCurrentAccount(named rawName: String) throws -> CodexAccountProfile {
+    func saveCurrentAccount(named rawName: String) throws -> SavedAccount {
         try lock.withLock {
             let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { throw CodexAccountError.accountNameRequired }
@@ -49,54 +49,54 @@ final class CodexAccountManager: @unchecked Sendable {
             var document = try loadDocument()
             let accountIdentifier = Self.accountIdentity(in: credential)?.identifier
             let timestamp = now()
-            let profile: CodexAccountProfile
+            let account: SavedAccount
             if
-                let index = document.profiles.firstIndex(where: {
+                let index = document.accounts.firstIndex(where: {
                     accountIdentifier != nil && $0.accountIdentifier == accountIdentifier
-                }) ?? document.activeProfileID.flatMap({ activeID in
-                    document.profiles.firstIndex(where: { $0.id == activeID })
+                }) ?? document.activeAccountID.flatMap({ activeID in
+                    document.accounts.firstIndex(where: { $0.id == activeID })
                 })
             {
-                document.profiles[index].name = name
-                document.profiles[index].lastUsedAt = timestamp
-                document.profiles[index].accountIdentifier = accountIdentifier
-                document.activeProfileID = document.profiles[index].id
-                profile = document.profiles[index]
+                document.accounts[index].name = name
+                document.accounts[index].lastUsedAt = timestamp
+                document.accounts[index].accountIdentifier = accountIdentifier
+                document.activeAccountID = document.accounts[index].id
+                account = document.accounts[index]
             } else {
-                profile = CodexAccountProfile(
+                account = SavedAccount(
                     id: UUID(),
                     name: name,
                     createdAt: timestamp,
                     lastUsedAt: timestamp,
                     accountIdentifier: accountIdentifier
                 )
-                document.profiles.append(profile)
-                document.activeProfileID = profile.id
+                document.accounts.append(account)
+                document.activeAccountID = account.id
             }
-            try vault.store(credential, for: profile.id)
+            try vault.store(credential, for: account.id)
             try saveDocument(document)
-            return profile
+            return account
         }
     }
 
-    func activate(profileID: UUID) throws -> CodexAccountTransaction {
+    func activate(accountID: UUID) throws -> AccountTransition {
         try lock.withLock {
             var document = try loadDocument()
-            guard let index = document.profiles.firstIndex(where: { $0.id == profileID }) else {
-                throw CodexAccountError.invalidProfile
+            guard let index = document.accounts.firstIndex(where: { $0.id == accountID }) else {
+                throw CodexAccountError.accountNotFound
             }
-            guard let targetCredential = try vault.credential(for: profileID) else {
-                throw CodexAccountError.missingCredential(document.profiles[index].name)
+            guard let targetCredential = try vault.credential(for: accountID) else {
+                throw CodexAccountError.missingCredential(document.accounts[index].name)
             }
-            let transaction = CodexAccountTransaction(
+            let transaction = AccountTransition(
                 previousCredential: try activeCredential(), previousDocument: document
             )
             do {
                 try saveActiveCredentialIfKnown(document)
                 try writeActiveCredential(targetCredential)
-                document.activeProfileID = profileID
-                document.profiles[index].lastUsedAt = now()
-                document.profiles[index].accountIdentifier = Self.accountIdentity(
+                document.activeAccountID = accountID
+                document.accounts[index].lastUsedAt = now()
+                document.accounts[index].accountIdentifier = Self.accountIdentity(
                     in: targetCredential
                 )?.identifier
                 try saveDocument(document)
@@ -109,10 +109,10 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    func beginAddingAccount() throws -> CodexAccountTransaction {
+    func beginAddingAccount() throws -> AccountTransition {
         try lock.withLock {
             let document = try loadDocument()
-            let transaction = CodexAccountTransaction(
+            let transaction = AccountTransition(
                 previousCredential: try activeCredential(), previousDocument: document
             )
             do {
@@ -121,7 +121,7 @@ final class CodexAccountManager: @unchecked Sendable {
                     try fileManager.removeItem(at: authenticationURL)
                 }
                 var signedOutDocument = document
-                signedOutDocument.activeProfileID = nil
+                signedOutDocument.activeAccountID = nil
                 try saveDocument(signedOutDocument)
                 return transaction
             } catch {
@@ -132,22 +132,22 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    func rollback(_ transaction: CodexAccountTransaction) throws {
+    func rollback(_ transaction: AccountTransition) throws {
         try lock.withLock {
             try restoreActiveCredential(transaction.previousCredential)
             try saveDocument(transaction.previousDocument)
         }
     }
 
-    func deleteProfile(_ profileID: UUID) throws {
+    func deleteAccount(_ accountID: UUID) throws {
         try lock.withLock {
             var document = try loadDocument()
             let previousDocument = document
-            document.profiles.removeAll { $0.id == profileID }
-            if document.activeProfileID == profileID { document.activeProfileID = nil }
+            document.accounts.removeAll { $0.id == accountID }
+            if document.activeAccountID == accountID { document.activeAccountID = nil }
             try saveDocument(document)
             do {
-                try vault.deleteCredential(for: profileID)
+                try vault.deleteCredential(for: accountID)
             } catch {
                 try? saveDocument(previousDocument)
                 throw error
@@ -165,10 +165,10 @@ final class CodexAccountManager: @unchecked Sendable {
         return data
     }
 
-    private func saveActiveCredentialIfKnown(_ document: CodexAccountDocument) throws {
+    private func saveActiveCredentialIfKnown(_ document: SavedAccountsDocument) throws {
         guard
-            let activeID = document.activeProfileID,
-            document.profiles.contains(where: { $0.id == activeID }),
+            let activeID = document.activeAccountID,
+            document.accounts.contains(where: { $0.id == activeID }),
             let credential = try activeCredential()
         else { return }
         try vault.store(credential, for: activeID)
@@ -196,71 +196,55 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    private func loadDocument() throws -> CodexAccountDocument {
+    private func loadDocument() throws -> SavedAccountsDocument {
         guard fileManager.fileExists(atPath: metadataURL.path) else {
-            return CodexAccountDocument()
+            return SavedAccountsDocument()
         }
         let data = try Data(contentsOf: metadataURL)
         let storedVersion = (try? JSONSerialization.jsonObject(with: data))
             .flatMap { $0 as? [String: Any] }?["version"] as? Int
-        var document: CodexAccountDocument
-        switch storedVersion {
-        case CodexAccountDocument.currentVersion:
-            document = try JSONDecoder().decode(CodexAccountDocument.self, from: data)
-        case 2:
-            document = try JSONDecoder().decode(CodexAccountDocument.self, from: data)
-            document.version = CodexAccountDocument.currentVersion
-        case 1:
-            let previous = try JSONDecoder().decode(LegacyAccountDocument.self, from: data)
-            document = CodexAccountDocument(
-                profiles: previous.profiles.map { profile in
-                    CodexAccountProfile(
-                        id: profile.id,
-                        name: profile.name,
-                        createdAt: profile.createdAt,
-                        lastUsedAt: profile.lastUsedAt,
-                        accountIdentifier: (try? vault.credential(for: profile.id))
-                            .flatMap { Self.accountIdentity(in: $0)?.identifier }
-                    )
-                },
-                activeProfileID: previous.activeProfileID
-            )
-        default:
-            throw CodexAccountError.unsupportedMetadataVersion(storedVersion ?? 0)
-        }
+        let migration = try AccountDocumentMigration.decode(
+            data,
+            version: storedVersion ?? 0,
+            accountIdentifier: { accountID in
+                (try? vault.credential(for: accountID))
+                    .flatMap { Self.accountIdentity(in: $0)?.identifier }
+            }
+        )
+        var document = migration.document
         let original = document
-        reconcileActiveProfile(in: &document, allowNameFallback: storedVersion != 3)
-        if document != original || storedVersion != 3 { try saveDocument(document) }
+        reconcileActiveAccount(in: &document, allowNameFallback: migration.requiresNameFallback)
+        if document != original || migration.requiresNameFallback { try saveDocument(document) }
         return document
     }
 
-    private func reconcileActiveProfile(
-        in document: inout CodexAccountDocument,
+    private func reconcileActiveAccount(
+        in document: inout SavedAccountsDocument,
         allowNameFallback: Bool
     ) {
         guard let credential = try? activeCredential() else {
-            document.activeProfileID = nil
+            document.activeAccountID = nil
             return
         }
         guard let identity = Self.accountIdentity(in: credential) else { return }
-        if let profile = document.profiles.first(where: {
+        if let account = document.accounts.first(where: {
             $0.accountIdentifier == identity.identifier
         }) {
-            document.activeProfileID = profile.id
+            document.activeAccountID = account.id
             return
         }
         if allowNameFallback, let displayName = identity.displayName {
-            let candidates = document.profiles.indices.filter {
-                document.profiles[$0].accountIdentifier == nil
-                    && Self.profileName(document.profiles[$0].name, matches: displayName)
+            let candidates = document.accounts.indices.filter {
+                document.accounts[$0].accountIdentifier == nil
+                    && Self.accountName(document.accounts[$0].name, matches: displayName)
             }
             if candidates.count == 1, let index = candidates.first {
-                document.profiles[index].accountIdentifier = identity.identifier
-                document.activeProfileID = document.profiles[index].id
+                document.accounts[index].accountIdentifier = identity.identifier
+                document.activeAccountID = document.accounts[index].id
                 return
             }
         }
-        document.activeProfileID = nil
+        document.activeAccountID = nil
     }
 
     private static func accountIdentity(in credential: Data) -> AccountIdentity? {
@@ -295,12 +279,12 @@ final class CodexAccountManager: @unchecked Sendable {
         return AccountIdentity(identifier: accountID, displayName: claims["name"] as? String)
     }
 
-    private static func profileName(_ profileName: String, matches displayName: String) -> Bool {
-        let profileWords = normalizedWords(in: profileName)
+    private static func accountName(_ accountName: String, matches displayName: String) -> Bool {
+        let accountWords = normalizedWords(in: accountName)
         let displayWords = normalizedWords(in: displayName)
-        guard !profileWords.isEmpty, !displayWords.isEmpty else { return false }
-        return profileWords == displayWords
-            || (profileWords.count == 1 && displayWords.contains(profileWords[0]))
+        guard !accountWords.isEmpty, !displayWords.isEmpty else { return false }
+        return accountWords == displayWords
+            || (accountWords.count == 1 && displayWords.contains(accountWords[0]))
     }
 
     private static func normalizedWords(in value: String) -> [String] {
@@ -309,7 +293,7 @@ final class CodexAccountManager: @unchecked Sendable {
             .filter { !$0.isEmpty }
     }
 
-    private func saveDocument(_ document: CodexAccountDocument) throws {
+    private func saveDocument(_ document: SavedAccountsDocument) throws {
         try fileManager.createDirectory(
             at: metadataURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -322,16 +306,4 @@ final class CodexAccountManager: @unchecked Sendable {
 private struct AccountIdentity {
     let identifier: String
     let displayName: String?
-}
-
-private struct LegacyAccountProfile: Decodable {
-    let id: UUID
-    let name: String
-    let createdAt: Date
-    let lastUsedAt: Date
-}
-
-private struct LegacyAccountDocument: Decodable {
-    let profiles: [LegacyAccountProfile]
-    let activeProfileID: UUID?
 }

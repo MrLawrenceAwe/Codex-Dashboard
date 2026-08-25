@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-protocol CodexAccountUsageProviding: Sendable {
+protocol AccountUsageProviding: Sendable {
     func usage() async throws -> CodexAccountUsage
     func reset() async
 }
@@ -23,7 +23,7 @@ enum CodexAccountUsageError: LocalizedError {
     }
 }
 
-actor CodexAppServerAccountUsageProvider: CodexAccountUsageProviding {
+actor AppServerUsageProvider: AccountUsageProviding {
     private let executableURL: URL
     private let codexHomeURL: URL
     private let timeout: Duration

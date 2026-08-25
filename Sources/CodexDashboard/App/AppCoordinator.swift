@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 @MainActor
-final class DashboardCoordinator: ObservableObject {
+final class AppCoordinator: ObservableObject {
     static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
 
     @Published private(set) var connectionState: DashboardConnectionState = .checking
@@ -19,36 +19,30 @@ final class DashboardCoordinator: ObservableObject {
     @Published var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
-    @Published var accountProfiles: [CodexAccountProfile] = []
-    @Published var activeAccountProfileID: UUID?
+    @Published var savedAccounts: [SavedAccount] = []
+    @Published var activeAccountID: UUID?
     @Published var accountStatusMessage: String?
-    @Published var accountUsageByProfileID: [UUID: CodexAccountUsageSnapshot] = [:]
+    @Published var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
     @Published var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
 
     let threadSnapshotService: ThreadSnapshotService
-    let compatibilityChecker: any LocalCompatibilityChecking
-    let versionTracker: CodexVersionCompatibilityTracker
-    let installedCodexVersion: () -> String?
-    let pollingController: DashboardPollingController
+    let compatibilityMonitor: CompatibilityMonitor
+    let pollingController: PollingController
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
     let promptLibraryStore: PromptLibraryFileStore
     let accountManager: CodexAccountManager
-    let accountUsageProvider: any CodexAccountUsageProviding
-    let accountUsageCacheStore: CodexAccountUsageCacheStore
-    let synchronizationGate = DashboardSynchronizationGate()
+    let accountUsageSession: AccountUsageSession
+    let synchronizationGate = SynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
     var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
-    var observedLifecycleEventsByThreadID: [String: ThreadLifecycleEvent]?
-    var lastLifecycleObservationDate: Date?
-    var isRefreshingAccountUsage = false
-    var lastUsageCacheSaveAt: Date?
+    var taskCompletionObserver = TaskCompletionObserver()
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -68,8 +62,8 @@ final class DashboardCoordinator: ObservableObject {
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
-        accountUsageProvider: any CodexAccountUsageProviding = CodexAppServerAccountUsageProvider(),
-        accountUsageCacheStore: CodexAccountUsageCacheStore? = nil,
+        accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
+        accountUsageCacheStore: UsageCache? = nil,
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -77,34 +71,36 @@ final class DashboardCoordinator: ObservableObject {
             workingTreeStatusProvider: workingTreeStatusProvider,
             unreadThreadIDProvider: unreadThreadIDProvider
         )
-        self.compatibilityChecker = compatibilityChecker
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
         self.promptLibraryStore = promptLibraryStore
         self.accountManager = accountManager
-        self.accountUsageProvider = accountUsageProvider
-        self.accountUsageCacheStore = accountUsageCacheStore ?? accountManager.usageCacheStore
+        accountUsageSession = AccountUsageSession(
+            provider: accountUsageProvider,
+            cache: accountUsageCacheStore ?? accountManager.usageCacheStore
+        )
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
-        pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
-        self.installedCodexVersion = installedCodexVersion
-        versionTracker = CodexVersionCompatibilityTracker(userDefaults: userDefaults)
+        pollingController = PollingController(observeFileChanges: observeFileChanges)
+        compatibilityMonitor = CompatibilityMonitor(
+            localChecker: compatibilityChecker,
+            userDefaults: userDefaults,
+            installedVersion: installedCodexVersion
+        )
         do {
             dashboardRuntime = try runtimeFactory()
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
-        accountUsageByProfileID = (try? self.accountUsageCacheStore.load()) ?? [:]
+        usageByAccountID = accountUsageSession.loadCache()
         refreshAccountState()
-        if let activeAccountProfileID,
-           let snapshot = accountUsageByProfileID[activeAccountProfileID] {
+        if let activeAccountID,
+           let snapshot = usageByAccountID[activeAccountID] {
             activeAccountUsageStatus = .stale(snapshot)
         }
     }
 
     func startMonitoring() {
-        compatibilityWasTriggeredByUpdate = versionTracker.updateWasDetected(
-            currentVersion: installedCodexVersion()
-        )
+        compatibilityWasTriggeredByUpdate = compatibilityMonitor.updateWasDetected
         pollingController.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
             updateWorkingTrees: { [weak self] paths in
@@ -171,7 +167,7 @@ final class DashboardCoordinator: ObservableObject {
         } catch {
             setFailure(
                 error,
-                lastKnownState: rendererAvailable ? .rendererReady : .codexClosed
+                lastKnownState: rendererAvailable ? .rendererAvailable : .codexClosed
             )
         }
     }
@@ -187,8 +183,8 @@ final class DashboardCoordinator: ObservableObject {
             switch try await dashboardRuntime.disableThreadDashboard() {
             case .codexClosed:
                 setConnectionState(.codexClosed)
-            case .rendererReady:
-                setConnectionState(.rendererReady)
+            case .rendererAvailable:
+                setConnectionState(.rendererAvailable)
             }
             setConnectionError(nil)
         } catch {

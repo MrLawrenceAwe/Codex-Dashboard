@@ -1,6 +1,6 @@
 import Foundation
 
-enum DashboardRendererScript {
+enum RendererScript {
     static let destroy = """
     (() => { window.__codexDashboard?.destroy?.(); return typeof window.__codexDashboard === 'undefined'; })()
     """
@@ -26,7 +26,7 @@ enum DashboardRendererScript {
         """
     }
 
-    static func deliver(_ snapshot: DashboardSnapshotPayload) throws -> String {
+    static func deliver(_ snapshot: DashboardSnapshot) throws -> String {
         let data = try JSONEncoder().encode(snapshot)
         guard let json = String(data: data, encoding: .utf8) else {
             throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")

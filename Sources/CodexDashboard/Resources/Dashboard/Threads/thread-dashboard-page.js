@@ -4,12 +4,12 @@ const threadDashboardPage = (() => {
     if (!pageHost) return false;
     const page = document.createElement('section');
     page.id = dashboardElements.elementIDs.page;
-    page.setAttribute('aria-label', 'Codex Thread Dashboard');
+    page.setAttribute('aria-label', 'Codex Task Dashboard');
     page.innerHTML = `
       <div class="dashboard-shell">
         <header class="dashboard-header">
           <div>
-            <h1>Thread Dashboard</h1>
+            <h1>Task Dashboard</h1>
             <div class="dashboard-summary" data-dashboard-summary aria-label="0 running, 0 unread, 0 changed projects">
               <span><strong data-summary-count="running">0</strong> running</span>
               <span><strong data-summary-count="unread">0</strong> unread</span>
@@ -55,7 +55,7 @@ const threadDashboardPage = (() => {
     page.querySelector('[data-load-more]').addEventListener('click', onLoadMore);
     page.querySelector('[data-thread-list]').addEventListener('click', onListClick);
     page.querySelector('[data-account-select]').addEventListener('change', (event) => {
-      if (event.target.value) onAccountAction({ type: 'switch', profileID: event.target.value });
+      if (event.target.value) onAccountAction({ type: 'switch', accountID: event.target.value });
     });
     page.querySelector('[data-account-save]').addEventListener('click', () => {
       const currentName = page.querySelector('[data-account-select] option:checked')?.textContent || '';

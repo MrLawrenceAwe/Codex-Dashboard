@@ -7,7 +7,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     private static let preferredPositionKey = "NSStatusItem Preferred Position \(autosaveName)"
     private static let defaultPreferredPosition = 450
 
-    private let coordinator: DashboardCoordinator
+    private let coordinator: AppCoordinator
     private let launchAtLogin: LaunchAtLoginController
     private let statusItem: NSStatusItem
     private var connectionStateCancellable: AnyCancellable?
@@ -15,7 +15,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     private weak var accountsMenuItem: NSMenuItem?
 
     init(
-        coordinator: DashboardCoordinator,
+        coordinator: AppCoordinator,
         launchAtLogin: LaunchAtLoginController
     ) {
         Self.registerDefaultPosition()
@@ -53,7 +53,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(actionItem("Open Diagnostics…", action: #selector(openDiagnostics)))
         menu.addItem(.separator())
 
-        let openDashboard = actionItem("Open Thread Dashboard", action: #selector(openThreadDashboard))
+        let openDashboard = actionItem("Open Task Dashboard", action: #selector(openThreadDashboard))
         openDashboard.isEnabled = coordinator.connectionState.dashboardIsMounted
         menu.addItem(openDashboard)
 
@@ -61,7 +61,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         restart.isEnabled = !coordinator.isPerformingAction && !coordinator.isCheckingCompatibility
         menu.addItem(restart)
 
-        let disable = actionItem("Disable Thread Dashboard", action: #selector(disableThreadDashboard))
+        let disable = actionItem("Disable Task Dashboard", action: #selector(disableThreadDashboard))
         disable.isEnabled = coordinator.connectionState.rendererIsAvailable && !coordinator.isPerformingAction
         menu.addItem(disable)
         menu.addItem(.separator())
@@ -112,20 +112,20 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     private func makeAccountsMenu() -> NSMenu {
         let menu = NSMenu(title: "Accounts")
-        for (index, profile) in coordinator.accountProfiles.enumerated() {
-            let isActive = profile.id == coordinator.activeAccountProfileID
-            let item = actionItem(profile.name, action: #selector(switchAccount(_:)))
-            item.representedObject = profile.id.uuidString
+        for (index, account) in coordinator.savedAccounts.enumerated() {
+            let isActive = account.id == coordinator.activeAccountID
+            let item = actionItem(account.name, action: #selector(switchAccount(_:)))
+            item.representedObject = account.id.uuidString
             item.state = isActive ? .on : .off
             item.isEnabled = !isActive && !coordinator.isPerformingAction
             menu.addItem(item)
             let usageTitles: [String]
             if isActive {
-                usageTitles = Self.accountUsageMenuTitles(
+                usageTitles = AccountUsageMenuFormatter.titles(
                     for: coordinator.activeAccountUsageStatus
                 )
-            } else if let snapshot = coordinator.accountUsageByProfileID[profile.id] {
-                usageTitles = Self.accountUsageMenuTitles(
+            } else if let snapshot = coordinator.usageByAccountID[account.id] {
+                usageTitles = AccountUsageMenuFormatter.titles(
                     for: .stale(snapshot),
                     staleLabel: "Cached usage"
                 )
@@ -133,16 +133,16 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
                 usageTitles = ["Usage: switch to refresh"]
             }
             addUsageItems(usageTitles, to: menu)
-            if index < coordinator.accountProfiles.count - 1 { menu.addItem(.separator()) }
+            if index < coordinator.savedAccounts.count - 1 { menu.addItem(.separator()) }
         }
-        if coordinator.activeAccountProfileID == nil {
-            if !coordinator.accountProfiles.isEmpty { menu.addItem(.separator()) }
+        if coordinator.activeAccountID == nil {
+            if !coordinator.savedAccounts.isEmpty { menu.addItem(.separator()) }
             let current = NSMenuItem(title: "Current account", action: nil, keyEquivalent: "")
             current.state = .on
             current.isEnabled = false
             menu.addItem(current)
             addUsageItems(
-                Self.accountUsageMenuTitles(for: coordinator.activeAccountUsageStatus),
+                AccountUsageMenuFormatter.titles(for: coordinator.activeAccountUsageStatus),
                 to: menu
             )
         }
@@ -153,12 +153,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let add = actionItem("Sign In to Another Account…", action: #selector(addAccount))
         add.isEnabled = !coordinator.isPerformingAction
         menu.addItem(add)
-        if !coordinator.accountProfiles.isEmpty {
+        if !coordinator.savedAccounts.isEmpty {
             let forget = NSMenuItem(title: "Forget Saved Account", action: nil, keyEquivalent: "")
             let forgetMenu = NSMenu(title: "Forget Saved Account")
-            for profile in coordinator.accountProfiles {
-                let item = actionItem(profile.name, action: #selector(forgetAccount(_:)))
-                item.representedObject = profile.id.uuidString
+            for account in coordinator.savedAccounts {
+                let item = actionItem(account.name, action: #selector(forgetAccount(_:)))
+                item.representedObject = account.id.uuidString
                 forgetMenu.addItem(item)
             }
             forget.submenu = forgetMenu
@@ -178,71 +178,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     private func refreshAccountsMenu() {
         accountsMenuItem?.submenu = makeAccountsMenu()
-    }
-
-    static func accountUsageMenuTitles(
-        for status: CodexAccountUsageStatus,
-        now: Date = .now,
-        staleLabel: String = "Usage may be stale"
-    ) -> [String] {
-        var titles: [String] = []
-        if let snapshot = status.snapshot {
-            if let window = snapshot.usage.fiveHour {
-                titles.append(usageWindowTitle("5-hour", window: window, now: now))
-            }
-            if let window = snapshot.usage.weekly {
-                titles.append(usageWindowTitle("Weekly", window: window, now: now))
-            }
-            if let resets = snapshot.usage.bankedResets {
-                var title = "Banked resets: \(max(0, resets.availableCount)) available"
-                if resets.availableCount > 0, let expiration = resets.nextExpiration {
-                    title += " · next expires \(relativeTime(until: expiration, now: now))"
-                }
-                titles.append(title)
-            }
-        }
-
-        switch status {
-        case .loading(let previous):
-            titles.append(previous == nil ? "Loading usage details…" : "Updating usage details…")
-        case .available:
-            if titles.isEmpty { titles.append("Usage details unavailable") }
-        case .stale(let snapshot):
-            titles.append("\(staleLabel) · updated \(timeString(snapshot.fetchedAt))")
-        case .unavailable:
-            titles.append("Usage details unavailable")
-        }
-        return titles
-    }
-
-    private static func usageWindowTitle(
-        _ label: String,
-        window: CodexUsageWindow,
-        now: Date
-    ) -> String {
-        let remaining = 100 - min(100, max(0, window.usedPercent))
-        var title = "\(label): \(remaining)% remaining"
-        if let resetsAt = window.resetsAt {
-            title += " · resets \(relativeTime(until: resetsAt, now: now))"
-        }
-        return title
-    }
-
-    private static func relativeTime(until date: Date, now: Date) -> String {
-        let minutes = max(0, Int(ceil(date.timeIntervalSince(now) / 60)))
-        guard minutes > 0 else { return "now" }
-        let days = minutes / 1_440
-        let hours = (minutes % 1_440) / 60
-        let remainingMinutes = minutes % 60
-        var parts: [String] = []
-        if days > 0 { parts.append("\(days)d") }
-        if hours > 0 { parts.append("\(hours)h") }
-        if days == 0, remainingMinutes > 0 { parts.append("\(remainingMinutes)m") }
-        return "in \(parts.joined(separator: " "))"
-    }
-
-    private static func timeString(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
     }
 
     private func updateIcon(for state: DashboardConnectionState) {
@@ -301,26 +236,26 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     @objc private func switchAccount(_ sender: NSMenuItem) {
         guard
             let identifier = sender.representedObject as? String,
-            let profileID = UUID(uuidString: identifier)
+            let accountID = UUID(uuidString: identifier)
         else { return }
-        Task { await coordinator.switchAccount(to: profileID) }
+        Task { await coordinator.switchAccount(to: accountID) }
     }
 
     @objc private func forgetAccount(_ sender: NSMenuItem) {
         guard
             let identifier = sender.representedObject as? String,
-            let profileID = UUID(uuidString: identifier),
-            let profile = coordinator.accountProfiles.first(where: { $0.id == profileID })
+            let accountID = UUID(uuidString: identifier),
+            let account = coordinator.savedAccounts.first(where: { $0.id == accountID })
         else { return }
         let alert = NSAlert()
-        alert.messageText = "Forget \(profile.name)?"
+        alert.messageText = "Forget \(account.name)?"
         alert.informativeText = "Its saved credentials will be removed from Keychain. This does not delete the OpenAI account."
         alert.addButton(withTitle: "Forget")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .warning
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        coordinator.deleteAccount(profileID)
+        coordinator.deleteAccount(accountID)
     }
 
     @objc private func checkCompatibility() {

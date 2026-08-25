@@ -36,7 +36,7 @@ final class CodexAccountUsageProviderTests: XCTestCase {
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700], ofItemAtPath: executableURL.path
         )
-        let provider = CodexAppServerAccountUsageProvider(
+        let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
             timeout: .seconds(1)
@@ -77,7 +77,7 @@ final class CodexAccountUsageProviderTests: XCTestCase {
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700], ofItemAtPath: executableURL.path
         )
-        let provider = CodexAppServerAccountUsageProvider(
+        let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
             timeout: .milliseconds(100)

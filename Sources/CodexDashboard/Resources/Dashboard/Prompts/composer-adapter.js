@@ -1,34 +1,9 @@
 const composerAdapter = (() => {
-  const modelLabels = {
-    'gpt-5.6-sol': '5.6 Sol',
-    'gpt-5.6-terra': '5.6 Terra',
-    'gpt-5.6-luna': '5.6 Luna',
-    'gpt-5.5': '5.5',
-    'gpt-5.4': '5.4',
-    'gpt-5.4-mini': '5.4 Mini',
-  };
-  const reasoningEffortLabels = {
-    light: 'Light',
-    medium: 'Medium',
-    high: 'High',
-    xhigh: 'Extra High',
-  };
-  const speedLabels = { standard: 'Standard', fast: 'Fast' };
-
-  function isVisible(element) {
-    return Boolean(element?.getClientRects().length)
-      && getComputedStyle(element).visibility !== 'hidden';
-  }
-
-  async function waitFor(value, timeout = 1200) {
-    const deadline = performance.now() + timeout;
-    while (performance.now() < deadline) {
-      const result = value();
-      if (result) return result;
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-    return null;
-  }
+  const { isVisible } = domUtils;
+  const waitFor = (value, timeout = 1200) => domUtils.waitFor(
+    value,
+    { timeout, interval: 25 },
+  );
 
   function intelligenceTrigger() {
     const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
@@ -110,9 +85,9 @@ const composerAdapter = (() => {
   async function applyPreset(preset) {
     if (!preset) return true;
     const selections = [
-      ['Model', modelLabels[preset.model]],
-      ['Effort', reasoningEffortLabels[preset.reasoningEffort]],
-      ['Speed', speedLabels[preset.speed]],
+      ['Model', presetOptions.label(presetOptions.models, preset.model)],
+      ['Effort', presetOptions.label(presetOptions.reasoningEfforts, preset.reasoningEffort)],
+      ['Speed', presetOptions.label(presetOptions.speeds, preset.speed)],
     ].filter(([, label]) => label);
     for (const [prefix, label] of selections) {
       if (!await selectPresetValue(prefix, label)) {

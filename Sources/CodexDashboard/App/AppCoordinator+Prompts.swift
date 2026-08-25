@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-extension DashboardCoordinator {
+extension AppCoordinator {
     func importPromptLibrary() async {
         let panel = NSOpenPanel()
         panel.title = "Import Prompt Library"

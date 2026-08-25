@@ -29,7 +29,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let preview: String
     let projectName: String
     let projectPath: String
-    let recencyTimestampMilliseconds: Int64
+    let recencyEpochMillis: Int64
     let isPinned: Bool
     var isUnread = false
     let model: String?
@@ -43,13 +43,13 @@ struct ThreadCatalog: Sendable {
     let totalThreadCount: Int
 }
 
-struct DashboardThreadPayload: Codable, Equatable, Sendable {
+struct ThreadWireModel: Codable, Equatable, Sendable {
     let id: String
     let title: String
     let preview: String
     let projectName: String
     let projectPath: String
-    let recencyTimestampMilliseconds: Int64
+    let recencyEpochMillis: Int64
     let isPinned: Bool
     let isUnread: Bool
     let model: String?
@@ -63,7 +63,7 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
         preview = thread.preview
         projectName = thread.projectName
         projectPath = thread.projectPath
-        recencyTimestampMilliseconds = thread.recencyTimestampMilliseconds
+        recencyEpochMillis = thread.recencyEpochMillis
         isPinned = thread.isPinned
         isUnread = thread.isUnread
         model = thread.model
@@ -73,19 +73,19 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
     }
 }
 
-struct DashboardSnapshotPayload: Codable, Equatable, Sendable {
-    let threads: [DashboardThreadPayload]
-    let accounts: [DashboardAccountPayload]
+struct DashboardSnapshot: Codable, Equatable, Sendable {
+    let threads: [ThreadWireModel]
+    let accounts: [SavedAccountOption]
     let activeAccountID: String?
     let accountStatusMessage: String?
 
     init(
         threads: [ThreadSummary],
-        accounts: [DashboardAccountPayload] = [],
+        accounts: [SavedAccountOption] = [],
         activeAccountID: String? = nil,
         accountStatusMessage: String? = nil
     ) {
-        self.threads = threads.map(DashboardThreadPayload.init)
+        self.threads = threads.map(ThreadWireModel.init)
         self.accounts = accounts
         self.activeAccountID = activeAccountID
         self.accountStatusMessage = accountStatusMessage

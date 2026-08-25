@@ -14,11 +14,7 @@ const codexUIContracts = (() => {
     'button[data-testid="composer-attachment-button"]',
   ];
 
-  function isVisible(element) {
-    if (!element || element.getClientRects().length === 0) return false;
-    const style = getComputedStyle(element);
-    return style.display !== 'none' && style.visibility !== 'hidden';
-  }
+  const { isVisible } = domUtils;
 
   function sidebar() {
     return document.querySelector('aside.app-shell-left-panel, aside');
@@ -189,15 +185,7 @@ const codexUIContracts = (() => {
   }
 
   async function probeCommitOrPushControls(timeout = 3000) {
-    const waitFor = async (value) => {
-      const deadline = performance.now() + timeout;
-      while (performance.now() < deadline) {
-        const result = value();
-        if (result) return result;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      return null;
-    };
+    const waitFor = (value) => domUtils.waitFor(value, { timeout });
 
     if (commitOrPushButton()) return true;
 

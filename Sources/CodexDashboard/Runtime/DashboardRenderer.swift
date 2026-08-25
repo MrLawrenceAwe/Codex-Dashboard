@@ -3,26 +3,24 @@ import Foundation
 @MainActor
 final class DashboardRenderer {
     private struct PendingSynchronization {
-        var snapshot: DashboardSnapshotPayload
+        var snapshot: DashboardSnapshot
         var targets: [DevToolsTarget]
         var forceRemount: Bool
         var waiters: [CheckedContinuation<Void, any Error>]
     }
 
     private let devTools: any DevToolsServing
-    private let injectionPayload: DashboardInjectionResources
+    private let injectionBundle: InjectionBundle
     private let compatibilityChecker: RendererCompatibilityChecker
-    private let promptLibraryStore: PromptLibraryFileStore?
+    private let promptLibraryBridge: PromptLibraryBridge?
     private var mountedTargetIDs: Set<String> = []
-    private var lastSnapshot: DashboardSnapshotPayload?
-    private var lastDeliveredPromptLibrary: PromptLibraryDocument?
+    private var lastSnapshot: DashboardSnapshot?
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var pendingSynchronization: PendingSynchronization?
     private var lastHealthCheckByTargetID: [String: Date] = [:]
     private var cachedTargets: [DevToolsTarget] = []
     private var lastTargetRefresh: Date?
-    private var nativePromptLibraryIsAuthoritative = false
     private let healthCheckInterval: TimeInterval
     private let now: () -> Date
 
@@ -30,19 +28,21 @@ final class DashboardRenderer {
 
     init(
         devTools: any DevToolsServing = DevToolsClient(),
-        injectionPayload: DashboardInjectionResources? = nil,
+        injectionBundle: InjectionBundle? = nil,
         promptLibraryStore: PromptLibraryFileStore? = nil,
         healthCheckInterval: TimeInterval = 30,
         now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
-        self.injectionPayload = try injectionPayload ?? DashboardInjectionResources.load()
-        self.promptLibraryStore = promptLibraryStore
+        self.injectionBundle = try injectionBundle ?? InjectionBundle.load()
+        promptLibraryBridge = promptLibraryStore.map {
+            PromptLibraryBridge(devTools: devTools, store: $0)
+        }
         self.healthCheckInterval = healthCheckInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
             devTools: devTools,
-            contractSource: try DashboardInjectionResources.loadRendererContractSource()
+            contractSource: try InjectionBundle.loadRendererContractSource()
         )
     }
 
@@ -67,7 +67,7 @@ final class DashboardRenderer {
     }
 
     func synchronize(
-        _ snapshot: DashboardSnapshotPayload,
+        _ snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
@@ -140,7 +140,7 @@ final class DashboardRenderer {
     }
 
     private func performSynchronization(
-        _ snapshot: DashboardSnapshotPayload,
+        _ snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws {
@@ -160,7 +160,7 @@ final class DashboardRenderer {
                 isHealthy = true
             } else if canCheckHealth {
                 isHealthy = (try? await devTools.evaluateBoolean(
-                    injectionPayload.healthCheckExpression,
+                    injectionBundle.healthCheckExpression,
                     in: target
                 )) == true
                 lastHealthCheckByTargetID[target.id] = now()
@@ -169,7 +169,7 @@ final class DashboardRenderer {
             }
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
-                guard try await devTools.evaluateBoolean(injectionPayload.mountExpression, in: target) else {
+                guard try await devTools.evaluateBoolean(injectionBundle.mountExpression, in: target) else {
                     throw DashboardError.enableFailed(
                         "The dashboard injection did not mount in the Codex renderer."
                     )
@@ -183,8 +183,8 @@ final class DashboardRenderer {
         }
 
         guard !Task.isCancelled, maintainsDashboard else { return }
-        try await synchronizePromptLibrary(
-            on: targets,
+        try await promptLibraryBridge?.synchronize(
+            targets: targets,
             healthyTargets: healthyTargets,
             mountedDashboard: mountedDashboard
         )
@@ -210,7 +210,7 @@ final class DashboardRenderer {
             }
 
             for target in targets {
-                let disabled = try await devTools.evaluateBoolean(DashboardRendererScript.destroy, in: target)
+                let disabled = try await devTools.evaluateBoolean(RendererScript.destroy, in: target)
                 guard disabled else {
                     throw DashboardError.disableFailed("The renderer still reports an active dashboard.")
                 }
@@ -225,12 +225,12 @@ final class DashboardRenderer {
 
     func open() async {
         for target in await targets(forceRefresh: true) {
-            _ = try? await devTools.evaluateBoolean(DashboardRendererScript.open, in: target)
+            _ = try? await devTools.evaluateBoolean(RendererScript.open, in: target)
         }
     }
 
     func openThread(_ threadID: String) async {
-        guard let expression = DashboardRendererScript.openThread(threadID) else { return }
+        guard let expression = RendererScript.openThread(threadID) else { return }
         for target in await targets(forceRefresh: true) {
             _ = try? await devTools.evaluateBoolean(expression, in: target)
         }
@@ -240,7 +240,7 @@ final class DashboardRenderer {
         for target in await targets(forceRefresh: false) {
             guard
                 let serialized = try? await devTools.evaluateString(
-                    DashboardRendererScript.consumeAccountAction,
+                    RendererScript.consumeAccountAction,
                     in: target
                 ),
                 let data = serialized.data(using: .utf8),
@@ -252,15 +252,15 @@ final class DashboardRenderer {
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {
-        nativePromptLibraryIsAuthoritative = true
+        promptLibraryBridge?.preferNativeLibrary()
     }
 
     func compatibilityChecks() async -> [CompatibilityCheck] {
         await compatibilityChecker.check()
     }
 
-    private func deliver(_ snapshot: DashboardSnapshotPayload, to targets: [DevToolsTarget]) async throws {
-        let expression = try DashboardRendererScript.deliver(snapshot)
+    private func deliver(_ snapshot: DashboardSnapshot, to targets: [DevToolsTarget]) async throws {
+        let expression = try RendererScript.deliver(snapshot)
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
                 throw DashboardError.enableFailed(
@@ -270,103 +270,10 @@ final class DashboardRenderer {
         }
     }
 
-    private func synchronizePromptLibrary(
-        on targets: [DevToolsTarget],
-        healthyTargets: [DevToolsTarget],
-        mountedDashboard: Bool
-    ) async throws {
-        guard let promptLibraryStore, let firstTarget = targets.first else { return }
-        var nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
-        var discardedPendingLibrary = false
-        if nativeLibraryIsAuthoritative {
-            try await discardPendingPromptLibrary(on: targets)
-            discardedPendingLibrary = true
-        } else {
-            if let serialized = try await devTools.evaluateString(
-                DashboardRendererScript.exportPendingPromptLibrary,
-                in: firstTarget
-            ),
-               let data = serialized.data(using: .utf8),
-               let pendingLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
-               pendingLibrary.isValid {
-                nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
-                if nativeLibraryIsAuthoritative {
-                    try await discardPendingPromptLibrary(on: targets)
-                    discardedPendingLibrary = true
-                } else {
-                    _ = try promptLibraryStore.save(pendingLibrary)
-                    let acknowledgement = try DashboardRendererScript.acknowledgePendingPromptLibrary(
-                        pendingLibrary
-                    )
-                    guard try await devTools.evaluateBoolean(acknowledgement, in: firstTarget) else {
-                        throw DashboardError.enableFailed("The prompt library save could not be acknowledged by the renderer.")
-                    }
-                }
-            }
-        }
-        let storedBeforeSynchronization = try promptLibraryStore.load()
-        let nativeLibraryChanged = storedBeforeSynchronization != lastDeliveredPromptLibrary
-        let sourceTarget = healthyTargets.first ?? (storedBeforeSynchronization == nil ? firstTarget : nil)
-
-        if !nativeLibraryChanged, let sourceTarget,
-           let serialized = try await devTools.evaluateString(
-               DashboardRendererScript.exportPromptLibrary,
-               in: sourceTarget
-           ),
-           let data = serialized.data(using: .utf8),
-           let rendererLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
-           rendererLibrary.isValid
-        {
-            nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
-            if nativeLibraryIsAuthoritative {
-                if !discardedPendingLibrary {
-                    try await discardPendingPromptLibrary(on: targets)
-                    discardedPendingLibrary = true
-                }
-            } else {
-                _ = try promptLibraryStore.save(rendererLibrary)
-            }
-        }
-
-        nativeLibraryIsAuthoritative = nativeLibraryIsAuthoritative
-            || nativePromptLibraryIsAuthoritative
-        if nativeLibraryIsAuthoritative, !discardedPendingLibrary {
-            try await discardPendingPromptLibrary(on: targets)
-        }
-        guard let nativeLibrary = try promptLibraryStore.load() else { return }
-        guard nativeLibraryIsAuthoritative
-                || mountedDashboard
-                || nativeLibrary != lastDeliveredPromptLibrary
-        else { return }
-        let expression = try DashboardRendererScript.deliverPromptLibrary(nativeLibrary)
-        for target in targets {
-            guard try await devTools.evaluateBoolean(expression, in: target) else {
-                throw DashboardError.enableFailed("The prompt library was unavailable in the Codex renderer.")
-            }
-        }
-        lastDeliveredPromptLibrary = nativeLibrary
-        if nativeLibraryIsAuthoritative {
-            nativePromptLibraryIsAuthoritative = false
-        }
-    }
-
-    private func discardPendingPromptLibrary(on targets: [DevToolsTarget]) async throws {
-        for target in targets {
-            guard try await devTools.evaluateBoolean(
-                DashboardRendererScript.discardPendingPromptLibrary,
-                in: target
-            ) else {
-                throw DashboardError.enableFailed(
-                    "The pending prompt library could not be cleared from the renderer."
-                )
-            }
-        }
-    }
-
     private func clearMountState() {
         mountedTargetIDs = []
         lastSnapshot = nil
-        lastDeliveredPromptLibrary = nil
+        promptLibraryBridge?.reset()
         lastHealthCheckByTargetID = [:]
         invalidateTargetCache()
     }

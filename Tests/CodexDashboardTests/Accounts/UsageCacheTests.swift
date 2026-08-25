@@ -2,14 +2,14 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class CodexAccountUsageCacheStoreTests: XCTestCase {
+final class UsageCacheTests: XCTestCase {
     func testRoundTripsNonSensitiveUsageSnapshots() throws {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CodexAccountUsageCacheStoreTests-\(UUID().uuidString)")
+            .appendingPathComponent("UsageCacheTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
         let cacheURL = directory.appendingPathComponent("account-usage.json")
-        let store = CodexAccountUsageCacheStore(cacheURL: cacheURL)
-        let profileID = UUID()
+        let store = UsageCache(cacheURL: cacheURL)
+        let accountID = UUID()
         let snapshot = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(
@@ -28,9 +28,9 @@ final class CodexAccountUsageCacheStoreTests: XCTestCase {
             fetchedAt: Date(timeIntervalSince1970: 1_000)
         )
 
-        try store.save([profileID: snapshot])
+        try store.save([accountID: snapshot])
 
-        XCTAssertEqual(try store.load(), [profileID: snapshot])
+        XCTAssertEqual(try store.load(), [accountID: snapshot])
         let storedText = try String(contentsOf: cacheURL, encoding: .utf8)
         XCTAssertFalse(storedText.contains("token"))
         XCTAssertEqual(
@@ -44,6 +44,6 @@ final class CodexAccountUsageCacheStoreTests: XCTestCase {
         let cacheURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("MissingAccountUsageCache-\(UUID().uuidString).json")
 
-        XCTAssertEqual(try CodexAccountUsageCacheStore(cacheURL: cacheURL).load(), [:])
+        XCTAssertEqual(try UsageCache(cacheURL: cacheURL).load(), [:])
     }
 }

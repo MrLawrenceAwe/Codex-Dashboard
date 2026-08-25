@@ -40,7 +40,7 @@ final class DashboardStatusItemControllerTests: XCTestCase {
             )
         )
 
-        let titles = DashboardStatusItemController.accountUsageMenuTitles(
+        let titles = AccountUsageMenuFormatter.titles(
             for: .available(CodexAccountUsageSnapshot(usage: usage, fetchedAt: now)),
             now: now
         )
@@ -62,7 +62,7 @@ final class DashboardStatusItemControllerTests: XCTestCase {
             fetchedAt: now
         )
 
-        let titles = DashboardStatusItemController.accountUsageMenuTitles(
+        let titles = AccountUsageMenuFormatter.titles(
             for: .stale(snapshot),
             now: now
         )
@@ -81,7 +81,7 @@ final class DashboardStatusItemControllerTests: XCTestCase {
             fetchedAt: now
         )
 
-        let titles = DashboardStatusItemController.accountUsageMenuTitles(
+        let titles = AccountUsageMenuFormatter.titles(
             for: .stale(snapshot),
             now: now,
             staleLabel: "Cached usage"
@@ -94,11 +94,11 @@ final class DashboardStatusItemControllerTests: XCTestCase {
 
     func testLoadingAndUnavailableAccountUsageHaveUsefulPlaceholders() {
         XCTAssertEqual(
-            DashboardStatusItemController.accountUsageMenuTitles(for: .loading(previous: nil)),
+            AccountUsageMenuFormatter.titles(for: .loading(previous: nil)),
             ["Loading usage details…"]
         )
         XCTAssertEqual(
-            DashboardStatusItemController.accountUsageMenuTitles(for: .unavailable),
+            AccountUsageMenuFormatter.titles(for: .unavailable),
             ["Usage details unavailable"]
         )
     }

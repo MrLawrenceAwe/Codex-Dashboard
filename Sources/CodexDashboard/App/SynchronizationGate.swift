@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class DashboardSynchronizationGate {
+final class SynchronizationGate {
     private var task: Task<Void, Never>?
     private var taskID: UUID?
     private var trailingSynchronizationRequested = false

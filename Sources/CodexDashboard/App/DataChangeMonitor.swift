@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 @MainActor
-final class DashboardDataChangeMonitor {
+final class DataChangeMonitor {
     private struct Watch {
         let descriptor: Int32
         let source: DispatchSourceFileSystemObject
