@@ -43,6 +43,22 @@ struct CodexUsageWindow: Equatable, Sendable {
 struct CodexAccountUsage: Equatable, Sendable {
     let fiveHour: CodexUsageWindow?
     let weekly: CodexUsageWindow?
+    let bankedResets: CodexBankedResetSummary?
+
+    init(
+        fiveHour: CodexUsageWindow?,
+        weekly: CodexUsageWindow?,
+        bankedResets: CodexBankedResetSummary? = nil
+    ) {
+        self.fiveHour = fiveHour
+        self.weekly = weekly
+        self.bankedResets = bankedResets
+    }
+}
+
+struct CodexBankedResetSummary: Equatable, Sendable {
+    let availableCount: Int
+    let nextExpiration: Date?
 }
 
 struct CodexAccountUsageSnapshot: Equatable, Sendable {
@@ -88,6 +104,7 @@ struct DashboardAccountUsagePayload: Codable, Equatable, Sendable {
     let state: State
     let fiveHour: DashboardUsageWindowPayload?
     let weekly: DashboardUsageWindowPayload?
+    let bankedResets: DashboardBankedResetPayload?
     let fetchedAtMilliseconds: Int64?
 
     init(_ status: CodexAccountUsageStatus) {
@@ -100,8 +117,21 @@ struct DashboardAccountUsagePayload: Codable, Equatable, Sendable {
         let snapshot = status.snapshot
         fiveHour = snapshot?.usage.fiveHour.map(DashboardUsageWindowPayload.init)
         weekly = snapshot?.usage.weekly.map(DashboardUsageWindowPayload.init)
+        bankedResets = snapshot?.usage.bankedResets.map(DashboardBankedResetPayload.init)
         fetchedAtMilliseconds = snapshot.map {
             Int64(($0.fetchedAt.timeIntervalSince1970 * 1_000).rounded())
+        }
+    }
+}
+
+struct DashboardBankedResetPayload: Codable, Equatable, Sendable {
+    let availableCount: Int
+    let nextExpirationMilliseconds: Int64?
+
+    init(_ summary: CodexBankedResetSummary) {
+        availableCount = summary.availableCount
+        nextExpirationMilliseconds = summary.nextExpiration.map {
+            Int64(($0.timeIntervalSince1970 * 1_000).rounded())
         }
     }
 }

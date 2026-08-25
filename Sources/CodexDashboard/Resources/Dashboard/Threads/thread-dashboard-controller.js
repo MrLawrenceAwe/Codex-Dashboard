@@ -177,6 +177,10 @@ function resetRemaining(resetAtMilliseconds) {
   if (!Number.isFinite(resetAtMilliseconds)) return 'reset time unavailable';
   const remainingMinutes = Math.max(0, Math.ceil((resetAtMilliseconds - Date.now()) / 60000));
   if (remainingMinutes === 0) return 'resetting now';
+  return `resets in ${remainingDuration(remainingMinutes)}`;
+}
+
+function remainingDuration(remainingMinutes) {
   const days = Math.floor(remainingMinutes / 1440);
   const hours = Math.floor((remainingMinutes % 1440) / 60);
   const minutes = remainingMinutes % 60;
@@ -184,7 +188,7 @@ function resetRemaining(resetAtMilliseconds) {
   if (days) parts.push(`${days}d`);
   if (hours) parts.push(`${hours}h`);
   if (!days && minutes) parts.push(`${minutes}m`);
-  return `resets in ${parts.join(' ')}`;
+  return parts.join(' ');
 }
 
 function usageWindowMarkup(label, window) {
@@ -207,6 +211,19 @@ function usageUpdatedAt(fetchedAtMilliseconds) {
   }).format(new Date(fetchedAtMilliseconds));
 }
 
+function bankedResetsMarkup(bankedResets) {
+  if (!bankedResets || !Number.isFinite(bankedResets.availableCount)) return '';
+  const count = Math.max(0, Math.round(bankedResets.availableCount));
+  let expiration = '';
+  if (count > 0 && Number.isFinite(bankedResets.nextExpirationMilliseconds)) {
+    const minutes = Math.max(0, Math.ceil(
+      (bankedResets.nextExpirationMilliseconds - Date.now()) / 60000,
+    ));
+    expiration = minutes > 0 ? ` · next expires in ${remainingDuration(minutes)}` : ' · expiring now';
+  }
+  return `<div class="dashboard-banked-resets"><strong>Banked resets</strong> <span>${count} available${expiration}</span></div>`;
+}
+
 function renderAccountUsage(status) {
   const container = document.querySelector('[data-account-usage]');
   if (!container) return;
@@ -214,17 +231,18 @@ function renderAccountUsage(status) {
     usageWindowMarkup('5 hour', status?.fiveHour),
     usageWindowMarkup('Weekly', status?.weekly),
   ].filter(Boolean).join('');
+  const bankedResets = bankedResetsMarkup(status?.bankedResets);
   let message = '';
-  if (status?.state === 'loading') message = windows ? 'Updating usage…' : 'Loading usage…';
+  if (status?.state === 'loading') message = windows || bankedResets ? 'Updating usage…' : 'Loading usage…';
   if (status?.state === 'unavailable') message = 'Usage unavailable';
   if (status?.state === 'stale') {
     const updatedAt = usageUpdatedAt(status.fetchedAtMilliseconds);
     message = updatedAt ? `Usage may be stale · updated ${updatedAt}` : 'Usage may be stale';
   }
-  if (status?.state === 'available' && !windows) message = 'Usage unavailable';
-  container.innerHTML = `${windows}${message ? `<span class="dashboard-usage-message">${message}</span>` : ''}`;
+  if (status?.state === 'available' && !windows && !bankedResets) message = 'Usage unavailable';
+  container.innerHTML = `${windows}${bankedResets}${message ? `<span class="dashboard-usage-message">${message}</span>` : ''}`;
   container.dataset.usageState = status?.state || '';
-  container.hidden = !windows && !message;
+  container.hidden = !windows && !bankedResets && !message;
 }
 
 function queueAccountAction(action) {
