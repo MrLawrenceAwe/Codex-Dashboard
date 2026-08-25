@@ -39,6 +39,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        coordinator.refreshAccountState()
         menu.removeAllItems()
         let status = NSMenuItem(title: coordinator.statusPresentation.title, action: nil, keyEquivalent: "")
         status.isEnabled = false

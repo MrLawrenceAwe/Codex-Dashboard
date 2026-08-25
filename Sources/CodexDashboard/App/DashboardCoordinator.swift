@@ -128,6 +128,7 @@ final class DashboardCoordinator: ObservableObject {
 
     func synchronizeDashboard() async {
         guard !isPerformingAction else { return }
+        refreshAccountState()
         await synchronizationGate.perform { [weak self] in await self?.synchronizeRuntime() }
     }
 
