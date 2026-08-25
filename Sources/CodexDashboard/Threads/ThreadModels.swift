@@ -75,8 +75,19 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
 
 struct DashboardSnapshotPayload: Codable, Equatable, Sendable {
     let threads: [DashboardThreadPayload]
+    let accounts: [DashboardAccountPayload]
+    let activeAccountID: String?
+    let accountStatusMessage: String?
 
-    init(threads: [ThreadSummary]) {
+    init(
+        threads: [ThreadSummary],
+        accounts: [DashboardAccountPayload] = [],
+        activeAccountID: String? = nil,
+        accountStatusMessage: String? = nil
+    ) {
         self.threads = threads.map(DashboardThreadPayload.init)
+        self.accounts = accounts
+        self.activeAccountID = activeAccountID
+        self.accountStatusMessage = accountStatusMessage
     }
 }

@@ -43,6 +43,8 @@ enum DashboardRendererScript {
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 
+    static let consumeAccountAction = "window.__codexDashboard?.consumeAccountAction?.() ?? null"
+
     static func deliverPromptLibrary(_ library: PromptLibraryDocument) throws -> String {
         let data = try JSONEncoder().encode(library)
         guard let json = String(data: data, encoding: .utf8) else {

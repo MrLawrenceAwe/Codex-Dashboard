@@ -29,6 +29,9 @@ extension DashboardCoordinator {
                 try await publishSnapshot(to: targets, using: dashboardRuntime)
                 setConnectionState(.dashboardMounted)
                 setConnectionError(nil)
+                if let action = await dashboardRuntime.consumeAccountAction() {
+                    Task { await self.handleAccountAction(action) }
+                }
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
                 setFailure(error, lastKnownState: .rendererReady)
@@ -141,7 +144,7 @@ extension DashboardCoordinator {
         using runtime: any DashboardRuntime
     ) async throws {
         try await runtime.synchronizeDashboard(
-            with: DashboardSnapshotPayload(threads: threads), on: targets, forceRemount: false
+            with: dashboardSnapshotPayload(), on: targets, forceRemount: false
         )
     }
 

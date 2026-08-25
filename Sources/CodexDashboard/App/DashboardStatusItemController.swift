@@ -59,6 +59,16 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(disable)
         menu.addItem(.separator())
 
+        let accountsItem = NSMenuItem(title: accountMenuTitle, action: nil, keyEquivalent: "")
+        accountsItem.submenu = makeAccountsMenu()
+        menu.addItem(accountsItem)
+        if let message = coordinator.accountStatusMessage {
+            let accountStatus = NSMenuItem(title: message, action: nil, keyEquivalent: "")
+            accountStatus.isEnabled = false
+            menu.addItem(accountStatus)
+        }
+        menu.addItem(.separator())
+
         let compatibilityTitle = coordinator.isCheckingCompatibility
             ? "Checking Compatibility…"
             : "Check Compatibility"
@@ -88,6 +98,41 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         return item
     }
 
+    private var accountMenuTitle: String {
+        coordinator.activeAccountName.map { "Account: \($0)" } ?? "Accounts"
+    }
+
+    private func makeAccountsMenu() -> NSMenu {
+        let menu = NSMenu(title: "Accounts")
+        for profile in coordinator.accountProfiles {
+            let item = actionItem(profile.name, action: #selector(switchAccount(_:)))
+            item.representedObject = profile.id.uuidString
+            item.state = profile.id == coordinator.activeAccountProfileID ? .on : .off
+            item.isEnabled = profile.id != coordinator.activeAccountProfileID
+                && !coordinator.isPerformingAction
+            menu.addItem(item)
+        }
+        if !coordinator.accountProfiles.isEmpty { menu.addItem(.separator()) }
+        let save = actionItem("Save Current Account…", action: #selector(saveCurrentAccount))
+        save.isEnabled = !coordinator.isPerformingAction
+        menu.addItem(save)
+        let add = actionItem("Sign In to Another Account…", action: #selector(addAccount))
+        add.isEnabled = !coordinator.isPerformingAction
+        menu.addItem(add)
+        if !coordinator.accountProfiles.isEmpty {
+            let forget = NSMenuItem(title: "Forget Saved Account", action: nil, keyEquivalent: "")
+            let forgetMenu = NSMenu(title: "Forget Saved Account")
+            for profile in coordinator.accountProfiles {
+                let item = actionItem(profile.name, action: #selector(forgetAccount(_:)))
+                item.representedObject = profile.id.uuidString
+                forgetMenu.addItem(item)
+            }
+            forget.submenu = forgetMenu
+            menu.addItem(forget)
+        }
+        return menu
+    }
+
     private func updateIcon(for state: DashboardConnectionState) {
         let symbolName = state.dashboardIsMounted ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2"
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Codex Dashboard")
@@ -111,6 +156,59 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func disableThreadDashboard() {
         Task { await coordinator.disableThreadDashboard() }
+    }
+
+    @objc private func saveCurrentAccount() {
+        let alert = NSAlert()
+        alert.messageText = coordinator.activeAccountName == nil
+            ? "Save Current Codex Account"
+            : "Rename and Update Saved Account"
+        alert.informativeText = "Credentials are stored in macOS Keychain and are never written to the dashboard's settings file."
+        let field = NSTextField(string: coordinator.activeAccountName ?? "")
+        field.placeholderString = "Account Name"
+        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        coordinator.saveCurrentAccount(named: field.stringValue)
+    }
+
+    @objc private func addAccount() {
+        let alert = NSAlert()
+        alert.messageText = "Sign In to Another Codex Account?"
+        alert.informativeText = "Codex will restart signed out. After signing in, choose Save Current Account from this menu. Existing saved accounts remain in Keychain."
+        alert.addButton(withTitle: "Restart and Sign In")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { await coordinator.beginAddingAccount() }
+    }
+
+    @objc private func switchAccount(_ sender: NSMenuItem) {
+        guard
+            let identifier = sender.representedObject as? String,
+            let profileID = UUID(uuidString: identifier)
+        else { return }
+        Task { await coordinator.switchAccount(to: profileID) }
+    }
+
+    @objc private func forgetAccount(_ sender: NSMenuItem) {
+        guard
+            let identifier = sender.representedObject as? String,
+            let profileID = UUID(uuidString: identifier),
+            let profile = coordinator.accountProfiles.first(where: { $0.id == profileID })
+        else { return }
+        let alert = NSAlert()
+        alert.messageText = "Forget \(profile.name)?"
+        alert.informativeText = "Its saved credentials will be removed from Keychain. This does not delete the OpenAI account."
+        alert.addButton(withTitle: "Forget")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        coordinator.deleteAccount(profileID)
     }
 
     @objc private func checkCompatibility() {

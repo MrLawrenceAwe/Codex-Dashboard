@@ -71,7 +71,12 @@ const threadDashboardState = (() => {
 
   function normalizeSnapshot(snapshot) {
     const threads = Array.isArray(snapshot?.threads) ? snapshot.threads : [];
-    return { threads };
+    const accounts = Array.isArray(snapshot?.accounts) ? snapshot.accounts : [];
+    const activeAccountID = typeof snapshot?.activeAccountID === 'string'
+      ? snapshot.activeAccountID : null;
+    const accountStatusMessage = typeof snapshot?.accountStatusMessage === 'string'
+      ? snapshot.accountStatusMessage : null;
+    return { threads, accounts, activeAccountID, accountStatusMessage };
   }
 
   return { derive, filter, loadPreferences, normalizeSnapshot, savePreferences };

@@ -235,6 +235,21 @@ final class DashboardRenderer {
         }
     }
 
+    func consumeAccountAction() async -> DashboardAccountAction? {
+        for target in await targets(forceRefresh: false) {
+            guard
+                let serialized = try? await devTools.evaluateString(
+                    DashboardRendererScript.consumeAccountAction,
+                    in: target
+                ),
+                let data = serialized.data(using: .utf8),
+                let action = try? JSONDecoder().decode(DashboardAccountAction.self, from: data)
+            else { continue }
+            return action
+        }
+        return nil
+    }
+
     func compatibilityChecks() async -> [CompatibilityCheck] {
         await compatibilityChecker.check()
     }

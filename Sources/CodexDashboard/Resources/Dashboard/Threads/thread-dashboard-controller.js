@@ -3,6 +3,10 @@ const navigationEventTypes = ['pointerdown', 'mousedown', 'click', 'keydown'];
 const routeEventTypes = ['message', 'popstate', 'hashchange'];
 
 let threads = [];
+let accounts = [];
+let activeAccountID = null;
+let accountStatusMessage = null;
+let pendingAccountAction = null;
 const storedPreferences = threadDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
 let searchTerm = '';
@@ -150,6 +154,36 @@ function renderDashboard() {
     state,
   });
   if (rendered) dashboardNeedsRender = false;
+}
+
+function renderAccountControls() {
+  const select = document.querySelector('[data-account-select]');
+  if (!select) return;
+  const options = accounts.map((account) => `
+    <option value="${dashboardElements.escapeHTML(account.id)}"${account.id === activeAccountID ? ' selected' : ''}>
+      ${dashboardElements.escapeHTML(account.name)}
+    </option>`).join('');
+  select.innerHTML = options || '<option value="">Current account</option>';
+  const notice = document.querySelector('[data-dashboard-notice]');
+  if (notice && accountStatusMessage) {
+    notice.textContent = accountStatusMessage;
+    notice.hidden = false;
+  }
+}
+
+function queueAccountAction(action) {
+  pendingAccountAction = action;
+  accountStatusMessage = action.type === 'switch'
+    ? 'Switching accounts…'
+    : (action.type === 'add' ? 'Preparing account sign-in…' : 'Saving account…');
+  renderAccountControls();
+}
+
+function consumeAccountAction() {
+  if (!pendingAccountAction) return null;
+  const action = pendingAccountAction;
+  pendingAccountAction = null;
+  return JSON.stringify(action);
 }
 
 function scheduleDashboardRender() {
@@ -338,6 +372,7 @@ function mountDashboardPage() {
     }
     openThreadFromEvent(event);
     },
+    onAccountAction: queueAccountAction,
   });
 }
 
@@ -376,12 +411,16 @@ function isOpen() {
 function applySnapshot(nextSnapshot) {
   const snapshot = threadDashboardState.normalizeSnapshot(nextSnapshot);
   threads = snapshot.threads;
+  accounts = snapshot.accounts;
+  activeAccountID = snapshot.activeAccountID;
+  accountStatusMessage = snapshot.accountStatusMessage;
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
   requestDashboardRender();
+  renderAccountControls();
 }
 
 function activeProject() {
@@ -483,6 +522,7 @@ return {
   open: openDashboard,
   isOpen,
   applySnapshot,
+  consumeAccountAction,
   activeProject,
 };
 })();
