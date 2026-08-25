@@ -22,6 +22,7 @@ final class DashboardRenderer {
     private var lastHealthCheckByTargetID: [String: Date] = [:]
     private var cachedTargets: [DevToolsTarget] = []
     private var lastTargetRefresh: Date?
+    private var nativePromptLibraryIsAuthoritative = false
     private let healthCheckInterval: TimeInterval
     private let now: () -> Date
 
@@ -250,6 +251,10 @@ final class DashboardRenderer {
         return nil
     }
 
+    func preferNativePromptLibraryOnNextSynchronization() {
+        nativePromptLibraryIsAuthoritative = true
+    }
+
     func compatibilityChecks() async -> [CompatibilityCheck] {
         await compatibilityChecker.check()
     }
@@ -271,19 +276,32 @@ final class DashboardRenderer {
         mountedDashboard: Bool
     ) async throws {
         guard let promptLibraryStore, let firstTarget = targets.first else { return }
-        if let serialized = try await devTools.evaluateString(
-            DashboardRendererScript.exportPendingPromptLibrary,
-            in: firstTarget
-        ),
-           let data = serialized.data(using: .utf8),
-           let pendingLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
-           pendingLibrary.isValid {
-            _ = try promptLibraryStore.save(pendingLibrary)
-            let acknowledgement = try DashboardRendererScript.acknowledgePendingPromptLibrary(
-                pendingLibrary
-            )
-            guard try await devTools.evaluateBoolean(acknowledgement, in: firstTarget) else {
-                throw DashboardError.enableFailed("The prompt library save could not be acknowledged by the renderer.")
+        var nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
+        var discardedPendingLibrary = false
+        if nativeLibraryIsAuthoritative {
+            try await discardPendingPromptLibrary(on: targets)
+            discardedPendingLibrary = true
+        } else {
+            if let serialized = try await devTools.evaluateString(
+                DashboardRendererScript.exportPendingPromptLibrary,
+                in: firstTarget
+            ),
+               let data = serialized.data(using: .utf8),
+               let pendingLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
+               pendingLibrary.isValid {
+                nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
+                if nativeLibraryIsAuthoritative {
+                    try await discardPendingPromptLibrary(on: targets)
+                    discardedPendingLibrary = true
+                } else {
+                    _ = try promptLibraryStore.save(pendingLibrary)
+                    let acknowledgement = try DashboardRendererScript.acknowledgePendingPromptLibrary(
+                        pendingLibrary
+                    )
+                    guard try await devTools.evaluateBoolean(acknowledgement, in: firstTarget) else {
+                        throw DashboardError.enableFailed("The prompt library save could not be acknowledged by the renderer.")
+                    }
+                }
             }
         }
         let storedBeforeSynchronization = try promptLibraryStore.load()
@@ -299,11 +317,27 @@ final class DashboardRenderer {
            let rendererLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
            rendererLibrary.isValid
         {
-            _ = try promptLibraryStore.save(rendererLibrary)
+            nativeLibraryIsAuthoritative = nativePromptLibraryIsAuthoritative
+            if nativeLibraryIsAuthoritative {
+                if !discardedPendingLibrary {
+                    try await discardPendingPromptLibrary(on: targets)
+                    discardedPendingLibrary = true
+                }
+            } else {
+                _ = try promptLibraryStore.save(rendererLibrary)
+            }
         }
 
+        nativeLibraryIsAuthoritative = nativeLibraryIsAuthoritative
+            || nativePromptLibraryIsAuthoritative
+        if nativeLibraryIsAuthoritative, !discardedPendingLibrary {
+            try await discardPendingPromptLibrary(on: targets)
+        }
         guard let nativeLibrary = try promptLibraryStore.load() else { return }
-        guard mountedDashboard || nativeLibrary != lastDeliveredPromptLibrary else { return }
+        guard nativeLibraryIsAuthoritative
+                || mountedDashboard
+                || nativeLibrary != lastDeliveredPromptLibrary
+        else { return }
         let expression = try DashboardRendererScript.deliverPromptLibrary(nativeLibrary)
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
@@ -311,6 +345,22 @@ final class DashboardRenderer {
             }
         }
         lastDeliveredPromptLibrary = nativeLibrary
+        if nativeLibraryIsAuthoritative {
+            nativePromptLibraryIsAuthoritative = false
+        }
+    }
+
+    private func discardPendingPromptLibrary(on targets: [DevToolsTarget]) async throws {
+        for target in targets {
+            guard try await devTools.evaluateBoolean(
+                DashboardRendererScript.discardPendingPromptLibrary,
+                in: target
+            ) else {
+                throw DashboardError.enableFailed(
+                    "The pending prompt library could not be cleared from the renderer."
+                )
+            }
+        }
     }
 
     private func clearMountState() {

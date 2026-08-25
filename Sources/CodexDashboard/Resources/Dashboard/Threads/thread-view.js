@@ -75,7 +75,7 @@ const threadDashboardView = (() => {
     updateHeaderSummary(state);
     const page = document.getElementById(dashboardElements.elementIDs.page);
     if (!page) return false;
-    const notice = page.querySelector('[data-dashboard-notice]');
+    const notice = page.querySelector('[data-commit-notice]');
     if (notice) {
       notice.textContent = commitOrPushError;
       notice.hidden = !commitOrPushError;

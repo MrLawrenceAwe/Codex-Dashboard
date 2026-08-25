@@ -538,7 +538,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
             [
               document.getElementById('codex-dashboard-page').classList.contains('is-open'),
-              document.querySelector('[data-dashboard-notice]').textContent,
+              document.querySelector('[data-commit-notice]').textContent,
             ]
             """
         ) as? [Any]
@@ -548,6 +548,92 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(
             values[1] as? String,
             "Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead."
+        )
+    }
+
+    func testAccountStatusAndCommitNoticesRenderIndependently() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let snapshot = DashboardSnapshotPayload(
+            threads: [],
+            accountStatusMessage: "Wait for active tasks to finish before switching accounts."
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        _ = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.open(); window.__codexDashboard.applySnapshot(\(payload));"
+        )
+        try await Task.sleep(for: .milliseconds(100))
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              document.querySelector('[data-account-notice]').hidden,
+              document.querySelector('[data-account-notice]').textContent,
+              document.querySelector('[data-commit-notice]').hidden,
+              document.querySelector('[data-commit-notice]').textContent,
+            ]
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(
+            try XCTUnwrap(state) as? [AnyHashable],
+            [false, "Wait for active tasks to finish before switching accounts.", true, ""]
+        )
+    }
+
+    func testCommitFailureAfterThreadNavigationIsRenderedImmediately() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
+              </aside>
+              <main>
+                <button type="button" data-slot="thread-summary-panel-item-button">Commit or push</button>
+              </main>
+              <script>
+                const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+                row.addEventListener('click', () => {
+                  row.setAttribute('aria-current', 'page');
+                  document.querySelector('[data-slot="thread-summary-panel-item-button"]')?.remove();
+                });
+              </script>
+            </body></html>
+            """,
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "idle-thread",
+                projectPath: "/tmp/changed-project",
+                workingTreeStatus: .hasChanges
+            ),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              document.querySelector('[data-project-commit]').click();
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(250))
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+              document.querySelector('[data-commit-notice]').hidden,
+              document.querySelector('[data-commit-notice]').textContent,
+            ]
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(
+            try XCTUnwrap(state) as? [AnyHashable],
+            [true, false, "The project thread opened, but Codex could not start Commit or push."]
         )
     }
 

@@ -23,11 +23,13 @@ protocol DashboardRuntime: AnyObject {
     func openThreadDashboard() async
     func openThread(_ threadID: String) async
     func consumeAccountAction() async -> DashboardAccountAction?
+    func preferNativePromptLibraryOnNextSynchronization()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
 extension DashboardRuntime {
     func consumeAccountAction() async -> DashboardAccountAction? { nil }
+    func preferNativePromptLibraryOnNextSynchronization() {}
 }
 
 @MainActor
@@ -96,6 +98,10 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
 
     func consumeAccountAction() async -> DashboardAccountAction? {
         await renderer.consumeAccountAction()
+    }
+
+    func preferNativePromptLibraryOnNextSynchronization() {
+        renderer.preferNativePromptLibraryOnNextSynchronization()
     }
 
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] {

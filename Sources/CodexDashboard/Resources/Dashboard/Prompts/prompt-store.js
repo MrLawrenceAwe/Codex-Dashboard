@@ -112,6 +112,11 @@ const promptStore = (() => {
 
     pendingLibrary,
 
+    discardPendingLibrary() {
+      try { localStorage.removeItem(pendingLibraryStorageKey); } catch (_) { return false; }
+      return true;
+    },
+
     acknowledgePendingLibrary(library) {
       const pending = pendingLibrary();
       if (!pending) return true;
