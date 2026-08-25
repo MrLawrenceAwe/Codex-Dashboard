@@ -1,5 +1,6 @@
 const promptStore = (() => {
   const libraryStorageKey = 'codex-dashboard.prompt-library';
+  const pendingLibraryStorageKey = 'codex-dashboard.pending-prompt-library';
   const collapsedSectionsStorageKey = 'codex-dashboard.collapsed-prompt-sections';
 
   const {
@@ -39,7 +40,32 @@ const promptStore = (() => {
     };
   }
 
-  const library = loadLegacyLibrary();
+  function normalizedLibrary(library) {
+    if (!promptLibraryContract.isValidLibrary(library)) return null;
+    return {
+      version: 3,
+      prompts: normalizePrompts(library.prompts),
+      sections: normalizeSections(library.sections, library.prompts),
+    };
+  }
+
+  function pendingLibrary() {
+    return normalizedLibrary(readJSON(pendingLibraryStorageKey, null));
+  }
+
+  function canonicalize(value) {
+    if (Array.isArray(value)) return value.map(canonicalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+    }
+    return value;
+  }
+
+  function librariesMatch(left, right) {
+    return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+  }
+
+  const library = pendingLibrary() || loadLegacyLibrary();
   const storedCollapsedSections = readJSON(collapsedSectionsStorageKey, []);
   const store = {
     prompts: library.prompts,
@@ -65,6 +91,8 @@ const promptStore = (() => {
 
     commitLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);
+      const library = { version: 3, prompts: nextPrompts, sections };
+      if (!writeJSON(pendingLibraryStorageKey, library)) return false;
       store.prompts = nextPrompts;
       store.sections = sections;
       return true;
@@ -80,6 +108,16 @@ const promptStore = (() => {
         prompts: store.prompts,
         sections: normalizeSections(store.sections, store.prompts),
       };
+    },
+
+    pendingLibrary,
+
+    acknowledgePendingLibrary(library) {
+      const pending = pendingLibrary();
+      if (!pending) return true;
+      if (!librariesMatch(pending, library)) return false;
+      try { localStorage.removeItem(pendingLibraryStorageKey); } catch (_) { return false; }
+      return true;
     },
 
     applyLibrary(library) {

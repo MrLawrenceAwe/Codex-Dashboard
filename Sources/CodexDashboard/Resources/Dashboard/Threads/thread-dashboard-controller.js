@@ -159,11 +159,15 @@ function renderDashboard() {
 function renderAccountControls() {
   const select = document.querySelector('[data-account-select]');
   if (!select) return;
+  const hasSavedActiveAccount = accounts.some((account) => account.id === activeAccountID);
+  const currentAccountOption = hasSavedActiveAccount
+    ? ''
+    : '<option value="" selected>Current account</option>';
   const options = accounts.map((account) => `
     <option value="${dashboardElements.escapeHTML(account.id)}"${account.id === activeAccountID ? ' selected' : ''}>
       ${dashboardElements.escapeHTML(account.name)}
     </option>`).join('');
-  select.innerHTML = options || '<option value="">Current account</option>';
+  select.innerHTML = currentAccountOption + options;
   const notice = document.querySelector('[data-dashboard-notice]');
   if (notice && accountStatusMessage) {
     notice.textContent = accountStatusMessage;

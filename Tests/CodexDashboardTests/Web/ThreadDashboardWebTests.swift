@@ -1107,4 +1107,30 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(action["profileID"], workID.uuidString)
     }
 
+    func testAccountSelectorShowsCurrentAccountWhenNoSavedProfileIsActive() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let savedID = UUID()
+        let snapshot = DashboardSnapshotPayload(
+            threads: [],
+            accounts: [DashboardAccountPayload(id: savedID.uuidString, name: "Saved", isActive: false)],
+            activeAccountID: nil,
+            accountStatusMessage: nil
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const select = document.querySelector('[data-account-select]');
+              return [select.options.length, select.value, select.options[0].textContent.trim()];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], [2, "", "Current account"])
+    }
+
 }

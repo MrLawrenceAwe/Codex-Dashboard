@@ -7,6 +7,11 @@ window.__codexDashboard = {
   applySnapshot: threadDashboard.applySnapshot,
   consumeAccountAction: threadDashboard.consumeAccountAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
+  exportPendingPromptLibrary: () => {
+    const library = promptStore.pendingLibrary();
+    return library ? JSON.stringify(library) : null;
+  },
+  acknowledgePendingPromptLibrary: (library) => promptStore.acknowledgePendingLibrary(library),
   applyPromptLibrary: (library) => {
     const applied = promptStore.applyLibrary(library);
     if (applied) promptLibrary.refresh();

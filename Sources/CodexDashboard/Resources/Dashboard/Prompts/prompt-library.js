@@ -27,7 +27,7 @@ const promptLibrary = (() => {
       ? options
       : [[selectedValue, `Saved model · ${selectedValue}`], ...options];
     return availableOptions.map(([value, label]) => (
-      `<option value="${value}"${value === selectedValue ? ' selected' : ''}>${label}</option>`
+      `<option value="${dashboardElements.escapeHTML(value)}"${value === selectedValue ? ' selected' : ''}>${dashboardElements.escapeHTML(label)}</option>`
     )).join('');
   }
 
