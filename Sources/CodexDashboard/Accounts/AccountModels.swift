@@ -21,27 +21,14 @@ struct DashboardAccountPayload: Codable, Equatable, Sendable {
     let id: String
     let name: String
     let isActive: Bool
-    let usage: DashboardAccountUsagePayload?
-
-    init(
-        id: String,
-        name: String,
-        isActive: Bool,
-        usage: DashboardAccountUsagePayload? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.isActive = isActive
-        self.usage = usage
-    }
 }
 
-struct CodexUsageWindow: Equatable, Sendable {
+struct CodexUsageWindow: Codable, Equatable, Sendable {
     let usedPercent: Int
     let resetsAt: Date?
 }
 
-struct CodexAccountUsage: Equatable, Sendable {
+struct CodexAccountUsage: Codable, Equatable, Sendable {
     let fiveHour: CodexUsageWindow?
     let weekly: CodexUsageWindow?
     let bankedResets: CodexBankedResetSummary?
@@ -57,12 +44,12 @@ struct CodexAccountUsage: Equatable, Sendable {
     }
 }
 
-struct CodexBankedResetSummary: Equatable, Sendable {
+struct CodexBankedResetSummary: Codable, Equatable, Sendable {
     let availableCount: Int
     let nextExpiration: Date?
 }
 
-struct CodexAccountUsageSnapshot: Equatable, Sendable {
+struct CodexAccountUsageSnapshot: Codable, Equatable, Sendable {
     let usage: CodexAccountUsage
     let fetchedAt: Date
 }
@@ -78,61 +65,6 @@ enum CodexAccountUsageStatus: Equatable, Sendable {
         case .loading(let previous): previous
         case .available(let snapshot), .stale(let snapshot): snapshot
         case .unavailable: nil
-        }
-    }
-}
-
-struct DashboardUsageWindowPayload: Codable, Equatable, Sendable {
-    let usedPercent: Int
-    let resetsAtMilliseconds: Int64?
-
-    init(_ window: CodexUsageWindow) {
-        usedPercent = window.usedPercent
-        resetsAtMilliseconds = window.resetsAt.map {
-            Int64(($0.timeIntervalSince1970 * 1_000).rounded())
-        }
-    }
-}
-
-struct DashboardAccountUsagePayload: Codable, Equatable, Sendable {
-    enum State: String, Codable, Sendable {
-        case loading
-        case available
-        case stale
-        case unavailable
-    }
-
-    let state: State
-    let fiveHour: DashboardUsageWindowPayload?
-    let weekly: DashboardUsageWindowPayload?
-    let bankedResets: DashboardBankedResetPayload?
-    let fetchedAtMilliseconds: Int64?
-
-    init(_ status: CodexAccountUsageStatus) {
-        switch status {
-        case .loading: state = .loading
-        case .available: state = .available
-        case .stale: state = .stale
-        case .unavailable: state = .unavailable
-        }
-        let snapshot = status.snapshot
-        fiveHour = snapshot?.usage.fiveHour.map(DashboardUsageWindowPayload.init)
-        weekly = snapshot?.usage.weekly.map(DashboardUsageWindowPayload.init)
-        bankedResets = snapshot?.usage.bankedResets.map(DashboardBankedResetPayload.init)
-        fetchedAtMilliseconds = snapshot.map {
-            Int64(($0.fetchedAt.timeIntervalSince1970 * 1_000).rounded())
-        }
-    }
-}
-
-struct DashboardBankedResetPayload: Codable, Equatable, Sendable {
-    let availableCount: Int
-    let nextExpirationMilliseconds: Int64?
-
-    init(_ summary: CodexBankedResetSummary) {
-        availableCount = summary.availableCount
-        nextExpirationMilliseconds = summary.nextExpiration.map {
-            Int64(($0.timeIntervalSince1970 * 1_000).rounded())
         }
     }
 }

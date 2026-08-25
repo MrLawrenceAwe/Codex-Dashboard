@@ -25,6 +25,8 @@ enum CodexConfiguration {
     static let globalStateURL = codexDirectory.appendingPathComponent(".codex-global-state.json")
     static let authenticationURL = codexDirectory.appendingPathComponent("auth.json")
     static let accountMetadataURL = applicationSupportDirectory.appendingPathComponent("accounts.json")
+    static let accountUsageCacheURL = applicationSupportDirectory
+        .appendingPathComponent("account-usage.json")
 
     static var installedVersion: String? {
         guard let bundle = Bundle(url: codexApplicationURL) else { return nil }

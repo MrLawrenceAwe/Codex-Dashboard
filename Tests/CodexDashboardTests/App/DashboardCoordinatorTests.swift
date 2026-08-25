@@ -122,6 +122,19 @@ private struct StubAccountUsageProvider: CodexAccountUsageProviding {
     func reset() async {}
 }
 
+private actor RecordingAccountUsageProvider: CodexAccountUsageProviding {
+    private(set) var requestCount = 0
+
+    func usage() -> CodexAccountUsage {
+        requestCount += 1
+        return CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func reset() {}
+
+    func count() -> Int { requestCount }
+}
+
 private actor SequencedAccountUsageProvider: CodexAccountUsageProviding {
     private var outcomes: [CodexAccountUsage?]
 
@@ -190,7 +203,7 @@ private final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @u
 
 @MainActor
 private final class StubDashboardRuntime: DashboardRuntime {
-    let codexIsRunning = false
+    let codexIsRunning: Bool
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
     private let compatibilityChecks: [CompatibilityCheck]
@@ -200,9 +213,11 @@ private final class StubDashboardRuntime: DashboardRuntime {
     private(set) var openedThreadIDs: [String] = []
 
     init(
+        codexIsRunning: Bool = false,
         compatibilityChecks: [CompatibilityCheck] = [],
         synchronizationError: Error? = nil
     ) {
+        self.codexIsRunning = codexIsRunning
         self.compatibilityChecks = compatibilityChecks
         self.synchronizationError = synchronizationError
     }
@@ -252,7 +267,7 @@ final class DashboardCoordinatorTests: XCTestCase {
                 vault: CoordinatorMemoryCredentialVault()
             ),
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
         )
 
         await coordinator.refreshAccountUsage()
@@ -264,7 +279,6 @@ final class DashboardCoordinatorTests: XCTestCase {
             return XCTFail("Expected stale usage")
         }
         XCTAssertEqual(snapshot.usage, usage)
-        XCTAssertEqual(coordinator.dashboardSnapshotPayload().activeAccountUsage?.state, .stale)
     }
 
     func testConcurrentUsageRefreshesAreCoalesced() async throws {
@@ -284,7 +298,7 @@ final class DashboardCoordinatorTests: XCTestCase {
                 vault: CoordinatorMemoryCredentialVault()
             ),
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
         )
 
         let first = Task { @MainActor in await coordinator.refreshAccountUsage() }
@@ -294,6 +308,72 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
         await provider.resume(with: CodexAccountUsage(fiveHour: nil, weekly: nil))
         await first.value
+    }
+
+    func testUsageRefreshIsSkippedWhileCodexIsClosed() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorClosedUsageTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = SuspendedAccountUsageProvider()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: CodexAccountManager(
+                metadataURL: directory.appendingPathComponent("accounts.json"),
+                authenticationURL: directory.appendingPathComponent("auth.json"),
+                vault: CoordinatorMemoryCredentialVault()
+            ),
+            accountUsageProvider: provider,
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: false) }
+        )
+
+        await coordinator.refreshAccountUsage()
+
+        let requestCount = await provider.count()
+        XCTAssertEqual(requestCount, 0)
+        XCTAssertEqual(coordinator.activeAccountUsageStatus, .unavailable)
+    }
+
+    func testRestoresCachedUsageForActiveAccountAfterRelaunch() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorUsageRestoreTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let profile = try accountManager.saveCurrentAccount(named: "Lawrence")
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: nil),
+                weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
+            ),
+            fetchedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        try accountManager.usageCacheStore.save([profile.id: snapshot])
+
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: accountManager,
+            accountUsageProvider: StubAccountUsageProvider(),
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: false) }
+        )
+
+        XCTAssertEqual(coordinator.accountUsageByProfileID[profile.id], snapshot)
+        XCTAssertEqual(coordinator.activeAccountUsageStatus, .stale(snapshot))
     }
 
     func testAddingAccountKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
@@ -602,6 +682,10 @@ final class DashboardCoordinatorTests: XCTestCase {
         XCTAssertEqual(DashboardPollingController.Schedule.unread(active: false), .seconds(1))
     }
 
+    func testAccountUsagePollingScheduleRefreshesEveryThirtySeconds() {
+        XCTAssertEqual(DashboardPollingController.Schedule.accountUsage, .seconds(30))
+    }
+
     func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
         XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: true), .seconds(15))
         XCTAssertEqual(DashboardPollingController.Schedule.workingTree(active: false), .seconds(60))
@@ -654,6 +738,37 @@ final class DashboardCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(foregrounder.callCount, 1)
         XCTAssertEqual(runtime.openedThreadIDs, ["thread-1"])
+    }
+
+    func testTaskCompletionImmediatelyRefreshesAccountUsage() async throws {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let catalogProvider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let usageProvider = RecordingAccountUsageProvider()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: catalogProvider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            accountUsageProvider: usageProvider,
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+        try await waitUntil { await usageProvider.count() == 1 }
+
+        let requestCount = await usageProvider.count()
+        XCTAssertEqual(requestCount, 1)
     }
 
     func testNewestSimultaneousCompletionIsOpened() async {

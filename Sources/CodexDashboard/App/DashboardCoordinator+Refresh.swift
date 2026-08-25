@@ -96,8 +96,11 @@ extension DashboardCoordinator {
         refreshThreadDataWarning()
         lastSuccessfulRefresh = .now
         if let completedThreadID {
-            codexForegrounder.foregroundCodex()
-            await dashboardRuntime?.openThread(completedThreadID)
+            Task { await self.refreshAccountUsage() }
+            if foregroundOnTaskCompletion {
+                codexForegrounder.foregroundCodex()
+                await dashboardRuntime?.openThread(completedThreadID)
+            }
         }
     }
 
@@ -110,11 +113,7 @@ extension DashboardCoordinator {
         let previousObservationDate = lastLifecycleObservationDate
         observedLifecycleEventsByThreadID = latestEvents
         lastLifecycleObservationDate = observationDate
-        guard
-            foregroundOnTaskCompletion,
-            let previousEvents,
-            let previousObservationDate
-        else { return nil }
+        guard let previousEvents, let previousObservationDate else { return nil }
 
         let newCompletions = latestEvents.compactMap { threadID, event -> (threadID: String, event: ThreadLifecycleEvent)? in
             guard

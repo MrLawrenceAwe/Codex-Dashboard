@@ -12,18 +12,25 @@ final class CodexAccountManager: @unchecked Sendable {
     private let fileManager: FileManager
     private let now: () -> Date
     private let lock = NSLock()
+    let usageCacheStore: CodexAccountUsageCacheStore
 
     init(
         metadataURL: URL = CodexConfiguration.accountMetadataURL,
         authenticationURL: URL = CodexConfiguration.authenticationURL,
         vault: any AccountCredentialVault = KeychainAccountCredentialVault(),
         fileManager: FileManager = .default,
+        usageCacheStore: CodexAccountUsageCacheStore? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.metadataURL = metadataURL
         self.authenticationURL = authenticationURL
         self.vault = vault
         self.fileManager = fileManager
+        self.usageCacheStore = usageCacheStore ?? CodexAccountUsageCacheStore(
+            cacheURL: metadataURL.deletingLastPathComponent()
+                .appendingPathComponent("account-usage.json"),
+            fileManager: fileManager
+        )
         self.now = now
     }
 

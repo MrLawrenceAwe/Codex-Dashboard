@@ -89,7 +89,6 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-shell { width: min(980px, calc(100% - 64px)); margin: 0 auto; padding: 42px 0 64px; }
 
 #codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
-#codex-dashboard-page .dashboard-account-area { display: grid; justify-items: end; gap: 8px; }
 #codex-dashboard-page .dashboard-account-controls { display: flex; align-items: flex-end; gap: 6px; }
 #codex-dashboard-page .dashboard-account-controls label { display: grid; gap: 6px; }
 #codex-dashboard-page .dashboard-account-controls select,
@@ -97,17 +96,6 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-account-controls select { min-width: 150px; padding: 5px 26px 5px 9px; }
 #codex-dashboard-page .dashboard-account-controls button { padding: 5px 9px; cursor: pointer; }
 #codex-dashboard-page .dashboard-account-controls button:hover { border-color: var(--dashboard-line-strong); color: var(--dashboard-text); }
-#codex-dashboard-page .dashboard-account-usage { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(135px, 1fr)); gap: 8px; }
-#codex-dashboard-page .dashboard-account-usage[hidden] { display: none; }
-#codex-dashboard-page .dashboard-usage-window { display: grid; min-width: 0; gap: 5px; }
-#codex-dashboard-page .dashboard-usage-copy { display: flex; min-width: 0; justify-content: space-between; gap: 9px; color: var(--dashboard-dim); font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-#codex-dashboard-page .dashboard-usage-copy strong { color: var(--dashboard-muted); font-weight: 620; }
-#codex-dashboard-page .dashboard-usage-track { display: block; height: 3px; overflow: hidden; border-radius: 999px; background: var(--dashboard-active); }
-#codex-dashboard-page .dashboard-usage-track > span { display: block; height: 100%; border-radius: inherit; background: var(--dashboard-green); }
-#codex-dashboard-page .dashboard-banked-resets { display: flex; grid-column: 1 / -1; justify-content: space-between; gap: 9px; color: var(--dashboard-dim); font-size: 9px; font-variant-numeric: tabular-nums; }
-#codex-dashboard-page .dashboard-banked-resets strong { color: var(--dashboard-muted); font-weight: 620; }
-#codex-dashboard-page .dashboard-usage-message { grid-column: 1 / -1; color: var(--dashboard-dim); font-size: 9px; text-align: right; }
-#codex-dashboard-page .dashboard-account-usage[data-usage-state="stale"] .dashboard-usage-track > span { background: var(--dashboard-amber); }
 #codex-dashboard-page h1 { margin: 0; color: var(--dashboard-text); font-size: 28px; font-weight: 590; line-height: 1.15; letter-spacing: -.025em; }
 #codex-dashboard-page .dashboard-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; color: var(--dashboard-dim); font-size: 11px; }
 #codex-dashboard-page .dashboard-summary span { display: inline-flex; align-items: center; gap: 3px; }

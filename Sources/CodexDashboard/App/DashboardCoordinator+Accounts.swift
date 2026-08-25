@@ -10,6 +10,7 @@ extension DashboardCoordinator {
             let existingUsage = activeAccountUsageStatus.snapshot
             let profile = try accountManager.saveCurrentAccount(named: name)
             if let existingUsage { accountUsageByProfileID[profile.id] = existingUsage }
+            persistAccountUsageCache(force: true)
             accountStatusMessage = "Saved \(profile.name) securely in Keychain."
             refreshAccountState()
             if let existingUsage { activeAccountUsageStatus = .available(existingUsage) }
@@ -35,6 +36,7 @@ extension DashboardCoordinator {
             try accountManager.deleteProfile(profileID)
             accountStatusMessage = "Removed the saved account from Keychain."
             accountUsageByProfileID[profileID] = nil
+            persistAccountUsageCache(force: true)
             refreshAccountState()
             if activeAccountProfileID == nil { activeAccountUsageStatus = .unavailable }
             Task { await publishAccountSnapshot() }
@@ -46,11 +48,14 @@ extension DashboardCoordinator {
     func refreshAccountState() {
         do {
             let document = try accountManager.document()
-            accountProfiles = document.profiles.sorted {
+            let profiles = document.profiles.sorted {
                 if $0.lastUsedAt == $1.lastUsedAt { return $0.name < $1.name }
                 return $0.lastUsedAt > $1.lastUsedAt
             }
-            activeAccountProfileID = document.activeProfileID
+            if accountProfiles != profiles { accountProfiles = profiles }
+            if activeAccountProfileID != document.activeProfileID {
+                activeAccountProfileID = document.activeProfileID
+            }
         } catch {
             accountStatusMessage = error.localizedDescription
         }
@@ -82,16 +87,10 @@ extension DashboardCoordinator {
                 DashboardAccountPayload(
                     id: $0.id.uuidString,
                     name: $0.name,
-                    isActive: $0.id == activeAccountProfileID,
-                    usage: ($0.id == activeAccountProfileID
-                        ? DashboardAccountUsagePayload(activeAccountUsageStatus)
-                        : accountUsageByProfileID[$0.id].map {
-                            DashboardAccountUsagePayload(.stale($0))
-                        })
+                    isActive: $0.id == activeAccountProfileID
                 )
             },
             activeAccountID: activeAccountProfileID?.uuidString,
-            activeAccountUsage: DashboardAccountUsagePayload(activeAccountUsageStatus),
             accountStatusMessage: accountStatusMessage
         )
     }
@@ -108,6 +107,7 @@ extension DashboardCoordinator {
 
         isPerformingAction = true
         refreshGeneration += 1
+        persistAccountUsageCache(force: true)
         await synchronizationGate.cancel()
         let accountTransaction: CodexAccountTransaction
         do {
@@ -184,14 +184,13 @@ extension DashboardCoordinator {
     }
 
     func refreshAccountUsage() async {
-        guard !isRefreshingAccountUsage else { return }
+        guard !isRefreshingAccountUsage, dashboardRuntime?.codexIsRunning == true else { return }
         isRefreshingAccountUsage = true
         defer { isRefreshingAccountUsage = false }
         let generation = refreshGeneration
         let profileID = activeAccountProfileID
         let previous = activeAccountUsageStatus.snapshot
         activeAccountUsageStatus = .loading(previous: previous)
-        await publishAccountSnapshot()
 
         do {
             let usage = try await accountUsageProvider.usage()
@@ -201,7 +200,10 @@ extension DashboardCoordinator {
             else { return }
             let snapshot = CodexAccountUsageSnapshot(usage: usage, fetchedAt: .now)
             activeAccountUsageStatus = .available(snapshot)
-            if let profileID { accountUsageByProfileID[profileID] = snapshot }
+            if let profileID {
+                accountUsageByProfileID[profileID] = snapshot
+                persistAccountUsageCache()
+            }
         } catch {
             guard !Task.isCancelled,
                   generation == refreshGeneration,
@@ -210,6 +212,21 @@ extension DashboardCoordinator {
             activeAccountUsageStatus = previous.map(CodexAccountUsageStatus.stale)
                 ?? .unavailable
         }
-        await publishAccountSnapshot()
+    }
+
+    func persistAccountUsageCache(force: Bool = false, now: Date = .now) {
+        if !force,
+           let lastUsageCacheSaveAt,
+           now.timeIntervalSince(lastUsageCacheSaveAt) < 5 * 60 {
+            return
+        }
+        let profileIDs = Set(accountProfiles.map(\.id))
+        let snapshots = accountUsageByProfileID.filter { profileIDs.contains($0.key) }
+        do {
+            try accountUsageCacheStore.save(snapshots)
+            lastUsageCacheSaveAt = now
+        } catch {
+            // Usage cache failures must not interfere with account switching or live usage.
+        }
     }
 }

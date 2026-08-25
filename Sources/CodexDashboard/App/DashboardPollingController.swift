@@ -7,7 +7,7 @@ final class DashboardPollingController {
         static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
         static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
         static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
-        static func accountUsage(active: Bool) -> Duration { active ? .seconds(60) : .seconds(300) }
+        static let accountUsage: Duration = .seconds(30)
     }
 
     private var catalogPollingTask: Task<Void, Never>?
@@ -61,7 +61,7 @@ final class DashboardPollingController {
         accountUsagePollingTask = Task {
             while !Task.isCancelled {
                 await refreshAccountUsage()
-                try? await Task.sleep(for: Schedule.accountUsage(active: Self.isUserActive))
+                try? await Task.sleep(for: Schedule.accountUsage)
             }
         }
         fileChanges?.start(
