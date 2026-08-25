@@ -15,8 +15,14 @@ enum CodexConfiguration {
     private static let codexDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".codex", isDirectory: true)
 
+    private static let applicationSupportDirectory = FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask
+    ).first!.appendingPathComponent("Codex Dashboard", isDirectory: true)
+
     static let stateDatabaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
     static let globalStateURL = codexDirectory.appendingPathComponent(".codex-global-state.json")
+    static let authenticationURL = codexDirectory.appendingPathComponent("auth.json")
+    static let accountMetadataURL = applicationSupportDirectory.appendingPathComponent("accounts.json")
 
     static var installedVersion: String? {
         guard let bundle = Bundle(url: codexApplicationURL) else { return nil }

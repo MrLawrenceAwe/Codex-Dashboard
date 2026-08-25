@@ -53,6 +53,7 @@ removes it.
 - Prompt search, keyboard and pointer reordering, section rename/deletion, and `{{selection}}` and `{{clipboard}}` placeholders speed up reusable prompt workflows. Prompts can optionally apply saved model, reasoning-effort, and Standard/Fast speed settings before insertion. Saved model identifiers remain intact and editable when Codex's model list changes. Deleting a section moves its prompts to **General** rather than deleting them.
 - Dashboard filter and collapsed-project preferences persist across renderer reloads.
 - The menu bar provides dashboard, restart, disable, compatibility, diagnostics, completion foregrounding, and launch-at-login actions.
+- Multiple Codex accounts can be saved under friendly names and switched from either the menu bar or the Thread Dashboard header. Credential blobs stay in macOS Keychain; the non-secret profile list is stored in `~/Library/Application Support/Codex Dashboard/accounts.json`. Switching waits for idle tasks, preserves the shared Codex thread/configuration directory, updates the active account atomically, restarts Codex, and rolls back if relaunch fails.
 - Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
 - Diagnostics show versions, refresh state, thread counts, renderer targets, and warnings, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
@@ -62,6 +63,14 @@ removes it.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.
+
+## Account switching
+
+1. While signed in to Codex, choose **Accounts → Save Current Account…** and give it a recognizable name.
+2. Choose **Sign In to Another Account…**. Codex restarts signed out; complete the normal OpenAI sign-in in Codex.
+3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Thread Dashboard**.
+
+Codex still uses one active account at a time. The switcher does not merge accounts, transfer subscriptions or usage, or rotate accounts automatically. Do not commit, export, or manually copy `~/.codex/auth.json`.
 
 ## Visual baselines
 

@@ -7,7 +7,7 @@ final class DashboardCoordinator: ObservableObject {
 
     @Published private(set) var connectionState: DashboardConnectionState = .checking
     @Published private(set) var connectionError: String?
-    @Published private(set) var isPerformingAction = false
+    @Published var isPerformingAction = false
     @Published var threadDataWarning: String?
     @Published var threads: [ThreadSummary] = []
     @Published var totalThreadCount = 0
@@ -19,6 +19,9 @@ final class DashboardCoordinator: ObservableObject {
     @Published var rendererTargetCount = 0
     @Published private(set) var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
+    @Published var accountProfiles: [CodexAccountProfile] = []
+    @Published var activeAccountProfileID: UUID?
+    @Published var accountStatusMessage: String?
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -31,7 +34,8 @@ final class DashboardCoordinator: ObservableObject {
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
     let promptLibraryStore: PromptLibraryFileStore
-    private let synchronizationGate = DashboardSynchronizationGate()
+    let accountManager: CodexAccountManager
+    let synchronizationGate = DashboardSynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
@@ -57,6 +61,7 @@ final class DashboardCoordinator: ObservableObject {
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
+        accountManager: CodexAccountManager = CodexAccountManager(),
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -68,6 +73,7 @@ final class DashboardCoordinator: ObservableObject {
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
         self.promptLibraryStore = promptLibraryStore
+        self.accountManager = accountManager
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion
@@ -77,6 +83,7 @@ final class DashboardCoordinator: ObservableObject {
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
+        refreshAccountState()
     }
 
     func startMonitoring() {
@@ -138,7 +145,7 @@ final class DashboardCoordinator: ObservableObject {
             rendererAvailable = true
             try await loadThreadSnapshot()
             try await dashboardRuntime.synchronizeDashboard(
-                with: DashboardSnapshotPayload(threads: threads),
+                with: dashboardSnapshotPayload(),
                 on: targets,
                 forceRemount: true
             )

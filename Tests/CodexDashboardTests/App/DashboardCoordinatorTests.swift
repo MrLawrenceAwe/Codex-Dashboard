@@ -127,17 +127,40 @@ private actor SequencedCompatibilityChecker: LocalCompatibilityChecking {
     }
 }
 
+private final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked Sendable {
+    private var values: [UUID: Data] = [:]
+    private let lock = NSLock()
+
+    func credential(for profileID: UUID) -> Data? {
+        lock.withLock { values[profileID] }
+    }
+
+    func store(_ credential: Data, for profileID: UUID) {
+        lock.withLock { values[profileID] = credential }
+    }
+
+    func deleteCredential(for profileID: UUID) {
+        _ = lock.withLock { values.removeValue(forKey: profileID) }
+    }
+}
+
 @MainActor
 private final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning = false
     let codexLaunchDate: Date? = nil
     let maintainsDashboard = false
     private let compatibilityChecks: [CompatibilityCheck]
+    private let synchronizationError: Error?
     private(set) var restartCallCount = 0
+    private(set) var synchronizeCallCount = 0
     private(set) var openedThreadIDs: [String] = []
 
-    init(compatibilityChecks: [CompatibilityCheck] = []) {
+    init(
+        compatibilityChecks: [CompatibilityCheck] = [],
+        synchronizationError: Error? = nil
+    ) {
         self.compatibilityChecks = compatibilityChecks
+        self.synchronizationError = synchronizationError
     }
 
     func rendererTargets() async -> [DevToolsTarget] { [] }
@@ -150,7 +173,10 @@ private final class StubDashboardRuntime: DashboardRuntime {
         with snapshot: DashboardSnapshotPayload,
         on targets: [DevToolsTarget],
         forceRemount: Bool
-    ) async throws {}
+    ) async throws {
+        synchronizeCallCount += 1
+        if let synchronizationError { throw synchronizationError }
+    }
     func disableThreadDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
     func openThreadDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
@@ -159,6 +185,93 @@ private final class StubDashboardRuntime: DashboardRuntime {
 
 @MainActor
 final class DashboardCoordinatorTests: XCTestCase {
+    private enum AccountTestError: Error { case mountFailed }
+
+    func testAddingAccountKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorAccountTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        let metadataURL = directory.appendingPathComponent("support/accounts.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: metadataURL,
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        _ = try accountManager.saveCurrentAccount(named: "Lawrence")
+        let runtime = StubDashboardRuntime()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            accountManager: accountManager,
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.beginAddingAccount()
+
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertEqual(runtime.synchronizeCallCount, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: authenticationURL.path))
+        XCTAssertNil(try accountManager.document().activeProfileID)
+        XCTAssertEqual(coordinator.connectionState, .rendererReady)
+        XCTAssertEqual(
+            coordinator.accountStatusMessage,
+            "Sign in to the other account, then save it from Accounts."
+        )
+    }
+
+    func testSuccessfulCredentialSwitchIsNotRolledBackWhenDashboardMountFails() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorSwitchTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        let metadataURL = directory.appendingPathComponent("support/accounts.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: metadataURL,
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let lawrence = try accountManager.saveCurrentAccount(named: "Lawrence")
+        _ = try accountManager.beginAddingAccount()
+        try Data(#"{"account":"mum"}"#.utf8).write(to: authenticationURL)
+        _ = try accountManager.saveCurrentAccount(named: "Mum")
+        let runtime = StubDashboardRuntime(synchronizationError: AccountTestError.mountFailed)
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            accountManager: accountManager,
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.switchAccount(to: lawrence.id)
+
+        XCTAssertEqual(try accountManager.document().activeProfileID, lawrence.id)
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), Data(#"{"account":"lawrence"}"#.utf8))
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertEqual(runtime.synchronizeCallCount, 1)
+        XCTAssertEqual(coordinator.connectionState, .rendererReady)
+        XCTAssertEqual(
+            coordinator.accountStatusMessage,
+            "Switched to Lawrence. The dashboard will reconnect when Codex is ready."
+        )
+    }
+
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {
         let incompatible = CompatibilityCheck(
             id: "sidebar-host",

@@ -1068,4 +1068,43 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["0", true])
     }
 
+    func testAccountSelectorPublishesSwitchAction() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let personalID = UUID()
+        let workID = UUID()
+        let snapshot = DashboardSnapshotPayload(
+            threads: [],
+            accounts: [
+                DashboardAccountPayload(
+                    id: personalID.uuidString, name: "Personal", isActive: true
+                ),
+                DashboardAccountPayload(id: workID.uuidString, name: "Work", isActive: false),
+            ],
+            activeAccountID: personalID.uuidString,
+            accountStatusMessage: "Ready"
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const select = document.querySelector('[data-account-select]');
+              const initial = [select.options.length, select.value, select.options[1].textContent.trim()];
+              select.value = \(String(reflecting: workID.uuidString));
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              return [initial, JSON.parse(window.__codexDashboard.consumeAccountAction())];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [AnyHashable], [2, personalID.uuidString, "Work"])
+        let action = try XCTUnwrap(values[1] as? [String: String])
+        XCTAssertEqual(action["type"], "switch")
+        XCTAssertEqual(action["profileID"], workID.uuidString)
+    }
+
 }
