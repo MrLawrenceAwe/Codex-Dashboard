@@ -1,5 +1,71 @@
 import Darwin
+import CoreServices
 import Foundation
+
+private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
+    private let projectPaths: Set<String>
+    private let action: @MainActor @Sendable (Set<String>) async -> Void
+    private var stream: FSEventStreamRef?
+
+    init(
+        projectPaths: Set<String>,
+        action: @escaping @MainActor @Sendable (Set<String>) async -> Void
+    ) {
+        self.projectPaths = projectPaths
+        self.action = action
+    }
+
+    func start() {
+        guard !projectPaths.isEmpty else { return }
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+        let callback: FSEventStreamCallback = { _, context, _, _, _, _ in
+            guard let context else { return }
+            let monitor = Unmanaged<RecursiveProjectChangeMonitor>
+                .fromOpaque(context)
+                .takeUnretainedValue()
+            monitor.notifyChange()
+        }
+        let flags = FSEventStreamCreateFlags(
+            kFSEventStreamCreateFlagFileEvents
+                | kFSEventStreamCreateFlagWatchRoot
+                | kFSEventStreamCreateFlagNoDefer
+        )
+        guard let stream = FSEventStreamCreate(
+            nil,
+            callback,
+            &context,
+            Array(projectPaths) as CFArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.1,
+            flags
+        ) else { return }
+        self.stream = stream
+        FSEventStreamSetDispatchQueue(stream, DispatchQueue.global(qos: .utility))
+        FSEventStreamStart(stream)
+    }
+
+    func stop() {
+        guard let stream else { return }
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream)
+        FSEventStreamRelease(stream)
+        self.stream = nil
+    }
+
+    deinit { stop() }
+
+    private func notifyChange() {
+        let projectPaths = projectPaths
+        let action = action
+        Task { @MainActor in await action(projectPaths) }
+    }
+}
 
 @MainActor
 final class DataChangeMonitor {
@@ -20,6 +86,7 @@ final class DataChangeMonitor {
 
     private var dataWatches: [Watch] = []
     private var projectWatches: [Watch] = []
+    private var projectChangeMonitor: RecursiveProjectChangeMonitor?
     private var watchedProjectPaths: Set<String> = []
     private var catalogURL: URL?
     private var unreadStateURL: URL?
@@ -55,21 +122,24 @@ final class DataChangeMonitor {
         guard paths != watchedProjectPaths else { return }
         watchedProjectPaths = paths
         cancel(&projectWatches)
+        projectChangeMonitor?.stop()
+        projectChangeMonitor = nil
 
         var pathsByGitURL: [URL: Set<String>] = [:]
         for path in paths {
             let projectURL = URL(fileURLWithPath: path, isDirectory: true)
             guard FileManager.default.fileExists(atPath: projectURL.path) else { continue }
-            if let watch = makeWatch(for: projectURL, action: { [weak self] in
-                self?.scheduleProjectRefresh(for: [path])
-            }) {
-                projectWatches.append(watch)
-            }
-
             if let gitURL = GitMetadataLocator.metadataURL(for: projectURL) {
                 pathsByGitURL[gitURL, default: []].insert(path)
             }
         }
+        let existingPaths = Set(paths.filter { FileManager.default.fileExists(atPath: $0) })
+        let projectChangeMonitor = RecursiveProjectChangeMonitor(
+            projectPaths: existingPaths,
+            action: { [weak self] paths in self?.scheduleProjectRefresh(for: paths) }
+        )
+        projectChangeMonitor.start()
+        self.projectChangeMonitor = projectChangeMonitor
         for (gitURL, affectedPaths) in pathsByGitURL {
             if let watch = makeWatch(for: gitURL, action: { [weak self] in
                 self?.scheduleProjectRefresh(for: affectedPaths)
@@ -87,6 +157,8 @@ final class DataChangeMonitor {
         pendingProjectPaths = []
         cancel(&dataWatches)
         cancel(&projectWatches)
+        projectChangeMonitor?.stop()
+        projectChangeMonitor = nil
         watchedProjectPaths = []
         catalogURL = nil
         unreadStateURL = nil

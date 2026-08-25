@@ -188,6 +188,17 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(document.activeAccountID, oluwatoyin.id)
     }
 
+    func testIdentityUsesDirectAccountIDWhenIDTokenClaimsCannotBeDecoded() throws {
+        let credential = Data(
+            #"{"tokens":{"account_id":"account-lawrence","id_token":"header.invalid.signature"}}"#.utf8
+        )
+
+        let identity = try XCTUnwrap(AccountIdentityDecoder.identity(in: credential))
+
+        XCTAssertEqual(identity.identifier, "account-lawrence")
+        XCTAssertNil(identity.displayName)
+    }
+
     func testMigratesExistingAccountsAndReconcilesTheirAccountIdentifiers() throws {
         let lawrenceID = UUID()
         let oluwatoyinID = UUID()

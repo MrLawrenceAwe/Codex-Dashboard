@@ -75,6 +75,38 @@ final class DataChangeMonitorTests: XCTestCase {
         XCTAssertEqual(catalogRefreshes, 1)
     }
 
+    func testNestedProjectFileChangeTriggersWorkingTreeRefresh() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-nested-monitor-\(UUID().uuidString)", isDirectory: true)
+        let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
+        let nestedDirectory = projectDirectory.appendingPathComponent("Sources/Feature", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        let nestedFile = nestedDirectory.appendingPathComponent("Feature.swift")
+        try Data("initial".utf8).write(to: nestedFile)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = DataChangeMonitor()
+        var refreshedProjectPaths: Set<String> = []
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshWorkingTrees: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
+        )
+        monitor.updateProjectPaths([projectDirectory.path])
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        try Data("updated".utf8).write(to: nestedFile)
+
+        try await waitUntil { refreshedProjectPaths.contains(projectDirectory.path) }
+    }
+
     func testLinkedWorktreeResolvesActualGitMetadataDirectory() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-worktree-monitor-\(UUID().uuidString)", isDirectory: true)

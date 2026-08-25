@@ -109,8 +109,7 @@ final class CodexAccountManager: @unchecked Sendable {
                 try documentStore.save(document)
                 return transaction
             } catch {
-                try? activeCredentialFile.restore(transaction.previousCredential)
-                try? documentStore.save(transaction.previousDocument)
+                try recover(transaction, after: error)
                 throw error
             }
         }
@@ -130,8 +129,7 @@ final class CodexAccountManager: @unchecked Sendable {
                 try documentStore.save(signedOutDocument)
                 return transaction
             } catch {
-                try? activeCredentialFile.restore(transaction.previousCredential)
-                try? documentStore.save(transaction.previousDocument)
+                try recover(transaction, after: error)
                 throw error
             }
         }
@@ -139,8 +137,24 @@ final class CodexAccountManager: @unchecked Sendable {
 
     func rollback(_ transaction: AccountTransition) throws {
         try lock.withLock {
-            try activeCredentialFile.restore(transaction.previousCredential)
-            try documentStore.save(transaction.previousDocument)
+            let currentCredential = try activeCredentialFile.read()
+            let currentDocument = try documentStore.load()
+            do {
+                try activeCredentialFile.restore(transaction.previousCredential)
+                try documentStore.save(transaction.previousDocument)
+            } catch {
+                let rollbackError = error
+                do {
+                    try activeCredentialFile.restore(currentCredential)
+                    try documentStore.save(currentDocument)
+                } catch {
+                    throw CodexAccountError.recoveryFailed(
+                        "Rollback failed: \(rollbackError.localizedDescription) "
+                            + "Restoring the switched state also failed: \(error.localizedDescription)"
+                    )
+                }
+                throw rollbackError
+            }
         }
     }
 
@@ -167,6 +181,18 @@ final class CodexAccountManager: @unchecked Sendable {
             let credential = try activeCredentialFile.read()
         else { return }
         try vault.store(credential, for: activeID)
+    }
+
+    private func recover(_ transaction: AccountTransition, after transitionError: Error) throws {
+        do {
+            try activeCredentialFile.restore(transaction.previousCredential)
+            try documentStore.save(transaction.previousDocument)
+        } catch {
+            throw CodexAccountError.recoveryFailed(
+                "The original operation failed: \(transitionError.localizedDescription) "
+                    + "Restoring the previous state also failed: \(error.localizedDescription)"
+            )
+        }
     }
 
 }

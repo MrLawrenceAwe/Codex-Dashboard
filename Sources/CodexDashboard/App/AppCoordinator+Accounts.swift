@@ -123,15 +123,27 @@ extension AppCoordinator {
         let targets: [DevToolsTarget]
         do {
             targets = try await dashboardRuntime.restartCodex()
-        } catch {
-            try? accountManager.rollback(accountTransaction)
+        } catch let restartError {
+            do {
+                try accountManager.rollback(accountTransaction)
+            } catch let rollbackError {
+                await accountUsageSession.reset()
+                refreshAccountState()
+                setAccountStatus(
+                    "Codex could not restart, and the account change could not be rolled back. "
+                        + rollbackError.localizedDescription
+                )
+                setPerformingAction(false)
+                setFailure(rollbackError, lastKnownState: .codexClosed)
+                return
+            }
             await accountUsageSession.reset()
             refreshAccountState()
             setAccountStatus("Codex could not restart, so the account change was rolled back.")
             dashboardRuntime.prepareForRestart()
             _ = try? await dashboardRuntime.restartCodex()
             setPerformingAction(false)
-            setFailure(error, lastKnownState: .codexClosed)
+            setFailure(restartError, lastKnownState: .codexClosed)
             return
         }
 

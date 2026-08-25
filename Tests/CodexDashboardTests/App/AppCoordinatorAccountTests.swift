@@ -222,6 +222,56 @@ extension AppCoordinatorTests {
         )
     }
 
+    func testFailedRollbackIsReportedAndDoesNotAttemptAnotherRestart() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorRollbackTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        let metadataURL = directory.appendingPathComponent("support/accounts.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data(#"{"account":"first"}"#.utf8).write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: metadataURL,
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let first = try accountManager.saveCurrentAccount(named: "First")
+        _ = try accountManager.beginAddingAccount()
+        try Data(#"{"account":"second"}"#.utf8).write(to: authenticationURL)
+        _ = try accountManager.saveCurrentAccount(named: "Second")
+        let runtime = StubDashboardRuntime(
+            restartError: AccountTestError.mountFailed,
+            onRestart: {
+                try? FileManager.default.removeItem(at: metadataURL)
+                try? FileManager.default.createDirectory(at: metadataURL, withIntermediateDirectories: true)
+            }
+        )
+        let coordinator = AppCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            accountManager: accountManager,
+            accountUsageProvider: StubAccountUsageProvider(),
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.switchAccount(to: first.id)
+
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertTrue(
+            coordinator.accountStatusMessage?.contains("could not be rolled back") == true
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: authenticationURL),
+            Data(#"{"account":"first"}"#.utf8)
+        )
+    }
+
     func testAccountUsagePollingScheduleRefreshesEveryThirtySeconds() {
         XCTAssertEqual(PollingController.Schedule.accountUsage, .seconds(30))
     }

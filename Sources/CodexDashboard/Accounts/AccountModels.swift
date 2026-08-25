@@ -95,6 +95,7 @@ enum CodexAccountError: LocalizedError {
     case accountNameRequired
     case invalidCredential
     case keychain(OSStatus)
+    case recoveryFailed(String)
     case unsupportedMetadataVersion(Int)
 
     var errorDescription: String? {
@@ -113,6 +114,8 @@ enum CodexAccountError: LocalizedError {
             return "Codex authentication data is invalid and was not saved or activated."
         case .keychain(let status):
             return "The Codex account credential could not be accessed in Keychain (\(status))."
+        case .recoveryFailed(let detail):
+            return "The Codex account change could not be recovered safely. \(detail)"
         case .unsupportedMetadataVersion(let version):
             return "The saved account list uses unsupported version \(version). Update Codex Dashboard before changing accounts."
         }

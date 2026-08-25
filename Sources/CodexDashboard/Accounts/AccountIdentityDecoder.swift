@@ -25,7 +25,7 @@ enum AccountIdentityDecoder {
             let payloadData = Data(base64Encoded: payload),
             let claims = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
             let authentication = claims["https://api.openai.com/auth"] as? [String: Any]
-        else { return nil }
+        else { return identity(identifier: directAccountID) }
         let accountID = directAccountID ?? authentication["chatgpt_account_id"] as? String
         guard let accountID, !accountID.isEmpty else { return nil }
         return AccountIdentity(identifier: accountID, displayName: claims["name"] as? String)
