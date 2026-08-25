@@ -4,7 +4,11 @@ import XCTest
 @testable import CodexDashboard
 
 private final class MemoryAccountCredentialVault: AccountCredentialVault, @unchecked Sendable {
+    enum TestError: Error { case deletionFailed }
+
     private var values: [UUID: Data] = [:]
+    private var deletionCount = 0
+    private var deletionShouldFail = false
     private let lock = NSLock()
 
     func credential(for profileID: UUID) -> Data? {
@@ -15,8 +19,18 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
         lock.withLock { values[profileID] = credential }
     }
 
-    func deleteCredential(for profileID: UUID) {
-        _ = lock.withLock { values.removeValue(forKey: profileID) }
+    func deleteCredential(for profileID: UUID) throws {
+        try lock.withLock {
+            if deletionShouldFail { throw TestError.deletionFailed }
+            deletionCount += 1
+            values.removeValue(forKey: profileID)
+        }
+    }
+
+    var deleteCallCount: Int { lock.withLock { deletionCount } }
+
+    func failDeletion() {
+        lock.withLock { deletionShouldFail = true }
     }
 }
 
@@ -117,6 +131,40 @@ final class CodexAccountManagerTests: XCTestCase {
         }
         XCTAssertEqual(try Data(contentsOf: metadataURL), unsupportedDocument)
         XCTAssertTrue(FileManager.default.fileExists(atPath: authenticationURL.path))
+    }
+
+    func testDeleteDoesNotRemoveCredentialWhenMetadataCannotBeSaved() throws {
+        let credential = Data(#"{"account":"personal"}"#.utf8)
+        try credential.write(to: authenticationURL)
+        let profile = try manager.saveCurrentAccount(named: "Personal")
+        let supportDirectory = metadataURL.deletingLastPathComponent()
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o500],
+            ofItemAtPath: supportDirectory.path
+        )
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: supportDirectory.path
+            )
+        }
+
+        XCTAssertThrowsError(try manager.deleteProfile(profile.id))
+        XCTAssertEqual(vault.deleteCallCount, 0)
+        XCTAssertEqual(vault.credential(for: profile.id), credential)
+    }
+
+    func testDeleteRestoresMetadataWhenCredentialDeletionFails() throws {
+        let credential = Data(#"{"account":"personal"}"#.utf8)
+        try credential.write(to: authenticationURL)
+        let profile = try manager.saveCurrentAccount(named: "Personal")
+        vault.failDeletion()
+
+        XCTAssertThrowsError(try manager.deleteProfile(profile.id)) { error in
+            XCTAssertTrue(error is MemoryAccountCredentialVault.TestError)
+        }
+        XCTAssertEqual(try manager.document().profiles, [profile])
+        XCTAssertEqual(vault.credential(for: profile.id), credential)
     }
 
     func testReconcilesStaleActiveProfileWithCurrentCodexAccount() throws {

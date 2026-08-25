@@ -27,7 +27,8 @@ const threadDashboardPage = (() => {
             <button type="button" data-account-add>Add account</button>
           </div>
         </header>
-        <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
+        <div class="dashboard-notice" data-account-notice role="status" hidden></div>
+        <div class="dashboard-notice" data-commit-notice role="alert" hidden></div>
         <div class="dashboard-section-header">
           <div class="dashboard-toolbar">
             <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>

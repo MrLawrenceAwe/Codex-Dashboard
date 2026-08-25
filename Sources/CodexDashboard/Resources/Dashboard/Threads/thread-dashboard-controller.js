@@ -138,6 +138,7 @@ async function openProjectCommitOrPush(projectPath) {
   if (await codexHost.openCommitOrPush(thread)) return;
   commitOrPushError = 'The project thread opened, but Codex could not start Commit or push.';
   openDashboard();
+  renderDashboard();
 }
 
 function renderDashboard() {
@@ -168,10 +169,13 @@ function renderAccountControls() {
       ${dashboardElements.escapeHTML(account.name)}
     </option>`).join('');
   select.innerHTML = currentAccountOption + options;
-  const notice = document.querySelector('[data-dashboard-notice]');
+  const notice = document.querySelector('[data-account-notice]');
   if (notice && accountStatusMessage) {
     notice.textContent = accountStatusMessage;
     notice.hidden = false;
+  } else if (notice) {
+    notice.textContent = '';
+    notice.hidden = true;
   }
 }
 

@@ -11,6 +11,7 @@ window.__codexDashboard = {
     const library = promptStore.pendingLibrary();
     return library ? JSON.stringify(library) : null;
   },
+  discardPendingPromptLibrary: () => promptStore.discardPendingLibrary(),
   acknowledgePendingPromptLibrary: (library) => promptStore.acknowledgePendingLibrary(library),
   applyPromptLibrary: (library) => {
     const applied = promptStore.applyLibrary(library);

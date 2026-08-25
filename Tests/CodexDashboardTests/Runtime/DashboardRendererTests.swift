@@ -179,6 +179,10 @@ private actor PromptLibraryRendererDevTools: DevToolsServing {
     }
 
     func expressions() -> [String] { booleanExpressions }
+
+    func setPendingLibrary(_ library: String?) {
+        pendingLibrary = library
+    }
 }
 
 @MainActor
@@ -279,6 +283,71 @@ final class DashboardRendererTests: XCTestCase {
         XCTAssertEqual(try store.load(), pendingLibrary)
         let expressions = await devTools.expressions()
         XCTAssertTrue(expressions.contains { $0.contains("acknowledgePendingPromptLibrary") })
+    }
+
+    func testNativePromptLibraryImportOverridesPendingRendererEdits() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let imported = PromptLibraryDocument(
+            version: 3,
+            prompts: [SavedPrompt(
+                id: "imported",
+                name: "Imported",
+                content: "Imported content",
+                section: nil,
+                scope: SavedPromptScope(type: "global", projectPath: nil),
+                preset: nil,
+                usePreset: nil
+            )],
+            sections: []
+        )
+        let pending = PromptLibraryDocument(
+            version: 3,
+            prompts: [SavedPrompt(
+                id: "pending",
+                name: "Pending",
+                content: "Pending renderer content",
+                section: nil,
+                scope: SavedPromptScope(type: "global", projectPath: nil),
+                preset: nil,
+                usePreset: nil
+            )],
+            sections: []
+        )
+        let importedData = try JSONEncoder().encode(imported)
+        let importedJSON = try XCTUnwrap(String(data: importedData, encoding: .utf8))
+        let pendingData = try JSONEncoder().encode(pending)
+        let pendingJSON = try XCTUnwrap(String(data: pendingData, encoding: .utf8))
+        let devTools = PromptLibraryRendererDevTools(
+            target: target,
+            exportedLibrary: importedJSON
+        )
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("imported-renderer-prompts-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        try store.save(imported)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionPayload: DashboardInjectionResources(version: "test", mountExpression: "mount"),
+            promptLibraryStore: store
+        )
+        let snapshot = DashboardSnapshotPayload(threads: [])
+        try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
+
+        await devTools.setPendingLibrary(pendingJSON)
+        renderer.preferNativePromptLibraryOnNextSynchronization()
+        try await renderer.synchronize(snapshot, on: [target])
+
+        XCTAssertEqual(try store.load(), imported)
+        let expressions = await devTools.expressions()
+        XCTAssertTrue(expressions.contains { $0.contains("discardPendingPromptLibrary") })
+        XCTAssertTrue(expressions.contains { $0.contains("Imported content") })
     }
 
     func testOpeningThreadDispatchesItsRoute() async throws {

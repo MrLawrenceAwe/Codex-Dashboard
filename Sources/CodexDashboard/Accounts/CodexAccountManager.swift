@@ -142,10 +142,16 @@ final class CodexAccountManager: @unchecked Sendable {
     func deleteProfile(_ profileID: UUID) throws {
         try lock.withLock {
             var document = try loadDocument()
+            let previousDocument = document
             document.profiles.removeAll { $0.id == profileID }
             if document.activeProfileID == profileID { document.activeProfileID = nil }
-            try vault.deleteCredential(for: profileID)
             try saveDocument(document)
+            do {
+                try vault.deleteCredential(for: profileID)
+            } catch {
+                try? saveDocument(previousDocument)
+                throw error
+            }
         }
     }
 

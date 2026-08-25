@@ -46,6 +46,9 @@ enum DashboardRendererScript {
     static let exportPendingPromptLibrary =
         "window.__codexDashboard?.exportPendingPromptLibrary?.() ?? null"
 
+    static let discardPendingPromptLibrary =
+        "window.__codexDashboard?.discardPendingPromptLibrary?.() === true"
+
     static let consumeAccountAction = "window.__codexDashboard?.consumeAccountAction?.() ?? null"
 
     static func deliverPromptLibrary(_ library: PromptLibraryDocument) throws -> String {
