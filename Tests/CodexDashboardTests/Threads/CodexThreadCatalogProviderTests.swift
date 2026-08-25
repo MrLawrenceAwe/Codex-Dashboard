@@ -31,11 +31,11 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads.first?.title, "Running thread")
         XCTAssertEqual(catalog.threads.first?.projectName, "running")
         XCTAssertEqual(catalog.threads.first?.projectPath, "/tmp/running")
-        XCTAssertEqual(catalog.threads.first?.recencyTimestamp, now - 30)
+        XCTAssertEqual(catalog.threads.first?.recencyTimestampMilliseconds, (now - 30) * 1_000)
         XCTAssertEqual(catalog.threads.first?.workingTreeStatus, .notRepository)
         XCTAssertTrue(catalog.threads.first?.isPinned == true)
         XCTAssertEqual(catalog.threads[1].title, "Renamed thread")
-        XCTAssertEqual(catalog.threads[1].recencyTimestamp, now - 600)
+        XCTAssertEqual(catalog.threads[1].recencyTimestampMilliseconds, (now - 600) * 1_000)
     }
 
     func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {
@@ -51,7 +51,28 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
 
         XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated", "idle"])
         XCTAssertEqual(catalog.threads[0].runState, .running)
-        XCTAssertEqual(catalog.threads[0].recencyTimestamp, now - 30)
+        XCTAssertEqual(catalog.threads[0].recencyTimestampMilliseconds, (now - 30) * 1_000)
+    }
+
+    func testPreservesMillisecondRecencyWhenThreadsShareASecond() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(now: now, testCase: self)
+        let update = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [
+                stateDatabaseURL.path,
+                "UPDATE threads SET recency_at_ms = CASE id WHEN 'running' THEN \(now * 1_000 + 100) WHEN 'updated' THEN \(now * 1_000 + 900) ELSE recency_at_ms END;",
+            ],
+            timeout: 3
+        )
+        XCTAssertEqual(update.terminationStatus, 0)
+
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+
+        XCTAssertEqual(Array(catalog.threads.prefix(2).map(\.id)), ["updated", "running"])
+        XCTAssertEqual(catalog.threads.first?.recencyTimestampMilliseconds, now * 1_000 + 900)
     }
 
     func testLoadsCompleteCatalogForClientSidePagingAndSearch() async throws {

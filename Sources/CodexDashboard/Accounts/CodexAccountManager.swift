@@ -178,7 +178,7 @@ final class CodexAccountManager: @unchecked Sendable {
             CodexAccountDocument.self, from: Data(contentsOf: metadataURL)
         )
         guard document.version == CodexAccountDocument.currentVersion else {
-            return CodexAccountDocument()
+            throw CodexAccountError.unsupportedMetadataVersion(document.version)
         }
         return document
     }

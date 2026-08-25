@@ -29,7 +29,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let preview: String
     let projectName: String
     let projectPath: String
-    let recencyTimestamp: Int64
+    let recencyTimestampMilliseconds: Int64
     let isPinned: Bool
     var isUnread = false
     let model: String?
@@ -49,7 +49,7 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
     let preview: String
     let projectName: String
     let projectPath: String
-    let recencyTimestamp: Int64
+    let recencyTimestampMilliseconds: Int64
     let isPinned: Bool
     let isUnread: Bool
     let model: String?
@@ -63,7 +63,7 @@ struct DashboardThreadPayload: Codable, Equatable, Sendable {
         preview = thread.preview
         projectName = thread.projectName
         projectPath = thread.projectPath
-        recencyTimestamp = thread.recencyTimestamp
+        recencyTimestampMilliseconds = thread.recencyTimestampMilliseconds
         isPinned = thread.isPinned
         isUnread = thread.isUnread
         model = thread.model

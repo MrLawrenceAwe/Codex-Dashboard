@@ -43,6 +43,44 @@ final class PromptLibraryFileStoreTests: XCTestCase {
         XCTAssertEqual(try store.load(), current)
     }
 
+    func testImportRejectsPresetValuesUnsupportedByRenderer() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("prompt-preset-import-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(
+            documentURL: directory.appendingPathComponent("prompt-library.json")
+        )
+        let current = library(model: "gpt-current")
+        try store.save(current)
+        let invalidURL = directory.appendingPathComponent("invalid-preset.json")
+        let invalid = library(model: "gpt-current", reasoningEffort: "unsupported")
+        try JSONEncoder().encode(invalid).write(to: invalidURL)
+
+        XCTAssertThrowsError(try store.importDocument(from: invalidURL))
+        XCTAssertEqual(try store.load(), current)
+    }
+
+    func testRapidSavesCreateDistinctBackups() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("prompt-backups-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(
+            documentURL: directory.appendingPathComponent("prompt-library.json"),
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+
+        try store.save(library(model: "gpt-one"))
+        try store.save(library(model: "gpt-two"))
+        try store.save(library(model: "gpt-three"))
+
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: store.backupDirectoryURL.path).count,
+            2
+        )
+    }
+
     func testLoadMigratesLegacyLowReasoningEffortAndCreatesBackup() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("prompt-migration-\(UUID().uuidString)", isDirectory: true)

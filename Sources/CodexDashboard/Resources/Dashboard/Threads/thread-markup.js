@@ -44,7 +44,7 @@ const threadMarkup = (() => {
           ${compact ? '' : `<span class="dashboard-thread-preview">${dashboardElements.escapeHTML(thread.preview || 'No preview available')}</span>`}
           <span class="dashboard-meta">
             ${showProject ? `<span>${dashboardElements.escapeHTML(thread.projectName)}</span>` : ''}
-            <span>${formatRelativeTime(thread.recencyTimestamp)}</span>
+            <span>${formatRelativeTime(Number(thread.recencyTimestampMilliseconds || 0) / 1000)}</span>
             ${!compact && thread.model ? `<span>${dashboardElements.escapeHTML(thread.model)}</span>` : ''}
           </span>
         </span>
