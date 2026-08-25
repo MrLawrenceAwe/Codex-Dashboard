@@ -1119,6 +1119,10 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             weekly: CodexUsageWindow(
                 usedPercent: 42,
                 resetsAt: now.addingTimeInterval(3 * 24 * 60 * 60)
+            ),
+            bankedResets: CodexBankedResetSummary(
+                availableCount: 2,
+                nextExpiration: now.addingTimeInterval(24 * 60 * 60)
             )
         )
         let snapshot = DashboardSnapshotPayload(
@@ -1162,6 +1166,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let text = try XCTUnwrap(values["text"] as? String)
         XCTAssertTrue(text.contains("5 hour 82% left · resets in"), text)
         XCTAssertTrue(text.contains("Weekly 58% left · resets in"), text)
+        XCTAssertTrue(text.contains("Banked resets 2 available · next expires in"), text)
         XCTAssertEqual(values["values"] as? [String], ["18", "42"])
     }
 

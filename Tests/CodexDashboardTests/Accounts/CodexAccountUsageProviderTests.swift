@@ -20,7 +20,7 @@ final class CodexAccountUsageProviderTests: XCTestCase {
           case "$line" in
             *rateLimits*)
               if [ "$initialized" = 1 ]; then
-                printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":17,"windowDurationMins":null,"resetsAt":2000},"secondary":{"usedPercent":41,"windowDurationMins":null,"resetsAt":3000}}}}'
+                printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":17,"windowDurationMins":null,"resetsAt":2000},"secondary":{"usedPercent":41,"windowDurationMins":null,"resetsAt":3000}},"rateLimitResetCredits":{"availableCount":2,"credits":[{"id":"later","resetType":"codexRateLimits","status":"available","grantedAt":1000,"expiresAt":5000},{"id":"sooner","resetType":"codexRateLimits","status":"available","grantedAt":1000,"expiresAt":4000}]}}}'
               fi
               ;;
             *initialized*)
@@ -49,6 +49,8 @@ final class CodexAccountUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.fiveHour?.resetsAt, Date(timeIntervalSince1970: 2_000))
         XCTAssertEqual(usage.weekly?.usedPercent, 41)
         XCTAssertEqual(usage.weekly?.resetsAt, Date(timeIntervalSince1970: 3_000))
+        XCTAssertEqual(usage.bankedResets?.availableCount, 2)
+        XCTAssertEqual(usage.bankedResets?.nextExpiration, Date(timeIntervalSince1970: 4_000))
         let requests = try String(contentsOf: requestsURL, encoding: .utf8)
         XCTAssertEqual(requests.components(separatedBy: "\"method\":\"initialize\"").count - 1, 1)
         XCTAssertEqual(requests.components(separatedBy: "rateLimits").count - 1, 2)

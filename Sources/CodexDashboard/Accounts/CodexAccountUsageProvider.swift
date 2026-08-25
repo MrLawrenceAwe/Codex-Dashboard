@@ -71,7 +71,7 @@ actor CodexAppServerAccountUsageProvider: CodexAccountUsageProviding {
                 timeout: timeout
             )
             let response = try JSONDecoder().decode(RateLimitsResponse.self, from: responseData)
-            return response.result.rateLimits.accountUsage
+            return response.result.accountUsage
         } catch {
             if session === activeSession { session = nil }
             activeSession.terminate()
@@ -237,6 +237,11 @@ private struct RateLimitsResponse: Decodable {
 
     struct Result: Decodable {
         let rateLimits: Snapshot
+        let rateLimitResetCredits: ResetCredits?
+
+        var accountUsage: CodexAccountUsage {
+            rateLimits.accountUsage(bankedResets: rateLimitResetCredits?.summary)
+        }
     }
 }
 
@@ -244,15 +249,37 @@ private struct Snapshot: Decodable {
     let primary: Window?
     let secondary: Window?
 
-    var accountUsage: CodexAccountUsage {
+    func accountUsage(bankedResets: CodexBankedResetSummary?) -> CodexAccountUsage {
         let windows = [primary, secondary].compactMap { $0 }
         return CodexAccountUsage(
             fiveHour: windows.first { $0.windowDurationMins == 300 }?.usageWindow
                 ?? primary?.usageWindow,
             weekly: windows.first { $0.windowDurationMins == 10_080 }?.usageWindow
-                ?? secondary?.usageWindow
+                ?? secondary?.usageWindow,
+            bankedResets: bankedResets
         )
     }
+}
+
+private struct ResetCredits: Decodable {
+    let availableCount: Int
+    let credits: [ResetCredit]?
+
+    var summary: CodexBankedResetSummary {
+        CodexBankedResetSummary(
+            availableCount: max(0, availableCount),
+            nextExpiration: credits?
+                .filter { $0.status == "available" }
+                .compactMap(\.expiresAt)
+                .min()
+                .map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+    }
+}
+
+private struct ResetCredit: Decodable {
+    let status: String
+    let expiresAt: Int64?
 }
 
 private struct Window: Decodable {
