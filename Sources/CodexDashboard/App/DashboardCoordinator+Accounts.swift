@@ -7,10 +7,16 @@ extension DashboardCoordinator {
 
     func saveCurrentAccount(named name: String) {
         do {
+            let existingUsage = activeAccountUsageStatus.snapshot
             let profile = try accountManager.saveCurrentAccount(named: name)
+            if let existingUsage { accountUsageByProfileID[profile.id] = existingUsage }
             accountStatusMessage = "Saved \(profile.name) securely in Keychain."
             refreshAccountState()
-            Task { await publishAccountSnapshot() }
+            if let existingUsage { activeAccountUsageStatus = .available(existingUsage) }
+            Task {
+                await publishAccountSnapshot()
+                await refreshAccountUsage()
+            }
         } catch {
             accountStatusMessage = error.localizedDescription
         }
@@ -28,7 +34,9 @@ extension DashboardCoordinator {
         do {
             try accountManager.deleteProfile(profileID)
             accountStatusMessage = "Removed the saved account from Keychain."
+            accountUsageByProfileID[profileID] = nil
             refreshAccountState()
+            if activeAccountProfileID == nil { activeAccountUsageStatus = .unavailable }
             Task { await publishAccountSnapshot() }
         } catch {
             accountStatusMessage = error.localizedDescription
@@ -74,10 +82,16 @@ extension DashboardCoordinator {
                 DashboardAccountPayload(
                     id: $0.id.uuidString,
                     name: $0.name,
-                    isActive: $0.id == activeAccountProfileID
+                    isActive: $0.id == activeAccountProfileID,
+                    usage: ($0.id == activeAccountProfileID
+                        ? DashboardAccountUsagePayload(activeAccountUsageStatus)
+                        : accountUsageByProfileID[$0.id].map {
+                            DashboardAccountUsagePayload(.stale($0))
+                        })
                 )
             },
             activeAccountID: activeAccountProfileID?.uuidString,
+            activeAccountUsage: DashboardAccountUsagePayload(activeAccountUsageStatus),
             accountStatusMessage: accountStatusMessage
         )
     }
@@ -98,6 +112,7 @@ extension DashboardCoordinator {
         let accountTransaction: CodexAccountTransaction
         do {
             accountTransaction = try transaction()
+            await accountUsageProvider.reset()
         } catch {
             accountStatusMessage = error.localizedDescription
             isPerformingAction = false
@@ -113,6 +128,7 @@ extension DashboardCoordinator {
             targets = try await dashboardRuntime.restartCodex()
         } catch {
             try? accountManager.rollback(accountTransaction)
+            await accountUsageProvider.reset()
             refreshAccountState()
             accountStatusMessage = "Codex could not restart, so the account change was rolled back."
             dashboardRuntime.prepareForRestart()
@@ -123,8 +139,15 @@ extension DashboardCoordinator {
         }
 
         refreshAccountState()
+        if let profileID = activeAccountProfileID,
+           let snapshot = accountUsageByProfileID[profileID] {
+            activeAccountUsageStatus = .stale(snapshot)
+        } else {
+            activeAccountUsageStatus = .unavailable
+        }
         accountStatusMessage = activeAccountName.map { "Switched to \($0)." }
             ?? "Sign in to the other account, then save it from Accounts."
+        Task { await refreshAccountUsage() }
 
         // The signed-out renderer intentionally has none of the Codex workspace hosts
         // required by the injected dashboard. Reaching it means the account transition
@@ -158,5 +181,35 @@ extension DashboardCoordinator {
         try? await dashboardRuntime.synchronizeDashboard(
             with: dashboardSnapshotPayload(), on: targets, forceRemount: false
         )
+    }
+
+    func refreshAccountUsage() async {
+        guard !isRefreshingAccountUsage else { return }
+        isRefreshingAccountUsage = true
+        defer { isRefreshingAccountUsage = false }
+        let generation = refreshGeneration
+        let profileID = activeAccountProfileID
+        let previous = activeAccountUsageStatus.snapshot
+        activeAccountUsageStatus = .loading(previous: previous)
+        await publishAccountSnapshot()
+
+        do {
+            let usage = try await accountUsageProvider.usage()
+            guard !Task.isCancelled,
+                  generation == refreshGeneration,
+                  profileID == activeAccountProfileID
+            else { return }
+            let snapshot = CodexAccountUsageSnapshot(usage: usage, fetchedAt: .now)
+            activeAccountUsageStatus = .available(snapshot)
+            if let profileID { accountUsageByProfileID[profileID] = snapshot }
+        } catch {
+            guard !Task.isCancelled,
+                  generation == refreshGeneration,
+                  profileID == activeAccountProfileID
+            else { return }
+            activeAccountUsageStatus = previous.map(CodexAccountUsageStatus.stale)
+                ?? .unavailable
+        }
+        await publishAccountSnapshot()
     }
 }

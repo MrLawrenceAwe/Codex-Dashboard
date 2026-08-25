@@ -1107,4 +1107,102 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(action["profileID"], workID.uuidString)
     }
 
+    func testAccountUsageShowsFiveHourAndWeeklyLimitsWithResetCountdowns() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let accountID = UUID()
+        let now = Date()
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(
+                usedPercent: 18,
+                resetsAt: now.addingTimeInterval(2 * 60 * 60)
+            ),
+            weekly: CodexUsageWindow(
+                usedPercent: 42,
+                resetsAt: now.addingTimeInterval(3 * 24 * 60 * 60)
+            )
+        )
+        let snapshot = DashboardSnapshotPayload(
+            threads: [],
+            accounts: [
+                DashboardAccountPayload(
+                    id: accountID.uuidString,
+                    name: "Personal",
+                    isActive: true,
+                    usage: DashboardAccountUsagePayload(.available(
+                        CodexAccountUsageSnapshot(usage: usage, fetchedAt: now)
+                    ))
+                ),
+            ],
+            activeAccountID: accountID.uuidString,
+            activeAccountUsage: DashboardAccountUsagePayload(.available(
+                CodexAccountUsageSnapshot(usage: usage, fetchedAt: now)
+            ))
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const usage = document.querySelector('[data-account-usage]');
+              return {
+                hidden: usage.hidden,
+                text: usage.textContent.replace(/\\s+/g, ' ').trim(),
+                values: [...usage.querySelectorAll('[role="progressbar"]')]
+                  .map((node) => node.getAttribute('aria-valuenow')),
+              };
+            })()
+            """
+        ) as? [String: Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values["hidden"] as? Bool, false)
+        let text = try XCTUnwrap(values["text"] as? String)
+        XCTAssertTrue(text.contains("5 hour 82% left · resets in"), text)
+        XCTAssertTrue(text.contains("Weekly 58% left · resets in"), text)
+        XCTAssertEqual(values["values"] as? [String], ["18", "42"])
+    }
+
+    func testUnsavedCurrentAccountCanShowStaleUsageState() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let status = CodexAccountUsageStatus.stale(
+            CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: CodexUsageWindow(usedPercent: 25, resetsAt: nil),
+                    weekly: nil
+                ),
+                fetchedAt: Date()
+            )
+        )
+        let snapshot = DashboardSnapshotPayload(
+            threads: [],
+            activeAccountUsage: DashboardAccountUsagePayload(status)
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.open();
+              const usage = document.querySelector('[data-account-usage]');
+              return [
+                document.querySelector('[data-account-select]').value,
+                usage.dataset.usageState,
+                usage.textContent.replace(/\\s+/g, ' ').trim(),
+              ];
+            })()
+            """
+        ) as? [String]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0], "")
+        XCTAssertEqual(values[1], "stale")
+        XCTAssertTrue(values[2].contains("5 hour 75% left"))
+        XCTAssertTrue(values[2].contains("Usage may be stale"))
+    }
+
 }
