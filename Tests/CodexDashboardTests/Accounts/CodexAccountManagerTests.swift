@@ -118,4 +118,103 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: metadataURL), unsupportedDocument)
         XCTAssertTrue(FileManager.default.fileExists(atPath: authenticationURL.path))
     }
+
+    func testReconcilesStaleActiveProfileWithCurrentCodexAccount() throws {
+        let lawrenceCredential = credential(accountID: "account-lawrence")
+        try lawrenceCredential.write(to: authenticationURL)
+        let lawrence = try manager.saveCurrentAccount(named: "Lawrence")
+
+        _ = try manager.beginAddingAccount()
+        let oluwatoyinCredential = credential(accountID: "account-oluwatoyin")
+        try oluwatoyinCredential.write(to: authenticationURL)
+        let oluwatoyin = try manager.saveCurrentAccount(named: "Oluwatoyin")
+
+        var metadata = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: metadataURL)
+        ) as! [String: Any]
+        metadata["activeProfileID"] = lawrence.id.uuidString
+        try JSONSerialization.data(withJSONObject: metadata).write(to: metadataURL)
+
+        let document = try manager.document()
+
+        XCTAssertEqual(document.activeProfileID, oluwatoyin.id)
+    }
+
+    func testMigratesExistingProfilesAndReconcilesTheirAccountIdentifiers() throws {
+        let lawrenceID = UUID()
+        let oluwatoyinID = UUID()
+        vault.store(credential(accountID: "account-lawrence"), for: lawrenceID)
+        vault.store(credential(accountID: "account-oluwatoyin"), for: oluwatoyinID)
+        try credential(accountID: "account-oluwatoyin").write(to: authenticationURL)
+        let legacy: [String: Any] = [
+            "version": 1,
+            "profiles": [
+                ["id": lawrenceID.uuidString, "name": "Lawrence", "createdAt": 1.0, "lastUsedAt": 1.0],
+                ["id": oluwatoyinID.uuidString, "name": "Oluwatoyin", "createdAt": 2.0, "lastUsedAt": 2.0],
+            ],
+            "activeProfileID": lawrenceID.uuidString,
+        ]
+        try FileManager.default.createDirectory(
+            at: metadataURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
+
+        let document = try manager.document()
+
+        XCTAssertEqual(document.version, 3)
+        XCTAssertEqual(document.activeProfileID, oluwatoyinID)
+        XCTAssertEqual(
+            document.profiles.first(where: { $0.id == lawrenceID })?.accountIdentifier,
+            "account-lawrence"
+        )
+        XCTAssertEqual(
+            document.profiles.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,
+            "account-oluwatoyin"
+        )
+    }
+
+    func testMigratesV2UsingVerifiedCurrentDisplayNameWhenIdentifiersAreMissing() throws {
+        let lawrenceID = UUID()
+        let oluwatoyinID = UUID()
+        try credential(accountID: "account-oluwatoyin", name: "Oluwatoyin Awe")
+            .write(to: authenticationURL)
+        let metadata: [String: Any] = [
+            "version": 2,
+            "profiles": [
+                ["id": lawrenceID.uuidString, "name": "Lawrence", "createdAt": 1.0, "lastUsedAt": 1.0],
+                ["id": oluwatoyinID.uuidString, "name": "Oluwatoyin", "createdAt": 2.0, "lastUsedAt": 2.0],
+            ],
+            "activeProfileID": lawrenceID.uuidString,
+        ]
+        try FileManager.default.createDirectory(
+            at: metadataURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try JSONSerialization.data(withJSONObject: metadata).write(to: metadataURL)
+
+        let document = try manager.document()
+
+        XCTAssertEqual(document.version, 3)
+        XCTAssertEqual(document.activeProfileID, oluwatoyinID)
+        XCTAssertEqual(
+            document.profiles.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,
+            "account-oluwatoyin"
+        )
+    }
+
+    private func credential(accountID: String, name: String? = nil) -> Data {
+        var tokens: [String: Any] = ["account_id": accountID]
+        if let name {
+            let claims: [String: Any] = [
+                "name": name,
+                "https://api.openai.com/auth": ["chatgpt_account_id": accountID],
+            ]
+            let payload = try! JSONSerialization.data(withJSONObject: claims)
+                .base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            tokens["id_token"] = "header.\(payload).signature"
+        }
+        return try! JSONSerialization.data(withJSONObject: ["tokens": tokens])
+    }
 }

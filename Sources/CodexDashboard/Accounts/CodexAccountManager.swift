@@ -40,18 +40,28 @@ final class CodexAccountManager: @unchecked Sendable {
                 throw CodexAccountError.noActiveCredential
             }
             var document = try loadDocument()
+            let accountIdentifier = Self.accountIdentity(in: credential)?.identifier
             let timestamp = now()
             let profile: CodexAccountProfile
             if
-                let activeID = document.activeProfileID,
-                let index = document.profiles.firstIndex(where: { $0.id == activeID })
+                let index = document.profiles.firstIndex(where: {
+                    accountIdentifier != nil && $0.accountIdentifier == accountIdentifier
+                }) ?? document.activeProfileID.flatMap({ activeID in
+                    document.profiles.firstIndex(where: { $0.id == activeID })
+                })
             {
                 document.profiles[index].name = name
                 document.profiles[index].lastUsedAt = timestamp
+                document.profiles[index].accountIdentifier = accountIdentifier
+                document.activeProfileID = document.profiles[index].id
                 profile = document.profiles[index]
             } else {
                 profile = CodexAccountProfile(
-                    id: UUID(), name: name, createdAt: timestamp, lastUsedAt: timestamp
+                    id: UUID(),
+                    name: name,
+                    createdAt: timestamp,
+                    lastUsedAt: timestamp,
+                    accountIdentifier: accountIdentifier
                 )
                 document.profiles.append(profile)
                 document.activeProfileID = profile.id
@@ -79,6 +89,9 @@ final class CodexAccountManager: @unchecked Sendable {
                 try writeActiveCredential(targetCredential)
                 document.activeProfileID = profileID
                 document.profiles[index].lastUsedAt = now()
+                document.profiles[index].accountIdentifier = Self.accountIdentity(
+                    in: targetCredential
+                )?.identifier
                 try saveDocument(document)
                 return transaction
             } catch {
@@ -174,13 +187,113 @@ final class CodexAccountManager: @unchecked Sendable {
         guard fileManager.fileExists(atPath: metadataURL.path) else {
             return CodexAccountDocument()
         }
-        let document = try JSONDecoder().decode(
-            CodexAccountDocument.self, from: Data(contentsOf: metadataURL)
-        )
-        guard document.version == CodexAccountDocument.currentVersion else {
-            throw CodexAccountError.unsupportedMetadataVersion(document.version)
+        let data = try Data(contentsOf: metadataURL)
+        let storedVersion = (try? JSONSerialization.jsonObject(with: data))
+            .flatMap { $0 as? [String: Any] }?["version"] as? Int
+        var document: CodexAccountDocument
+        switch storedVersion {
+        case CodexAccountDocument.currentVersion:
+            document = try JSONDecoder().decode(CodexAccountDocument.self, from: data)
+        case 2:
+            document = try JSONDecoder().decode(CodexAccountDocument.self, from: data)
+            document.version = CodexAccountDocument.currentVersion
+        case 1:
+            let previous = try JSONDecoder().decode(LegacyAccountDocument.self, from: data)
+            document = CodexAccountDocument(
+                profiles: previous.profiles.map { profile in
+                    CodexAccountProfile(
+                        id: profile.id,
+                        name: profile.name,
+                        createdAt: profile.createdAt,
+                        lastUsedAt: profile.lastUsedAt,
+                        accountIdentifier: (try? vault.credential(for: profile.id))
+                            .flatMap { Self.accountIdentity(in: $0)?.identifier }
+                    )
+                },
+                activeProfileID: previous.activeProfileID
+            )
+        default:
+            throw CodexAccountError.unsupportedMetadataVersion(storedVersion ?? 0)
         }
+        let original = document
+        reconcileActiveProfile(in: &document, allowNameFallback: storedVersion != 3)
+        if document != original || storedVersion != 3 { try saveDocument(document) }
         return document
+    }
+
+    private func reconcileActiveProfile(
+        in document: inout CodexAccountDocument,
+        allowNameFallback: Bool
+    ) {
+        guard let credential = try? activeCredential() else {
+            document.activeProfileID = nil
+            return
+        }
+        guard let identity = Self.accountIdentity(in: credential) else { return }
+        if let profile = document.profiles.first(where: {
+            $0.accountIdentifier == identity.identifier
+        }) {
+            document.activeProfileID = profile.id
+            return
+        }
+        if allowNameFallback, let displayName = identity.displayName {
+            let candidates = document.profiles.indices.filter {
+                document.profiles[$0].accountIdentifier == nil
+                    && Self.profileName(document.profiles[$0].name, matches: displayName)
+            }
+            if candidates.count == 1, let index = candidates.first {
+                document.profiles[index].accountIdentifier = identity.identifier
+                document.activeProfileID = document.profiles[index].id
+                return
+            }
+        }
+        document.activeProfileID = nil
+    }
+
+    private static func accountIdentity(in credential: Data) -> AccountIdentity? {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: credential),
+            let root = object as? [String: Any],
+            let tokens = root["tokens"] as? [String: Any]
+        else { return nil }
+        let directAccountID = tokens["account_id"] as? String
+        guard let idToken = tokens["id_token"] as? String else {
+            return directAccountID.flatMap {
+                $0.isEmpty ? nil : AccountIdentity(identifier: $0, displayName: nil)
+            }
+        }
+        let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else {
+            return directAccountID.flatMap {
+                $0.isEmpty ? nil : AccountIdentity(identifier: $0, displayName: nil)
+            }
+        }
+        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard
+            let payloadData = Data(base64Encoded: payload),
+            let claims = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
+            let authentication = claims["https://api.openai.com/auth"] as? [String: Any],
+            let accountID = directAccountID
+                ?? authentication["chatgpt_account_id"] as? String,
+            !accountID.isEmpty
+        else { return nil }
+        return AccountIdentity(identifier: accountID, displayName: claims["name"] as? String)
+    }
+
+    private static func profileName(_ profileName: String, matches displayName: String) -> Bool {
+        let profileWords = normalizedWords(in: profileName)
+        let displayWords = normalizedWords(in: displayName)
+        guard !profileWords.isEmpty, !displayWords.isEmpty else { return false }
+        return profileWords == displayWords
+            || (profileWords.count == 1 && displayWords.contains(profileWords[0]))
+    }
+
+    private static func normalizedWords(in value: String) -> [String] {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
     }
 
     private func saveDocument(_ document: CodexAccountDocument) throws {
@@ -191,4 +304,21 @@ final class CodexAccountManager: @unchecked Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(document).write(to: metadataURL, options: [.atomic])
     }
+}
+
+private struct AccountIdentity {
+    let identifier: String
+    let displayName: String?
+}
+
+private struct LegacyAccountProfile: Decodable {
+    let id: UUID
+    let name: String
+    let createdAt: Date
+    let lastUsedAt: Date
+}
+
+private struct LegacyAccountDocument: Decodable {
+    let profiles: [LegacyAccountProfile]
+    let activeProfileID: UUID?
 }

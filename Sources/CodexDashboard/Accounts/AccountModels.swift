@@ -6,10 +6,11 @@ struct CodexAccountProfile: Codable, Equatable, Identifiable, Sendable {
     var name: String
     let createdAt: Date
     var lastUsedAt: Date
+    var accountIdentifier: String?
 }
 
 struct CodexAccountDocument: Codable, Equatable, Sendable {
-    static let currentVersion = 1
+    static let currentVersion = 3
 
     var version = Self.currentVersion
     var profiles: [CodexAccountProfile] = []
