@@ -77,20 +77,17 @@ struct DashboardSnapshotPayload: Codable, Equatable, Sendable {
     let threads: [DashboardThreadPayload]
     let accounts: [DashboardAccountPayload]
     let activeAccountID: String?
-    let activeAccountUsage: DashboardAccountUsagePayload?
     let accountStatusMessage: String?
 
     init(
         threads: [ThreadSummary],
         accounts: [DashboardAccountPayload] = [],
         activeAccountID: String? = nil,
-        activeAccountUsage: DashboardAccountUsagePayload? = nil,
         accountStatusMessage: String? = nil
     ) {
         self.threads = threads.map(DashboardThreadPayload.init)
         self.accounts = accounts
         self.activeAccountID = activeAccountID
-        self.activeAccountUsage = activeAccountUsage
         self.accountStatusMessage = accountStatusMessage
     }
 }

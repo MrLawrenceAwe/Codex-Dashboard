@@ -5,7 +5,6 @@ const routeEventTypes = ['message', 'popstate', 'hashchange'];
 let threads = [];
 let accounts = [];
 let activeAccountID = null;
-let activeAccountUsage = null;
 let accountStatusMessage = null;
 let pendingAccountAction = null;
 const storedPreferences = threadDashboardState.loadPreferences();
@@ -165,84 +164,11 @@ function renderAccountControls() {
       ${dashboardElements.escapeHTML(account.name)}
     </option>`).join('');
   select.innerHTML = options || '<option value="">Current account</option>';
-  renderAccountUsage(activeAccountUsage);
   const notice = document.querySelector('[data-dashboard-notice]');
   if (notice && accountStatusMessage) {
     notice.textContent = accountStatusMessage;
     notice.hidden = false;
   }
-}
-
-function resetRemaining(resetAtMilliseconds) {
-  if (!Number.isFinite(resetAtMilliseconds)) return 'reset time unavailable';
-  const remainingMinutes = Math.max(0, Math.ceil((resetAtMilliseconds - Date.now()) / 60000));
-  if (remainingMinutes === 0) return 'resetting now';
-  return `resets in ${remainingDuration(remainingMinutes)}`;
-}
-
-function remainingDuration(remainingMinutes) {
-  const days = Math.floor(remainingMinutes / 1440);
-  const hours = Math.floor((remainingMinutes % 1440) / 60);
-  const minutes = remainingMinutes % 60;
-  const parts = [];
-  if (days) parts.push(`${days}d`);
-  if (hours) parts.push(`${hours}h`);
-  if (!days && minutes) parts.push(`${minutes}m`);
-  return parts.join(' ');
-}
-
-function usageWindowMarkup(label, window) {
-  if (!window || !Number.isFinite(window.usedPercent)) return '';
-  const usedPercent = Math.min(100, Math.max(0, Math.round(window.usedPercent)));
-  const remainingPercent = 100 - usedPercent;
-  return `
-    <div class="dashboard-usage-window" title="${label}: ${usedPercent}% used">
-      <span class="dashboard-usage-copy"><strong>${label}</strong> <span>${remainingPercent}% left · ${resetRemaining(window.resetsAtMilliseconds)}</span></span>
-      <span class="dashboard-usage-track" role="progressbar" aria-label="${label} usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${usedPercent}">
-        <span style="width:${usedPercent}%"></span>
-      </span>
-    </div>`;
-}
-
-function usageUpdatedAt(fetchedAtMilliseconds) {
-  if (!Number.isFinite(fetchedAtMilliseconds)) return '';
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric', minute: '2-digit',
-  }).format(new Date(fetchedAtMilliseconds));
-}
-
-function bankedResetsMarkup(bankedResets) {
-  if (!bankedResets || !Number.isFinite(bankedResets.availableCount)) return '';
-  const count = Math.max(0, Math.round(bankedResets.availableCount));
-  let expiration = '';
-  if (count > 0 && Number.isFinite(bankedResets.nextExpirationMilliseconds)) {
-    const minutes = Math.max(0, Math.ceil(
-      (bankedResets.nextExpirationMilliseconds - Date.now()) / 60000,
-    ));
-    expiration = minutes > 0 ? ` · next expires in ${remainingDuration(minutes)}` : ' · expiring now';
-  }
-  return `<div class="dashboard-banked-resets"><strong>Banked resets</strong> <span>${count} available${expiration}</span></div>`;
-}
-
-function renderAccountUsage(status) {
-  const container = document.querySelector('[data-account-usage]');
-  if (!container) return;
-  const windows = [
-    usageWindowMarkup('5 hour', status?.fiveHour),
-    usageWindowMarkup('Weekly', status?.weekly),
-  ].filter(Boolean).join('');
-  const bankedResets = bankedResetsMarkup(status?.bankedResets);
-  let message = '';
-  if (status?.state === 'loading') message = windows || bankedResets ? 'Updating usage…' : 'Loading usage…';
-  if (status?.state === 'unavailable') message = 'Usage unavailable';
-  if (status?.state === 'stale') {
-    const updatedAt = usageUpdatedAt(status.fetchedAtMilliseconds);
-    message = updatedAt ? `Usage may be stale · updated ${updatedAt}` : 'Usage may be stale';
-  }
-  if (status?.state === 'available' && !windows && !bankedResets) message = 'Usage unavailable';
-  container.innerHTML = `${windows}${bankedResets}${message ? `<span class="dashboard-usage-message">${message}</span>` : ''}`;
-  container.dataset.usageState = status?.state || '';
-  container.hidden = !windows && !bankedResets && !message;
 }
 
 function queueAccountAction(action) {
@@ -487,7 +413,6 @@ function applySnapshot(nextSnapshot) {
   threads = snapshot.threads;
   accounts = snapshot.accounts;
   activeAccountID = snapshot.activeAccountID;
-  activeAccountUsage = snapshot.activeAccountUsage;
   accountStatusMessage = snapshot.accountStatusMessage;
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),

@@ -38,6 +38,7 @@ final class DashboardCoordinator: ObservableObject {
     let promptLibraryStore: PromptLibraryFileStore
     let accountManager: CodexAccountManager
     let accountUsageProvider: any CodexAccountUsageProviding
+    let accountUsageCacheStore: CodexAccountUsageCacheStore
     let synchronizationGate = DashboardSynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -47,6 +48,7 @@ final class DashboardCoordinator: ObservableObject {
     var observedLifecycleEventsByThreadID: [String: ThreadLifecycleEvent]?
     var lastLifecycleObservationDate: Date?
     var isRefreshingAccountUsage = false
+    var lastUsageCacheSaveAt: Date?
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -67,6 +69,7 @@ final class DashboardCoordinator: ObservableObject {
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any CodexAccountUsageProviding = CodexAppServerAccountUsageProvider(),
+        accountUsageCacheStore: CodexAccountUsageCacheStore? = nil,
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -80,6 +83,7 @@ final class DashboardCoordinator: ObservableObject {
         self.promptLibraryStore = promptLibraryStore
         self.accountManager = accountManager
         self.accountUsageProvider = accountUsageProvider
+        self.accountUsageCacheStore = accountUsageCacheStore ?? accountManager.usageCacheStore
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion
@@ -89,7 +93,12 @@ final class DashboardCoordinator: ObservableObject {
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
+        accountUsageByProfileID = (try? self.accountUsageCacheStore.load()) ?? [:]
         refreshAccountState()
+        if let activeAccountProfileID,
+           let snapshot = accountUsageByProfileID[activeAccountProfileID] {
+            activeAccountUsageStatus = .stale(snapshot)
+        }
     }
 
     func startMonitoring() {
@@ -118,6 +127,7 @@ final class DashboardCoordinator: ObservableObject {
 
     func stopMonitoring() {
         refreshGeneration += 1
+        persistAccountUsageCache(force: true)
         pollingController.stop()
         synchronizationGate.stop()
         if let activationObserver {

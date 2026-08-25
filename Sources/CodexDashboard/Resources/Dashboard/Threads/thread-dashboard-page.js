@@ -16,18 +16,15 @@ const threadDashboardPage = (() => {
               <span><strong data-summary-count="changed">0</strong> changed</span>
             </div>
           </div>
-          <div class="dashboard-account-area">
-            <div class="dashboard-account-controls" data-account-controls>
-              <label>
-                <span class="dashboard-control-label">Codex account</span>
-                <select data-account-select aria-label="Active Codex account">
-                  <option value="">Current account</option>
-                </select>
-              </label>
-              <button type="button" data-account-save>Save</button>
-              <button type="button" data-account-add>Add account</button>
-            </div>
-            <div class="dashboard-account-usage" data-account-usage hidden></div>
+          <div class="dashboard-account-controls" data-account-controls>
+            <label>
+              <span class="dashboard-control-label">Codex account</span>
+              <select data-account-select aria-label="Active Codex account">
+                <option value="">Current account</option>
+              </select>
+            </label>
+            <button type="button" data-account-save>Save</button>
+            <button type="button" data-account-add>Add account</button>
           </div>
         </header>
         <div class="dashboard-notice" data-dashboard-notice role="alert" hidden></div>
