@@ -5,6 +5,53 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testUnknownModelIdentifierIsEscapedInThePresetSelector() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let modelIdentifier = #"\"></option></select><img src=x onerror=\"window.__modelOptionXSS = true\">"#
+        let library = PromptLibraryDocument(
+            version: 3,
+            prompts: [SavedPrompt(
+                id: "unknown-model",
+                name: "Unknown model",
+                content: "Prompt",
+                section: nil,
+                scope: SavedPromptScope(type: "global", projectPath: nil),
+                preset: SavedPromptPreset(
+                    model: modelIdentifier,
+                    reasoningEffort: nil,
+                    speed: nil
+                ),
+                usePreset: true
+            )],
+            sections: []
+        )
+        let data = try JSONEncoder().encode(library)
+        let payload = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyPromptLibrary(\(payload));
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-edit="unknown-model"]').click();
+              const option = document.querySelector('[name="presetModel"] option:checked');
+              return JSON.stringify({
+                value: option.value,
+                label: option.textContent,
+                injected: window.__modelOptionXSS === true,
+                imageCount: document.querySelectorAll('img[src="x"]').length,
+              });
+            })()
+            """
+        ) as? String
+        let values = try decodeJSONObject(try XCTUnwrap(result))
+
+        XCTAssertEqual(values["value"] as? String, modelIdentifier)
+        XCTAssertEqual(values["label"] as? String, "Saved model · \(modelIdentifier)")
+        XCTAssertEqual(values["injected"] as? Bool, false)
+        XCTAssertEqual(values["imageCount"] as? Int, 0)
+    }
+
     func testUnrelatedHostMutationsDoNotRescanComposerSelectors() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(

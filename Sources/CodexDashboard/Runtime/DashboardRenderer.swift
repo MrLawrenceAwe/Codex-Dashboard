@@ -271,6 +271,21 @@ final class DashboardRenderer {
         mountedDashboard: Bool
     ) async throws {
         guard let promptLibraryStore, let firstTarget = targets.first else { return }
+        if let serialized = try await devTools.evaluateString(
+            DashboardRendererScript.exportPendingPromptLibrary,
+            in: firstTarget
+        ),
+           let data = serialized.data(using: .utf8),
+           let pendingLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
+           pendingLibrary.isValid {
+            _ = try promptLibraryStore.save(pendingLibrary)
+            let acknowledgement = try DashboardRendererScript.acknowledgePendingPromptLibrary(
+                pendingLibrary
+            )
+            guard try await devTools.evaluateBoolean(acknowledgement, in: firstTarget) else {
+                throw DashboardError.enableFailed("The prompt library save could not be acknowledged by the renderer.")
+            }
+        }
         let storedBeforeSynchronization = try promptLibraryStore.load()
         let nativeLibraryChanged = storedBeforeSynchronization != lastDeliveredPromptLibrary
         let sourceTarget = healthyTargets.first ?? (storedBeforeSynchronization == nil ? firstTarget : nil)
