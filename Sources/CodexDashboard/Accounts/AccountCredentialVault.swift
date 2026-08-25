@@ -9,92 +9,77 @@ protocol AccountCredentialVault: Sendable {
 }
 
 struct KeychainAccountCredentialVault: AccountCredentialVault {
-    private let protectedService = "com.lawrenceawe.CodexDashboard.accounts.user-presence-v1"
-    private let legacyService = "com.lawrenceawe.CodexDashboard.accounts"
+    private let service = "com.lawrenceawe.CodexDashboard.accounts"
+    private let previousUserPresenceService =
+        "com.lawrenceawe.CodexDashboard.accounts.user-presence-v1"
     private let authenticationPrompt = "Use Touch ID to switch Codex accounts"
 
     func credential(for profileID: UUID) throws -> Data? {
         if let credential = try readCredential(
             for: profileID,
-            service: protectedService,
-            promptForUserPresence: true
+            service: service,
+            authenticationContext: nil
         ) {
             return credential
         }
 
-        // Existing installations used an ordinary generic-password item. Read it once
-        // using its original access policy, then move it into the user-presence vault.
-        guard let legacyCredential = try readCredential(
-            for: profileID,
-            service: legacyService,
-            promptForUserPresence: false
-        ) else { return nil }
-        try store(legacyCredential, for: profileID)
-        deleteLegacyCredentialWithoutPrompt(for: profileID)
-        return legacyCredential
+        // A prior build stored credentials in the data-protection Keychain. Keep a
+        // recovery path so a properly entitled build can move those secrets without
+        // losing saved accounts. Ad-hoc local builds cannot access that Keychain and
+        // report errSecMissingEntitlement, which must not break the ordinary vault.
+        let previousCredential: Data?
+        do {
+            previousCredential = try readCredential(
+                for: profileID,
+                service: previousUserPresenceService,
+                authenticationContext: authenticationContext()
+            )
+        } catch CodexAccountError.keychain(let status) where status == errSecMissingEntitlement {
+            return nil
+        }
+        guard let previousCredential else { return nil }
+        try store(previousCredential, for: profileID)
+        deletePreviousCredentialWithoutPrompt(for: profileID)
+        return previousCredential
     }
 
     func store(_ credential: Data, for profileID: UUID) throws {
-        var updateQuery = baseQuery(for: profileID, service: protectedService)
-        updateQuery[kSecUseAuthenticationContext as String] = authenticationContext()
+        let updateQuery = baseQuery(for: profileID, service: service)
         let updateStatus = SecItemUpdate(
             updateQuery as CFDictionary,
             [kSecValueData as String: credential] as CFDictionary
         )
         if updateStatus == errSecSuccess {
-            deleteLegacyCredentialWithoutPrompt(for: profileID)
             return
         }
         guard updateStatus == errSecItemNotFound else {
             throw CodexAccountError.keychain(updateStatus)
         }
 
-        var accessControlError: Unmanaged<CFError>?
-        guard let accessControl = SecAccessControlCreateWithFlags(
-            nil,
-            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-            .userPresence,
-            &accessControlError
-        ) else {
-            let detail = accessControlError?.takeRetainedValue().localizedDescription
-                ?? "Keychain rejected the access-control policy."
-            throw CodexAccountError.keychainAccessControl(detail)
-        }
-
-        var addition = baseQuery(for: profileID, service: protectedService)
+        var addition = baseQuery(for: profileID, service: service)
         addition[kSecValueData as String] = credential
-        addition[kSecAttrAccessControl as String] = accessControl
         let addStatus = SecItemAdd(addition as CFDictionary, nil)
         guard addStatus == errSecSuccess else { throw CodexAccountError.keychain(addStatus) }
-        deleteLegacyCredentialWithoutPrompt(for: profileID)
     }
 
     func deleteCredential(for profileID: UUID) throws {
-        var protectedQuery = baseQuery(for: profileID, service: protectedService)
-        protectedQuery[kSecUseAuthenticationContext as String] = authenticationContext()
-        let protectedStatus = SecItemDelete(protectedQuery as CFDictionary)
-        guard protectedStatus == errSecSuccess || protectedStatus == errSecItemNotFound else {
-            throw CodexAccountError.keychain(protectedStatus)
+        let status = SecItemDelete(baseQuery(for: profileID, service: service) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw CodexAccountError.keychain(status)
         }
-
-        let legacyStatus = SecItemDelete(
-            baseQuery(for: profileID, service: legacyService) as CFDictionary
-        )
-        guard legacyStatus == errSecSuccess || legacyStatus == errSecItemNotFound else {
-            throw CodexAccountError.keychain(legacyStatus)
-        }
+        deletePreviousCredentialWithoutPrompt(for: profileID)
     }
 
     private func readCredential(
         for profileID: UUID,
         service: String,
-        promptForUserPresence: Bool
+        authenticationContext: LAContext?
     ) throws -> Data? {
         var query = baseQuery(for: profileID, service: service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
-        if promptForUserPresence {
-            query[kSecUseAuthenticationContext as String] = authenticationContext()
+        if let authenticationContext {
+            query[kSecUseAuthenticationContext as String] = authenticationContext
         }
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -103,8 +88,8 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         return result as? Data
     }
 
-    private func deleteLegacyCredentialWithoutPrompt(for profileID: UUID) {
-        var query = baseQuery(for: profileID, service: legacyService)
+    private func deletePreviousCredentialWithoutPrompt(for profileID: UUID) {
+        var query = baseQuery(for: profileID, service: previousUserPresenceService)
         query[kSecUseAuthenticationContext as String] = authenticationContext(
             interactionAllowed: false
         )
