@@ -208,6 +208,8 @@ final class StubDashboardRuntime: DashboardRuntime {
     let maintainsDashboard = false
     private let compatibilityChecks: [CompatibilityCheck]
     private let synchronizationError: Error?
+    private let restartError: Error?
+    private let onRestart: (() -> Void)?
     private(set) var restartCallCount = 0
     private(set) var synchronizeCallCount = 0
     private(set) var openedThreadIDs: [String] = []
@@ -215,17 +217,23 @@ final class StubDashboardRuntime: DashboardRuntime {
     init(
         codexIsRunning: Bool = false,
         compatibilityChecks: [CompatibilityCheck] = [],
-        synchronizationError: Error? = nil
+        synchronizationError: Error? = nil,
+        restartError: Error? = nil,
+        onRestart: (() -> Void)? = nil
     ) {
         self.codexIsRunning = codexIsRunning
         self.compatibilityChecks = compatibilityChecks
         self.synchronizationError = synchronizationError
+        self.restartError = restartError
+        self.onRestart = onRestart
     }
 
     func rendererTargets() async -> [DevToolsTarget] { [] }
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1
+        onRestart?()
+        if let restartError { throw restartError }
         return []
     }
     func synchronizeDashboard(
