@@ -3,6 +3,8 @@ import Foundation
 enum CodexConfiguration {
     static let bundleIdentifier = "com.openai.codex"
     static let codexApplicationURL = URL(fileURLWithPath: "/Applications/ChatGPT.app", isDirectory: true)
+    static let codexExecutableURL = codexApplicationURL
+        .appendingPathComponent("Contents/Resources/codex")
     static let devToolsAddress = "127.0.0.1"
     static let devToolsPort = 47_832
 
@@ -12,7 +14,7 @@ enum CodexConfiguration {
         "--remote-allow-origins=http://localhost",
     ]
 
-    private static let codexDirectory = FileManager.default.homeDirectoryForCurrentUser
+    static let codexDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".codex", isDirectory: true)
 
     private static let applicationSupportDirectory = FileManager.default.urls(

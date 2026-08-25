@@ -7,11 +7,13 @@ final class DashboardPollingController {
         static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
         static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
         static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
+        static func accountUsage(active: Bool) -> Duration { active ? .seconds(60) : .seconds(300) }
     }
 
     private var catalogPollingTask: Task<Void, Never>?
     private var workingTreePollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
+    private var accountUsagePollingTask: Task<Void, Never>?
     private let fileChanges: DashboardDataChangeMonitor?
 
     init(observeFileChanges: Bool = true) {
@@ -22,16 +24,19 @@ final class DashboardPollingController {
         catalogPollingTask?.cancel()
         workingTreePollingTask?.cancel()
         unreadPollingTask?.cancel()
+        accountUsagePollingTask?.cancel()
     }
 
     func start(
         synchronizeDashboard: @escaping @MainActor () async -> Void,
         updateWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void,
-        updateUnreadState: @escaping @MainActor () async -> Void
+        updateUnreadState: @escaping @MainActor () async -> Void,
+        refreshAccountUsage: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
               workingTreePollingTask == nil,
-              unreadPollingTask == nil
+              unreadPollingTask == nil,
+              accountUsagePollingTask == nil
         else { return }
 
         catalogPollingTask = Task {
@@ -51,6 +56,12 @@ final class DashboardPollingController {
             while !Task.isCancelled {
                 await updateUnreadState()
                 try? await Task.sleep(for: Schedule.unread(active: Self.isUserActive))
+            }
+        }
+        accountUsagePollingTask = Task {
+            while !Task.isCancelled {
+                await refreshAccountUsage()
+                try? await Task.sleep(for: Schedule.accountUsage(active: Self.isUserActive))
             }
         }
         fileChanges?.start(
@@ -75,9 +86,11 @@ final class DashboardPollingController {
         catalogPollingTask?.cancel()
         workingTreePollingTask?.cancel()
         unreadPollingTask?.cancel()
+        accountUsagePollingTask?.cancel()
         catalogPollingTask = nil
         workingTreePollingTask = nil
         unreadPollingTask = nil
+        accountUsagePollingTask = nil
         fileChanges?.stop()
     }
 }

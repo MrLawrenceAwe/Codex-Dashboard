@@ -114,6 +114,50 @@ private struct StubCompatibilityChecker: LocalCompatibilityChecking {
     }
 }
 
+private struct StubAccountUsageProvider: CodexAccountUsageProviding {
+    func usage() async throws -> CodexAccountUsage {
+        CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func reset() async {}
+}
+
+private actor SequencedAccountUsageProvider: CodexAccountUsageProviding {
+    private var outcomes: [CodexAccountUsage?]
+
+    init(outcomes: [CodexAccountUsage?]) {
+        self.outcomes = outcomes
+    }
+
+    func usage() async throws -> CodexAccountUsage {
+        guard !outcomes.isEmpty, let usage = outcomes.removeFirst() else {
+            throw CodexAccountUsageError.unavailable
+        }
+        return usage
+    }
+
+    func reset() async {}
+}
+
+private actor SuspendedAccountUsageProvider: CodexAccountUsageProviding {
+    private var continuation: CheckedContinuation<CodexAccountUsage, Never>?
+    private(set) var requestCount = 0
+
+    func usage() async -> CodexAccountUsage {
+        requestCount += 1
+        return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func reset() async {}
+
+    func resume(with usage: CodexAccountUsage) {
+        continuation?.resume(returning: usage)
+        continuation = nil
+    }
+
+    func count() -> Int { requestCount }
+}
+
 private actor SequencedCompatibilityChecker: LocalCompatibilityChecking {
     private var results: [[CompatibilityCheck]]
 
@@ -187,6 +231,71 @@ private final class StubDashboardRuntime: DashboardRuntime {
 final class DashboardCoordinatorTests: XCTestCase {
     private enum AccountTestError: Error { case mountFailed }
 
+    func testUsageFailureMarksPreviousUnsavedAccountUsageStale() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorUsageTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
+        )
+        let provider = SequencedAccountUsageProvider(outcomes: [usage, nil])
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: CodexAccountManager(
+                metadataURL: directory.appendingPathComponent("accounts.json"),
+                authenticationURL: directory.appendingPathComponent("auth.json"),
+                vault: CoordinatorMemoryCredentialVault()
+            ),
+            accountUsageProvider: provider,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.refreshAccountUsage()
+        guard case .available = coordinator.activeAccountUsageStatus else {
+            return XCTFail("Expected available usage")
+        }
+        await coordinator.refreshAccountUsage()
+        guard case .stale(let snapshot) = coordinator.activeAccountUsageStatus else {
+            return XCTFail("Expected stale usage")
+        }
+        XCTAssertEqual(snapshot.usage, usage)
+        XCTAssertEqual(coordinator.dashboardSnapshotPayload().activeAccountUsage?.state, .stale)
+    }
+
+    func testConcurrentUsageRefreshesAreCoalesced() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DashboardCoordinatorUsageCoalescingTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = SuspendedAccountUsageProvider()
+        let coordinator = DashboardCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: CodexAccountManager(
+                metadataURL: directory.appendingPathComponent("accounts.json"),
+                authenticationURL: directory.appendingPathComponent("auth.json"),
+                vault: CoordinatorMemoryCredentialVault()
+            ),
+            accountUsageProvider: provider,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        let first = Task { @MainActor in await coordinator.refreshAccountUsage() }
+        try await waitUntil { await provider.count() == 1 }
+        await coordinator.refreshAccountUsage()
+        let requestCount = await provider.count()
+        XCTAssertEqual(requestCount, 1)
+        await provider.resume(with: CodexAccountUsage(fiveHour: nil, weekly: nil))
+        await first.value
+    }
+
     func testAddingAccountKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("DashboardCoordinatorAccountTests-\(UUID().uuidString)")
@@ -212,6 +321,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
+            accountUsageProvider: StubAccountUsageProvider(),
             runtimeFactory: { runtime }
         )
 
@@ -256,6 +366,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
+            accountUsageProvider: StubAccountUsageProvider(),
             runtimeFactory: { runtime }
         )
 
@@ -339,6 +450,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
+            accountUsageProvider: StubAccountUsageProvider(),
             runtimeFactory: { StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
@@ -684,6 +796,7 @@ final class DashboardCoordinatorTests: XCTestCase {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
+            accountUsageProvider: StubAccountUsageProvider(),
             runtimeFactory: { StubDashboardRuntime() }
         )
 

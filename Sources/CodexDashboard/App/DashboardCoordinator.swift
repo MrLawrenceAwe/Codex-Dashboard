@@ -22,6 +22,8 @@ final class DashboardCoordinator: ObservableObject {
     @Published var accountProfiles: [CodexAccountProfile] = []
     @Published var activeAccountProfileID: UUID?
     @Published var accountStatusMessage: String?
+    @Published var accountUsageByProfileID: [UUID: CodexAccountUsageSnapshot] = [:]
+    @Published var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -35,6 +37,7 @@ final class DashboardCoordinator: ObservableObject {
     let codexForegrounder: any CodexForegrounding
     let promptLibraryStore: PromptLibraryFileStore
     let accountManager: CodexAccountManager
+    let accountUsageProvider: any CodexAccountUsageProviding
     let synchronizationGate = DashboardSynchronizationGate()
     var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -43,6 +46,7 @@ final class DashboardCoordinator: ObservableObject {
     private var activationObserver: NSObjectProtocol?
     var observedLifecycleEventsByThreadID: [String: ThreadLifecycleEvent]?
     var lastLifecycleObservationDate: Date?
+    var isRefreshingAccountUsage = false
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -62,6 +66,7 @@ final class DashboardCoordinator: ObservableObject {
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
+        accountUsageProvider: any CodexAccountUsageProviding = CodexAppServerAccountUsageProvider(),
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(
@@ -74,6 +79,7 @@ final class DashboardCoordinator: ObservableObject {
         self.codexForegrounder = codexForegrounder
         self.promptLibraryStore = promptLibraryStore
         self.accountManager = accountManager
+        self.accountUsageProvider = accountUsageProvider
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         pollingController = DashboardPollingController(observeFileChanges: observeFileChanges)
         self.installedCodexVersion = installedCodexVersion
@@ -95,7 +101,8 @@ final class DashboardCoordinator: ObservableObject {
             updateWorkingTrees: { [weak self] paths in
                 await self?.updateWorkingTreeStatuses(projectPaths: paths)
             },
-            updateUnreadState: { [weak self] in await self?.refreshUnreadState() }
+            updateUnreadState: { [weak self] in await self?.refreshUnreadState() },
+            refreshAccountUsage: { [weak self] in await self?.refreshAccountUsage() }
         )
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
