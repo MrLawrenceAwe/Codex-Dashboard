@@ -133,6 +133,7 @@ struct DiagnosticsWindowView: View {
 
     var body: some View {
         let codexVersion = CodexConfiguration.installedVersion ?? "not found"
+        let actions = coordinator.dashboardActions
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
@@ -156,22 +157,22 @@ struct DiagnosticsWindowView: View {
             ConnectionStatusCard(coordinator: coordinator)
 
             HStack(spacing: 10) {
-                Button("Open Task Dashboard") {
+                Button(DashboardActionPresentation.openTitle) {
                     Task { await coordinator.openThreadDashboard() }
                 }
-                .disabled(!coordinator.connectionState.dashboardIsMounted)
+                .disabled(!actions.canOpen)
 
-                Button("Restart & Enable") {
+                Button(DashboardActionPresentation.restartTitle) {
                     Task { await coordinator.restartCodexAndEnableThreadDashboard() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(coordinator.isPerformingAction || coordinator.isCheckingCompatibility)
+                .disabled(!actions.canRestart)
 
                 if coordinator.connectionState.rendererIsAvailable {
-                    Button("Disable") {
+                    Button(DashboardActionPresentation.disableTitle) {
                         Task { await coordinator.disableThreadDashboard() }
                     }
-                    .disabled(coordinator.isPerformingAction)
+                    .disabled(!actions.canDisable)
                 }
             }
 

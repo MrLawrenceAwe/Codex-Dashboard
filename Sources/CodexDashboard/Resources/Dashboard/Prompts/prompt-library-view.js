@@ -70,14 +70,14 @@ const promptLibraryView = (() => {
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
-        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="General" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
+        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${dashboardElements.escapeHTML(promptLibraryContract.defaultSection)}" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${scopeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(scopeProject.name)}</option>` : ''}</select></label>
         <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a model preset</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
           <legend>Model preset</legend>
-          <label>Model<select name="presetModel">${selectOptions(presetOptions.models, prompt?.preset?.model || 'gpt-5.6-sol')}</select></label>
-          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetOptions.reasoningEfforts, prompt?.preset?.reasoningEffort || 'medium')}</select></label>
-          <label>Speed<select name="presetSpeed">${selectOptions(presetOptions.speeds, prompt?.preset?.speed || 'standard')}</select></label>
+          <label>Model<select name="presetModel">${selectOptions(presetOptions.models, prompt?.preset?.model || promptLibraryContract.defaults.model)}</select></label>
+          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetOptions.reasoningEfforts, prompt?.preset?.reasoningEffort || promptLibraryContract.defaults.reasoningEffort)}</select></label>
+          <label>Speed<select name="presetSpeed">${selectOptions(presetOptions.speeds, prompt?.preset?.speed || promptLibraryContract.defaults.speed)}</select></label>
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardElements.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
@@ -140,14 +140,15 @@ const promptLibraryView = (() => {
       groupedPrompts.get(section).push(prompt);
     });
     const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
-      if (left === 'General') return -1;
-      if (right === 'General') return 1;
+      if (left === promptLibraryContract.defaultSection) return -1;
+      if (right === promptLibraryContract.defaultSection) return 1;
       return left.localeCompare(right);
     });
     const sections = orderedSections.map(([section, sectionPrompts], sectionIndex) => {
       const collapsed = promptStore.collapsedSections.has(section);
       const sectionBodyID = `dashboard-prompt-section-${groupIndex}-${sectionIndex}`;
-      const canManageSection = group.scope.type === 'global' && section !== 'General';
+      const canManageSection = group.scope.type === 'global'
+        && section !== promptLibraryContract.defaultSection;
       return `
         <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${dashboardElements.escapeHTML(section)}" data-prompt-scope-key="${dashboardElements.escapeHTML(scopeKey(group.scope))}">
           <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${dashboardElements.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">

@@ -5,6 +5,7 @@ struct InjectionBundle: Sendable {
     private struct ResourceManifest: Decodable {
         let scripts: [String]
         let stylesheets: [String]
+        let contracts: [String: [String]]
     }
 
     let version: String
@@ -43,6 +44,7 @@ struct InjectionBundle: Sendable {
         (() => {
           const DASHBOARD_VERSION = \(String(reflecting: version));
           const DASHBOARD_CSS = \(encodedCSS);
+          \(PromptLibrarySchema.javascriptDeclaration)
           \(script)
         })()
         """
@@ -50,18 +52,26 @@ struct InjectionBundle: Sendable {
     }
 
     static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
-        try loadResources(
-            named: ["Core/dom-utils", "Core/codex-ui-contracts"],
-            withExtension: "js",
-            from: bundle ?? defaultResourceBundle
-        )
+        try loadContract(named: "renderer", bundle: bundle)
     }
 
     static func loadPromptLibraryContractSource(bundle: Bundle? = nil) throws -> String {
-        try loadResources(
-            named: ["Prompts/prompt-library-contract"],
+        PromptLibrarySchema.javascriptDeclaration + "\n" + (try loadContract(
+            named: "promptLibrary",
+            bundle: bundle
+        ))
+    }
+
+    private static func loadContract(named name: String, bundle: Bundle?) throws -> String {
+        let resourceBundle = bundle ?? defaultResourceBundle
+        let manifest = try loadManifest(from: resourceBundle)
+        guard let resources = manifest.contracts[name] else {
+            throw DashboardError.missingResources
+        }
+        return try loadResources(
+            named: resources,
             withExtension: "js",
-            from: bundle ?? defaultResourceBundle
+            from: resourceBundle
         )
     }
 

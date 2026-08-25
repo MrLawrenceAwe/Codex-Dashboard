@@ -3,10 +3,9 @@ import Foundation
 extension AppCoordinator {
     func checkCompatibility() async {
         guard !isCheckingCompatibility else { return }
-        isCheckingCompatibility = true
-        defer { isCheckingCompatibility = false }
+        setCompatibilityChecking(true)
+        defer { setCompatibilityChecking(false) }
 
-        compatibilityReport = await compatibilityMonitor.check(runtime: dashboardRuntime)
-        lastCompatibilityCheck = .now
+        setCompatibilityReport(await compatibilityMonitor.check(runtime: dashboardRuntime))
     }
 }

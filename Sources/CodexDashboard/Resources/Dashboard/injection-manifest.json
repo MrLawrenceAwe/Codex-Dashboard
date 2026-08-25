@@ -25,5 +25,14 @@
   "stylesheets": [
     "Threads/thread-dashboard",
     "Prompts/prompt-library"
-  ]
+  ],
+  "contracts": {
+    "renderer": [
+      "Core/dom-utils",
+      "Core/codex-ui-contracts"
+    ],
+    "promptLibrary": [
+      "Prompts/prompt-library-contract"
+    ]
+  }
 }
