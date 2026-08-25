@@ -122,7 +122,7 @@ async function openProjectCommitOrPush(projectPath) {
   commitOrPushError = '';
   const candidates = threads
     .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
-    .sort((left, right) => Number(right.recencyTimestamp || 0) - Number(left.recencyTimestamp || 0));
+    .sort((left, right) => Number(right.recencyTimestampMilliseconds || 0) - Number(left.recencyTimestampMilliseconds || 0));
   const [thread] = candidates;
   if (!thread) {
     commitOrPushError = 'No idle thread is available for this project.';

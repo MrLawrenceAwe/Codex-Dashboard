@@ -43,6 +43,7 @@ enum CodexAccountError: LocalizedError {
     case invalidCredential
     case keychain(OSStatus)
     case keychainAccessControl(String)
+    case unsupportedMetadataVersion(Int)
 
     var errorDescription: String? {
         switch self {
@@ -62,6 +63,8 @@ enum CodexAccountError: LocalizedError {
             return "The Codex account credential could not be accessed in Keychain (\(status))."
         case .keychainAccessControl(let detail):
             return "Touch ID protection could not be configured for the Codex account. \(detail)"
+        case .unsupportedMetadataVersion(let version):
+            return "The saved account list uses unsupported version \(version). Update Codex Dashboard before changing accounts."
         }
     }
 }

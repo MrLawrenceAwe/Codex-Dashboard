@@ -81,7 +81,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             ThreadSummary.fixture(
                 id: "thread-\(index)",
                 title: index == 64 ? "Needle outside first page" : "Thread \(index)",
-                recencyTimestamp: Int64(65 - index),
+                recencyTimestampMilliseconds: Int64(65 - index),
                 runState: .running
             )
         }
@@ -382,7 +382,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "First",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
-                recencyTimestamp: 3,
+                recencyTimestampMilliseconds: 3,
                 workingTreeStatus: .hasChanges
             ),
             ThreadSummary.fixture(
@@ -391,7 +391,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Second",
                 projectName: "Changed Project",
                 projectPath: "/tmp/changed-project",
-                recencyTimestamp: 2
+                recencyTimestampMilliseconds: 2
             ),
             ThreadSummary.fixture(
                 id: "clean-project-thread",
@@ -399,7 +399,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Clean",
                 projectName: "Clean Project",
                 projectPath: "/tmp/clean-project",
-                recencyTimestamp: 1
+                recencyTimestampMilliseconds: 1
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -750,7 +750,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 id: "running-thread",
                 title: "Newer running thread",
                 projectPath: "/tmp/changed-project",
-                recencyTimestamp: 5,
+                recencyTimestampMilliseconds: 5,
                 runState: .running,
                 workingTreeStatus: .hasChanges
             ),
@@ -758,21 +758,21 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 id: "off-sidebar-idle-thread",
                 title: "Newest idle thread not mounted in the sidebar",
                 projectPath: "/tmp/changed-project",
-                recencyTimestamp: 4,
+                recencyTimestampMilliseconds: 4,
                 workingTreeStatus: .hasChanges
             ),
             ThreadSummary.fixture(
                 id: "idle-thread",
                 title: "Older idle thread",
                 projectPath: "/tmp/changed-project",
-                recencyTimestamp: 2,
+                recencyTimestampMilliseconds: 2,
                 workingTreeStatus: .hasChanges
             ),
             ThreadSummary.fixture(
                 id: "clean-thread",
                 title: "Clean project thread",
                 projectPath: "/tmp/clean-project",
-                recencyTimestamp: 1,
+                recencyTimestampMilliseconds: 1,
                 workingTreeStatus: .clean
             ),
         ]
@@ -829,7 +829,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                recencyTimestamp: 4,
+                recencyTimestampMilliseconds: 4,
                 runState: .running,
                 workingTreeStatus: .clean
             ),
@@ -839,7 +839,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                recencyTimestamp: 3,
+                recencyTimestampMilliseconds: 3,
                 runState: .running,
                 workingTreeStatus: .clean
             ),
@@ -849,7 +849,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Idle",
                 projectName: "Project A",
                 projectPath: "/tmp/project-a",
-                recencyTimestamp: 2
+                recencyTimestampMilliseconds: 2
             ),
             ThreadSummary.fixture(
                 id: "project-b-running",
@@ -857,7 +857,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
                 preview: "Running",
                 projectName: "Project B",
                 projectPath: "/tmp/project-b",
-                recencyTimestamp: 1,
+                recencyTimestampMilliseconds: 1,
                 runState: .running,
                 workingTreeStatus: .clean
             ),

@@ -75,7 +75,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 preview: "Already read",
                 projectName: "Project",
                 projectPath: "/tmp/project",
-                recencyTimestamp: 2
+                recencyTimestampMilliseconds: 2
             ),
             ThreadSummary.fixture(
                 id: "thread-unread",
@@ -83,7 +83,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 preview: "Needs attention",
                 projectName: "Project",
                 projectPath: "/tmp/project",
-                recencyTimestamp: 1,
+                recencyTimestampMilliseconds: 1,
                 isPinned: true,
                 model: "test-model",
                 runState: .running,

@@ -58,12 +58,19 @@ struct SavedPromptScope: Codable, Equatable, Sendable {
 }
 
 struct SavedPromptPreset: Codable, Equatable, Sendable {
+    private static let reasoningEffortValues: Set<String> = [
+        "light", "medium", "high", "xhigh",
+    ]
+    private static let speedValues: Set<String> = ["standard", "fast"]
+
     let model: String?
     let reasoningEffort: String?
     let speed: String?
 
     var isValid: Bool {
         model.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? true
+            && (reasoningEffort.map(Self.reasoningEffortValues.contains) ?? true)
+            && (speed.map(Self.speedValues.contains) ?? true)
     }
 
     var migratingLegacyReasoningEffort: SavedPromptPreset {

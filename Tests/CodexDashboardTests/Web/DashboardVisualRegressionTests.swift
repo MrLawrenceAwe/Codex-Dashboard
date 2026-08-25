@@ -59,7 +59,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
                 preview: "Finish the current dashboard improvements and verify the result.",
                 projectName: "Codex Dashboard",
                 projectPath: "/Users/example/Codex Dashboard",
-                recencyTimestamp: now,
+                recencyTimestampMilliseconds: now * 1_000,
                 isPinned: true,
                 model: "gpt-5.6-sol",
                 runState: .running,
@@ -71,7 +71,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
                 preview: "Check the finished release notes and packaging.",
                 projectName: "Codex Dashboard",
                 projectPath: "/Users/example/Codex Dashboard",
-                recencyTimestamp: now - 900,
+                recencyTimestampMilliseconds: (now - 900) * 1_000,
                 isUnread: true,
                 model: "gpt-5.6-terra"
             ),
@@ -81,7 +81,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
                 preview: "Add predictable focus and activation behavior.",
                 projectName: "Voice Tools",
                 projectPath: "/Users/example/Voice Tools",
-                recencyTimestamp: now - 7_200,
+                recencyTimestampMilliseconds: (now - 7_200) * 1_000,
                 model: "gpt-5.5"
             ),
         ])

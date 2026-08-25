@@ -99,4 +99,23 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: authenticationURL), credential)
         XCTAssertEqual(try manager.document().activeProfileID, profile.id)
     }
+
+    func testUnsupportedMetadataVersionIsNotOverwritten() throws {
+        let unsupportedDocument = Data(
+            #"{"version":99,"profiles":[],"activeProfileID":null}"#.utf8
+        )
+        try FileManager.default.createDirectory(
+            at: metadataURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try unsupportedDocument.write(to: metadataURL)
+        try Data(#"{"account":"current"}"#.utf8).write(to: authenticationURL)
+
+        XCTAssertThrowsError(try manager.beginAddingAccount()) { error in
+            guard case CodexAccountError.unsupportedMetadataVersion(99) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: metadataURL), unsupportedDocument)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: authenticationURL.path))
+    }
 }

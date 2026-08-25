@@ -72,9 +72,11 @@ final class PromptLibraryFileStore {
     private func createBackup(with data: Data) throws {
         try fileManager.createDirectory(at: backupDirectoryURL, withIntermediateDirectories: true)
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let timestamp = formatter.string(from: now()).replacingOccurrences(of: ":", with: "-")
-        let backupURL = backupDirectoryURL.appendingPathComponent("prompt-library-\(timestamp).json")
+        let backupURL = backupDirectoryURL.appendingPathComponent(
+            "prompt-library-\(timestamp)-\(UUID().uuidString).json"
+        )
         try data.write(to: backupURL, options: .atomic)
         let backups = try fileManager.contentsOfDirectory(
             at: backupDirectoryURL,
