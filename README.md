@@ -1,6 +1,6 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS menu-bar utility that adds a recent-thread dashboard
+Codex Dashboard is a native macOS menu-bar utility that adds a recent-task dashboard
 to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
@@ -25,12 +25,12 @@ It moves the installed app to the Trash.
 1. Open **Codex Dashboard** from `$HOME/Applications`; it appears in the menu bar.
 2. Finish any active response in Codex.
 3. Select **Restart & Enable**.
-4. Select **Thread Dashboard** directly in the Codex sidebar. It opens in
+4. Select **Task Dashboard** directly in the Codex sidebar. It opens in
    the main content pane while the rest of Codex navigation stays available.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
 All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion; this can be disabled from the menu bar. Use
-**Disable Thread Dashboard** to unload the injected UI immediately. A normal Codex restart also
+**Disable Task Dashboard** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 
 ## Architecture
@@ -38,9 +38,9 @@ removes it.
 - Native SwiftUI menu-bar utility with an on-demand diagnostics window; no browser automation or Node runtime.
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools connection managed by `LocalCodexDashboardRuntime` and `DashboardRenderer`.
-- Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`, grouped into `Core`, `Threads`, and `Prompts`.
+- Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`, grouped into `Core`, `Accounts`, `Threads`, and `Prompts`.
 - A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and composer-control contract drift after Codex updates.
-- Swift source is grouped by application coordination, compatibility checks, prompt persistence, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries.
+- Swift source is grouped by application coordination, accounts, compatibility checks, prompt persistence, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries and are split by behaviour.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - Thread, unread-state, and project-directory changes use local filesystem notifications as an accelerator. Git metadata notifications also follow linked-worktree pointers to the metadata directory that actually changes. Authoritative catalog polling runs every two seconds and unread-state polling every 500 milliseconds while active; background cadence drops to eight seconds and one second respectively. Working-tree fallback polling runs every 15 seconds while active and every minute in the background, and returning to Codex forces an immediate status refresh. Git status checks disable optional locks so observation does not itself generate repository-change events. Silent renderer-only read-state changes retain a bounded fallback: 1.5 seconds after a native snapshot, then every three seconds while the dashboard is open, ten seconds while closed, and thirty seconds while hidden.
 - Threads are ordered by Codex's indexed recency metadata, avoiding historical rollout scans while keeping the complete local catalog searchable. Only threads active during the current Codex process have their latest lifecycle envelope inspected. The renderer initially mounts 60 matching threads and exposes **Load more threads** in 60-thread pages to keep the DOM responsive.
@@ -53,14 +53,14 @@ removes it.
 - Prompt search, keyboard and pointer reordering, section rename/deletion, and `{{selection}}` and `{{clipboard}}` placeholders speed up reusable prompt workflows. Prompts can optionally apply saved model, reasoning-effort, and Standard/Fast speed settings before insertion. Saved model identifiers remain intact and editable when Codex's model list changes. Deleting a section moves its prompts to **General** rather than deleting them.
 - Dashboard filter and collapsed-project preferences persist across renderer reloads.
 - The menu bar provides dashboard, restart, disable, compatibility, diagnostics, completion foregrounding, and launch-at-login actions.
-- Multiple Codex accounts can be saved under friendly names and switched from either the menu bar or the Thread Dashboard header. Credential blobs stay in macOS Keychain; the non-secret profile list and Codex account identifiers are stored in `~/Library/Application Support/Codex Dashboard/accounts.json`. The active profile is reconciled with Codex's current sign-in before it is displayed or switched. Switching waits for idle tasks, preserves the shared Codex thread/configuration directory, updates the active account atomically, restarts Codex, and rolls back if relaunch fails.
+- Multiple Codex accounts can be saved under friendly names and switched from either the menu bar or the Task Dashboard header. Credential blobs stay in macOS Keychain; the non-secret saved-account list and Codex account identifiers are stored in `~/Library/Application Support/Codex Dashboard/accounts.json`. The active saved account is reconciled with Codex's current sign-in before it is displayed or switched. Switching waits for idle tasks, preserves the shared Codex thread/configuration directory, updates the active account atomically, restarts Codex, and rolls back if relaunch fails.
 - The menu-bar account submenu shows the active account's five-hour and weekly Codex usage remaining, countdowns to each timed reset, and the number of available banked resets with the nearest known expiry. Non-sensitive usage snapshots are cached locally with timestamps so inactive accounts retain their last known usage across relaunches. A persistent, properly initialized local app-server session uses Codex's canonical active home, is restarted on account changes, and refreshes every 30 seconds while Codex is running, immediately when the account menu opens, and after task completion. Polling pauses when Codex is closed, never opens inactive credentials in Keychain, and visibly marks failed or cached results as stale.
 - Compatibility checks run automatically and are highlighted after the installed Codex version changes. Blocking drift prevents remounting until it is reviewed.
 - Diagnostics show versions, refresh state, thread counts, renderer targets, and warnings, and can be copied in one action.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
-- A native-looking **Thread Dashboard** sidebar item is inserted beside Codex's other
+- A native-looking **Task Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- Codex host selectors are isolated in `Core/codex-host.js`; prompt storage, composer-launcher integration, prompt-library UI, composer insertion, thread rendering, and host exposure live in feature folders listed by `injection-manifest.json`.
+- Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard
 injection maintenance.
@@ -69,7 +69,7 @@ injection maintenance.
 
 1. While signed in to Codex, choose **Accounts → Save Current Account…** and give it a recognizable name.
 2. Choose **Sign In to Another Account…**. Codex restarts signed out; complete the normal OpenAI sign-in in Codex.
-3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Thread Dashboard**.
+3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Task Dashboard**.
 
 Codex still uses one active account at a time. The switcher does not merge accounts, transfer subscriptions or usage, or rotate accounts automatically. Do not commit, export, or manually copy `~/.codex/auth.json`.
 

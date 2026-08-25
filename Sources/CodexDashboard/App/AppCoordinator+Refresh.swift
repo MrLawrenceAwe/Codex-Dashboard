@@ -1,6 +1,6 @@
 import Foundation
 
-extension DashboardCoordinator {
+extension AppCoordinator {
     func synchronizeRuntime() async {
         do {
             try await loadThreadSnapshot()
@@ -16,11 +16,11 @@ extension DashboardCoordinator {
         guard !Task.isCancelled, !isPerformingAction else { return }
 
         if compatibilityWasTriggeredByUpdate && isCheckingCompatibility {
-            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady)
+            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable)
             return
         }
         if let compatibilityReport, compatibilityReport.blockingCount > 0 {
-            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererReady)
+            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable)
             setConnectionError(Self.incompatibleContractMessage)
             return
         }
@@ -34,12 +34,12 @@ extension DashboardCoordinator {
                 }
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
-                setFailure(error, lastKnownState: .rendererReady)
+                setFailure(error, lastKnownState: .rendererAvailable)
             }
             return
         }
         setConnectionState(!targets.isEmpty
-            ? .rendererReady
+            ? .rendererAvailable
             : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed))
         setConnectionError(nil)
     }
@@ -86,7 +86,7 @@ extension DashboardCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        let completedThreadID = observeTaskCompletions(in: snapshot.catalog.threads)
+        let completedThreadID = taskCompletionObserver.newestCompletion(in: snapshot.catalog.threads)
         setThreads(snapshot.catalog.threads)
         if totalThreadCount != snapshot.catalog.totalThreadCount {
             totalThreadCount = snapshot.catalog.totalThreadCount
@@ -102,33 +102,6 @@ extension DashboardCoordinator {
                 await dashboardRuntime?.openThread(completedThreadID)
             }
         }
-    }
-
-    private func observeTaskCompletions(in updatedThreads: [ThreadSummary]) -> String? {
-        let observationDate = Date()
-        let latestEvents = Dictionary(uniqueKeysWithValues: updatedThreads.compactMap { thread in
-            thread.latestLifecycleEvent.map { (thread.id, $0) }
-        })
-        let previousEvents = observedLifecycleEventsByThreadID
-        let previousObservationDate = lastLifecycleObservationDate
-        observedLifecycleEventsByThreadID = latestEvents
-        lastLifecycleObservationDate = observationDate
-        guard let previousEvents, let previousObservationDate else { return nil }
-
-        let newCompletions = latestEvents.compactMap { threadID, event -> (threadID: String, event: ThreadLifecycleEvent)? in
-            guard
-                event.kind == .completed,
-                previousEvents[threadID] != event,
-                previousEvents[threadID] != nil || event.timestamp > previousObservationDate
-            else { return nil }
-            return (threadID, event)
-        }
-        return newCompletions.max { left, right in
-            if left.event.timestamp == right.event.timestamp {
-                return left.threadID < right.threadID
-            }
-            return left.event.timestamp < right.event.timestamp
-        }?.threadID
     }
 
     private func publishSnapshotIfMaintained() async {

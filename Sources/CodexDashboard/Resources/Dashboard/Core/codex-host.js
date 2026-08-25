@@ -43,20 +43,12 @@ const codexHost = {
   },
 
   async openCommitOrPush(thread) {
-    const waitFor = async (value, timeout = 3000) => {
-      const deadline = performance.now() + timeout;
-      while (performance.now() < deadline) {
-        const result = value();
-        if (result) return result;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      return null;
-    };
+    const waitFor = (value, timeout = 3000) => domUtils.waitFor(value, { timeout });
 
     this.navigateToThread(thread);
     const selected = await waitFor(() => codexUIContracts.isThreadSelected(thread.id), 5000);
     if (!selected) return false;
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await domUtils.delay(100);
 
     let commitButton = codexUIContracts.commitOrPushButton();
     if (!commitButton) {

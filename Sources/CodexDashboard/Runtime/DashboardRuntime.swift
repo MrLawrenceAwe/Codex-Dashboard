@@ -2,7 +2,7 @@ import Foundation
 
 enum DashboardDisableOutcome {
     case codexClosed
-    case rendererReady
+    case rendererAvailable
 }
 
 @MainActor
@@ -15,7 +15,7 @@ protocol DashboardRuntime: AnyObject {
     func prepareForRestart()
     func restartCodex() async throws -> [DevToolsTarget]
     func synchronizeDashboard(
-        with snapshot: DashboardSnapshotPayload,
+        with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws
@@ -77,7 +77,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     }
 
     func synchronizeDashboard(
-        with snapshot: DashboardSnapshotPayload,
+        with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
         forceRemount: Bool = false
     ) async throws {
@@ -85,7 +85,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     }
 
     func disableThreadDashboard() async throws -> DashboardDisableOutcome {
-        try await renderer.disable() ? .rendererReady : .codexClosed
+        try await renderer.disable() ? .rendererAvailable : .codexClosed
     }
 
     func openThreadDashboard() async {

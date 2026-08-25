@@ -1,7 +1,7 @@
 import SwiftUI
 
 private struct ConnectionStatusCard: View {
-    @ObservedObject var coordinator: DashboardCoordinator
+    @ObservedObject var coordinator: AppCoordinator
 
     private var statusColor: Color {
         if coordinator.connectionState.dashboardIsMounted {
@@ -37,7 +37,7 @@ private struct ConnectionStatusCard: View {
 }
 
 private struct CompatibilityCard: View {
-    @ObservedObject var coordinator: DashboardCoordinator
+    @ObservedObject var coordinator: AppCoordinator
     @State private var detailsAreExpanded = false
 
     private func color(for status: CompatibilityStatus) -> Color {
@@ -129,7 +129,7 @@ private struct CompatibilityCard: View {
 }
 
 struct DiagnosticsWindowView: View {
-    @ObservedObject var coordinator: DashboardCoordinator
+    @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
         let codexVersion = CodexConfiguration.installedVersion ?? "not found"
@@ -156,7 +156,7 @@ struct DiagnosticsWindowView: View {
             ConnectionStatusCard(coordinator: coordinator)
 
             HStack(spacing: 10) {
-                Button("Open Thread Dashboard") {
+                Button("Open Task Dashboard") {
                     Task { await coordinator.openThreadDashboard() }
                 }
                 .disabled(!coordinator.connectionState.dashboardIsMounted)
@@ -219,7 +219,7 @@ struct DiagnosticsWindowView: View {
                 .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Text("The app runs from the menu bar. The Thread Dashboard reads local Codex thread metadata and activity logs; the signed Codex application bundle is never modified.")
+            Text("The app runs from the menu bar. The Task Dashboard reads local Codex thread metadata and activity logs; the signed Codex application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -1,0 +1,208 @@
+const dashboardLifecycle = (() => {
+  const navigationEvents = ['pointerdown', 'mousedown', 'click', 'keydown'];
+  const routeEvents = ['message', 'popstate', 'hashchange'];
+  let hooks;
+  let structureObserver;
+  let sidebarObserver;
+  let composerObserver;
+  let resizeObserver;
+  let observedSidebar;
+  let observedStructureRoot;
+  let observedMutationSidebar;
+  let observedComposerRoot;
+  let repairFrame;
+  let pendingUnreadSync = false;
+  let pendingHostRebind = false;
+
+  function handleNavigation(event) {
+    if (event.type === 'message') {
+      if (event.data?.type === 'navigate-to-route') {
+        if (hooks.isOpen()) hooks.close();
+        scheduleRepair({ rebindHosts: true });
+      }
+      return;
+    }
+    if (event.type === 'popstate' || event.type === 'hashchange') {
+      if (hooks.isOpen()) hooks.close();
+      scheduleRepair({ rebindHosts: true });
+      return;
+    }
+    if (event.type === 'keydown') {
+      const opensNewChat = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n';
+      if (hooks.isOpen() && opensNewChat) hooks.close();
+      return;
+    }
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(`#${dashboardElements.elementIDs.navButton}`)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.type === 'click') hooks.open();
+      return;
+    }
+    if (event.type === 'click' && target?.closest('aside')) {
+      if (hooks.isOpen()) hooks.close();
+      scheduleRepair({ rebindHosts: true });
+    }
+  }
+
+  function syncContentInset() {
+    const sidebar = codexHost.sidebar();
+    const pageHost = codexHost.pageHost();
+    const sidebarRect = sidebar?.getBoundingClientRect();
+    const hostRect = pageHost?.getBoundingClientRect();
+    const hostScale = pageHost?.offsetWidth > 0 ? hostRect.width / pageHost.offsetWidth : 1;
+    const width = sidebarRect && hostRect && Number.isFinite(hostScale) && hostScale > 0
+      ? Math.max(0, (sidebarRect.right - hostRect.left) / hostScale)
+      : 0;
+    document.documentElement.style.setProperty(
+      '--codex-dashboard-content-left',
+      `${Math.round(width)}px`,
+    );
+  }
+
+  function observeSidebarSize() {
+    const sidebar = codexHost.sidebar();
+    if (!resizeObserver || sidebar === observedSidebar) return;
+    resizeObserver.disconnect();
+    if (sidebar) resizeObserver.observe(sidebar);
+    observedSidebar = sidebar;
+  }
+
+  function attachPage() {
+    const page = document.getElementById(dashboardElements.elementIDs.page);
+    const pageHost = codexHost.pageHost();
+    if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
+  }
+
+  function composerRoot() {
+    const composer = codexUIContracts.composer();
+    return composer?.closest('form') || composer?.parentElement || null;
+  }
+
+  function observeHosts() {
+    const structureRoot = codexHost.pageHost();
+    if (structureObserver && structureRoot !== observedStructureRoot) {
+      structureObserver.disconnect();
+      if (structureRoot) structureObserver.observe(structureRoot, { childList: true, subtree: true });
+      observedStructureRoot = structureRoot;
+    }
+    const sidebar = codexHost.sidebar();
+    if (sidebarObserver && sidebar !== observedMutationSidebar) {
+      sidebarObserver.disconnect();
+      if (sidebar) sidebarObserver.observe(sidebar, { childList: true, subtree: true });
+      observedMutationSidebar = sidebar;
+    }
+    const root = composerRoot();
+    if (composerObserver && root !== observedComposerRoot) {
+      composerObserver.disconnect();
+      if (root) composerObserver.observe(root, { childList: true, subtree: true });
+      observedComposerRoot = root;
+    }
+  }
+
+  function scheduleRepair({ syncUnread = false, rebindHosts = false } = {}) {
+    pendingUnreadSync ||= syncUnread;
+    pendingHostRebind ||= rebindHosts;
+    if (repairFrame !== undefined) return;
+    repairFrame = requestAnimationFrame(() => {
+      repairFrame = undefined;
+      const shouldSyncUnread = pendingUnreadSync;
+      const shouldRebindHosts = pendingHostRebind;
+      pendingUnreadSync = false;
+      pendingHostRebind = false;
+      const restoredPage = !document.getElementById(dashboardElements.elementIDs.page);
+      if (restoredPage) hooks.mountPage();
+      if (!document.getElementById(dashboardElements.elementIDs.navButton)) hooks.mountNavigation();
+      if (hooks.isOpen() && restoredPage) hooks.open();
+      attachPage();
+      observeSidebarSize();
+      if (shouldRebindHosts) {
+        observeHosts();
+        promptLauncher.scheduleSync();
+      }
+      if (shouldSyncUnread && hooks.syncUnread()) hooks.requestRender();
+    });
+  }
+
+  function handleStructureMutations() {
+    const launcher = document.querySelector('[data-codex-prompt-launcher]');
+    if (
+      document.getElementById(dashboardElements.elementIDs.page)
+        && document.getElementById(dashboardElements.elementIDs.navButton)
+        && launcher?.isConnected
+        && observedComposerRoot?.isConnected
+    ) return;
+    scheduleRepair({ rebindHosts: true });
+  }
+
+  function handleComposerMutations() {
+    if (composerRoot() !== observedComposerRoot) {
+      scheduleRepair({ rebindHosts: true });
+      return;
+    }
+    promptLauncher.scheduleSync();
+  }
+
+  function ensureMounted(nextHooks) {
+    hooks = nextHooks;
+    if (!document.body) return false;
+    if (!document.getElementById(dashboardElements.elementIDs.style)) {
+      const style = document.createElement('style');
+      style.id = dashboardElements.elementIDs.style;
+      style.textContent = DASHBOARD_CSS;
+      document.head.append(style);
+    }
+    const pageWasMissing = !document.getElementById(dashboardElements.elementIDs.page);
+    if (pageWasMissing) hooks.mountPage();
+    if (!document.getElementById(dashboardElements.elementIDs.navButton)) hooks.mountNavigation();
+    attachPage();
+    syncContentInset();
+    promptLibrary.mount();
+    if (hooks.isOpen() && pageWasMissing) hooks.open();
+
+    if (!structureObserver) {
+      structureObserver = new MutationObserver(handleStructureMutations);
+      sidebarObserver = new MutationObserver(() => scheduleRepair({ syncUnread: true }));
+      composerObserver = new MutationObserver(handleComposerMutations);
+      observeHosts();
+      navigationEvents.forEach((type) => document.addEventListener(type, handleNavigation, true));
+      routeEvents.forEach((type) => window.addEventListener(type, handleNavigation, true));
+    }
+    if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(syncContentInset);
+      observeSidebarSize();
+    }
+    return Boolean(
+      document.getElementById(dashboardElements.elementIDs.style)
+        && document.getElementById(dashboardElements.elementIDs.page)
+        && document.getElementById(dashboardElements.elementIDs.navButton)
+    );
+  }
+
+  function destroy() {
+    structureObserver?.disconnect();
+    sidebarObserver?.disconnect();
+    composerObserver?.disconnect();
+    resizeObserver?.disconnect();
+    if (repairFrame !== undefined) cancelAnimationFrame(repairFrame);
+    navigationEvents.forEach((type) => document.removeEventListener(type, handleNavigation, true));
+    routeEvents.forEach((type) => window.removeEventListener(type, handleNavigation, true));
+    structureObserver = undefined;
+    sidebarObserver = undefined;
+    composerObserver = undefined;
+    resizeObserver = undefined;
+    observedSidebar = undefined;
+    observedStructureRoot = undefined;
+    observedMutationSidebar = undefined;
+    observedComposerRoot = undefined;
+    repairFrame = undefined;
+    pendingUnreadSync = false;
+    pendingHostRebind = false;
+    promptLibrary.unmount();
+    document.documentElement.classList.remove('codex-dashboard-open');
+    document.documentElement.style.removeProperty('--codex-dashboard-content-left');
+    Object.values(dashboardElements.elementIDs).forEach((id) => document.getElementById(id)?.remove());
+  }
+
+  return { destroy, ensureMounted };
+})();

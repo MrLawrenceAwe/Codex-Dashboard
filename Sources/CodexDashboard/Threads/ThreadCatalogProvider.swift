@@ -143,7 +143,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 preview: thread.preview,
                 projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
                 projectPath: thread.projectPath,
-                recencyTimestampMilliseconds: thread.recencyAtMilliseconds,
+                recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: runState,
@@ -151,10 +151,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 workingTreeStatus: .notRepository
             )
         }.sorted { left, right in
-            if left.recencyTimestampMilliseconds == right.recencyTimestampMilliseconds {
+            if left.recencyEpochMillis == right.recencyEpochMillis {
                 return left.id < right.id
             }
-            return left.recencyTimestampMilliseconds > right.recencyTimestampMilliseconds
+            return left.recencyEpochMillis > right.recencyEpochMillis
         }
         return ThreadCatalog(
             threads: threadSummaries,

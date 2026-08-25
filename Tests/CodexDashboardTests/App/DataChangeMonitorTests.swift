@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class DashboardDataChangeMonitorTests: XCTestCase {
+final class DataChangeMonitorTests: XCTestCase {
     func testFileAndProjectChangesTriggerTargetedRefreshes() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-file-monitor-\(UUID().uuidString)", isDirectory: true)
@@ -16,7 +16,7 @@ final class DashboardDataChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DashboardDataChangeMonitor()
+        let monitor = DataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var workingTreeRefreshes = 0
@@ -54,7 +54,7 @@ final class DashboardDataChangeMonitorTests: XCTestCase {
         try Data("initial-catalog".utf8).write(to: catalogURL)
         try Data("initial-unread".utf8).write(to: unreadURL)
 
-        let monitor = DashboardDataChangeMonitor()
+        let monitor = DataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         monitor.start(

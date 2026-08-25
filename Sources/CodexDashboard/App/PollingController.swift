@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 @MainActor
-final class DashboardPollingController {
+final class PollingController {
     enum Schedule {
         static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
         static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
@@ -14,10 +14,10 @@ final class DashboardPollingController {
     private var workingTreePollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
-    private let fileChanges: DashboardDataChangeMonitor?
+    private let fileChanges: DataChangeMonitor?
 
     init(observeFileChanges: Bool = true) {
-        fileChanges = observeFileChanges ? DashboardDataChangeMonitor() : nil
+        fileChanges = observeFileChanges ? DataChangeMonitor() : nil
     }
 
     deinit {

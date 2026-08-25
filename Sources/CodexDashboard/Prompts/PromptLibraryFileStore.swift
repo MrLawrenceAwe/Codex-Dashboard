@@ -27,7 +27,7 @@ final class PromptLibraryFileStore {
     func load() throws -> PromptLibraryDocument? {
         guard fileManager.fileExists(atPath: documentURL.path) else { return nil }
         let storedDocument = try JSONDecoder().decode(PromptLibraryDocument.self, from: Data(contentsOf: documentURL))
-        let document = storedDocument.migratingLegacyReasoningEffort
+        let document = PromptLibraryMigration.migrate(storedDocument)
         guard document.isValid else { throw DashboardError.invalidPromptLibrary }
         if document != storedDocument {
             try save(document)
@@ -53,9 +53,10 @@ final class PromptLibraryFileStore {
         let document = try JSONDecoder().decode(
             PromptLibraryDocument.self,
             from: Data(contentsOf: sourceURL)
-        ).migratingLegacyReasoningEffort
-        guard document.isValid else { throw DashboardError.invalidPromptLibrary }
-        try save(document)
+        )
+        let migratedDocument = PromptLibraryMigration.migrate(document)
+        guard migratedDocument.isValid else { throw DashboardError.invalidPromptLibrary }
+        try save(migratedDocument)
     }
 
     func exportDocument(to destinationURL: URL) throws {

@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-struct CodexAccountProfile: Codable, Equatable, Identifiable, Sendable {
+struct SavedAccount: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
     let createdAt: Date
@@ -9,15 +9,21 @@ struct CodexAccountProfile: Codable, Equatable, Identifiable, Sendable {
     var accountIdentifier: String?
 }
 
-struct CodexAccountDocument: Codable, Equatable, Sendable {
+struct SavedAccountsDocument: Codable, Equatable, Sendable {
     static let currentVersion = 3
 
     var version = Self.currentVersion
-    var profiles: [CodexAccountProfile] = []
-    var activeProfileID: UUID?
+    var accounts: [SavedAccount] = []
+    var activeAccountID: UUID?
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case accounts = "profiles"
+        case activeAccountID = "activeProfileID"
+    }
 }
 
-struct DashboardAccountPayload: Codable, Equatable, Sendable {
+struct SavedAccountOption: Codable, Equatable, Sendable {
     let id: String
     let name: String
     let isActive: Bool
@@ -77,14 +83,14 @@ struct DashboardAccountAction: Codable, Equatable, Sendable {
     }
 
     let type: Kind
-    let profileID: UUID?
+    let accountID: UUID?
     let name: String?
 }
 
 enum CodexAccountError: LocalizedError {
     case noActiveCredential
     case missingCredential(String)
-    case invalidProfile
+    case accountNotFound
     case activeTasks
     case accountNameRequired
     case invalidCredential
@@ -97,7 +103,7 @@ enum CodexAccountError: LocalizedError {
             return "Codex is not signed in. Sign in first, then save the account."
         case .missingCredential(let name):
             return "The saved credentials for \(name) are unavailable. Save that account again."
-        case .invalidProfile:
+        case .accountNotFound:
             return "The selected Codex account no longer exists."
         case .activeTasks:
             return "Wait for active Codex tasks to finish before switching accounts."

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-extension DashboardCoordinator {
+extension AppCoordinator {
     func copyDiagnostics() {
         let diagnostics = DashboardDiagnostics(
             dashboardVersion: Bundle.main.object(
