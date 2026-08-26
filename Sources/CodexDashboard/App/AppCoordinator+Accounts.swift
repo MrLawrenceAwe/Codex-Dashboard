@@ -190,11 +190,6 @@ extension AppCoordinator {
         }
     }
 
-    func refreshAllAccountUsage() async {
-        await refreshAccountUsage()
-        await refreshInactiveAccountUsage()
-    }
-
     func refreshSavedAccountUsage(
         _ accountID: UUID,
         reportsFailure: Bool = true
