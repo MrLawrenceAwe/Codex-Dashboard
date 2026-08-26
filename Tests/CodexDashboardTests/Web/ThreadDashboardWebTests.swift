@@ -229,6 +229,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             .fixture(
                 id: "completed",
                 title: "Finished work",
+                isUnread: true,
                 latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: .now)
             ),
         ])
@@ -238,6 +239,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               const row = document.querySelector('[data-thread-id="completed"]');
               return [
                 Boolean(row.querySelector('.dashboard-completed-status')),

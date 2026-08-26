@@ -5,8 +5,8 @@ const threadDashboardState = (() => {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(preferencesKey) || '{}'); } catch (_) {}
     return {
-      filterMode: ['all', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'all',
+      filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'running',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
@@ -57,8 +57,7 @@ const threadDashboardState = (() => {
   }) {
     const query = searchTerm.trim().toLowerCase();
     return threads.filter((thread) => {
-      const matchesFilter = filterMode === 'all'
-        || (filterMode === 'running' && thread.runState === 'running')
+      const matchesFilter = (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));

@@ -31,12 +31,11 @@ const threadDashboardPage = (() => {
         <div class="dashboard-notice" data-commit-notice role="alert" hidden></div>
         <div class="dashboard-section-header">
           <div class="dashboard-toolbar">
-            <label class="dashboard-search" aria-label="Search all threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>
+            <label class="dashboard-search" aria-label="Search visible threads">${threadMarkup.icon('search')}<input type="search" placeholder="Search by title, project, or message" data-dashboard-search /></label>
             <div class="dashboard-toolbar-group dashboard-filter-group">
               <span class="dashboard-control-label">Show</span>
               <div class="dashboard-filters" aria-label="Filter threads">
-                <button type="button" data-filter="all" class="is-active">All <span class="dashboard-filter-count" data-filter-count="all">0</span></button>
-                <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
+                <button type="button" data-filter="running" class="is-active">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
                 <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
                 <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
               </div>

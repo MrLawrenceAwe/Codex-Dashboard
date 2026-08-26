@@ -81,6 +81,37 @@ final class PromptLibraryFileStoreTests: XCTestCase {
         )
     }
 
+    func testBackupRotationPreservesUnrelatedFiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("prompt-backup-rotation-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(
+            documentURL: directory.appendingPathComponent("prompt-library.json"),
+            maximumBackupCount: 1
+        )
+        try store.save(library(model: "gpt-one"))
+        try FileManager.default.createDirectory(
+            at: store.backupDirectoryURL,
+            withIntermediateDirectories: true
+        )
+        let unrelatedURL = store.backupDirectoryURL.appendingPathComponent("keep-me.json")
+        try Data("personal backup".utf8).write(to: unrelatedURL)
+
+        try store.save(library(model: "gpt-two"))
+        try store.save(library(model: "gpt-three"))
+
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: store.backupDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedURL.path))
+        XCTAssertEqual(
+            contents.filter { $0.lastPathComponent.hasPrefix("prompt-library-") }.count,
+            1
+        )
+    }
+
     func testLoadMigratesLegacyLowReasoningEffortAndCreatesBackup() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("prompt-migration-\(UUID().uuidString)", isDirectory: true)
