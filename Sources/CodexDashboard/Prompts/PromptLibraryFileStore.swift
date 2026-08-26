@@ -15,7 +15,7 @@ final class PromptLibraryFileStore {
     ) {
         self.fileManager = fileManager
         self.now = now
-        self.maximumBackupCount = maximumBackupCount
+        self.maximumBackupCount = max(0, maximumBackupCount)
         let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
         let directory = documentURL?.deletingLastPathComponent()
@@ -46,6 +46,7 @@ final class PromptLibraryFileStore {
             try createBackup(with: currentData)
         }
         try data.write(to: documentURL, options: .atomic)
+        pruneBackups()
         return true
     }
 
@@ -79,17 +80,29 @@ final class PromptLibraryFileStore {
             "prompt-library-\(timestamp)-\(UUID().uuidString).json"
         )
         try data.write(to: backupURL, options: .atomic)
-        let backups = try fileManager.contentsOfDirectory(
+    }
+
+    private func pruneBackups() {
+        guard let backups = try? fileManager.contentsOfDirectory(
             at: backupDirectoryURL,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
-        ).sorted { left, right in
+        ).filter(Self.isGeneratedBackup).sorted(by: { left, right in
             let leftDate = try? left.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             let rightDate = try? right.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             return (leftDate ?? .distantPast) > (rightDate ?? .distantPast)
-        }
+        }) else { return }
         for staleBackup in backups.dropFirst(maximumBackupCount) {
-            try fileManager.removeItem(at: staleBackup)
+            try? fileManager.removeItem(at: staleBackup)
         }
+    }
+
+    private static func isGeneratedBackup(_ url: URL) -> Bool {
+        guard url.pathExtension == "json" else { return false }
+        let filename = url.deletingPathExtension().lastPathComponent
+        guard filename.hasPrefix("prompt-library-"), filename.count > 37 else { return false }
+        let separator = filename.index(filename.endIndex, offsetBy: -37)
+        guard filename[separator] == "-" else { return false }
+        return UUID(uuidString: String(filename[filename.index(after: separator)...])) != nil
     }
 }

@@ -167,7 +167,7 @@ extension ThreadDashboardWebTests {
         XCTAssertEqual(values[6] as? String, "3 running, 0 unread, 0 changed projects")
     }
 
-    func testAllFilterIsDefaultAndSearchesIdleCleanThreads() async throws {
+    func testRunningFilterIsDefaultAndAllFilterIsAbsent() async throws {
         let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "running", title: "Active work", runState: .running),
@@ -179,19 +179,19 @@ extension ThreadDashboardWebTests {
             (() => {
               window.__codexDashboard.applySnapshot(\(payload));
               window.__codexDashboard.open();
-              const allIsActive = document.querySelector('[data-filter="all"]').classList.contains('is-active');
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               const search = document.querySelector('[data-dashboard-search]');
               search.value = 'Archived needle';
               search.dispatchEvent(new Event('input', { bubbles: true }));
-              document.querySelector('[data-filter="all"]').click();
+              document.querySelector('[data-filter="running"]').click();
               return [
-                allIsActive,
+                document.querySelector('[data-filter="running"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="all"]') === null,
                 initialIDs,
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter-count="all"]').textContent,
+                document.querySelector('[data-filter-count="running"]').textContent,
               ];
             })()
             """
@@ -199,9 +199,10 @@ extension ThreadDashboardWebTests {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? [String], ["running", "idle"])
-        XCTAssertEqual(values[2] as? [String], ["idle"])
-        XCTAssertEqual(values[3] as? String, "2")
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? [String], ["running"])
+        XCTAssertEqual(values[3] as? [String], [])
+        XCTAssertEqual(values[4] as? String, "1")
     }
 
 }

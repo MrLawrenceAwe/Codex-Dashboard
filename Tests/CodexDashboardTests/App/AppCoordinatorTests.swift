@@ -336,7 +336,8 @@ final class AppCoordinatorTests: XCTestCase {
     ) async throws {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
-        while !(await condition()), clock.now < deadline {
+        while clock.now < deadline {
+            if await condition() { return }
             try await Task.sleep(for: .milliseconds(25))
         }
         let conditionWasMet = await condition()
