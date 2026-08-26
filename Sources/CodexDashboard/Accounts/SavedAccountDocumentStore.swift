@@ -29,15 +29,36 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
             data,
             version: storedVersion ?? 0,
             accountIdentifier: { [vault] accountID in
-                (try? vault.credential(for: accountID))
+                (try? vault.credentialWithoutUserInteraction(for: accountID))
                     .flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
             }
         )
         var document = migration.document
         let original = document
+        if migration.requiresIdentitySynchronization {
+            synchronizeSavedAccountIdentities(in: &document)
+        }
         reconcileActiveAccount(in: &document, allowNameFallback: migration.requiresNameFallback)
-        if document != original || migration.requiresNameFallback { try save(document) }
+        if document != original
+            || migration.requiresNameFallback
+            || migration.requiresIdentitySynchronization
+        {
+            try save(document)
+        }
         return document
+    }
+
+    private func synchronizeSavedAccountIdentities(in document: inout SavedAccountsDocument) {
+        for index in document.accounts.indices {
+            guard
+                let credential = try? vault.credentialWithoutUserInteraction(
+                    for: document.accounts[index].id
+                ),
+                let identity = AccountIdentityDecoder.identity(in: credential)
+            else { continue }
+            document.accounts[index].name = identity.accountName
+            document.accounts[index].accountIdentifier = identity.identifier
+        }
     }
 
     func save(_ document: SavedAccountsDocument) throws {

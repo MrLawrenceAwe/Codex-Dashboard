@@ -5,10 +5,10 @@ extension AppCoordinator {
         savedAccounts.first { $0.id == activeAccountID }?.name
     }
 
-    func saveCurrentAccount(named name: String) {
+    func saveCurrentAccount() {
         do {
             let existingUsage = activeAccountUsageStatus.snapshot
-            let account = try accountManager.saveCurrentAccount(named: name)
+            let account = try accountManager.saveCurrentAccount()
             if let existingUsage { updateUsage(existingUsage, for: account.id) }
             persistAccountUsageCache(force: true)
             setAccountStatus("Saved \(account.name) securely in Keychain.")
@@ -36,6 +36,8 @@ extension AppCoordinator {
             try accountManager.deleteAccount(accountID)
             setAccountStatus("Removed the saved account from Keychain.")
             updateUsage(nil, for: accountID)
+            setRefreshingUsage(false, for: accountID)
+            setUsageError(nil, for: accountID)
             persistAccountUsageCache(force: true)
             refreshAccountState()
             if activeAccountID == nil { setActiveAccountUsageStatus(.unavailable) }
@@ -61,11 +63,7 @@ extension AppCoordinator {
     func handleAccountAction(_ action: DashboardAccountAction) async {
         switch action.type {
         case .save:
-            guard let name = action.name else {
-                setAccountStatus(CodexAccountError.accountNameRequired.localizedDescription)
-                return
-            }
-            saveCurrentAccount(named: name)
+            saveCurrentAccount()
         case .add:
             await beginAddingAccount()
         case .switchAccount:
@@ -221,6 +219,66 @@ extension AppCoordinator {
             setActiveAccountUsageStatus(
                 previous.map(CodexAccountUsageStatus.stale) ?? .unavailable
             )
+        }
+    }
+
+    func refreshInactiveAccountUsage() async {
+        guard !isPerformingAction else { return }
+        for account in savedAccounts where account.id != activeAccountID {
+            guard !Task.isCancelled else { return }
+            await refreshSavedAccountUsage(account.id, reportsFailure: false)
+        }
+    }
+
+    func refreshAllAccountUsage() async {
+        await refreshAccountUsage()
+        await refreshInactiveAccountUsage()
+    }
+
+    func refreshSavedAccountUsage(
+        _ accountID: UUID,
+        reportsFailure: Bool = true
+    ) async {
+        if accountID == activeAccountID {
+            await refreshAccountUsage()
+            return
+        }
+        guard !isPerformingAction,
+              savedAccounts.contains(where: { $0.id == accountID }),
+              refreshingUsageAccountIDs.isEmpty
+        else { return }
+
+        let generation = refreshGeneration
+        setRefreshingUsage(true, for: accountID)
+        defer { setRefreshingUsage(false, for: accountID) }
+        do {
+            let credential = try accountManager.savedCredential(for: accountID)
+            guard let result = try await accountUsageSession.fetchUsage(using: credential) else {
+                return
+            }
+            guard !Task.isCancelled,
+                  generation == refreshGeneration,
+                  accountID != activeAccountID,
+                  savedAccounts.contains(where: { $0.id == accountID })
+            else { return }
+
+            try accountManager.updateSavedCredential(result.credential, for: accountID)
+            updateUsage(
+                CodexAccountUsageSnapshot(usage: result.usage, fetchedAt: .now),
+                for: accountID
+            )
+            setUsageError(nil, for: accountID)
+            persistAccountUsageCache(force: true)
+        } catch {
+            guard !Task.isCancelled,
+                  generation == refreshGeneration,
+                  savedAccounts.contains(where: { $0.id == accountID })
+            else { return }
+            setUsageError(error.localizedDescription, for: accountID)
+            if reportsFailure,
+               let account = savedAccounts.first(where: { $0.id == accountID }) {
+                setAccountStatus("Could not update usage for \(account.name): \(error.localizedDescription)")
+            }
         }
     }
 

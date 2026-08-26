@@ -10,7 +10,7 @@ struct SavedAccount: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct SavedAccountsDocument: Codable, Equatable, Sendable {
-    static let currentVersion = 3
+    static let currentVersion = 4
 
     var version = Self.currentVersion
     var accounts: [SavedAccount] = []
@@ -84,7 +84,6 @@ struct DashboardAccountAction: Codable, Equatable, Sendable {
 
     let type: Kind
     let accountID: UUID?
-    let name: String?
 }
 
 enum CodexAccountError: LocalizedError {
@@ -92,7 +91,7 @@ enum CodexAccountError: LocalizedError {
     case missingCredential(String)
     case accountNotFound
     case activeTasks
-    case accountNameRequired
+    case accountIdentityUnavailable
     case invalidCredential
     case keychain(OSStatus)
     case recoveryFailed(String)
@@ -108,8 +107,8 @@ enum CodexAccountError: LocalizedError {
             return "The selected Codex account no longer exists."
         case .activeTasks:
             return "Wait for active Codex tasks to finish before switching accounts."
-        case .accountNameRequired:
-            return "Enter a name for this Codex account."
+        case .accountIdentityUnavailable:
+            return "Codex could not read the signed-in account identity. Sign in again, then save the account."
         case .invalidCredential:
             return "Codex authentication data is invalid and was not saved or activated."
         case .keychain(let status):

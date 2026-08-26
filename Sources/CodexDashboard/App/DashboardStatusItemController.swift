@@ -12,6 +12,9 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private var connectionStateCancellable: AnyCancellable?
     private var accountUsageCancellable: AnyCancellable?
+    private var savedAccountUsageCancellable: AnyCancellable?
+    private var accountUsageProgressCancellable: AnyCancellable?
+    private var accountUsageErrorCancellable: AnyCancellable?
     private weak var accountsMenuItem: NSMenuItem?
 
     init(
@@ -34,6 +37,15 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             self?.updateIcon(for: state)
         }
         accountUsageCancellable = coordinator.$activeAccountUsageStatus
+            .dropFirst()
+            .sink { [weak self] _ in self?.refreshAccountsMenu() }
+        savedAccountUsageCancellable = coordinator.$usageByAccountID
+            .dropFirst()
+            .sink { [weak self] _ in self?.refreshAccountsMenu() }
+        accountUsageProgressCancellable = coordinator.$refreshingUsageAccountIDs
+            .dropFirst()
+            .sink { [weak self] _ in self?.refreshAccountsMenu() }
+        accountUsageErrorCancellable = coordinator.$usageErrorsByAccountID
             .dropFirst()
             .sink { [weak self] _ in self?.refreshAccountsMenu() }
     }
@@ -140,9 +152,31 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
                     staleLabel: "Cached usage"
                 )
             } else {
-                usageTitles = ["Usage: switch to refresh"]
+                usageTitles = ["Usage details unavailable"]
             }
             addUsageItems(usageTitles, to: menu)
+            if !isActive {
+                let isRefreshing = coordinator.refreshingUsageAccountIDs.contains(account.id)
+                let update = actionItem(
+                    isRefreshing ? "Updating Usage…" : "Update Usage",
+                    action: #selector(updateAccountUsage(_:))
+                )
+                update.representedObject = account.id.uuidString
+                update.indentationLevel = 1
+                update.isEnabled = coordinator.refreshingUsageAccountIDs.isEmpty
+                    && !coordinator.isPerformingAction
+                menu.addItem(update)
+                if let error = coordinator.usageErrorsByAccountID[account.id] {
+                    let failure = NSMenuItem(
+                        title: "Update failed: \(error)",
+                        action: nil,
+                        keyEquivalent: ""
+                    )
+                    failure.indentationLevel = 1
+                    failure.isEnabled = false
+                    menu.addItem(failure)
+                }
+            }
             if index < coordinator.savedAccounts.count - 1 { menu.addItem(.separator()) }
         }
         if coordinator.activeAccountID == nil {
@@ -157,7 +191,17 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             )
         }
         menu.addItem(.separator())
-        let save = actionItem("Save Current Account…", action: #selector(saveCurrentAccount))
+        if coordinator.savedAccounts.count > 1 {
+            let updateAll = actionItem(
+                "Update All Usage",
+                action: #selector(updateAllAccountUsage)
+            )
+            updateAll.isEnabled = !coordinator.isPerformingAction
+                && coordinator.refreshingUsageAccountIDs.isEmpty
+            menu.addItem(updateAll)
+            menu.addItem(.separator())
+        }
+        let save = actionItem("Save Current Account", action: #selector(saveCurrentAccount))
         save.isEnabled = !coordinator.isPerformingAction
         menu.addItem(save)
         let add = actionItem("Sign In to Another Account…", action: #selector(addAccount))
@@ -216,20 +260,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func saveCurrentAccount() {
-        let alert = NSAlert()
-        alert.messageText = coordinator.activeAccountName == nil
-            ? "Save Current Codex Account"
-            : "Rename and Update Saved Account"
-        alert.informativeText = "Credentials are stored in macOS Keychain and are never written to the dashboard's settings file."
-        let field = NSTextField(string: coordinator.activeAccountName ?? "")
-        field.placeholderString = "Account Name"
-        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        coordinator.saveCurrentAccount(named: field.stringValue)
+        coordinator.saveCurrentAccount()
     }
 
     @objc private func addAccount() {
@@ -249,6 +280,18 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             let accountID = UUID(uuidString: identifier)
         else { return }
         Task { await coordinator.switchAccount(to: accountID) }
+    }
+
+    @objc private func updateAccountUsage(_ sender: NSMenuItem) {
+        guard
+            let identifier = sender.representedObject as? String,
+            let accountID = UUID(uuidString: identifier)
+        else { return }
+        Task { await coordinator.refreshSavedAccountUsage(accountID) }
+    }
+
+    @objc private func updateAllAccountUsage() {
+        Task { await coordinator.refreshAllAccountUsage() }
     }
 
     @objc private func forgetAccount(_ sender: NSMenuItem) {

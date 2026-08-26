@@ -119,7 +119,32 @@ struct StubAccountUsageProvider: AccountUsageProviding {
         CodexAccountUsage(fiveHour: nil, weekly: nil)
     }
 
+    func usage(using credential: Data) async throws -> SavedAccountUsageResult {
+        SavedAccountUsageResult(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: nil),
+            credential: credential
+        )
+    }
+
     func reset() async {}
+}
+
+func testAccountCredential(accountID: String, name: String) -> Data {
+    let claims: [String: Any] = [
+        "name": name,
+        "https://api.openai.com/auth": ["chatgpt_account_id": accountID],
+    ]
+    let payload = try! JSONSerialization.data(withJSONObject: claims)
+        .base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+    return try! JSONSerialization.data(withJSONObject: [
+        "tokens": [
+            "account_id": accountID,
+            "id_token": "header.\(payload).signature",
+        ],
+    ])
 }
 
 actor RecordingAccountUsageProvider: AccountUsageProviding {
@@ -128,6 +153,14 @@ actor RecordingAccountUsageProvider: AccountUsageProviding {
     func usage() -> CodexAccountUsage {
         requestCount += 1
         return CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func usage(using credential: Data) -> SavedAccountUsageResult {
+        requestCount += 1
+        return SavedAccountUsageResult(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: nil),
+            credential: credential
+        )
     }
 
     func reset() {}
@@ -149,6 +182,10 @@ actor SequencedAccountUsageProvider: AccountUsageProviding {
         return usage
     }
 
+    func usage(using credential: Data) async throws -> SavedAccountUsageResult {
+        SavedAccountUsageResult(usage: try await usage(), credential: credential)
+    }
+
     func reset() async {}
 }
 
@@ -161,6 +198,14 @@ actor SuspendedAccountUsageProvider: AccountUsageProviding {
         return await withCheckedContinuation { continuation = $0 }
     }
 
+    func usage(using credential: Data) async -> SavedAccountUsageResult {
+        requestCount += 1
+        return SavedAccountUsageResult(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: nil),
+            credential: credential
+        )
+    }
+
     func reset() async {}
 
     func resume(with usage: CodexAccountUsage) {
@@ -169,6 +214,33 @@ actor SuspendedAccountUsageProvider: AccountUsageProviding {
     }
 
     func count() -> Int { requestCount }
+}
+
+actor SavedAccountRecordingUsageProvider: AccountUsageProviding {
+    private let usageResult: CodexAccountUsage
+    private let refreshedCredential: Data
+    private(set) var receivedCredentials: [Data] = []
+
+    init(usage: CodexAccountUsage, refreshedCredential: Data) {
+        usageResult = usage
+        self.refreshedCredential = refreshedCredential
+    }
+
+    func usage() -> CodexAccountUsage {
+        CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func usage(using credential: Data) -> SavedAccountUsageResult {
+        receivedCredentials.append(credential)
+        return SavedAccountUsageResult(
+            usage: usageResult,
+            credential: refreshedCredential
+        )
+    }
+
+    func reset() {}
+
+    func credentials() -> [Data] { receivedCredentials }
 }
 
 actor SequencedCompatibilityChecker: LocalCompatibilityChecking {
@@ -189,6 +261,10 @@ final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked
     private let lock = NSLock()
 
     func credential(for accountID: UUID) -> Data? {
+        lock.withLock { values[accountID] }
+    }
+
+    func credentialWithoutUserInteraction(for accountID: UUID) -> Data? {
         lock.withLock { values[accountID] }
     }
 

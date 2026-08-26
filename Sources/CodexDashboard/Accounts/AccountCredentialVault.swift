@@ -4,6 +4,7 @@ import Security
 
 protocol AccountCredentialVault: Sendable {
     func credential(for accountID: UUID) throws -> Data?
+    func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data?
     func store(_ credential: Data, for accountID: UUID) throws
     func deleteCredential(for accountID: UUID) throws
 }
@@ -15,11 +16,32 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
     private let authenticationPrompt = "Use Touch ID to switch Codex accounts"
 
     func credential(for accountID: UUID) throws -> Data? {
-        if let credential = try readCredential(
-            for: accountID,
-            service: service,
-            authenticationContext: nil
-        ) {
+        try credential(for: accountID, interactionAllowed: true)
+    }
+
+    func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data? {
+        try credential(for: accountID, interactionAllowed: false)
+    }
+
+    private func credential(
+        for accountID: UUID,
+        interactionAllowed: Bool
+    ) throws -> Data? {
+        let currentCredential: Data?
+        do {
+            currentCredential = try readCredential(
+                for: accountID,
+                service: service,
+                authenticationContext: interactionAllowed
+                    ? nil
+                    : authenticationContext(interactionAllowed: false)
+            )
+        } catch CodexAccountError.keychain(let status)
+            where !interactionAllowed && Self.requiresUserInteraction(status)
+        {
+            return nil
+        }
+        if let credential = currentCredential {
             return credential
         }
 
@@ -32,15 +54,27 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
             previousCredential = try readCredential(
                 for: accountID,
                 service: previousUserPresenceService,
-                authenticationContext: authenticationContext()
+                authenticationContext: authenticationContext(
+                    interactionAllowed: interactionAllowed
+                )
             )
         } catch CodexAccountError.keychain(let status) where status == errSecMissingEntitlement {
+            return nil
+        } catch CodexAccountError.keychain(let status)
+            where !interactionAllowed && Self.requiresUserInteraction(status)
+        {
             return nil
         }
         guard let previousCredential else { return nil }
         try store(previousCredential, for: accountID)
         deletePreviousCredentialWithoutPrompt(for: accountID)
         return previousCredential
+    }
+
+    private static func requiresUserInteraction(_ status: OSStatus) -> Bool {
+        status == errSecInteractionNotAllowed
+            || status == errSecAuthFailed
+            || status == errSecUserCanceled
     }
 
     func store(_ credential: Data, for accountID: UUID) throws {

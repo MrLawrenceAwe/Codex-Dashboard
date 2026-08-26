@@ -23,7 +23,7 @@ const threadDashboardPage = (() => {
                 <option value="">Current account</option>
               </select>
             </label>
-            <button type="button" data-account-save>Save</button>
+            <button type="button" data-account-save>Save account</button>
             <button type="button" data-account-add>Add account</button>
           </div>
         </header>
@@ -58,9 +58,7 @@ const threadDashboardPage = (() => {
       if (event.target.value) onAccountAction({ type: 'switch', accountID: event.target.value });
     });
     page.querySelector('[data-account-save]').addEventListener('click', () => {
-      const currentName = page.querySelector('[data-account-select] option:checked')?.textContent || '';
-      const name = window.prompt('Name this Codex account', currentName === 'Current account' ? '' : currentName);
-      if (name?.trim()) onAccountAction({ type: 'save', name: name.trim() });
+      onAccountAction({ type: 'save' });
     });
     page.querySelector('[data-account-add]').addEventListener('click', () => {
       if (window.confirm('Restart Codex signed out so you can add another account?')) {

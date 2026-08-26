@@ -104,13 +104,14 @@ extension AppCoordinatorTests {
         try FileManager.default.createDirectory(
             at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        try testAccountCredential(accountID: "account-lawrence", name: "Lawrence")
+            .write(to: authenticationURL)
         let accountManager = CodexAccountManager(
             metadataURL: directory.appendingPathComponent("support/accounts.json"),
             authenticationURL: authenticationURL,
             vault: CoordinatorMemoryCredentialVault()
         )
-        let account = try accountManager.saveCurrentAccount(named: "Lawrence")
+        let account = try accountManager.saveCurrentAccount()
         let snapshot = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: nil),
@@ -144,13 +145,14 @@ extension AppCoordinatorTests {
         try FileManager.default.createDirectory(
             at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        try testAccountCredential(accountID: "account-lawrence", name: "Lawrence")
+            .write(to: authenticationURL)
         let accountManager = CodexAccountManager(
             metadataURL: metadataURL,
             authenticationURL: authenticationURL,
             vault: CoordinatorMemoryCredentialVault()
         )
-        _ = try accountManager.saveCurrentAccount(named: "Lawrence")
+        _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime()
         let coordinator = AppCoordinator(
             catalogProvider: StubCatalogProvider(
@@ -186,16 +188,20 @@ extension AppCoordinatorTests {
         try FileManager.default.createDirectory(
             at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        try Data(#"{"account":"lawrence"}"#.utf8).write(to: authenticationURL)
+        let lawrenceCredential = testAccountCredential(
+            accountID: "account-lawrence", name: "Lawrence"
+        )
+        try lawrenceCredential.write(to: authenticationURL)
         let accountManager = CodexAccountManager(
             metadataURL: metadataURL,
             authenticationURL: authenticationURL,
             vault: CoordinatorMemoryCredentialVault()
         )
-        let lawrence = try accountManager.saveCurrentAccount(named: "Lawrence")
+        let lawrence = try accountManager.saveCurrentAccount()
         _ = try accountManager.beginAddingAccount()
-        try Data(#"{"account":"mum"}"#.utf8).write(to: authenticationURL)
-        _ = try accountManager.saveCurrentAccount(named: "Mum")
+        let mumCredential = testAccountCredential(accountID: "account-mum", name: "Mum")
+        try mumCredential.write(to: authenticationURL)
+        _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime(synchronizationError: AccountTestError.mountFailed)
         let coordinator = AppCoordinator(
             catalogProvider: StubCatalogProvider(
@@ -212,7 +218,7 @@ extension AppCoordinatorTests {
         await coordinator.switchAccount(to: lawrence.id)
 
         XCTAssertEqual(try accountManager.document().activeAccountID, lawrence.id)
-        XCTAssertEqual(try Data(contentsOf: authenticationURL), Data(#"{"account":"lawrence"}"#.utf8))
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), lawrenceCredential)
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(runtime.synchronizeCallCount, 1)
         XCTAssertEqual(coordinator.connectionState, .rendererAvailable)
@@ -231,16 +237,18 @@ extension AppCoordinatorTests {
         try FileManager.default.createDirectory(
             at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        try Data(#"{"account":"first"}"#.utf8).write(to: authenticationURL)
+        let firstCredential = testAccountCredential(accountID: "account-first", name: "First")
+        try firstCredential.write(to: authenticationURL)
         let accountManager = CodexAccountManager(
             metadataURL: metadataURL,
             authenticationURL: authenticationURL,
             vault: CoordinatorMemoryCredentialVault()
         )
-        let first = try accountManager.saveCurrentAccount(named: "First")
+        let first = try accountManager.saveCurrentAccount()
         _ = try accountManager.beginAddingAccount()
-        try Data(#"{"account":"second"}"#.utf8).write(to: authenticationURL)
-        _ = try accountManager.saveCurrentAccount(named: "Second")
+        let secondCredential = testAccountCredential(accountID: "account-second", name: "Second")
+        try secondCredential.write(to: authenticationURL)
+        _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime(
             restartError: AccountTestError.mountFailed,
             onRestart: {
@@ -268,12 +276,70 @@ extension AppCoordinatorTests {
         )
         XCTAssertEqual(
             try Data(contentsOf: authenticationURL),
-            Data(#"{"account":"first"}"#.utf8)
+            firstCredential
         )
     }
 
     func testAccountUsagePollingScheduleRefreshesEveryThirtySeconds() {
         XCTAssertEqual(PollingController.Schedule.accountUsage, .seconds(30))
+    }
+
+    func testInactiveAccountUsagePollingScheduleRefreshesEveryFiveMinutes() {
+        XCTAssertEqual(PollingController.Schedule.inactiveAccountUsage, .seconds(5 * 60))
+    }
+
+    func testInactiveAccountUsageRefreshDoesNotSwitchActiveAccount() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorInactiveUsageTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let firstCredential = testAccountCredential(accountID: "account-first", name: "First")
+        let secondCredential = testAccountCredential(accountID: "account-second", name: "Second")
+        let refreshedFirstCredential = testAccountCredential(
+            accountID: "account-first", name: "First Refreshed"
+        )
+        try firstCredential.write(to: authenticationURL)
+        let vault = CoordinatorMemoryCredentialVault()
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: vault
+        )
+        let first = try accountManager.saveCurrentAccount()
+        _ = try accountManager.beginAddingAccount()
+        try secondCredential.write(to: authenticationURL)
+        let second = try accountManager.saveCurrentAccount()
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 22, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 44, resetsAt: nil)
+        )
+        let provider = SavedAccountRecordingUsageProvider(
+            usage: usage,
+            refreshedCredential: refreshedFirstCredential
+        )
+        let coordinator = AppCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: accountManager,
+            accountUsageProvider: provider,
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+        )
+
+        await coordinator.refreshSavedAccountUsage(first.id)
+        let receivedCredentials = await provider.credentials()
+
+        XCTAssertEqual(coordinator.activeAccountID, second.id)
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
+        XCTAssertEqual(receivedCredentials, [firstCredential])
+        XCTAssertEqual(vault.credential(for: first.id), refreshedFirstCredential)
+        XCTAssertEqual(coordinator.usageByAccountID[first.id]?.usage, usage)
+        XCTAssertNil(coordinator.usageErrorsByAccountID[first.id])
     }
 
 }
