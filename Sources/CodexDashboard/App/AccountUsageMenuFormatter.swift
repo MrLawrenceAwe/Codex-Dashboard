@@ -4,20 +4,40 @@ enum AccountUsageMenuFormatter {
     static func titles(
         for status: CodexAccountUsageStatus,
         now: Date = .now,
-        staleLabel: String = "Usage may be stale"
+        staleLabel: String = "Usage may be stale",
+        locale: Locale = .current,
+        timeZone: TimeZone = .current
     ) -> [String] {
         var titles: [String] = []
         if let snapshot = status.snapshot {
             if let window = snapshot.usage.fiveHour {
-                titles.append(windowTitle("5-hour", window: window, now: now))
+                titles.append(windowTitle(
+                    "5-hour",
+                    window: window,
+                    now: now,
+                    locale: locale,
+                    timeZone: timeZone
+                ))
             }
             if let window = snapshot.usage.weekly {
-                titles.append(windowTitle("Weekly", window: window, now: now))
+                titles.append(windowTitle(
+                    "Weekly",
+                    window: window,
+                    now: now,
+                    locale: locale,
+                    timeZone: timeZone
+                ))
             }
             if let resets = snapshot.usage.bankedResets {
                 var title = "Banked resets: \(max(0, resets.availableCount)) available"
                 if resets.availableCount > 0, let expiration = resets.nextExpiration {
-                    title += " · next expires \(relativeTime(until: expiration, now: now))"
+                    let deadline = deadlineDescription(
+                        expiration,
+                        now: now,
+                        locale: locale,
+                        timeZone: timeZone
+                    )
+                    title += " · next expires \(deadline)"
                 }
                 titles.append(title)
             }
@@ -39,14 +59,39 @@ enum AccountUsageMenuFormatter {
     private static func windowTitle(
         _ label: String,
         window: CodexUsageWindow,
-        now: Date
+        now: Date,
+        locale: Locale,
+        timeZone: TimeZone
     ) -> String {
         let remaining = 100 - min(100, max(0, window.usedPercent))
         var title = "\(label): \(remaining)% remaining"
         if let resetsAt = window.resetsAt {
-            title += " · resets \(relativeTime(until: resetsAt, now: now))"
+            let deadline = deadlineDescription(
+                resetsAt,
+                now: now,
+                locale: locale,
+                timeZone: timeZone
+            )
+            title += " · resets \(deadline)"
         }
         return title
+    }
+
+    private static func deadlineDescription(
+        _ date: Date,
+        now: Date,
+        locale: Locale,
+        timeZone: TimeZone
+    ) -> String {
+        let absolute = date.formatted(
+            Date.FormatStyle(
+                date: .abbreviated,
+                time: .shortened,
+                locale: locale,
+                timeZone: timeZone
+            )
+        )
+        return "\(relativeTime(until: date, now: now)) (\(absolute))"
     }
 
     private static func relativeTime(until date: Date, now: Date) -> String {

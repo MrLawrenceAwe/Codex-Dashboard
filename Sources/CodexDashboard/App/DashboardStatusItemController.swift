@@ -193,8 +193,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         if coordinator.savedAccounts.count > 1 {
             let updateAll = actionItem(
-                "Update All Usage",
-                action: #selector(updateAllAccountUsage)
+                "Update Signed-Out Usage",
+                action: #selector(updateSignedOutAccountUsage)
             )
             updateAll.isEnabled = !coordinator.isPerformingAction
                 && coordinator.refreshingUsageAccountIDs.isEmpty
@@ -290,8 +290,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         Task { await coordinator.refreshSavedAccountUsage(accountID) }
     }
 
-    @objc private func updateAllAccountUsage() {
-        Task { await coordinator.refreshAllAccountUsage() }
+    @objc private func updateSignedOutAccountUsage() {
+        Task { await coordinator.refreshInactiveAccountUsage() }
     }
 
     @objc private func forgetAccount(_ sender: NSMenuItem) {

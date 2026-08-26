@@ -42,13 +42,15 @@ final class DashboardStatusItemControllerTests: XCTestCase {
 
         let titles = AccountUsageMenuFormatter.titles(
             for: .available(CodexAccountUsageSnapshot(usage: usage, fetchedAt: now)),
-            now: now
+            now: now,
+            locale: Locale(identifier: "en_GB"),
+            timeZone: TimeZone(secondsFromGMT: 0)!
         )
 
         XCTAssertEqual(titles, [
-            "5-hour: 82% remaining · resets in 2h 15m",
-            "Weekly: 58% remaining · resets in 3d 4h",
-            "Banked resets: 2 available · next expires in 1d",
+            "5-hour: 82% remaining · resets in 2h 15m (18 May 2033 at 5:48)",
+            "Weekly: 58% remaining · resets in 3d 4h (21 May 2033 at 7:33)",
+            "Banked resets: 2 available · next expires in 1d (19 May 2033 at 3:33)",
         ])
     }
 
