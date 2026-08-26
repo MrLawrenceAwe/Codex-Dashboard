@@ -75,8 +75,10 @@ struct ThreadWireModel: Codable, Equatable, Sendable {
 
 struct DashboardSnapshot: Codable, Equatable, Sendable {
     let threads: [ThreadWireModel]
+    let accountPopover: AccountPopoverSnapshot?
 
-    init(threads: [ThreadSummary]) {
+    init(threads: [ThreadSummary], accountPopover: AccountPopoverSnapshot? = nil) {
         self.threads = threads.map(ThreadWireModel.init)
+        self.accountPopover = accountPopover
     }
 }

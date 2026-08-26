@@ -158,6 +158,7 @@ const dashboardLifecycle = (() => {
     attachPage();
     syncContentInset();
     promptLibrary.mount();
+    accountPopover.mount();
     if (hooks.isOpen() && pageWasMissing) hooks.open();
 
     if (!structureObserver) {
@@ -199,6 +200,7 @@ const dashboardLifecycle = (() => {
     pendingUnreadSync = false;
     pendingHostRebind = false;
     promptLibrary.unmount();
+    accountPopover.unmount();
     document.documentElement.classList.remove('codex-dashboard-open');
     document.documentElement.style.removeProperty('--codex-dashboard-content-left');
     Object.values(dashboardElements.elementIDs).forEach((id) => document.getElementById(id)?.remove());

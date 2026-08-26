@@ -272,6 +272,10 @@ final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked
         lock.withLock { values[accountID] = credential }
     }
 
+    func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) {
+        lock.withLock { values[accountID] = credential }
+    }
+
     func deleteCredential(for accountID: UUID) {
         _ = lock.withLock { values.removeValue(forKey: accountID) }
     }

@@ -13,6 +13,7 @@
     "Prompts/prompt-library-dialog",
     "Prompts/prompt-library-view",
     "Prompts/prompt-library-controller",
+    "Accounts/account-popover",
     "Threads/thread-markup",
     "Threads/thread-state",
     "Threads/thread-view",
@@ -23,7 +24,8 @@
   ],
   "stylesheets": [
     "Threads/thread-dashboard",
-    "Prompts/prompt-library"
+    "Prompts/prompt-library",
+    "Accounts/account-popover"
   ],
   "contracts": {
     "renderer": [

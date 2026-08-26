@@ -331,7 +331,7 @@ extension AppCoordinatorTests {
             runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
         )
 
-        await coordinator.refreshSavedAccountUsage(first.id)
+        _ = await coordinator.refreshSavedAccountUsage(first.id)
         let receivedCredentials = await provider.credentials()
 
         XCTAssertEqual(coordinator.activeAccountID, second.id)

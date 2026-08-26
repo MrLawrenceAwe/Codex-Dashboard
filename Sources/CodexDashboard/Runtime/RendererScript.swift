@@ -36,10 +36,14 @@ enum RendererScript {
           const dashboard = window.__codexDashboard;
           if (typeof dashboard?.applySnapshot !== 'function') return false;
           dashboard.applySnapshot(\(json));
+          dashboard.applyAccountPopoverSnapshot?.((\(json)).accountPopover);
           return true;
         })()
         """
     }
+
+    static let consumeAccountPopoverAction =
+        "window.__codexDashboard?.consumeAccountPopoverAction?.() ?? null"
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 

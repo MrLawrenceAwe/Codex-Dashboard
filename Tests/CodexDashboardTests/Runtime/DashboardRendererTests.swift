@@ -185,8 +185,48 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
     }
 }
 
+actor AccountPopoverRendererDevTools: DevToolsServing {
+    private let target: DevToolsTarget
+    private let action: String?
+
+    init(target: DevToolsTarget, action: String?) {
+        self.target = target
+        self.action = action
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] { [target] }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
+
+    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+        action
+    }
+}
+
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testConsumesAccountPopoverActionFromRenderer() async throws {
+        let accountID = UUID()
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = AccountPopoverRendererDevTools(
+            target: target,
+            action: "{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
+        )
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
+        )
+
+        let action = await renderer.consumeAccountPopoverAction()
+
+        XCTAssertEqual(action, AccountPopoverAction(kind: .updateUsage, accountID: accountID))
+    }
+
     func testOpeningThreadDispatchesItsRoute() async throws {
         let target = DevToolsTarget(
             id: "main",
