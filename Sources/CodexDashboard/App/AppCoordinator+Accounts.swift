@@ -1,6 +1,48 @@
 import Foundation
 
+enum SavedAccountUsageRefreshOutcome: Equatable {
+    case completed
+    case authorizationRequired
+}
+
 extension AppCoordinator {
+    func handleAccountPopoverAction() async {
+        guard !isPerformingAction,
+              let action = await dashboardRuntime?.consumeAccountPopoverAction()
+        else { return }
+        switch action.kind {
+        case .updateUsage:
+            guard let accountID = action.accountID else { return }
+            _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
+        case .updateSignedOutUsage:
+            for account in savedAccounts where account.id != activeAccountID {
+                _ = await refreshSavedAccountUsage(account.id, interactionAllowed: true)
+            }
+        case .saveCurrentAccount:
+            saveCurrentAccount()
+        case .switchAccount:
+            guard let accountID = action.accountID else { return }
+            await switchAccount(to: accountID)
+        case .addAccount:
+            await beginAddingAccount()
+        case .forgetAccount:
+            guard let accountID = action.accountID else { return }
+            deleteAccount(accountID)
+        }
+        await publishSnapshotIfMaintainedForAccounts()
+    }
+
+    private func publishSnapshotIfMaintainedForAccounts() async {
+        guard let dashboardRuntime, dashboardRuntime.maintainsDashboard else { return }
+        let targets = await dashboardRuntime.rendererTargets()
+        guard !targets.isEmpty else { return }
+        try? await dashboardRuntime.synchronizeDashboard(
+            with: dashboardSnapshotPayload(),
+            on: targets,
+            forceRemount: false
+        )
+    }
+
     var activeAccountName: String? {
         savedAccounts.first { $0.id == activeAccountID }?.name
     }
@@ -57,7 +99,37 @@ extension AppCoordinator {
     }
 
     func dashboardSnapshotPayload() -> DashboardSnapshot {
-        DashboardSnapshot(threads: threads)
+        DashboardSnapshot(threads: threads, accountPopover: accountPopoverSnapshot())
+    }
+
+    private func accountPopoverSnapshot() -> AccountPopoverSnapshot {
+        AccountPopoverSnapshot(
+            accounts: savedAccounts.map { account in
+                let isActive = account.id == activeAccountID
+                let usageStatus: CodexAccountUsageStatus
+                if isActive {
+                    usageStatus = activeAccountUsageStatus
+                } else if let snapshot = usageByAccountID[account.id] {
+                    usageStatus = .stale(snapshot)
+                } else {
+                    usageStatus = .unavailable
+                }
+                return AccountPopoverItem(
+                    id: account.id,
+                    name: account.name,
+                    isActive: isActive,
+                    usageLines: AccountPopoverUsageFormatter.titles(
+                        for: usageStatus,
+                        staleLabel: isActive ? "Usage may be stale" : "Cached usage"
+                    ),
+                    isRefreshing: refreshingUsageAccountIDs.contains(account.id),
+                    errorMessage: usageErrorsByAccountID[account.id]
+                )
+            },
+            activeAccountID: activeAccountID,
+            statusMessage: accountStatusMessage,
+            isBusy: isPerformingAction || !refreshingUsageAccountIDs.isEmpty
+        )
     }
 
     private func performAccountTransition(
@@ -186,55 +258,65 @@ extension AppCoordinator {
         guard !isPerformingAction else { return }
         for account in savedAccounts where account.id != activeAccountID {
             guard !Task.isCancelled else { return }
-            await refreshSavedAccountUsage(account.id, reportsFailure: false)
+            _ = await refreshSavedAccountUsage(account.id, reportsFailure: false)
         }
     }
 
     func refreshSavedAccountUsage(
         _ accountID: UUID,
-        reportsFailure: Bool = true
-    ) async {
+        reportsFailure: Bool = true,
+        interactionAllowed: Bool = false
+    ) async -> SavedAccountUsageRefreshOutcome {
         if accountID == activeAccountID {
             await refreshAccountUsage()
-            return
+            return .completed
         }
         guard !isPerformingAction,
               savedAccounts.contains(where: { $0.id == accountID }),
               refreshingUsageAccountIDs.isEmpty
-        else { return }
+        else { return .completed }
 
         let generation = refreshGeneration
         setRefreshingUsage(true, for: accountID)
         defer { setRefreshingUsage(false, for: accountID) }
         do {
-            let credential = try accountManager.savedCredential(for: accountID)
+            let credential = try interactionAllowed
+                ? accountManager.savedCredentialAllowingUserInteraction(for: accountID)
+                : accountManager.savedCredentialWithoutUserInteraction(for: accountID)
             guard let result = try await accountUsageSession.fetchUsage(using: credential) else {
-                return
+                return .completed
             }
             guard !Task.isCancelled,
                   generation == refreshGeneration,
                   accountID != activeAccountID,
                   savedAccounts.contains(where: { $0.id == accountID })
-            else { return }
+            else { return .completed }
 
-            try accountManager.updateSavedCredential(result.credential, for: accountID)
+            try accountManager.updateSavedCredential(
+                result.credential,
+                for: accountID,
+                interactionAllowed: interactionAllowed
+            )
             updateUsage(
                 CodexAccountUsageSnapshot(usage: result.usage, fetchedAt: .now),
                 for: accountID
             )
             setUsageError(nil, for: accountID)
             persistAccountUsageCache(force: true)
+        } catch CodexAccountError.keychainAuthorizationRequired {
+            return .authorizationRequired
         } catch {
             guard !Task.isCancelled,
                   generation == refreshGeneration,
                   savedAccounts.contains(where: { $0.id == accountID })
-            else { return }
+            else { return .completed }
             setUsageError(error.localizedDescription, for: accountID)
             if reportsFailure,
                let account = savedAccounts.first(where: { $0.id == accountID }) {
                 setAccountStatus("Could not update usage for \(account.name): \(error.localizedDescription)")
             }
         }
+        return .completed
     }
 
     func persistAccountUsageCache(force: Bool = false, now: Date = .now) {

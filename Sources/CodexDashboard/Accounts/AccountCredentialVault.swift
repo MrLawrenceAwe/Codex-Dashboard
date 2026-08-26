@@ -6,6 +6,7 @@ protocol AccountCredentialVault: Sendable {
     func credential(for accountID: UUID) throws -> Data?
     func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data?
     func store(_ credential: Data, for accountID: UUID) throws
+    func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) throws
     func deleteCredential(for accountID: UUID) throws
 }
 
@@ -34,12 +35,13 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
                 service: service,
                 authenticationContext: interactionAllowed
                     ? nil
-                    : authenticationContext(interactionAllowed: false)
+                    : authenticationContext(interactionAllowed: false),
+                interactionAllowed: interactionAllowed
             )
         } catch CodexAccountError.keychain(let status)
             where !interactionAllowed && Self.requiresUserInteraction(status)
         {
-            return nil
+            throw CodexAccountError.keychainAuthorizationRequired
         }
         if let credential = currentCredential {
             return credential
@@ -56,16 +58,22 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
                 service: previousUserPresenceService,
                 authenticationContext: authenticationContext(
                     interactionAllowed: interactionAllowed
-                )
+                ),
+                interactionAllowed: interactionAllowed
             )
         } catch CodexAccountError.keychain(let status) where status == errSecMissingEntitlement {
             return nil
         } catch CodexAccountError.keychain(let status)
             where !interactionAllowed && Self.requiresUserInteraction(status)
         {
+            throw CodexAccountError.keychainAuthorizationRequired
+        }
+        guard let previousCredential else {
+            if !interactionAllowed {
+                throw CodexAccountError.keychainAuthorizationRequired
+            }
             return nil
         }
-        guard let previousCredential else { return nil }
         try store(previousCredential, for: accountID)
         deletePreviousCredentialWithoutPrompt(for: accountID)
         return previousCredential
@@ -78,7 +86,20 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
     }
 
     func store(_ credential: Data, for accountID: UUID) throws {
-        let updateQuery = baseQuery(for: accountID, service: service)
+        try store(credential, for: accountID, interactionAllowed: true)
+    }
+
+    func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) throws {
+        try store(credential, for: accountID, interactionAllowed: false)
+    }
+
+    private func store(
+        _ credential: Data,
+        for accountID: UUID,
+        interactionAllowed: Bool
+    ) throws {
+        var updateQuery = baseQuery(for: accountID, service: service)
+        configureAuthentication(in: &updateQuery, interactionAllowed: interactionAllowed)
         let updateStatus = SecItemUpdate(
             updateQuery as CFDictionary,
             [kSecValueData as String: credential] as CFDictionary
@@ -91,6 +112,7 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         }
 
         var addition = baseQuery(for: accountID, service: service)
+        configureAuthentication(in: &addition, interactionAllowed: interactionAllowed)
         addition[kSecValueData as String] = credential
         let addStatus = SecItemAdd(addition as CFDictionary, nil)
         guard addStatus == errSecSuccess else { throw CodexAccountError.keychain(addStatus) }
@@ -107,7 +129,8 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
     private func readCredential(
         for accountID: UUID,
         service: String,
-        authenticationContext: LAContext?
+        authenticationContext: LAContext?,
+        interactionAllowed: Bool
     ) throws -> Data? {
         var query = baseQuery(for: accountID, service: service)
         query[kSecReturnData as String] = true
@@ -115,6 +138,11 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         if let authenticationContext {
             query[kSecUseAuthenticationContext as String] = authenticationContext
         }
+        configureAuthentication(
+            in: &query,
+            interactionAllowed: interactionAllowed,
+            skipsProtectedItems: true
+        )
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
@@ -127,7 +155,22 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         query[kSecUseAuthenticationContext as String] = authenticationContext(
             interactionAllowed: false
         )
+        configureAuthentication(in: &query, interactionAllowed: false)
         _ = SecItemDelete(query as CFDictionary)
+    }
+
+    private func configureAuthentication(
+        in query: inout [String: Any],
+        interactionAllowed: Bool,
+        skipsProtectedItems: Bool = false
+    ) {
+        guard !interactionAllowed else { return }
+        query[kSecUseAuthenticationContext as String] = authenticationContext(
+            interactionAllowed: false
+        )
+        if skipsProtectedItems {
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
+        }
     }
 
     private func authenticationContext(interactionAllowed: Bool = true) -> LAContext {

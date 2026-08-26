@@ -236,6 +236,17 @@ final class DashboardRenderer {
         }
     }
 
+    func consumeAccountPopoverAction() async -> AccountPopoverAction? {
+        guard let target = (await targets()).first,
+              let serialized = try? await devTools.evaluateString(
+                RendererScript.consumeAccountPopoverAction,
+                in: target
+              ),
+              let data = serialized.data(using: .utf8)
+        else { return nil }
+        return try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+    }
+
     func preferNativePromptLibraryOnNextSynchronization() {
         promptLibraryBridge?.preferNativeLibrary()
     }

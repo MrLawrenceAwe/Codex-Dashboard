@@ -16,6 +16,7 @@ final class PollingController {
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
+    private var accountPopoverActionPollingTask: Task<Void, Never>?
     private let fileChanges: DataChangeMonitor?
 
     init(observeFileChanges: Bool = true) {
@@ -28,6 +29,7 @@ final class PollingController {
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
+        accountPopoverActionPollingTask?.cancel()
     }
 
     func start(
@@ -35,13 +37,15 @@ final class PollingController {
         updateWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void,
         updateUnreadState: @escaping @MainActor () async -> Void,
         refreshAccountUsage: @escaping @MainActor () async -> Void,
-        refreshInactiveAccountUsage: @escaping @MainActor () async -> Void
+        refreshInactiveAccountUsage: @escaping @MainActor () async -> Void,
+        handleAccountPopoverAction: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
               workingTreePollingTask == nil,
               unreadPollingTask == nil,
               accountUsagePollingTask == nil,
-              inactiveAccountUsagePollingTask == nil
+              inactiveAccountUsagePollingTask == nil,
+              accountPopoverActionPollingTask == nil
         else { return }
 
         catalogPollingTask = Task {
@@ -75,6 +79,12 @@ final class PollingController {
                 try? await Task.sleep(for: Schedule.inactiveAccountUsage)
             }
         }
+        accountPopoverActionPollingTask = Task {
+            while !Task.isCancelled {
+                await handleAccountPopoverAction()
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
         fileChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
@@ -99,11 +109,13 @@ final class PollingController {
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
+        accountPopoverActionPollingTask?.cancel()
         catalogPollingTask = nil
         workingTreePollingTask = nil
         unreadPollingTask = nil
         accountUsagePollingTask = nil
         inactiveAccountUsagePollingTask = nil
+        accountPopoverActionPollingTask = nil
         fileChanges?.stop()
     }
 }

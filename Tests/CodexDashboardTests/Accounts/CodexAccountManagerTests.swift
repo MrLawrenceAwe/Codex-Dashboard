@@ -10,6 +10,8 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     private var deletionCount = 0
     private var interactiveReadCount = 0
     private var backgroundReadCount = 0
+    private var interactiveStoreCount = 0
+    private var backgroundStoreCount = 0
     private var deletionShouldFail = false
     private let lock = NSLock()
 
@@ -28,7 +30,17 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     }
 
     func store(_ credential: Data, for accountID: UUID) {
-        lock.withLock { values[accountID] = credential }
+        lock.withLock {
+            interactiveStoreCount += 1
+            values[accountID] = credential
+        }
+    }
+
+    func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) {
+        lock.withLock {
+            backgroundStoreCount += 1
+            values[accountID] = credential
+        }
     }
 
     func deleteCredential(for accountID: UUID) throws {
@@ -42,6 +54,8 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     var deleteCallCount: Int { lock.withLock { deletionCount } }
     var interactiveReads: Int { lock.withLock { interactiveReadCount } }
     var backgroundReads: Int { lock.withLock { backgroundReadCount } }
+    var interactiveStores: Int { lock.withLock { interactiveStoreCount } }
+    var backgroundStores: Int { lock.withLock { backgroundStoreCount } }
 
     func failDeletion() {
         lock.withLock { deletionShouldFail = true }
@@ -239,11 +253,47 @@ final class CodexAccountManagerTests: XCTestCase {
         try credential.write(to: authenticationURL)
         let account = try manager.saveCurrentAccount()
 
-        let savedCredential = try manager.savedCredential(for: account.id)
+        let savedCredential = try manager.savedCredentialWithoutUserInteraction(for: account.id)
 
         XCTAssertEqual(savedCredential, credential)
         XCTAssertEqual(vault.interactiveReads, 0)
         XCTAssertEqual(vault.backgroundReads, 1)
+    }
+
+    func testManualCredentialRecoveryAllowsInteractiveVaultAccessWithoutSwitching() throws {
+        let credential = credential(accountID: "account-personal", name: "Personal")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+
+        let savedCredential = try manager.savedCredentialAllowingUserInteraction(
+            for: account.id
+        )
+
+        XCTAssertEqual(savedCredential, credential)
+        XCTAssertEqual(vault.interactiveReads, 1)
+        XCTAssertEqual(vault.backgroundReads, 0)
+        XCTAssertEqual(try manager.document().activeAccountID, account.id)
+    }
+
+    func testUsageCredentialUpdateNeverRequestsInteractiveVaultAccess() throws {
+        let credential = credential(accountID: "account-personal", name: "Personal")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        let refreshedCredential = self.credential(
+            accountID: "account-personal",
+            name: "Personal",
+            accessToken: "refreshed"
+        )
+
+        try manager.updateSavedCredential(
+            refreshedCredential,
+            for: account.id,
+            interactionAllowed: false
+        )
+
+        XCTAssertEqual(vault.interactiveStores, 1)
+        XCTAssertEqual(vault.backgroundStores, 1)
+        XCTAssertEqual(vault.credential(for: account.id), refreshedCredential)
     }
 
     func testLoadReplacesStoredCustomNameWithAuthenticatedAccountName() throws {

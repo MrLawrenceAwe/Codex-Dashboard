@@ -45,26 +45,48 @@ final class CodexAccountManager: @unchecked Sendable {
         try lock.withLock { try documentStore.load() }
     }
 
-    func savedCredential(for accountID: UUID) throws -> Data {
+    func savedCredentialWithoutUserInteraction(for accountID: UUID) throws -> Data {
+        try savedCredential(for: accountID, interactionAllowed: false)
+    }
+
+    func savedCredentialAllowingUserInteraction(for accountID: UUID) throws -> Data {
+        try savedCredential(for: accountID, interactionAllowed: true)
+    }
+
+    private func savedCredential(
+        for accountID: UUID,
+        interactionAllowed: Bool
+    ) throws -> Data {
         try lock.withLock {
             let document = try documentStore.load()
             guard let account = document.accounts.first(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
             }
-            guard let credential = try vault.credentialWithoutUserInteraction(for: accountID) else {
+            let credential = try interactionAllowed
+                ? vault.credential(for: accountID)
+                : vault.credentialWithoutUserInteraction(for: accountID)
+            guard let credential else {
                 throw CodexAccountError.missingCredential(account.name)
             }
             return credential
         }
     }
 
-    func updateSavedCredential(_ credential: Data, for accountID: UUID) throws {
+    func updateSavedCredential(
+        _ credential: Data,
+        for accountID: UUID,
+        interactionAllowed: Bool
+    ) throws {
         try lock.withLock {
             let document = try documentStore.load()
             guard document.accounts.contains(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
             }
-            try vault.store(credential, for: accountID)
+            if interactionAllowed {
+                try vault.store(credential, for: accountID)
+            } else {
+                try vault.storeWithoutUserInteraction(credential, for: accountID)
+            }
         }
     }
 

@@ -105,26 +105,6 @@ final class DashboardStatusItemControllerTests: XCTestCase {
         )
     }
 
-    func testPersistentMenuActionActivatesWithoutARegularMenuItemAction() {
-        var activationCount = 0
-        let actionView = PersistentMenuActionView(
-            title: "Update Usage",
-            isEnabled: true
-        ) {
-            activationCount += 1
-        }
-        let item = NSMenuItem(title: "Update Usage", action: nil, keyEquivalent: "")
-        item.view = actionView
-
-        XCTAssertNil(item.action)
-        XCTAssertTrue(actionView.accessibilityPerformPress())
-        XCTAssertEqual(activationCount, 1)
-
-        actionView.isEnabled = false
-        XCTAssertFalse(actionView.accessibilityPerformPress())
-        XCTAssertEqual(activationCount, 1)
-    }
-
     func testDashboardActionAvailabilityIsSharedAcrossPresentations() {
         let mounted = DashboardActionPresentation(
             connectionState: .dashboardMounted,

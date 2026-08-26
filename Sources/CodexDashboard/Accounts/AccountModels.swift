@@ -76,6 +76,7 @@ enum CodexAccountError: LocalizedError {
     case activeTasks
     case accountIdentityUnavailable
     case invalidCredential
+    case keychainAuthorizationRequired
     case keychain(OSStatus)
     case recoveryFailed(String)
     case unsupportedMetadataVersion(Int)
@@ -94,6 +95,8 @@ enum CodexAccountError: LocalizedError {
             return "Codex could not read the signed-in account identity. Sign in again, then save the account."
         case .invalidCredential:
             return "Codex authentication data is invalid and was not saved or activated."
+        case .keychainAuthorizationRequired:
+            return "Keychain authorization is required to access the saved account."
         case .keychain(let status):
             return "The Codex account credential could not be accessed in Keychain (\(status))."
         case .recoveryFailed(let detail):

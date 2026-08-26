@@ -120,6 +120,9 @@ final class AppCoordinator: ObservableObject {
             refreshAccountUsage: { [weak self] in await self?.refreshAccountUsage() },
             refreshInactiveAccountUsage: {
                 [weak self] in await self?.refreshInactiveAccountUsage()
+            },
+            handleAccountPopoverAction: { [weak self] in
+                await self?.handleAccountPopoverAction()
             }
         )
         if activationObserver == nil {
