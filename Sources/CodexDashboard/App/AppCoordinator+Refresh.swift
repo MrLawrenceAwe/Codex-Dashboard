@@ -29,9 +29,6 @@ extension AppCoordinator {
                 try await publishSnapshot(to: targets, using: dashboardRuntime)
                 setConnectionState(.dashboardMounted)
                 setConnectionError(nil)
-                if let action = await dashboardRuntime.consumeAccountAction() {
-                    Task { await self.handleAccountAction(action) }
-                }
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
                 setFailure(error, lastKnownState: .rendererAvailable)

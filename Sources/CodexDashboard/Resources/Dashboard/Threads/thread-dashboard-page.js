@@ -1,5 +1,5 @@
 const threadDashboardPage = (() => {
-  function mount({ onFilter, onSearch, onLoadMore, onListClick, onAccountAction }) {
+  function mount({ onFilter, onSearch, onLoadMore, onListClick }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = document.createElement('section');
@@ -16,18 +16,7 @@ const threadDashboardPage = (() => {
               <span><strong data-summary-count="changed">0</strong> changed</span>
             </div>
           </div>
-          <div class="dashboard-account-controls" data-account-controls>
-            <label>
-              <span class="dashboard-control-label">Codex account</span>
-              <select data-account-select aria-label="Active Codex account">
-                <option value="">Current account</option>
-              </select>
-            </label>
-            <button type="button" data-account-save>Save account</button>
-            <button type="button" data-account-add>Add account</button>
-          </div>
         </header>
-        <div class="dashboard-notice" data-account-notice role="status" hidden></div>
         <div class="dashboard-notice" data-commit-notice role="alert" hidden></div>
         <div class="dashboard-section-header">
           <div class="dashboard-toolbar">
@@ -53,17 +42,6 @@ const threadDashboardPage = (() => {
     });
     page.querySelector('[data-load-more]').addEventListener('click', onLoadMore);
     page.querySelector('[data-thread-list]').addEventListener('click', onListClick);
-    page.querySelector('[data-account-select]').addEventListener('change', (event) => {
-      if (event.target.value) onAccountAction({ type: 'switch', accountID: event.target.value });
-    });
-    page.querySelector('[data-account-save]').addEventListener('click', () => {
-      onAccountAction({ type: 'save' });
-    });
-    page.querySelector('[data-account-add]').addEventListener('click', () => {
-      if (window.confirm('Restart Codex signed out so you can add another account?')) {
-        onAccountAction({ type: 'add' });
-      }
-    });
     pageHost.append(page);
     return true;
   }

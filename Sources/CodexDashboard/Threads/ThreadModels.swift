@@ -75,19 +75,8 @@ struct ThreadWireModel: Codable, Equatable, Sendable {
 
 struct DashboardSnapshot: Codable, Equatable, Sendable {
     let threads: [ThreadWireModel]
-    let accounts: [SavedAccountOption]
-    let activeAccountID: String?
-    let accountStatusMessage: String?
 
-    init(
-        threads: [ThreadSummary],
-        accounts: [SavedAccountOption] = [],
-        activeAccountID: String? = nil,
-        accountStatusMessage: String? = nil
-    ) {
+    init(threads: [ThreadSummary]) {
         self.threads = threads.map(ThreadWireModel.init)
-        self.accounts = accounts
-        self.activeAccountID = activeAccountID
-        self.accountStatusMessage = accountStatusMessage
     }
 }

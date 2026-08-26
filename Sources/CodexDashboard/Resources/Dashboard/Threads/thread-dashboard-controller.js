@@ -195,7 +195,6 @@ function mountDashboardPage() {
     }
     openThreadFromEvent(event);
     },
-    onAccountAction: accountControls.queue,
   });
 }
 
@@ -240,7 +239,6 @@ function applySnapshot(nextSnapshot) {
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
   requestThreadRender();
-  accountControls.applySnapshot(snapshot);
 }
 
 function scopeProject() {
@@ -293,7 +291,6 @@ return {
   open: openDashboard,
   isOpen,
   applySnapshot,
-  consumeAccountAction: accountControls.consume,
   scopeProject,
 };
 })();

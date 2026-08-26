@@ -4,7 +4,6 @@
     "Core/dom-utils",
     "Core/codex-ui-contracts",
     "Core/codex-host",
-    "Accounts/account-controls",
     "Prompts/prompt-library-contract",
     "Prompts/preset-options",
     "Prompts/prompt-store",
