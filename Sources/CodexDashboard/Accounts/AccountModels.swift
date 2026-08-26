@@ -23,12 +23,6 @@ struct SavedAccountsDocument: Codable, Equatable, Sendable {
     }
 }
 
-struct SavedAccountOption: Codable, Equatable, Sendable {
-    let id: String
-    let name: String
-    let isActive: Bool
-}
-
 struct CodexUsageWindow: Codable, Equatable, Sendable {
     let usedPercent: Int
     let resetsAt: Date?
@@ -73,17 +67,6 @@ enum CodexAccountUsageStatus: Equatable, Sendable {
         case .unavailable: nil
         }
     }
-}
-
-struct DashboardAccountAction: Codable, Equatable, Sendable {
-    enum Kind: String, Codable, Sendable {
-        case save
-        case add
-        case switchAccount = "switch"
-    }
-
-    let type: Kind
-    let accountID: UUID?
 }
 
 enum CodexAccountError: LocalizedError {

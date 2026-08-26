@@ -14,10 +14,7 @@ extension AppCoordinator {
             setAccountStatus("Saved \(account.name) securely in Keychain.")
             refreshAccountState()
             if let existingUsage { setActiveAccountUsageStatus(.available(existingUsage)) }
-            Task {
-                await publishAccountSnapshot()
-                await refreshAccountUsage()
-            }
+            Task { await refreshAccountUsage() }
         } catch {
             setAccountStatus(error.localizedDescription)
         }
@@ -41,7 +38,6 @@ extension AppCoordinator {
             persistAccountUsageCache(force: true)
             refreshAccountState()
             if activeAccountID == nil { setActiveAccountUsageStatus(.unavailable) }
-            Task { await publishAccountSnapshot() }
         } catch {
             setAccountStatus(error.localizedDescription)
         }
@@ -60,34 +56,8 @@ extension AppCoordinator {
         }
     }
 
-    func handleAccountAction(_ action: DashboardAccountAction) async {
-        switch action.type {
-        case .save:
-            saveCurrentAccount()
-        case .add:
-            await beginAddingAccount()
-        case .switchAccount:
-            guard let accountID = action.accountID else {
-                setAccountStatus(CodexAccountError.accountNotFound.localizedDescription)
-                return
-            }
-            await switchAccount(to: accountID)
-        }
-    }
-
     func dashboardSnapshotPayload() -> DashboardSnapshot {
-        DashboardSnapshot(
-            threads: threads,
-            accounts: savedAccounts.map {
-                SavedAccountOption(
-                    id: $0.id.uuidString,
-                    name: $0.name,
-                    isActive: $0.id == activeAccountID
-                )
-            },
-            activeAccountID: activeAccountID?.uuidString,
-            accountStatusMessage: accountStatusMessage
-        )
+        DashboardSnapshot(threads: threads)
     }
 
     private func performAccountTransition(
@@ -96,7 +66,6 @@ extension AppCoordinator {
         guard !isPerformingAction, let dashboardRuntime else { return }
         guard !threads.contains(where: { $0.runState == .running }) else {
             setAccountStatus(CodexAccountError.activeTasks.localizedDescription)
-            await publishAccountSnapshot()
             return
         }
 
@@ -181,15 +150,6 @@ extension AppCoordinator {
             })
             setFailure(error, lastKnownState: .rendererAvailable)
         }
-    }
-
-    private func publishAccountSnapshot() async {
-        guard !isPerformingAction, let dashboardRuntime, dashboardRuntime.maintainsDashboard else { return }
-        let targets = await dashboardRuntime.rendererTargets()
-        guard !targets.isEmpty else { return }
-        try? await dashboardRuntime.synchronizeDashboard(
-            with: dashboardSnapshotPayload(), on: targets, forceRemount: false
-        )
     }
 
     func refreshAccountUsage() async {

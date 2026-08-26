@@ -88,14 +88,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page button:focus-visible, #codex-dashboard-page input:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-page .dashboard-shell { width: min(980px, calc(100% - 64px)); margin: 0 auto; padding: 42px 0 64px; }
 
-#codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
-#codex-dashboard-page .dashboard-account-controls { display: flex; align-items: flex-end; gap: 6px; }
-#codex-dashboard-page .dashboard-account-controls label { display: grid; gap: 6px; }
-#codex-dashboard-page .dashboard-account-controls select,
-#codex-dashboard-page .dashboard-account-controls button { min-height: 32px; border: 1px solid var(--dashboard-line); border-radius: 7px; background: var(--dashboard-control); color: var(--dashboard-muted); font: inherit; font-size: 11px; }
-#codex-dashboard-page .dashboard-account-controls select { min-width: 150px; padding: 5px 26px 5px 9px; }
-#codex-dashboard-page .dashboard-account-controls button { padding: 5px 9px; cursor: pointer; }
-#codex-dashboard-page .dashboard-account-controls button:hover { border-color: var(--dashboard-line-strong); color: var(--dashboard-text); }
+#codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; }
 #codex-dashboard-page h1 { margin: 0; color: var(--dashboard-text); font-size: 28px; font-weight: 590; line-height: 1.15; letter-spacing: -.025em; }
 #codex-dashboard-page .dashboard-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; color: var(--dashboard-dim); font-size: 11px; }
 #codex-dashboard-page .dashboard-summary span { display: inline-flex; align-items: center; gap: 3px; }
