@@ -4,6 +4,7 @@ enum AccountDocumentMigration {
     struct Result {
         let document: SavedAccountsDocument
         let requiresNameFallback: Bool
+        let requiresIdentitySynchronization: Bool
     }
 
     static func decode(
@@ -15,12 +16,25 @@ enum AccountDocumentMigration {
         case SavedAccountsDocument.currentVersion:
             return Result(
                 document: try JSONDecoder().decode(SavedAccountsDocument.self, from: data),
-                requiresNameFallback: false
+                requiresNameFallback: false,
+                requiresIdentitySynchronization: false
+            )
+        case 3:
+            var document = try JSONDecoder().decode(SavedAccountsDocument.self, from: data)
+            document.version = SavedAccountsDocument.currentVersion
+            return Result(
+                document: document,
+                requiresNameFallback: false,
+                requiresIdentitySynchronization: true
             )
         case 2:
             var document = try JSONDecoder().decode(SavedAccountsDocument.self, from: data)
             document.version = SavedAccountsDocument.currentVersion
-            return Result(document: document, requiresNameFallback: true)
+            return Result(
+                document: document,
+                requiresNameFallback: true,
+                requiresIdentitySynchronization: true
+            )
         case 1:
             let legacy = try JSONDecoder().decode(LegacySavedAccountsDocument.self, from: data)
             return Result(
@@ -36,7 +50,8 @@ enum AccountDocumentMigration {
                     },
                     activeAccountID: legacy.activeAccountID
                 ),
-                requiresNameFallback: true
+                requiresNameFallback: true,
+                requiresIdentitySynchronization: true
             )
         default:
             throw CodexAccountError.unsupportedMetadataVersion(version)

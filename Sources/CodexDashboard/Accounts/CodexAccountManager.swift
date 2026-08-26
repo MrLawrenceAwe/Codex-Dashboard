@@ -45,37 +45,60 @@ final class CodexAccountManager: @unchecked Sendable {
         try lock.withLock { try documentStore.load() }
     }
 
-    @discardableResult
-    func saveCurrentAccount(named rawName: String) throws -> SavedAccount {
+    func savedCredential(for accountID: UUID) throws -> Data {
         try lock.withLock {
-            let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { throw CodexAccountError.accountNameRequired }
+            let document = try documentStore.load()
+            guard let account = document.accounts.first(where: { $0.id == accountID }) else {
+                throw CodexAccountError.accountNotFound
+            }
+            guard let credential = try vault.credentialWithoutUserInteraction(for: accountID) else {
+                throw CodexAccountError.missingCredential(account.name)
+            }
+            return credential
+        }
+    }
+
+    func updateSavedCredential(_ credential: Data, for accountID: UUID) throws {
+        try lock.withLock {
+            let document = try documentStore.load()
+            guard document.accounts.contains(where: { $0.id == accountID }) else {
+                throw CodexAccountError.accountNotFound
+            }
+            try vault.store(credential, for: accountID)
+        }
+    }
+
+    @discardableResult
+    func saveCurrentAccount() throws -> SavedAccount {
+        try lock.withLock {
             guard let credential = try activeCredentialFile.read() else {
                 throw CodexAccountError.noActiveCredential
             }
+            guard let identity = AccountIdentityDecoder.identity(in: credential) else {
+                throw CodexAccountError.accountIdentityUnavailable
+            }
             var document = try documentStore.load()
-            let accountIdentifier = AccountIdentityDecoder.identity(in: credential)?.identifier
             let timestamp = now()
             let account: SavedAccount
             if
                 let index = document.accounts.firstIndex(where: {
-                    accountIdentifier != nil && $0.accountIdentifier == accountIdentifier
+                    $0.accountIdentifier == identity.identifier
                 }) ?? document.activeAccountID.flatMap({ activeID in
                     document.accounts.firstIndex(where: { $0.id == activeID })
                 })
             {
-                document.accounts[index].name = name
+                document.accounts[index].name = identity.accountName
                 document.accounts[index].lastUsedAt = timestamp
-                document.accounts[index].accountIdentifier = accountIdentifier
+                document.accounts[index].accountIdentifier = identity.identifier
                 document.activeAccountID = document.accounts[index].id
                 account = document.accounts[index]
             } else {
                 account = SavedAccount(
                     id: UUID(),
-                    name: name,
+                    name: identity.accountName,
                     createdAt: timestamp,
                     lastUsedAt: timestamp,
-                    accountIdentifier: accountIdentifier
+                    accountIdentifier: identity.identifier
                 )
                 document.accounts.append(account)
                 document.activeAccountID = account.id

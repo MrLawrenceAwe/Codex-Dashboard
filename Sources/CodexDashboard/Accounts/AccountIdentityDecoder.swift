@@ -3,6 +3,18 @@ import Foundation
 struct AccountIdentity {
     let identifier: String
     let displayName: String?
+    let email: String?
+
+    var accountName: String {
+        Self.nonempty(displayName)
+            ?? Self.nonempty(email)
+            ?? identifier
+    }
+
+    private static func nonempty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 enum AccountIdentityDecoder {
@@ -28,7 +40,11 @@ enum AccountIdentityDecoder {
         else { return identity(identifier: directAccountID) }
         let accountID = directAccountID ?? authentication["chatgpt_account_id"] as? String
         guard let accountID, !accountID.isEmpty else { return nil }
-        return AccountIdentity(identifier: accountID, displayName: claims["name"] as? String)
+        return AccountIdentity(
+            identifier: accountID,
+            displayName: claims["name"] as? String,
+            email: claims["email"] as? String
+        )
     }
 
     static func accountName(_ accountName: String, matches displayName: String) -> Bool {
@@ -41,7 +57,9 @@ enum AccountIdentityDecoder {
 
     private static func identity(identifier: String?) -> AccountIdentity? {
         identifier.flatMap {
-            $0.isEmpty ? nil : AccountIdentity(identifier: $0, displayName: nil)
+            $0.isEmpty
+                ? nil
+                : AccountIdentity(identifier: $0, displayName: nil, email: nil)
         }
     }
 

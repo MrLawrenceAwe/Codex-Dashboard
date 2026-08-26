@@ -109,6 +109,30 @@ extension ThreadDashboardWebTests {
         XCTAssertEqual(action["accountID"], workID.uuidString)
     }
 
+    func testSavingAccountDoesNotPromptForAUserDefinedName() async throws {
+        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              let promptCount = 0;
+              window.prompt = () => { promptCount += 1; return 'Custom'; };
+              document.querySelector('[data-account-save]').click();
+              return [
+                promptCount,
+                document.querySelector('[data-account-save]').textContent,
+                JSON.parse(window.__codexDashboard.consumeAccountAction()),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 0)
+        XCTAssertEqual(values[1] as? String, "Save account")
+        XCTAssertEqual(values[2] as? [String: String], ["type": "save"])
+    }
+
     func testAccountSelectorShowsCurrentAccountWhenNoSavedAccountIsActive() async throws {
         let webView = try await DashboardWebTestHarness.threadDashboardWebView()
         let savedID = UUID()

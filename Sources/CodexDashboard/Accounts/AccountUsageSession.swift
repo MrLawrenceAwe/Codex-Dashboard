@@ -4,7 +4,8 @@ import Foundation
 final class AccountUsageSession {
     private let provider: any AccountUsageProviding
     private let cache: UsageCache
-    private var isRefreshing = false
+    private var isRefreshingActiveAccount = false
+    private var isRefreshingSavedAccount = false
     private var lastCacheSaveAt: Date?
 
     init(provider: any AccountUsageProviding, cache: UsageCache) {
@@ -17,10 +18,17 @@ final class AccountUsageSession {
     }
 
     func fetchUsage() async throws -> CodexAccountUsage? {
-        guard !isRefreshing else { return nil }
-        isRefreshing = true
-        defer { isRefreshing = false }
+        guard !isRefreshingActiveAccount else { return nil }
+        isRefreshingActiveAccount = true
+        defer { isRefreshingActiveAccount = false }
         return try await provider.usage()
+    }
+
+    func fetchUsage(using credential: Data) async throws -> SavedAccountUsageResult? {
+        guard !isRefreshingSavedAccount else { return nil }
+        isRefreshingSavedAccount = true
+        defer { isRefreshingSavedAccount = false }
+        return try await provider.usage(using: credential)
     }
 
     func reset() async {

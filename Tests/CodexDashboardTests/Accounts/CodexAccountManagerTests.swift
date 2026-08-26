@@ -8,11 +8,23 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
 
     private var values: [UUID: Data] = [:]
     private var deletionCount = 0
+    private var interactiveReadCount = 0
+    private var backgroundReadCount = 0
     private var deletionShouldFail = false
     private let lock = NSLock()
 
     func credential(for accountID: UUID) -> Data? {
-        lock.withLock { values[accountID] }
+        lock.withLock {
+            interactiveReadCount += 1
+            return values[accountID]
+        }
+    }
+
+    func credentialWithoutUserInteraction(for accountID: UUID) -> Data? {
+        lock.withLock {
+            backgroundReadCount += 1
+            return values[accountID]
+        }
     }
 
     func store(_ credential: Data, for accountID: UUID) {
@@ -28,6 +40,8 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     }
 
     var deleteCallCount: Int { lock.withLock { deletionCount } }
+    var interactiveReads: Int { lock.withLock { interactiveReadCount } }
+    var backgroundReads: Int { lock.withLock { backgroundReadCount } }
 
     func failDeletion() {
         lock.withLock { deletionShouldFail = true }
@@ -64,10 +78,10 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testSavesCurrentCredentialAndMetadataSeparately() throws {
-        let credential = Data(#"{"tokens":{"access_token":"secret"}}"#.utf8)
+        let credential = credential(accountID: "account-personal", name: "Personal")
         try credential.write(to: authenticationURL)
 
-        let account = try manager.saveCurrentAccount(named: " Personal ")
+        let account = try manager.saveCurrentAccount()
         let document = try manager.document()
 
         XCTAssertEqual(account.name, "Personal")
@@ -78,16 +92,22 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testSwitchSavesRotatedActiveCredentialAndRollbackRestoresIt() throws {
-        let personal = Data(#"{"account":"personal-original"}"#.utf8)
+        let personal = credential(
+            accountID: "account-personal", name: "Personal", accessToken: "personal-original"
+        )
         try personal.write(to: authenticationURL)
-        let personalAccount = try manager.saveCurrentAccount(named: "Personal")
+        let personalAccount = try manager.saveCurrentAccount()
 
         _ = try manager.beginAddingAccount()
-        let work = Data(#"{"account":"work"}"#.utf8)
+        let work = credential(
+            accountID: "account-work", name: "Work", accessToken: "work-original"
+        )
         try work.write(to: authenticationURL)
-        let workAccount = try manager.saveCurrentAccount(named: "Work")
+        let workAccount = try manager.saveCurrentAccount()
 
-        let rotatedWork = Data(#"{"account":"work-rotated"}"#.utf8)
+        let rotatedWork = credential(
+            accountID: "account-work", name: "Work", accessToken: "work-rotated"
+        )
         try rotatedWork.write(to: authenticationURL)
         let transaction = try manager.activate(accountID: personalAccount.id)
 
@@ -101,9 +121,9 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testBeginAddingAccountSignsOutAndCanRollback() throws {
-        let credential = Data(#"{"account":"current"}"#.utf8)
+        let credential = credential(accountID: "account-current", name: "Current")
         try credential.write(to: authenticationURL)
-        let account = try manager.saveCurrentAccount(named: "Current")
+        let account = try manager.saveCurrentAccount()
 
         let transaction = try manager.beginAddingAccount()
         XCTAssertFalse(FileManager.default.fileExists(atPath: authenticationURL.path))
@@ -122,7 +142,8 @@ final class CodexAccountManagerTests: XCTestCase {
             at: metadataURL.deletingLastPathComponent(), withIntermediateDirectories: true
         )
         try unsupportedDocument.write(to: metadataURL)
-        try Data(#"{"account":"current"}"#.utf8).write(to: authenticationURL)
+        try credential(accountID: "account-current", name: "Current")
+            .write(to: authenticationURL)
 
         XCTAssertThrowsError(try manager.beginAddingAccount()) { error in
             guard case CodexAccountError.unsupportedMetadataVersion(99) = error else {
@@ -134,9 +155,9 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testDeleteDoesNotRemoveCredentialWhenMetadataCannotBeSaved() throws {
-        let credential = Data(#"{"account":"personal"}"#.utf8)
+        let credential = credential(accountID: "account-personal", name: "Personal")
         try credential.write(to: authenticationURL)
-        let account = try manager.saveCurrentAccount(named: "Personal")
+        let account = try manager.saveCurrentAccount()
         let supportDirectory = metadataURL.deletingLastPathComponent()
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o500],
@@ -155,9 +176,9 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testDeleteRestoresMetadataWhenCredentialDeletionFails() throws {
-        let credential = Data(#"{"account":"personal"}"#.utf8)
+        let credential = credential(accountID: "account-personal", name: "Personal")
         try credential.write(to: authenticationURL)
-        let account = try manager.saveCurrentAccount(named: "Personal")
+        let account = try manager.saveCurrentAccount()
         vault.failDeletion()
 
         XCTAssertThrowsError(try manager.deleteAccount(account.id)) { error in
@@ -168,14 +189,16 @@ final class CodexAccountManagerTests: XCTestCase {
     }
 
     func testReconcilesStaleActiveAccountWithCurrentCodexAccount() throws {
-        let lawrenceCredential = credential(accountID: "account-lawrence")
+        let lawrenceCredential = credential(accountID: "account-lawrence", name: "Lawrence")
         try lawrenceCredential.write(to: authenticationURL)
-        let lawrence = try manager.saveCurrentAccount(named: "Lawrence")
+        let lawrence = try manager.saveCurrentAccount()
 
         _ = try manager.beginAddingAccount()
-        let oluwatoyinCredential = credential(accountID: "account-oluwatoyin")
+        let oluwatoyinCredential = credential(
+            accountID: "account-oluwatoyin", name: "Oluwatoyin"
+        )
         try oluwatoyinCredential.write(to: authenticationURL)
-        let oluwatoyin = try manager.saveCurrentAccount(named: "Oluwatoyin")
+        let oluwatoyin = try manager.saveCurrentAccount()
 
         var metadata = try JSONSerialization.jsonObject(
             with: Data(contentsOf: metadataURL)
@@ -199,12 +222,68 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertNil(identity.displayName)
     }
 
+    func testUsesAccountEmailWhenDisplayNameIsUnavailable() throws {
+        let credential = credential(
+            accountID: "account-personal",
+            email: "lawrence@example.com"
+        )
+        try credential.write(to: authenticationURL)
+
+        let account = try manager.saveCurrentAccount()
+
+        XCTAssertEqual(account.name, "lawrence@example.com")
+    }
+
+    func testUsageCredentialReadNeverRequestsInteractiveVaultAccess() throws {
+        let credential = credential(accountID: "account-personal", name: "Personal")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+
+        let savedCredential = try manager.savedCredential(for: account.id)
+
+        XCTAssertEqual(savedCredential, credential)
+        XCTAssertEqual(vault.interactiveReads, 0)
+        XCTAssertEqual(vault.backgroundReads, 1)
+    }
+
+    func testLoadReplacesStoredCustomNameWithAuthenticatedAccountName() throws {
+        let credential = credential(accountID: "account-personal", name: "Lawrence Awe")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        var document = try manager.document()
+        document.version = 3
+        document.accounts[0].name = "My custom label"
+        try JSONEncoder().encode(document).write(to: metadataURL)
+
+        let reloaded = try manager.document()
+
+        XCTAssertEqual(reloaded.accounts.first(where: { $0.id == account.id })?.name, "Lawrence Awe")
+    }
+
+    func testSavingRequiresAnAuthenticatedAccountIdentity() throws {
+        try Data(#"{"tokens":{"access_token":"secret"}}"#.utf8)
+            .write(to: authenticationURL)
+
+        XCTAssertThrowsError(try manager.saveCurrentAccount()) { error in
+            guard case CodexAccountError.accountIdentityUnavailable = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testMigratesExistingAccountsAndReconcilesTheirAccountIdentifiers() throws {
         let lawrenceID = UUID()
         let oluwatoyinID = UUID()
-        vault.store(credential(accountID: "account-lawrence"), for: lawrenceID)
-        vault.store(credential(accountID: "account-oluwatoyin"), for: oluwatoyinID)
-        try credential(accountID: "account-oluwatoyin").write(to: authenticationURL)
+        vault.store(
+            credential(accountID: "account-lawrence", name: "Lawrence"),
+            for: lawrenceID
+        )
+        vault.store(
+            credential(accountID: "account-oluwatoyin", name: "Oluwatoyin"),
+            for: oluwatoyinID
+        )
+        try credential(accountID: "account-oluwatoyin", name: "Oluwatoyin")
+            .write(to: authenticationURL)
         let legacy: [String: Any] = [
             "version": 1,
             "profiles": [
@@ -220,7 +299,7 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let document = try manager.document()
 
-        XCTAssertEqual(document.version, 3)
+        XCTAssertEqual(document.version, 4)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
             document.accounts.first(where: { $0.id == lawrenceID })?.accountIdentifier,
@@ -252,7 +331,7 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let document = try manager.document()
 
-        XCTAssertEqual(document.version, 3)
+        XCTAssertEqual(document.version, 4)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
             document.accounts.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,
@@ -260,13 +339,19 @@ final class CodexAccountManagerTests: XCTestCase {
         )
     }
 
-    private func credential(accountID: String, name: String? = nil) -> Data {
+    private func credential(
+        accountID: String,
+        name: String? = nil,
+        email: String? = nil,
+        accessToken: String? = nil
+    ) -> Data {
         var tokens: [String: Any] = ["account_id": accountID]
-        if let name {
-            let claims: [String: Any] = [
-                "name": name,
-                "https://api.openai.com/auth": ["chatgpt_account_id": accountID],
+        if name != nil || email != nil {
+            var claims: [String: Any] = [
+                "https://api.openai.com/auth": ["chatgpt_account_id": accountID]
             ]
+            claims["name"] = name
+            claims["email"] = email
             let payload = try! JSONSerialization.data(withJSONObject: claims)
                 .base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-")
@@ -274,6 +359,7 @@ final class CodexAccountManagerTests: XCTestCase {
                 .replacingOccurrences(of: "=", with: "")
             tokens["id_token"] = "header.\(payload).signature"
         }
+        tokens["access_token"] = accessToken
         return try! JSONSerialization.data(withJSONObject: ["tokens": tokens])
     }
 }

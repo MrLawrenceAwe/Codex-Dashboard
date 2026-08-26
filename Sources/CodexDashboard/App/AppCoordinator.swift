@@ -24,6 +24,8 @@ final class AppCoordinator: ObservableObject {
     @Published private(set) var accountStatusMessage: String?
     @Published private(set) var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
     @Published private(set) var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
+    @Published private(set) var refreshingUsageAccountIDs: Set<UUID> = []
+    @Published private(set) var usageErrorsByAccountID: [UUID: String] = [:]
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -115,7 +117,10 @@ final class AppCoordinator: ObservableObject {
                 await self?.updateWorkingTreeStatuses(projectPaths: paths)
             },
             updateUnreadState: { [weak self] in await self?.refreshUnreadState() },
-            refreshAccountUsage: { [weak self] in await self?.refreshAccountUsage() }
+            refreshAccountUsage: { [weak self] in await self?.refreshAccountUsage() },
+            refreshInactiveAccountUsage: {
+                [weak self] in await self?.refreshInactiveAccountUsage()
+            }
         )
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
@@ -266,6 +271,18 @@ final class AppCoordinator: ObservableObject {
 
     func setActiveAccountUsageStatus(_ status: CodexAccountUsageStatus) {
         activeAccountUsageStatus = status
+    }
+
+    func setRefreshingUsage(_ isRefreshing: Bool, for accountID: UUID) {
+        if isRefreshing {
+            refreshingUsageAccountIDs.insert(accountID)
+        } else {
+            refreshingUsageAccountIDs.remove(accountID)
+        }
+    }
+
+    func setUsageError(_ message: String?, for accountID: UUID) {
+        usageErrorsByAccountID[accountID] = message
     }
 
     func setCatalogWarning(_ warning: String?) {

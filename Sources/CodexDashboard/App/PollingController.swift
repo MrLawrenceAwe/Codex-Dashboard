@@ -8,12 +8,14 @@ final class PollingController {
         static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
         static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
         static let accountUsage: Duration = .seconds(30)
+        static let inactiveAccountUsage: Duration = .seconds(5 * 60)
     }
 
     private var catalogPollingTask: Task<Void, Never>?
     private var workingTreePollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
+    private var inactiveAccountUsagePollingTask: Task<Void, Never>?
     private let fileChanges: DataChangeMonitor?
 
     init(observeFileChanges: Bool = true) {
@@ -25,18 +27,21 @@ final class PollingController {
         workingTreePollingTask?.cancel()
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
+        inactiveAccountUsagePollingTask?.cancel()
     }
 
     func start(
         synchronizeDashboard: @escaping @MainActor () async -> Void,
         updateWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void,
         updateUnreadState: @escaping @MainActor () async -> Void,
-        refreshAccountUsage: @escaping @MainActor () async -> Void
+        refreshAccountUsage: @escaping @MainActor () async -> Void,
+        refreshInactiveAccountUsage: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
               workingTreePollingTask == nil,
               unreadPollingTask == nil,
-              accountUsagePollingTask == nil
+              accountUsagePollingTask == nil,
+              inactiveAccountUsagePollingTask == nil
         else { return }
 
         catalogPollingTask = Task {
@@ -64,6 +69,12 @@ final class PollingController {
                 try? await Task.sleep(for: Schedule.accountUsage)
             }
         }
+        inactiveAccountUsagePollingTask = Task {
+            while !Task.isCancelled {
+                await refreshInactiveAccountUsage()
+                try? await Task.sleep(for: Schedule.inactiveAccountUsage)
+            }
+        }
         fileChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
@@ -87,10 +98,12 @@ final class PollingController {
         workingTreePollingTask?.cancel()
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
+        inactiveAccountUsagePollingTask?.cancel()
         catalogPollingTask = nil
         workingTreePollingTask = nil
         unreadPollingTask = nil
         accountUsagePollingTask = nil
+        inactiveAccountUsagePollingTask = nil
         fileChanges?.stop()
     }
 }

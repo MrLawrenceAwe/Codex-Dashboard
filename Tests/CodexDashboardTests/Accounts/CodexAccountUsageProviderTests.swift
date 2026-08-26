@@ -90,4 +90,62 @@ final class CodexAccountUsageProviderTests: XCTestCase {
             XCTAssertNotNil(error as? CodexAccountUsageError)
         }
     }
+
+    func testSavedAccountUsageUsesAndRemovesAnIsolatedHome() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "CodexSavedAccountUsageProviderTests-\(UUID().uuidString)", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executableURL = directory.appendingPathComponent("fake-codex")
+        let observedHomeURL = directory.appendingPathComponent("observed-home.txt")
+        let activeHome = directory.appendingPathComponent("active", isDirectory: true)
+        try FileManager.default.createDirectory(at: activeHome, withIntermediateDirectories: true)
+        let activeCredential = Data(#"{"account":"active"}"#.utf8)
+        try activeCredential.write(to: activeHome.appendingPathComponent("auth.json"))
+        let script = #"""
+        #!/bin/sh
+        printf '%s' "$CODEX_HOME" > "\#(observedHomeURL.path)"
+        initialized=0
+        while IFS= read -r line; do
+          case "$line" in
+            *rateLimits*)
+              if [ "$initialized" = 1 ]; then
+                printf '%s' '{"account":"saved-refreshed"}' > "$CODEX_HOME/auth.json"
+                printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":12,"windowDurationMins":null,"resetsAt":null},"secondary":null},"rateLimitResetCredits":null}}'
+              fi
+              ;;
+            *initialized*)
+              initialized=1
+              ;;
+            *initialize*)
+              printf '%s\n' '{"id":1,"result":{}}'
+              ;;
+          esac
+        done
+        """#
+        try Data(script.utf8).write(to: executableURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executableURL.path
+        )
+        let provider = AppServerUsageProvider(
+            executableURL: executableURL,
+            codexHomeURL: activeHome,
+            timeout: .seconds(1)
+        )
+
+        let result = try await provider.usage(
+            using: Data(#"{"account":"saved"}"#.utf8)
+        )
+
+        XCTAssertEqual(result.usage.fiveHour?.usedPercent, 12)
+        XCTAssertEqual(result.credential, Data(#"{"account":"saved-refreshed"}"#.utf8))
+        XCTAssertEqual(
+            try Data(contentsOf: activeHome.appendingPathComponent("auth.json")),
+            activeCredential
+        )
+        let observedHome = try String(contentsOf: observedHomeURL, encoding: .utf8)
+        XCTAssertNotEqual(observedHome, activeHome.path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: observedHome))
+    }
 }
