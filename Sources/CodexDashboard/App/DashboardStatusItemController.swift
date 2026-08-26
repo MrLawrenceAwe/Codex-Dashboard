@@ -134,6 +134,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     private func makeAccountsMenu() -> NSMenu {
         let menu = NSMenu(title: "Accounts")
+        populateAccountsMenu(menu)
+        return menu
+    }
+
+    private func populateAccountsMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
         for (index, account) in coordinator.savedAccounts.enumerated() {
             let isActive = account.id == coordinator.activeAccountID
             let item = actionItem(account.name, action: #selector(switchAccount(_:)))
@@ -157,14 +163,14 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             addUsageItems(usageTitles, to: menu)
             if !isActive {
                 let isRefreshing = coordinator.refreshingUsageAccountIDs.contains(account.id)
-                let update = actionItem(
+                let update = persistentActionItem(
                     isRefreshing ? "Updating Usage…" : "Update Usage",
-                    action: #selector(updateAccountUsage(_:))
-                )
-                update.representedObject = account.id.uuidString
-                update.indentationLevel = 1
-                update.isEnabled = coordinator.refreshingUsageAccountIDs.isEmpty
-                    && !coordinator.isPerformingAction
+                    indentationLevel: 1,
+                    isEnabled: coordinator.refreshingUsageAccountIDs.isEmpty
+                        && !coordinator.isPerformingAction
+                ) { [weak self] in
+                    Task { await self?.coordinator.refreshSavedAccountUsage(account.id) }
+                }
                 menu.addItem(update)
                 if let error = coordinator.usageErrorsByAccountID[account.id] {
                     let failure = NSMenuItem(
@@ -192,12 +198,13 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
         if coordinator.savedAccounts.count > 1 {
-            let updateAll = actionItem(
+            let updateAll = persistentActionItem(
                 "Update Signed-Out Usage",
-                action: #selector(updateSignedOutAccountUsage)
-            )
-            updateAll.isEnabled = !coordinator.isPerformingAction
-                && coordinator.refreshingUsageAccountIDs.isEmpty
+                isEnabled: !coordinator.isPerformingAction
+                    && coordinator.refreshingUsageAccountIDs.isEmpty
+            ) { [weak self] in
+                Task { await self?.coordinator.refreshInactiveAccountUsage() }
+            }
             menu.addItem(updateAll)
             menu.addItem(.separator())
         }
@@ -218,7 +225,22 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             forget.submenu = forgetMenu
             menu.addItem(forget)
         }
-        return menu
+    }
+
+    private func persistentActionItem(
+        _ title: String,
+        indentationLevel: Int = 0,
+        isEnabled: Bool,
+        action: @escaping @MainActor () -> Void
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.view = PersistentMenuActionView(
+            title: title,
+            indentationLevel: indentationLevel,
+            isEnabled: isEnabled,
+            action: action
+        )
+        return item
     }
 
     private func addUsageItems(_ titles: [String], to menu: NSMenu) {
@@ -231,7 +253,9 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     private func refreshAccountsMenu() {
-        accountsMenuItem?.submenu = makeAccountsMenu()
+        guard let accountsMenuItem, let menu = accountsMenuItem.submenu else { return }
+        accountsMenuItem.title = accountMenuTitle
+        populateAccountsMenu(menu)
     }
 
     private func updateIcon(for state: DashboardConnectionState) {
@@ -280,18 +304,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             let accountID = UUID(uuidString: identifier)
         else { return }
         Task { await coordinator.switchAccount(to: accountID) }
-    }
-
-    @objc private func updateAccountUsage(_ sender: NSMenuItem) {
-        guard
-            let identifier = sender.representedObject as? String,
-            let accountID = UUID(uuidString: identifier)
-        else { return }
-        Task { await coordinator.refreshSavedAccountUsage(accountID) }
-    }
-
-    @objc private func updateSignedOutAccountUsage() {
-        Task { await coordinator.refreshInactiveAccountUsage() }
     }
 
     @objc private func forgetAccount(_ sender: NSMenuItem) {
