@@ -109,6 +109,8 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 
 @MainActor
 final class DataChangeMonitor {
+    static let projectRefreshQuietPeriod: Duration = .milliseconds(500)
+
     private struct Watch {
         let descriptor: Int32
         let source: DispatchSourceFileSystemObject
@@ -305,22 +307,23 @@ final class DataChangeMonitor {
 
     private func scheduleProjectRefresh(for paths: Set<String>) {
         pendingProjectPaths.formUnion(paths)
-        guard projectRefreshTask == nil else { return }
         projectRefreshGeneration &+= 1
-        let generation = projectRefreshGeneration
+        guard projectRefreshTask == nil else { return }
         projectRefreshTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
             guard let self else { return }
             while !Task.isCancelled {
+                let generationBeforeQuietPeriod = self.projectRefreshGeneration
+                try? await Task.sleep(for: Self.projectRefreshQuietPeriod)
+                guard !Task.isCancelled else { break }
+                if self.projectRefreshGeneration != generationBeforeQuietPeriod {
+                    continue
+                }
                 let paths = self.pendingProjectPaths
                 self.pendingProjectPaths = []
                 if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
                 guard !Task.isCancelled, !self.pendingProjectPaths.isEmpty else { break }
-                try? await Task.sleep(for: .milliseconds(150))
             }
-            if self.projectRefreshGeneration == generation {
-                self.projectRefreshTask = nil
-            }
+            self.projectRefreshTask = nil
         }
     }
 

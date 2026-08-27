@@ -88,9 +88,42 @@ extension AppCoordinatorTests {
         XCTAssertEqual(latestPolicy, .refresh)
     }
 
-    func testUnreadPollingScheduleMatchesLatencyBounds() {
-        XCTAssertEqual(PollingController.Schedule.unread(active: true), .milliseconds(500))
-        XCTAssertEqual(PollingController.Schedule.unread(active: false), .seconds(1))
+    func testCatalogAndUnreadPollingUseSlowFallbacksWhenFileEventsAreAvailable() {
+        XCTAssertEqual(
+            PollingController.Schedule.catalog(active: true, fileEventsAvailable: true),
+            .seconds(30)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.catalog(active: false, fileEventsAvailable: true),
+            .seconds(2 * 60)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.unread(active: true, fileEventsAvailable: true),
+            .seconds(15)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.unread(active: false, fileEventsAvailable: true),
+            .seconds(60)
+        )
+    }
+
+    func testCatalogAndUnreadPollingRemainResponsiveWithoutFileEvents() {
+        XCTAssertEqual(
+            PollingController.Schedule.catalog(active: true, fileEventsAvailable: false),
+            .seconds(2)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.catalog(active: false, fileEventsAvailable: false),
+            .seconds(8)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.unread(active: true, fileEventsAvailable: false),
+            .milliseconds(500)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.unread(active: false, fileEventsAvailable: false),
+            .seconds(1)
+        )
     }
 
     func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {

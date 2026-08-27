@@ -351,11 +351,11 @@ final class AppCoordinatorTests: XCTestCase {
         )
         XCTAssertEqual(
             PollingController.Schedule.accountPopover(panelOpen: false, active: true),
-            .seconds(2)
+            .seconds(10)
         )
         XCTAssertEqual(
             PollingController.Schedule.accountPopover(panelOpen: false, active: false),
-            .seconds(8)
+            .seconds(60)
         )
     }
 

@@ -4,14 +4,20 @@ import Foundation
 @MainActor
 final class PollingController {
     enum Schedule {
-        static func catalog(active: Bool) -> Duration { active ? .seconds(2) : .seconds(8) }
+        static func catalog(active: Bool, fileEventsAvailable: Bool) -> Duration {
+            if fileEventsAvailable { return active ? .seconds(30) : .seconds(2 * 60) }
+            return active ? .seconds(2) : .seconds(8)
+        }
         static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
-        static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
+        static func unread(active: Bool, fileEventsAvailable: Bool) -> Duration {
+            if fileEventsAvailable { return active ? .seconds(15) : .seconds(60) }
+            return active ? .milliseconds(500) : .seconds(1)
+        }
         static let accountUsage: Duration = .seconds(30)
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
         static func accountPopover(panelOpen: Bool, active: Bool) -> Duration {
             if panelOpen { return .milliseconds(250) }
-            return active ? .seconds(2) : .seconds(8)
+            return active ? .seconds(10) : .seconds(60)
         }
     }
 
@@ -57,7 +63,10 @@ final class PollingController {
             let clock = ContinuousClock()
             while !Task.isCancelled {
                 await synchronizeDashboard()
-                try? await clock.sleep(for: Schedule.catalog(active: Self.isUserActive))
+                try? await clock.sleep(for: Schedule.catalog(
+                    active: Self.isUserActive,
+                    fileEventsAvailable: fileChanges != nil
+                ))
             }
         }
         workingTreePollingTask = Task {
@@ -69,7 +78,10 @@ final class PollingController {
         unreadPollingTask = Task {
             while !Task.isCancelled {
                 await updateUnreadState()
-                try? await Task.sleep(for: Schedule.unread(active: Self.isUserActive))
+                try? await Task.sleep(for: Schedule.unread(
+                    active: Self.isUserActive,
+                    fileEventsAvailable: fileChanges != nil
+                ))
             }
         }
         accountUsagePollingTask = Task {
