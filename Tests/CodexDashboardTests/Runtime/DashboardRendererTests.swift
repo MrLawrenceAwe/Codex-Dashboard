@@ -273,9 +273,38 @@ final class DashboardRendererTests: XCTestCase {
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        let action = await renderer.waitForAccountPopoverAction()
+        let result = await renderer.waitForAccountPopoverAction()
 
-        XCTAssertEqual(action, AccountPopoverAction(kind: .updateUsage, accountID: accountID))
+        XCTAssertEqual(
+            result,
+            .action(AccountPopoverAction(kind: .updateUsage, accountID: accountID))
+        )
+    }
+
+    func testAccountPopoverWaitDistinguishesTimeoutFromUnavailableRenderer() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let timedOutRenderer = try DashboardRenderer(
+            devTools: AccountPopoverRendererDevTools(target: target, action: "null"),
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
+        )
+        let unavailableRenderer = try DashboardRenderer(
+            devTools: AccountPopoverRendererDevTools(
+                target: target,
+                action: RendererScript.accountPopoverUnavailable
+            ),
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
+        )
+
+        let timedOutResult = await timedOutRenderer.waitForAccountPopoverAction()
+        let unavailableResult = await unavailableRenderer.waitForAccountPopoverAction()
+
+        XCTAssertEqual(timedOutResult, .timedOut)
+        XCTAssertEqual(unavailableResult, .unavailable)
     }
 
     func testOpeningThreadDispatchesItsRoute() async throws {

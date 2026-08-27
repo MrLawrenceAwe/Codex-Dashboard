@@ -345,14 +345,14 @@ final class StubDashboardRuntime: DashboardRuntime {
 final class AppCoordinatorTests: XCTestCase {
     enum AccountTestError: Error { case mountFailed }
 
-    func testAccountPopoverLongPollRetriesBackOffWhenNoActionArrives() {
+    func testUnavailableAccountPopoverUsesSlowRetry() {
         XCTAssertEqual(
-            PollingController.Schedule.accountPopoverRetry(active: true),
-            .seconds(1)
+            PollingController.Schedule.accountPopoverUnavailableRetry(active: true),
+            .seconds(10)
         )
         XCTAssertEqual(
-            PollingController.Schedule.accountPopoverRetry(active: false),
-            .seconds(15)
+            PollingController.Schedule.accountPopoverUnavailableRetry(active: false),
+            .seconds(60)
         )
     }
 

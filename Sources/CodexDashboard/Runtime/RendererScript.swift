@@ -47,8 +47,9 @@ enum RendererScript {
         return "(() => window.__codexDashboard?.applyAccountPopoverSnapshot?.(\(json)) === true)()"
     }
 
+    static let accountPopoverUnavailable = "__codexDashboardUnavailable__"
     static let waitForAccountPopoverAction =
-        "window.__codexDashboard?.waitForAccountPopoverAction?.() ?? Promise.resolve('null')"
+        "window.__codexDashboard?.waitForAccountPopoverAction?.() ?? Promise.resolve('\(accountPopoverUnavailable)')"
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 
