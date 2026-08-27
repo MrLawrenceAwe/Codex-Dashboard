@@ -3,14 +3,14 @@ import Foundation
 @MainActor
 final class AccountUsageSession {
     private let provider: any AccountUsageProviding
-    private let cache: UsageCache
+    private let cache: any UsageCaching
     private var activeUsageTask: Task<CodexAccountUsage, Error>?
     private var activeUsageTaskID: UUID?
     private var savedAccountUsageTask: Task<SavedAccountUsageResult, Error>?
     private var savedAccountUsageTaskID: UUID?
     private var lastCacheSaveAt: Date?
 
-    init(provider: any AccountUsageProviding, cache: UsageCache) {
+    init(provider: any AccountUsageProviding, cache: any UsageCaching) {
         self.provider = provider
         self.cache = cache
     }

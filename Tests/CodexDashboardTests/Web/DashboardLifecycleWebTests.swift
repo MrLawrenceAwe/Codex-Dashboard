@@ -5,6 +5,54 @@ import XCTest
 
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
+    func testSidebarObserverIgnoresDashboardMutationsAndTracksThreadRowChanges() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <aside class="app-shell-left-panel" role="navigation">
+            <button class="sidebar-item" data-app-action-sidebar-thread-id="local:thread">Thread</button>
+          </aside>
+          <main>Conversation surface</main>
+        </body></html>
+        """)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "thread", isUnread: false),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+              row.__reactFiber$test = {
+                memoizedProps: { conversationId: 'thread', isUnread: false },
+                return: null,
+              };
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              row.__reactFiber$test.memoizedProps.isUnread = true;
+              document.getElementById('codex-dashboard-navigation')
+                .append(document.createElement('span'));
+              return true;
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(100))
+        let unreadCountAfterDashboardMutation = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-navigation-count]').textContent"
+        ) as? String
+        XCTAssertEqual(unreadCountAfterDashboardMutation, "0")
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            document.querySelector('[data-app-action-sidebar-thread-id]')
+              .append(document.createElement('span'));
+            true;
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-navigation-count]').textContent === '1'",
+            in: webView
+        )
+    }
+
     func testDashboardLifecycleAndCoreInteractions() async throws {
         let webView = DashboardWebTestHarness.makeWebView()
         webView.loadHTMLString(

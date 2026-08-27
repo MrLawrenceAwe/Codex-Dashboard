@@ -22,7 +22,7 @@ final class AccountCoordinator: ObservableObject {
     init(
         manager: CodexAccountManager,
         usageProvider: any AccountUsageProviding,
-        usageCacheStore: UsageCache? = nil
+        usageCacheStore: (any UsageCaching)? = nil
     ) {
         self.manager = manager
         usageSession = AccountUsageSession(
@@ -149,16 +149,27 @@ final class AccountCoordinator: ObservableObject {
     }
 
     func refreshInactiveUsage() async {
-        for account in savedAccounts where account.id != activeAccountID {
+        let inactiveAccounts = savedAccounts.filter { $0.id != activeAccountID }
+        var shouldPersistUsageCache = false
+        defer {
+            if shouldPersistUsageCache { persistUsageCache(force: true) }
+        }
+        for account in inactiveAccounts {
             guard !Task.isCancelled else { return }
-            _ = await refreshInactiveAccountUsage(account.id, reportsFailure: false)
+            _ = await refreshInactiveAccountUsage(
+                account.id,
+                reportsFailure: false,
+                persistsUsageCache: false
+            )
+            shouldPersistUsageCache = true
         }
     }
 
     func refreshInactiveAccountUsage(
         _ accountID: UUID,
         reportsFailure: Bool = true,
-        interactionAllowed: Bool = false
+        interactionAllowed: Bool = false,
+        persistsUsageCache: Bool = true
     ) async -> SavedAccountUsageRefreshOutcome {
         if accountID == activeAccountID { return .completed }
         guard savedAccounts.contains(where: { $0.id == accountID }) else { return .completed }
@@ -189,7 +200,7 @@ final class AccountCoordinator: ObservableObject {
                 fetchedAt: .now
             )
             usageErrorsByAccountID[accountID] = nil
-            persistUsageCache(force: true)
+            if persistsUsageCache { persistUsageCache(force: true) }
         } catch CodexAccountError.keychainAuthorizationRequired {
             return .authorizationRequired
         } catch {

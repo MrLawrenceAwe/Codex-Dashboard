@@ -7,7 +7,12 @@ private struct CodexAccountUsageCacheDocument: Codable {
     let snapshots: [String: CodexAccountUsageSnapshot]
 }
 
-final class UsageCache: @unchecked Sendable {
+protocol UsageCaching: Sendable {
+    func load() throws -> [UUID: CodexAccountUsageSnapshot]
+    func save(_ snapshots: [UUID: CodexAccountUsageSnapshot]) throws
+}
+
+final class UsageCache: UsageCaching, @unchecked Sendable {
     private let cacheURL: URL
     private let fileManager: FileManager
     private let lock = NSLock()

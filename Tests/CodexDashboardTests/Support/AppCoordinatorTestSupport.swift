@@ -254,6 +254,26 @@ actor SavedAccountRecordingUsageProvider: AccountUsageProviding {
     func credentials() -> [Data] { receivedCredentials }
 }
 
+final class RecordingUsageCache: UsageCaching, @unchecked Sendable {
+    private let lock = NSLock()
+    private var snapshots: [UUID: CodexAccountUsageSnapshot] = [:]
+    private var writes = 0
+
+    func load() -> [UUID: CodexAccountUsageSnapshot] {
+        lock.withLock { snapshots }
+    }
+
+    func save(_ snapshots: [UUID: CodexAccountUsageSnapshot]) {
+        lock.withLock {
+            self.snapshots = snapshots
+            writes += 1
+        }
+    }
+
+    var saveCount: Int { lock.withLock { writes } }
+    var savedSnapshots: [UUID: CodexAccountUsageSnapshot] { lock.withLock { snapshots } }
+}
+
 actor SequencedCompatibilityChecker: LocalCompatibilityChecking {
     private var results: [[CompatibilityCheck]]
 
@@ -376,7 +396,7 @@ func makeAppCoordinator(
     promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
     accountManager: CodexAccountManager = CodexAccountManager(),
     accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
-    accountUsageCacheStore: UsageCache? = nil,
+    accountUsageCacheStore: (any UsageCaching)? = nil,
     runtimeFactory: () throws -> any DashboardRuntime = { StubDashboardRuntime() }
 ) -> AppCoordinator {
     AppCoordinator(
