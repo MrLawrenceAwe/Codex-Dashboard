@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum CodexConfiguration {
@@ -6,9 +7,10 @@ enum CodexConfiguration {
     static let codexExecutableURL = codexApplicationURL
         .appendingPathComponent("Contents/Resources/codex")
     static let devToolsAddress = "127.0.0.1"
-    // DevTools does not authenticate loopback clients. A per-launch high port avoids
-    // leaving a predictable, permanently-scanned local debugging endpoint.
-    static let devToolsPort = Int.random(in: 49_152...65_535)
+    // Reuse the port of an already-running Codex renderer so restarting only the
+    // dashboard does not orphan its connection. New Codex launches still receive
+    // a random high port because DevTools does not authenticate loopback clients.
+    static let devToolsPort = runningCodexDevToolsPort() ?? Int.random(in: 49_152...65_535)
 
     static let launchArguments = [
         "--remote-debugging-address=\(devToolsAddress)",
@@ -33,5 +35,37 @@ enum CodexConfiguration {
     static var installedVersion: String? {
         guard let bundle = Bundle(url: codexApplicationURL) else { return nil }
         return bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
+
+    static func devToolsPort(inProcessArguments arguments: String) -> Int? {
+        let prefix = "--remote-debugging-port="
+        return arguments.split(whereSeparator: { $0.isWhitespace })
+            .first(where: { $0.hasPrefix(prefix) })
+            .flatMap { Int($0.dropFirst(prefix.count)) }
+            .flatMap { (1...65_535).contains($0) ? $0 : nil }
+    }
+
+    private static func runningCodexDevToolsPort() -> Int? {
+        let applications = NSRunningApplication.runningApplications(
+            withBundleIdentifier: bundleIdentifier
+        ).sorted { ($0.launchDate ?? .distantPast) > ($1.launchDate ?? .distantPast) }
+        for application in applications {
+            let process = Process()
+            let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/bin/ps")
+            process.arguments = ["-p", String(application.processIdentifier), "-o", "args="]
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { continue }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard
+                process.terminationStatus == 0,
+                let arguments = String(data: data, encoding: .utf8),
+                let port = devToolsPort(inProcessArguments: arguments)
+            else { continue }
+            return port
+        }
+        return nil
     }
 }

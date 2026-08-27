@@ -18,4 +18,18 @@ final class CodexConfigurationTests: XCTestCase {
             ]
         )
     }
+
+    func testReadsDevToolsPortFromRunningCodexArguments() {
+        XCTAssertEqual(
+            CodexConfiguration.devToolsPort(inProcessArguments:
+                "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT "
+                    + "--remote-debugging-address=127.0.0.1 "
+                    + "--remote-debugging-port=61234"
+            ),
+            61_234
+        )
+        XCTAssertNil(CodexConfiguration.devToolsPort(inProcessArguments:
+            "ChatGPT --remote-debugging-port=70000"
+        ))
+    }
 }

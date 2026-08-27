@@ -243,12 +243,16 @@ actor DevToolsClient: DevToolsServing {
         if let session {
             self.session = session
         } else {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = 2
-            configuration.timeoutIntervalForResource = 4
-            self.session = URLSession(configuration: configuration)
+            self.session = URLSession(configuration: Self.sessionConfiguration())
         }
         self.connectionFactory = connectionFactory
+    }
+
+    nonisolated static func sessionConfiguration() -> URLSessionConfiguration {
+        // Account actions use a 30-second renderer-side long poll. Keep the
+        // persistent WebSocket on URLSession's normal resource lifetime and
+        // enforce short operation deadlines in evaluateBoolean/evaluateString.
+        .ephemeral
     }
 
     deinit {

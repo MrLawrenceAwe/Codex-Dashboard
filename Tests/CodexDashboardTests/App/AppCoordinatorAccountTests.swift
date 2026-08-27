@@ -5,6 +5,44 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testActiveUsageRefreshPublishesUpdatedAccountPopover() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorUsagePublicationTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try testAccountCredential(accountID: "account-lawrence", name: "Lawrence")
+            .write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        _ = try accountManager.saveCurrentAccount()
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
+        )
+        let runtime = StubDashboardRuntime(
+            codexIsRunning: true,
+            maintainsDashboard: true
+        )
+        let coordinator = makeAppCoordinator(
+            accountManager: accountManager,
+            accountUsageProvider: SequencedAccountUsageProvider(outcomes: [usage]),
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.refreshAccountUsage()
+
+        XCTAssertEqual(runtime.accountPopoverSynchronizationCount, 1)
+        let item = try XCTUnwrap(runtime.lastAccountPopoverSnapshot?.accounts.first)
+        XCTAssertTrue(item.usageLines.contains { $0.contains("80% remaining") })
+        XCTAssertTrue(item.usageLines.contains { $0.contains("60% remaining") })
+    }
+
     func testUsageFailureMarksPreviousUnsavedAccountUsageStale() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorUsageTests-\(UUID().uuidString)")

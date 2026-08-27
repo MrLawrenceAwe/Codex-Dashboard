@@ -36,6 +36,16 @@ private final class DevToolsConnectionFactoryProbe: @unchecked Sendable {
 }
 
 final class DevToolsClientTests: XCTestCase {
+    func testDefaultSessionAllowsAccountActionLongPolling() {
+        let configuration = DevToolsClient.sessionConfiguration()
+
+        XCTAssertGreaterThan(
+            configuration.timeoutIntervalForResource,
+            35,
+            "The persistent DevTools socket must outlive account action polling."
+        )
+    }
+
     func testTargetDecoding() throws {
         let data = Data(#"[{"id":"page-1","type":"page","title":"Codex","url":"app://codex","webSocketDebuggerUrl":"ws://127.0.0.1/devtools/page/1"}]"#.utf8)
         let targets = try JSONDecoder().decode([DevToolsTarget].self, from: data)

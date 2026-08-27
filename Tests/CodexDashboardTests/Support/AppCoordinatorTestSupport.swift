@@ -296,30 +296,43 @@ final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked
 final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning: Bool
     let codexLaunchDate: Date? = nil
-    let maintainsDashboard = false
+    let maintainsDashboard: Bool
     private let compatibilityChecks: [CompatibilityCheck]
     private let synchronizationError: Error?
     private let restartError: Error?
     private let onRestart: (() -> Void)?
     private(set) var restartCallCount = 0
     private(set) var synchronizeCallCount = 0
+    private(set) var lastSynchronizedSnapshot: DashboardSnapshot?
+    private(set) var accountPopoverSynchronizationCount = 0
+    private(set) var lastAccountPopoverSnapshot: AccountPopoverSnapshot?
     private(set) var openedThreadIDs: [String] = []
 
     init(
         codexIsRunning: Bool = false,
+        maintainsDashboard: Bool = false,
         compatibilityChecks: [CompatibilityCheck] = [],
         synchronizationError: Error? = nil,
         restartError: Error? = nil,
         onRestart: (() -> Void)? = nil
     ) {
         self.codexIsRunning = codexIsRunning
+        self.maintainsDashboard = maintainsDashboard
         self.compatibilityChecks = compatibilityChecks
         self.synchronizationError = synchronizationError
         self.restartError = restartError
         self.onRestart = onRestart
     }
 
-    func rendererTargets() async -> [DevToolsTarget] { [] }
+    func rendererTargets() async -> [DevToolsTarget] {
+        guard maintainsDashboard else { return [] }
+        return [DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )]
+    }
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1
@@ -333,11 +346,16 @@ final class StubDashboardRuntime: DashboardRuntime {
         forceRemount: Bool
     ) async throws {
         synchronizeCallCount += 1
+        lastSynchronizedSnapshot = snapshot
         if let synchronizationError { throw synchronizationError }
     }
     func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome { .codexClosed }
     func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
+    func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
+        accountPopoverSynchronizationCount += 1
+        lastAccountPopoverSnapshot = snapshot
+    }
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
 }
 
