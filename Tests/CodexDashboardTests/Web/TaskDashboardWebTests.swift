@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
+final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -41,7 +41,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "stable")])
         _ = try await webView.evaluateJavaScript(
             """
@@ -62,7 +62,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "deferred-thread", isUnread: true, runState: .running),
         ])
@@ -127,8 +127,9 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.open();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
               document.querySelector('[data-filter="running"]').click();
-              const saved = JSON.parse(localStorage.getItem('codex-dashboard.thread-preferences'));
-              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.ignoredProjectPaths[0], document.querySelector('[data-view]') === null]);
+              const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
+              const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
+              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.ignoredProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }
@@ -145,9 +146,10 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
         XCTAssertEqual(values[5] as? Bool, true)
+        XCTAssertEqual(values[6] as? Bool, true)
     }
 
-    func testNavigationShowsUncommittedChangesIndicatorForDirtyProjects() async throws {
+    func testNavigationShowsUncommittedChangesIndicatorForChangedProjects() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -224,7 +226,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletedThreadShowsTickInsteadOfOpenArrow() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "completed",
@@ -254,7 +256,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletionRouteDoesNotReplaceOpenDashboard() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))
 
         let result = try await webView.evaluateJavaScript(

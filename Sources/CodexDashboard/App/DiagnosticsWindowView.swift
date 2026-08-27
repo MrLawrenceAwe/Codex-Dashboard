@@ -158,19 +158,19 @@ struct DiagnosticsWindowView: View {
 
             HStack(spacing: 10) {
                 Button(DashboardActionPresentation.openTitle) {
-                    Task { await coordinator.openThreadDashboard() }
+                    Task { await coordinator.openTaskDashboard() }
                 }
                 .disabled(!actions.canOpen)
 
                 Button(DashboardActionPresentation.restartTitle) {
-                    Task { await coordinator.restartCodexAndEnableThreadDashboard() }
+                    Task { await coordinator.restartCodexAndEnableTaskDashboard() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!actions.canRestart)
 
                 if coordinator.connectionState.rendererIsAvailable {
                     Button(DashboardActionPresentation.disableTitle) {
-                        Task { await coordinator.disableThreadDashboard() }
+                        Task { await coordinator.disableTaskDashboard() }
                     }
                     .disabled(!actions.canDisable)
                 }

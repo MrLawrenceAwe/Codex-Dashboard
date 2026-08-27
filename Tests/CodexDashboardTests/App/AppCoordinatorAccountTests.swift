@@ -375,11 +375,11 @@ extension AppCoordinatorTests {
     }
 
     func testAccountUsagePollingScheduleRefreshesEveryThirtySeconds() {
-        XCTAssertEqual(PollingController.Schedule.accountUsage, .seconds(30))
+        XCTAssertEqual(RefreshScheduler.Schedule.accountUsage, .seconds(30))
     }
 
     func testInactiveAccountUsagePollingScheduleRefreshesEveryFiveMinutes() {
-        XCTAssertEqual(PollingController.Schedule.inactiveAccountUsage, .seconds(5 * 60))
+        XCTAssertEqual(RefreshScheduler.Schedule.inactiveAccountUsage, .seconds(5 * 60))
     }
 
     func testInactiveAccountUsageRefreshDoesNotSwitchActiveAccount() async throws {

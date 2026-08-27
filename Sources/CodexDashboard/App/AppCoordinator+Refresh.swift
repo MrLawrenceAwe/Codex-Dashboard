@@ -5,40 +5,49 @@ extension AppCoordinator {
         do {
             try await loadThreadSnapshot()
         } catch {
-            setCatalogWarning("Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)")
+            catalogWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
             refreshThreadDataWarning()
         }
 
         guard !Task.isCancelled, !isPerformingAction, let dashboardRuntime else { return }
         let codexIsRunning = dashboardRuntime.codexIsRunning
         let targets = await dashboardRuntime.rendererTargets()
-        setRendererTargetCount(targets.count)
+        updatePublished(\.rendererTargetCount, to: targets.count)
         guard !Task.isCancelled, !isPerformingAction else { return }
 
         if compatibilityWasTriggeredByUpdate && isCheckingCompatibility {
-            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable)
+            updatePublished(
+                \.connectionState,
+                to: targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable
+            )
             return
         }
         if let compatibilityReport, compatibilityReport.blockingCount > 0 {
-            setConnectionState(targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable)
-            setConnectionError(Self.incompatibleContractMessage)
+            updatePublished(
+                \.connectionState,
+                to: targets.isEmpty ? .codexRunningWithoutRenderer : .rendererAvailable
+            )
+            updatePublished(\.connectionError, to: Self.incompatibleContractMessage)
             return
         }
         if dashboardRuntime.maintainsDashboard, !targets.isEmpty {
             do {
                 try await publishSnapshot(to: targets, using: dashboardRuntime)
-                setConnectionState(.dashboardMounted)
-                setConnectionError(nil)
+                updatePublished(\.connectionState, to: .dashboardMounted)
+                updatePublished(\.connectionError, to: nil)
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
                 setFailure(error, lastKnownState: .rendererAvailable)
             }
             return
         }
-        setConnectionState(!targets.isEmpty
-            ? .rendererAvailable
-            : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed))
-        setConnectionError(nil)
+        updatePublished(
+            \.connectionState,
+            to: !targets.isEmpty
+                ? .rendererAvailable
+                : (codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed)
+        )
+        updatePublished(\.connectionError, to: nil)
     }
 
     func refreshUnreadState() async {
@@ -46,10 +55,10 @@ extension AppCoordinator {
         let generation = refreshGeneration
         let refresh = await threadSnapshotService.updateUnreadState()
         guard !isPerformingAction, generation == refreshGeneration else { return }
-        setUnreadStateWarning(refresh.warning)
+        unreadStateWarning = refresh.warning
         refreshThreadDataWarning()
         guard let unreadThreadIDs = refresh.unreadThreadIDs else { return }
-        setThreadSnapshot(threads.map { thread in
+        applyThreadSnapshot(threads.map { thread in
             var updatedThread = thread
             updatedThread.isUnread = unreadThreadIDs.contains(updatedThread.id)
             return updatedThread
@@ -59,7 +68,7 @@ extension AppCoordinator {
 
     func refreshAfterActivation() async {
         await synchronizeDashboard()
-        if !pollingController.hasFileChangeMonitoring {
+        if !refreshScheduler.hasFileChangeMonitoring {
             await updateWorkingTreeStatuses()
         }
     }
@@ -76,7 +85,7 @@ extension AppCoordinator {
             in: threads, projectPaths: requestedPaths
         ) else { return }
         guard !isPerformingAction, generation == refreshGeneration else { return }
-        setThreadSnapshot(threads.map { thread in
+        applyThreadSnapshot(threads.map { thread in
             var updatedThread = thread
             if let status = statusByProjectPath[updatedThread.projectPath] {
                 updatedThread.workingTreeStatus = status
@@ -90,13 +99,13 @@ extension AppCoordinator {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
         let completedThreadID = newestCompletedThreadID(in: snapshot.catalog.threads)
-        setThreadSnapshot(
+        applyThreadSnapshot(
             snapshot.catalog.threads,
             totalCount: snapshot.catalog.totalThreadCount,
             refreshedAt: .now
         )
-        setCatalogWarning(nil)
-        setUnreadStateWarning(snapshot.unreadStateWarning)
+        catalogWarning = nil
+        unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
         if let completedThreadID {
             Task { await self.refreshAccountUsage() }
@@ -126,7 +135,7 @@ extension AppCoordinator {
     private func refreshThreadDataWarning() {
         let warnings = [catalogWarning, unreadStateWarning].compactMap { $0 }
         let warning = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
-        setThreadDataWarning(warning)
+        updatePublished(\.threadDataWarning, to: warning)
     }
 
     var connectionSummary: String {

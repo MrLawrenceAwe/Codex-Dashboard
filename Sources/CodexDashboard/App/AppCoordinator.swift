@@ -5,34 +5,35 @@ import Foundation
 final class AppCoordinator: ObservableObject {
     static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
 
-    @Published private(set) var connectionState: DashboardConnectionState = .checking
-    @Published private(set) var connectionError: String?
-    @Published private(set) var isPerformingAction = false
-    @Published private(set) var threadDataWarning: String?
-    @Published private(set) var threads: [ThreadSummary] = []
-    @Published private(set) var totalThreadCount = 0
-    @Published private(set) var compatibilityReport: CompatibilityReport?
-    @Published private(set) var isCheckingCompatibility = false
-    private(set) var lastSuccessfulRefresh: Date?
-    @Published private(set) var lastCompatibilityCheck: Date?
-    @Published private(set) var lastErrorDate: Date?
-    @Published private(set) var rendererTargetCount = 0
-    @Published private(set) var compatibilityWasTriggeredByUpdate = false
-    @Published private(set) var promptLibraryStatusMessage: String?
-    @Published private(set) var savedAccounts: [SavedAccount] = []
-    @Published private(set) var activeAccountID: UUID?
-    @Published private(set) var accountStatusMessage: String?
-    @Published private(set) var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
-    @Published private(set) var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
-    @Published private(set) var refreshingUsageAccountIDs: Set<UUID> = []
-    @Published private(set) var usageErrorsByAccountID: [UUID: String] = [:]
+    @Published var connectionState: DashboardConnectionState = .checking
+    @Published var connectionError: String?
+    @Published var isPerformingAction = false
+    @Published var threadDataWarning: String?
+    @Published var threads: [ThreadSummary] = []
+    @Published var totalThreadCount = 0
+    @Published var compatibilityReport: CompatibilityReport?
+    @Published var isCheckingCompatibility = false
+    var lastSuccessfulRefresh: Date?
+    @Published var lastCompatibilityCheck: Date?
+    @Published var lastErrorDate: Date?
+    @Published var rendererTargetCount = 0
+    @Published var compatibilityWasTriggeredByUpdate = false
+    @Published var promptLibraryStatusMessage: String?
+    @Published var savedAccounts: [SavedAccount] = []
+    @Published var activeAccountID: UUID?
+    @Published var accountStatusMessage: String?
+    @Published var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
+    @Published var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
+    @Published var refreshingUsageAccountIDs: Set<UUID> = []
+    @Published var usageErrorsByAccountID: [UUID: String] = [:]
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
 
     let threadSnapshotService: ThreadSnapshotService
     let compatibilityMonitor: CompatibilityMonitor
-    let pollingController: PollingController
+    let refreshScheduler: RefreshScheduler
+    let accountPopoverActionListener = AccountPopoverActionListener()
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
     let promptLibraryStore: PromptLibraryFileStore
@@ -40,9 +41,9 @@ final class AppCoordinator: ObservableObject {
     let accountUsageSession: AccountUsageSession
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
-    private(set) var refreshGeneration = 0
-    private(set) var catalogWarning: String?
-    private(set) var unreadStateWarning: String?
+    var refreshGeneration = 0
+    var catalogWarning: String?
+    var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
     private var taskCompletionObserver = TaskCompletionObserver()
 
@@ -90,7 +91,7 @@ final class AppCoordinator: ObservableObject {
             cache: accountUsageCacheStore ?? accountManager.usageCacheStore
         )
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
-        pollingController = PollingController(observeFileChanges: observeFileChanges)
+        refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
         compatibilityMonitor = CompatibilityMonitor(
             localChecker: compatibilityChecker,
             userDefaults: userDefaults,
@@ -111,7 +112,7 @@ final class AppCoordinator: ObservableObject {
 
     func startMonitoring() {
         compatibilityWasTriggeredByUpdate = compatibilityMonitor.updateWasDetected
-        pollingController.start(
+        refreshScheduler.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
             updateWorkingTrees: { [weak self] paths in
                 await self?.updateWorkingTreeStatuses(projectPaths: paths)
@@ -121,13 +122,13 @@ final class AppCoordinator: ObservableObject {
             refreshInactiveAccountUsage: {
                 [weak self] in await self?.refreshInactiveAccountUsage()
             },
-            handleAccountPopoverAction: { [weak self] in
-                await self?.handleAccountPopoverAction() ?? .unavailable
-            },
             refreshAccountState: { [weak self] in
                 await self?.refreshAccountStateAfterFileChange()
             }
         )
+        accountPopoverActionListener.start { [weak self] in
+            await self?.handleAccountPopoverAction() ?? .unavailable
+        }
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,
@@ -143,7 +144,8 @@ final class AppCoordinator: ObservableObject {
     func stopMonitoring() {
         refreshGeneration += 1
         persistAccountUsageCache(force: true)
-        pollingController.stop()
+        refreshScheduler.stop()
+        accountPopoverActionListener.stop()
         synchronizationGate.stop()
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
@@ -156,31 +158,30 @@ final class AppCoordinator: ObservableObject {
         await synchronizationGate.perform { [weak self] in await self?.synchronizeRuntime() }
     }
 
-    func restartCodexAndEnableThreadDashboard() async {
+    func restartCodexAndEnableTaskDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
         do {
             try await loadThreadSnapshot()
         } catch {
-            setConnectionError(
+            connectionError =
                 "Codex was not restarted because active tasks could not be checked. "
                     + error.localizedDescription
-            )
             return
         }
         guard !threads.contains(where: { $0.runState == .running }) else {
-            setConnectionError("Finish or cancel active Codex tasks before restarting.")
+            connectionError = "Finish or cancel active Codex tasks before restarting."
             return
         }
         await checkCompatibility()
         guard compatibilityReport?.blockingCount ?? 0 == 0 else {
-            setConnectionError(Self.incompatibleContractMessage)
+            connectionError = Self.incompatibleContractMessage
             return
         }
         isPerformingAction = true
         refreshGeneration += 1
         dashboardRuntime.prepareForRestart()
-        setConnectionState(.checking)
-        setConnectionError(nil)
+        connectionState = .checking
+        connectionError = nil
         defer { isPerformingAction = false }
         await cancelSynchronization()
         var rendererAvailable = false
@@ -194,7 +195,7 @@ final class AppCoordinator: ObservableObject {
                 on: targets,
                 forceRemount: true
             )
-            setConnectionState(.dashboardMounted)
+            connectionState = .dashboardMounted
         } catch {
             setFailure(
                 error,
@@ -203,7 +204,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func disableThreadDashboard() async {
+    func disableTaskDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
         isPerformingAction = true
         refreshGeneration += 1
@@ -211,20 +212,20 @@ final class AppCoordinator: ObservableObject {
         await cancelSynchronization()
 
         do {
-            switch try await dashboardRuntime.disableThreadDashboard() {
+            switch try await dashboardRuntime.disableTaskDashboard() {
             case .codexClosed:
-                setConnectionState(.codexClosed)
+                connectionState = .codexClosed
             case .rendererAvailable:
-                setConnectionState(.rendererAvailable)
+                connectionState = .rendererAvailable
             }
-            setConnectionError(nil)
+            connectionError = nil
         } catch {
             setFailure(error, lastKnownState: .dashboardMounted)
         }
     }
 
-    func openThreadDashboard() async {
-        await dashboardRuntime?.openThreadDashboard()
+    func openTaskDashboard() async {
+        await dashboardRuntime?.openTaskDashboard()
     }
 
     private func cancelSynchronization() async {
@@ -232,98 +233,28 @@ final class AppCoordinator: ObservableObject {
     }
 
     func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
-        setConnectionState(lastKnownState)
-        setConnectionError(error.localizedDescription)
+        updatePublished(\.connectionState, to: lastKnownState)
+        updatePublished(\.connectionError, to: error.localizedDescription)
         lastErrorDate = .now
     }
 
-    func setConnectionState(_ state: DashboardConnectionState) {
-        if connectionState != state {
-            connectionState = state
-        }
+    func updatePublished<Value: Equatable>(
+        _ keyPath: ReferenceWritableKeyPath<AppCoordinator, Value>,
+        to value: Value
+    ) {
+        guard self[keyPath: keyPath] != value else { return }
+        self[keyPath: keyPath] = value
     }
 
-    func setConnectionError(_ error: String?) {
-        if connectionError != error {
-            connectionError = error
-        }
-    }
-
-    func setPerformingAction(_ value: Bool) {
-        isPerformingAction = value
-    }
-
-    func advanceRefreshGeneration() {
-        refreshGeneration += 1
-    }
-
-    func setCompatibilityChecking(_ value: Bool) {
-        isCheckingCompatibility = value
-    }
-
-    func setCompatibilityReport(_ report: CompatibilityReport, checkedAt: Date = .now) {
-        compatibilityReport = report
-        lastCompatibilityCheck = checkedAt
-    }
-
-    func setRendererTargetCount(_ count: Int) {
-        if rendererTargetCount != count { rendererTargetCount = count }
-    }
-
-    func setPromptLibraryStatus(_ message: String?) {
-        promptLibraryStatusMessage = message
-    }
-
-    func setAccountStatus(_ message: String?) {
-        accountStatusMessage = message
-    }
-
-    func setAccountState(accounts: [SavedAccount], activeAccountID: UUID?) {
-        if savedAccounts != accounts { savedAccounts = accounts }
-        if self.activeAccountID != activeAccountID { self.activeAccountID = activeAccountID }
-    }
-
-    func updateUsage(_ snapshot: CodexAccountUsageSnapshot?, for accountID: UUID) {
-        usageByAccountID[accountID] = snapshot
-    }
-
-    func setActiveAccountUsageStatus(_ status: CodexAccountUsageStatus) {
-        activeAccountUsageStatus = status
-    }
-
-    func setRefreshingUsage(_ isRefreshing: Bool, for accountID: UUID) {
-        if isRefreshing {
-            refreshingUsageAccountIDs.insert(accountID)
-        } else {
-            refreshingUsageAccountIDs.remove(accountID)
-        }
-    }
-
-    func setUsageError(_ message: String?, for accountID: UUID) {
-        usageErrorsByAccountID[accountID] = message
-    }
-
-    func setCatalogWarning(_ warning: String?) {
-        catalogWarning = warning
-    }
-
-    func setUnreadStateWarning(_ warning: String?) {
-        unreadStateWarning = warning
-    }
-
-    func setThreadSnapshot(
+    func applyThreadSnapshot(
         _ updatedThreads: [ThreadSummary],
         totalCount: Int? = nil,
         refreshedAt: Date? = nil
     ) {
-        pollingController.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
+        refreshScheduler.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
         if threads != updatedThreads { threads = updatedThreads }
         if let totalCount, totalThreadCount != totalCount { totalThreadCount = totalCount }
         if let refreshedAt { lastSuccessfulRefresh = refreshedAt }
-    }
-
-    func setThreadDataWarning(_ warning: String?) {
-        if threadDataWarning != warning { threadDataWarning = warning }
     }
 
     func newestCompletedThreadID(in threads: [ThreadSummary]) -> String? {

@@ -5,57 +5,66 @@ enum AccountDocumentMigration {
         let document: SavedAccountsDocument
         let requiresNameFallback: Bool
         let requiresIdentitySynchronization: Bool
+        let requiresRewrite: Bool
     }
 
     static func decode(
         _ data: Data,
         version: Int,
-        accountIdentifier: (UUID) -> String?
+        accountIdentifier: @escaping (UUID) -> String?
     ) throws -> Result {
         switch version {
         case SavedAccountsDocument.currentVersion:
             return Result(
                 document: try JSONDecoder().decode(SavedAccountsDocument.self, from: data),
                 requiresNameFallback: false,
-                requiresIdentitySynchronization: false
+                requiresIdentitySynchronization: false,
+                requiresRewrite: false
+            )
+        case 4:
+            return Result(
+                document: try currentDocument(from: data),
+                requiresNameFallback: false,
+                requiresIdentitySynchronization: false,
+                requiresRewrite: true
             )
         case 3:
-            var document = try JSONDecoder().decode(SavedAccountsDocument.self, from: data)
-            document.version = SavedAccountsDocument.currentVersion
             return Result(
-                document: document,
+                document: try currentDocument(from: data),
                 requiresNameFallback: false,
-                requiresIdentitySynchronization: true
+                requiresIdentitySynchronization: true,
+                requiresRewrite: true
             )
-        case 2:
-            var document = try JSONDecoder().decode(SavedAccountsDocument.self, from: data)
-            document.version = SavedAccountsDocument.currentVersion
+        case 1, 2:
             return Result(
-                document: document,
+                document: try currentDocument(from: data, accountIdentifier: accountIdentifier),
                 requiresNameFallback: true,
-                requiresIdentitySynchronization: true
-            )
-        case 1:
-            let legacy = try JSONDecoder().decode(LegacySavedAccountsDocument.self, from: data)
-            return Result(
-                document: SavedAccountsDocument(
-                    accounts: legacy.accounts.map { account in
-                        SavedAccount(
-                            id: account.id,
-                            name: account.name,
-                            createdAt: account.createdAt,
-                            lastUsedAt: account.lastUsedAt,
-                            accountIdentifier: accountIdentifier(account.id)
-                        )
-                    },
-                    activeAccountID: legacy.activeAccountID
-                ),
-                requiresNameFallback: true,
-                requiresIdentitySynchronization: true
+                requiresIdentitySynchronization: true,
+                requiresRewrite: true
             )
         default:
             throw CodexAccountError.unsupportedMetadataVersion(version)
         }
+    }
+
+    private static func currentDocument(
+        from data: Data,
+        accountIdentifier: ((UUID) -> String?)? = nil
+    ) throws -> SavedAccountsDocument {
+        let legacy = try JSONDecoder().decode(LegacySavedAccountsDocument.self, from: data)
+        return SavedAccountsDocument(
+            accounts: legacy.accounts.map { account in
+                SavedAccount(
+                    id: account.id,
+                    name: account.name,
+                    createdAt: account.createdAt,
+                    lastUsedAt: account.lastUsedAt,
+                    accountIdentifier: account.accountIdentifier
+                        ?? accountIdentifier?(account.id)
+                )
+            },
+            activeAccountID: legacy.activeAccountID
+        )
     }
 }
 
@@ -64,6 +73,7 @@ private struct LegacySavedAccount: Decodable {
     let name: String
     let createdAt: Date
     let lastUsedAt: Date
+    let accountIdentifier: String?
 }
 
 private struct LegacySavedAccountsDocument: Decodable {

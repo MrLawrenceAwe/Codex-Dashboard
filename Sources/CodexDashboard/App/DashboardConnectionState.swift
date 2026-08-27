@@ -25,7 +25,7 @@ enum DashboardConnectionState: Equatable {
         case .codexRunningWithoutRenderer:
             (
                 "Codex is running without the Task Dashboard connection",
-                "Restart it through this controller once to enable the Task Dashboard."
+                "Restart Codex from the Codex Dashboard menu once to enable the Task Dashboard."
             )
         case .rendererAvailable:
             ("Task Dashboard is ready", "The local renderer is connected and ready.")

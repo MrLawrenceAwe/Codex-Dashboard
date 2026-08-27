@@ -109,57 +109,57 @@ extension AppCoordinatorTests {
 
     func testCatalogAndUnreadPollingUseSlowFallbacksWhenFileEventsAreAvailable() {
         XCTAssertEqual(
-            PollingController.Schedule.catalog(active: true, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.catalog(active: true, fileEventsAvailable: true),
             .seconds(30)
         )
         XCTAssertEqual(
-            PollingController.Schedule.catalog(active: false, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.catalog(active: false, fileEventsAvailable: true),
             .seconds(2 * 60)
         )
         XCTAssertEqual(
-            PollingController.Schedule.unread(active: true, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.unread(active: true, fileEventsAvailable: true),
             .seconds(15)
         )
         XCTAssertEqual(
-            PollingController.Schedule.unread(active: false, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.unread(active: false, fileEventsAvailable: true),
             .seconds(60)
         )
     }
 
     func testCatalogAndUnreadPollingRemainResponsiveWithoutFileEvents() {
         XCTAssertEqual(
-            PollingController.Schedule.catalog(active: true, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.catalog(active: true, fileEventsAvailable: false),
             .seconds(2)
         )
         XCTAssertEqual(
-            PollingController.Schedule.catalog(active: false, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.catalog(active: false, fileEventsAvailable: false),
             .seconds(8)
         )
         XCTAssertEqual(
-            PollingController.Schedule.unread(active: true, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.unread(active: true, fileEventsAvailable: false),
             .milliseconds(500)
         )
         XCTAssertEqual(
-            PollingController.Schedule.unread(active: false, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.unread(active: false, fileEventsAvailable: false),
             .seconds(1)
         )
     }
 
     func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
         XCTAssertEqual(
-            PollingController.Schedule.workingTree(active: true, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.workingTree(active: true, fileEventsAvailable: true),
             .seconds(5 * 60)
         )
         XCTAssertEqual(
-            PollingController.Schedule.workingTree(active: false, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.workingTree(active: false, fileEventsAvailable: true),
             .seconds(15 * 60)
         )
         XCTAssertEqual(
-            PollingController.Schedule.workingTree(active: true, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.workingTree(active: true, fileEventsAvailable: false),
             .seconds(15)
         )
         XCTAssertEqual(
-            PollingController.Schedule.workingTree(active: false, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.workingTree(active: false, fileEventsAvailable: false),
             .seconds(60)
         )
     }

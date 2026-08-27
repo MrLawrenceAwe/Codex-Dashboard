@@ -16,7 +16,7 @@ struct RendererCompatibilityChecker {
                 id: "renderer",
                 title: "Renderer connection",
                 status: .unavailable,
-                detail: "Restart Codex through this controller to inspect renderer contracts."
+                detail: "Restart Codex from the Codex Dashboard menu to inspect renderer contracts."
             )]
         }
 

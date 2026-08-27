@@ -1,6 +1,6 @@
 import Foundation
 
-enum DashboardDisableOutcome {
+enum TaskDashboardDisableOutcome {
     case codexClosed
     case rendererAvailable
 }
@@ -19,8 +19,8 @@ protocol DashboardRuntime: AnyObject {
         on targets: [DevToolsTarget],
         forceRemount: Bool
     ) async throws
-    func disableThreadDashboard() async throws -> DashboardDisableOutcome
-    func openThreadDashboard() async
+    func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome
+    func openTaskDashboard() async
     func openThread(_ threadID: String) async
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult
     func preferNativePromptLibraryOnNextSynchronization()
@@ -84,11 +84,11 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         try await renderer.synchronize(snapshot, on: targets, forceRemount: forceRemount)
     }
 
-    func disableThreadDashboard() async throws -> DashboardDisableOutcome {
+    func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome {
         try await renderer.disable() ? .rendererAvailable : .codexClosed
     }
 
-    func openThreadDashboard() async {
+    func openTaskDashboard() async {
         await renderer.open()
     }
 

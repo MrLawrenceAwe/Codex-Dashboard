@@ -1,21 +1,21 @@
-const threadDashboard = (() => {
+const taskDashboard = (() => {
 let threads = [];
-const storedPreferences = threadDashboardState.loadPreferences();
+const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
 let searchTerm = '';
-const threadPageSize = 60;
-let visibleThreadLimit = threadPageSize;
+const pageSize = 60;
+let visibleLimit = pageSize;
 const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
 let unreadSyncTimer;
 let renderFrame;
 let unreadMonitoringStarted = false;
 let dashboardIsOpen = false;
-let threadViewNeedsRender = true;
+let viewNeedsRender = true;
 let unreadThreadIDs = new Set();
-let gitFlowError = '';
+let commitOrPushError = '';
 
 function savePreferences() {
-  threadDashboardState.savePreferences({
+  taskDashboardState.savePreferences({
     filterMode,
     collapsedProjects,
     ignoredProjectPaths,
@@ -35,7 +35,7 @@ function syncUnreadFromSidebar() {
 }
 
 function refreshUnreadFromSidebar() {
-  if (syncUnreadFromSidebar()) requestThreadRender();
+  if (syncUnreadFromSidebar()) requestRender();
 }
 
 function unreadSyncDelay() {
@@ -60,8 +60,8 @@ function isThreadUnread(thread) {
   return unreadThreadIDs.has(thread.id);
 }
 
-function deriveThreadViewState() {
-  return threadDashboardState.derive(threads, isThreadUnread, ignoredProjectPaths);
+function deriveViewState() {
+  return taskDashboardState.derive(threads, isThreadUnread, ignoredProjectPaths);
 }
 
 function openThread(thread) {
@@ -69,60 +69,60 @@ function openThread(thread) {
   codexHost.navigateToThread(thread);
 }
 
-async function openProjectGitFlow(projectPath) {
-  gitFlowError = '';
+async function openCommitOrPushForProject(projectPath) {
+  commitOrPushError = '';
   const candidates = threads
     .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
     .sort((left, right) => Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0));
   const [thread] = candidates;
   if (!thread) {
-    gitFlowError = 'No idle thread is available for this project.';
-    renderThreadView();
+    commitOrPushError = 'No idle thread is available for this project.';
+    renderDashboard();
     return;
   }
   if (!await codexHost.canOpenCommitOrPush()) {
-    gitFlowError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
-    renderThreadView();
+    commitOrPushError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
+    renderDashboard();
     return;
   }
   closeDashboard();
   if (await codexHost.openCommitOrPush(thread)) return;
-  gitFlowError = 'The project thread opened, but Codex could not start Commit or push.';
+  commitOrPushError = 'The project thread opened, but Codex could not start Commit or push.';
   openDashboard();
-  renderThreadView();
+  renderDashboard();
 }
 
-function renderThreadView() {
-  const state = deriveThreadViewState();
-  const rendered = threadDashboardView.render({
+function renderDashboard() {
+  const state = deriveViewState();
+  const rendered = taskDashboardView.render({
     threads,
     filterMode,
     searchTerm,
-    visibleThreadLimit,
+    visibleThreadLimit: visibleLimit,
     collapsedProjects,
     ignoredProjectPaths,
-    commitOrPushError: gitFlowError,
+    commitOrPushError,
     isThreadUnread,
     state,
   });
-  if (rendered) threadViewNeedsRender = false;
+  if (rendered) viewNeedsRender = false;
 }
 
-function scheduleThreadRender() {
+function scheduleRender() {
   if (renderFrame !== undefined) return;
   renderFrame = requestAnimationFrame(() => {
     renderFrame = undefined;
-    renderThreadView();
+    renderDashboard();
   });
 }
 
-function requestThreadRender() {
+function requestRender() {
   if (dashboardIsOpen) {
-    scheduleThreadRender();
+    scheduleRender();
     return;
   }
-  threadViewNeedsRender = true;
-  threadDashboardView.updateSidebarStatus(deriveThreadViewState());
+  viewNeedsRender = true;
+  taskDashboardView.updateSidebarStatus(deriveViewState());
 }
 
 function mountNavigationButton() {
@@ -145,55 +145,55 @@ function mountNavigationButton() {
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
   else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
-  threadDashboardView.updateSidebarStatus(deriveThreadViewState());
+  taskDashboardView.updateSidebarStatus(deriveViewState());
   return true;
 }
 
 function mountDashboardPage() {
-  threadViewNeedsRender = true;
-  return threadDashboardPage.mount({
+  viewNeedsRender = true;
+  return taskDashboardPage.mount({
     onFilter: (nextFilterMode) => {
       filterMode = nextFilterMode;
       savePreferences();
-      renderThreadView();
+      renderDashboard();
     },
     onSearch: (nextSearchTerm) => {
       searchTerm = nextSearchTerm;
-      visibleThreadLimit = threadPageSize;
-      scheduleThreadRender();
+      visibleLimit = pageSize;
+      scheduleRender();
     },
     onLoadMore: () => {
-      visibleThreadLimit += threadPageSize;
-      renderThreadView();
+      visibleLimit += pageSize;
+      renderDashboard();
     },
     onListClick: (event) => {
-    const projectIgnore = event.target.closest('[data-project-ignore]');
-    if (projectIgnore) {
-      event.preventDefault();
-      const projectPath = projectIgnore.dataset.projectIgnore;
-      if (ignoredProjectPaths.has(projectPath)) ignoredProjectPaths.delete(projectPath);
-      else ignoredProjectPaths.add(projectPath);
-      gitFlowError = '';
-      savePreferences();
-      renderThreadView();
-      return;
-    }
-    const projectCommit = event.target.closest('[data-project-commit]');
-    if (projectCommit) {
-      event.preventDefault();
-      void openProjectGitFlow(projectCommit.dataset.projectCommit);
-      return;
-    }
-    const projectToggle = event.target.closest('[data-project-toggle]');
-    if (projectToggle) {
-      const projectPath = projectToggle.dataset.projectToggle;
-      if (collapsedProjects.has(projectPath)) collapsedProjects.delete(projectPath);
-      else collapsedProjects.add(projectPath);
-      savePreferences();
-      renderThreadView();
-      return;
-    }
-    openThreadFromEvent(event);
+      const projectIgnore = event.target.closest('[data-project-ignore]');
+      if (projectIgnore) {
+        event.preventDefault();
+        const projectPath = projectIgnore.dataset.projectIgnore;
+        if (ignoredProjectPaths.has(projectPath)) ignoredProjectPaths.delete(projectPath);
+        else ignoredProjectPaths.add(projectPath);
+        commitOrPushError = '';
+        savePreferences();
+        renderDashboard();
+        return;
+      }
+      const projectCommit = event.target.closest('[data-project-commit]');
+      if (projectCommit) {
+        event.preventDefault();
+        void openCommitOrPushForProject(projectCommit.dataset.projectCommit);
+        return;
+      }
+      const projectToggle = event.target.closest('[data-project-toggle]');
+      if (projectToggle) {
+        const projectPath = projectToggle.dataset.projectToggle;
+        if (collapsedProjects.has(projectPath)) collapsedProjects.delete(projectPath);
+        else collapsedProjects.add(projectPath);
+        savePreferences();
+        renderDashboard();
+        return;
+      }
+      openThreadFromEvent(event);
     },
   });
 }
@@ -213,8 +213,8 @@ function openDashboard() {
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
   document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
-  if (threadViewNeedsRender) renderThreadView();
-  else threadDashboardView.updateSidebarStatus(deriveThreadViewState());
+  if (viewNeedsRender) renderDashboard();
+  else taskDashboardView.updateSidebarStatus(deriveViewState());
   scheduleUnreadSync(1500);
 }
 
@@ -231,13 +231,13 @@ function isOpen() {
 }
 
 function applyThreads(nextThreads) {
-  threads = threadDashboardState.normalizeThreads(nextThreads);
+  threads = taskDashboardState.normalizeThreads(nextThreads);
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
-  requestThreadRender();
+  requestRender();
 }
 
 function scopeProject() {
@@ -260,7 +260,7 @@ function ensureMounted() {
     mountNavigation: mountNavigationButton,
     mountPage: mountDashboardPage,
     open: openDashboard,
-    requestRender: requestThreadRender,
+    requestRender,
     syncUnread: syncUnreadFromSidebar,
   });
   if (!unreadMonitoringStarted) {
@@ -278,7 +278,7 @@ function destroy() {
   renderFrame = undefined;
   unreadSyncTimer = undefined;
   unreadMonitoringStarted = false;
-  threadViewNeedsRender = true;
+  viewNeedsRender = true;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   dashboardLifecycle.destroy();
   delete window.__codexDashboard;

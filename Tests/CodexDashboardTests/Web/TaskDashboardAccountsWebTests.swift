@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension ThreadDashboardWebTests {
+extension TaskDashboardWebTests {
     func testDashboardInsetAccountsForScaledCodexShell() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -41,7 +41,7 @@ extension ThreadDashboardWebTests {
     }
 
     func testDashboardDoesNotRenderAccountControlsOrAccountStatusNotice() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let state = try await webView.evaluateJavaScript(
             """
             [
@@ -133,7 +133,7 @@ extension ThreadDashboardWebTests {
     }
 
     func testCommitNoticeRemainsAvailable() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let result = try await webView.evaluateJavaScript(
             """
             (() => {

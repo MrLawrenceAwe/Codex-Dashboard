@@ -335,8 +335,8 @@ final class StubDashboardRuntime: DashboardRuntime {
         synchronizeCallCount += 1
         if let synchronizationError { throw synchronizationError }
     }
-    func disableThreadDashboard() async throws -> DashboardDisableOutcome { .codexClosed }
-    func openThreadDashboard() async {}
+    func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome { .codexClosed }
+    func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
 }
@@ -347,11 +347,11 @@ final class AppCoordinatorTests: XCTestCase {
 
     func testUnavailableAccountPopoverUsesSlowRetry() {
         XCTAssertEqual(
-            PollingController.Schedule.accountPopoverUnavailableRetry(active: true),
+            AccountPopoverActionListener.Schedule.unavailableRetry(active: true),
             .seconds(10)
         )
         XCTAssertEqual(
-            PollingController.Schedule.accountPopoverUnavailableRetry(active: false),
+            AccountPopoverActionListener.Schedule.unavailableRetry(active: false),
             .seconds(60)
         )
     }

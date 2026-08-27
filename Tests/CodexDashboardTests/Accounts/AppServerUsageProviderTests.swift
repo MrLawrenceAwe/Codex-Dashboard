@@ -3,10 +3,10 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class CodexAccountUsageProviderTests: XCTestCase {
+final class AppServerUsageProviderTests: XCTestCase {
     func testReadsFiveHourAndWeeklyWindowsFromAppServerResponse() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "CodexAccountUsageProviderTests-\(UUID().uuidString)", isDirectory: true
+            "AppServerUsageProviderTests-\(UUID().uuidString)", isDirectory: true
         )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -58,7 +58,7 @@ final class CodexAccountUsageProviderTests: XCTestCase {
 
     func testTimeoutTerminatesAnUnresponsiveAppServer() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "CodexAccountUsageProviderTimeoutTests-\(UUID().uuidString)", isDirectory: true
+            "AppServerUsageProviderTimeoutTests-\(UUID().uuidString)", isDirectory: true
         )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }

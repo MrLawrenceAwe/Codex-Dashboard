@@ -6,7 +6,8 @@ final class AccountUsageSession {
     private let cache: UsageCache
     private var activeUsageTask: Task<CodexAccountUsage, Error>?
     private var activeUsageTaskID: UUID?
-    private var isRefreshingSavedAccount = false
+    private var savedAccountUsageTask: Task<SavedAccountUsageResult, Error>?
+    private var savedAccountUsageTaskID: UUID?
     private var lastCacheSaveAt: Date?
 
     init(provider: any AccountUsageProviding, cache: UsageCache) {
@@ -36,16 +37,27 @@ final class AccountUsageSession {
     }
 
     func fetchUsage(using credential: Data) async throws -> SavedAccountUsageResult? {
-        guard !isRefreshingSavedAccount else { return nil }
-        isRefreshingSavedAccount = true
-        defer { isRefreshingSavedAccount = false }
-        return try await provider.usage(using: credential)
+        guard savedAccountUsageTask == nil else { return nil }
+        let taskID = UUID()
+        let task = Task { try await provider.usage(using: credential) }
+        savedAccountUsageTask = task
+        savedAccountUsageTaskID = taskID
+        defer {
+            if savedAccountUsageTaskID == taskID {
+                savedAccountUsageTask = nil
+                savedAccountUsageTaskID = nil
+            }
+        }
+        return try await task.value
     }
 
     func reset() async {
         activeUsageTask?.cancel()
         activeUsageTask = nil
         activeUsageTaskID = nil
+        savedAccountUsageTask?.cancel()
+        savedAccountUsageTask = nil
+        savedAccountUsageTaskID = nil
         await provider.reset()
     }
 

@@ -108,7 +108,7 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 }
 
 @MainActor
-final class DataChangeMonitor {
+final class FileChangeMonitor {
     static let projectRefreshQuietPeriod: Duration = .milliseconds(500)
 
     private struct Watch {

@@ -102,6 +102,13 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(document.accounts, [account])
         XCTAssertEqual(document.activeAccountID, account.id)
         XCTAssertEqual(vault.credential(for: account.id), credential)
+        let metadata = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any]
+        )
+        XCTAssertNotNil(metadata["accounts"])
+        XCTAssertEqual(metadata["activeAccountID"] as? String, account.id.uuidString)
+        XCTAssertNil(metadata["profiles"])
+        XCTAssertNil(metadata["activeProfileID"])
         XCTAssertFalse(String(data: try Data(contentsOf: metadataURL), encoding: .utf8)!.contains("secret"))
     }
 
@@ -217,7 +224,7 @@ final class CodexAccountManagerTests: XCTestCase {
         var metadata = try JSONSerialization.jsonObject(
             with: Data(contentsOf: metadataURL)
         ) as! [String: Any]
-        metadata["activeProfileID"] = lawrence.id.uuidString
+        metadata["activeAccountID"] = lawrence.id.uuidString
         try JSONSerialization.data(withJSONObject: metadata).write(to: metadataURL)
 
         let document = try manager.document()
@@ -300,14 +307,45 @@ final class CodexAccountManagerTests: XCTestCase {
         let credential = credential(accountID: "account-personal", name: "Lawrence Awe")
         try credential.write(to: authenticationURL)
         let account = try manager.saveCurrentAccount()
-        var document = try manager.document()
-        document.version = 3
-        document.accounts[0].name = "My custom label"
-        try JSONEncoder().encode(document).write(to: metadataURL)
+        let legacy: [String: Any] = [
+            "version": 3,
+            "profiles": [[
+                "id": account.id.uuidString,
+                "name": "My custom label",
+                "createdAt": account.createdAt.timeIntervalSinceReferenceDate,
+                "lastUsedAt": account.lastUsedAt.timeIntervalSinceReferenceDate,
+            ]],
+            "activeProfileID": account.id.uuidString,
+        ]
+        try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
 
         let reloaded = try manager.document()
 
         XCTAssertEqual(reloaded.accounts.first(where: { $0.id == account.id })?.name, "Lawrence Awe")
+    }
+
+    func testMigratesV4ProfileKeysToCurrentAccountKeys() throws {
+        let credential = credential(accountID: "account-personal", name: "Personal")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any]
+        )
+        legacy["version"] = 4
+        legacy["profiles"] = legacy.removeValue(forKey: "accounts")
+        legacy["activeProfileID"] = legacy.removeValue(forKey: "activeAccountID")
+        try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
+
+        XCTAssertEqual(try manager.document().activeAccountID, account.id)
+
+        let migrated = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any]
+        )
+        XCTAssertEqual(migrated["version"] as? Int, SavedAccountsDocument.currentVersion)
+        XCTAssertNotNil(migrated["accounts"])
+        XCTAssertNotNil(migrated["activeAccountID"])
+        XCTAssertNil(migrated["profiles"])
+        XCTAssertNil(migrated["activeProfileID"])
     }
 
     func testSavingRequiresAnAuthenticatedAccountIdentity() throws {
@@ -349,7 +387,7 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let document = try manager.document()
 
-        XCTAssertEqual(document.version, 4)
+        XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
             document.accounts.first(where: { $0.id == lawrenceID })?.accountIdentifier,
@@ -381,7 +419,7 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let document = try manager.document()
 
-        XCTAssertEqual(document.version, 4)
+        XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
             document.accounts.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,

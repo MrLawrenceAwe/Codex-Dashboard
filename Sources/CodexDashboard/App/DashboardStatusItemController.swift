@@ -51,7 +51,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let actions = coordinator.dashboardActions
         let openDashboard = actionItem(
             DashboardActionPresentation.openTitle,
-            action: #selector(openThreadDashboard)
+            action: #selector(openTaskDashboard)
         )
         openDashboard.isEnabled = actions.canOpen
         menu.addItem(openDashboard)
@@ -65,7 +65,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
         let disable = actionItem(
             DashboardActionPresentation.disableTitle,
-            action: #selector(disableThreadDashboard)
+            action: #selector(disableTaskDashboard)
         )
         disable.isEnabled = actions.canDisable
         menu.addItem(disable)
@@ -113,16 +113,16 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         _ = NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
-    @objc private func openThreadDashboard() {
-        Task { await coordinator.openThreadDashboard() }
+    @objc private func openTaskDashboard() {
+        Task { await coordinator.openTaskDashboard() }
     }
 
     @objc private func restartAndEnable() {
-        Task { await coordinator.restartCodexAndEnableThreadDashboard() }
+        Task { await coordinator.restartCodexAndEnableTaskDashboard() }
     }
 
-    @objc private func disableThreadDashboard() {
-        Task { await coordinator.disableThreadDashboard() }
+    @objc private func disableTaskDashboard() {
+        Task { await coordinator.disableTaskDashboard() }
     }
 
     @objc private func checkCompatibility() {

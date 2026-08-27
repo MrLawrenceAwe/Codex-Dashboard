@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class DataChangeMonitorTests: XCTestCase {
+final class FileChangeMonitorTests: XCTestCase {
     func testFileAndProjectChangesTriggerTargetedRefreshes() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-file-monitor-\(UUID().uuidString)", isDirectory: true)
@@ -16,7 +16,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var accountRefreshes = 0
@@ -60,7 +60,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try Data("initial-catalog".utf8).write(to: catalogURL)
         try Data("initial-unread".utf8).write(to: unreadURL)
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         monitor.start(
@@ -98,7 +98,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try Data("initial".utf8).write(to: nestedFile)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var refreshedProjectPaths: Set<String> = []
         monitor.start(
             catalogURL: catalogURL,
@@ -132,7 +132,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var refreshes: [Set<String>] = []
         monitor.start(
             catalogURL: catalogURL,
@@ -165,7 +165,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var refreshes: [Set<String>] = []
         monitor.start(
             catalogURL: catalogURL,
@@ -204,7 +204,7 @@ final class DataChangeMonitorTests: XCTestCase {
         try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = DataChangeMonitor()
+        let monitor = FileChangeMonitor()
         var refreshCount = 0
         var activeRefreshCount = 0
         var maximumActiveRefreshCount = 0

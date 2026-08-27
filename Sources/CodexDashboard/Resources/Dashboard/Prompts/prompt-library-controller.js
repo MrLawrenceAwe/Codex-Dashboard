@@ -75,7 +75,7 @@ function openLibrary() {
     : undefined;
   dialogState = { mode: 'list' };
   searchTerm = '';
-  scopeProject = threadDashboard.scopeProject();
+  scopeProject = taskDashboard.scopeProject();
   presentDialog();
 }
 

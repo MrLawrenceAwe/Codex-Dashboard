@@ -1,4 +1,4 @@
-const threadDashboardView = (() => {
+const taskDashboardView = (() => {
   const renderedMarkup = new WeakMap();
 
   function updateMarkup(element, markup) {
@@ -7,7 +7,7 @@ const threadDashboardView = (() => {
     renderedMarkup.set(element, markup);
   }
 
-  function updateSidebarStatus({ unreadCount, runningThreads, dirtyProjectPaths }) {
+  function updateSidebarStatus({ unreadCount, runningThreads, visibleChangedProjectPaths }) {
     const unreadBadge = document.querySelector('[data-navigation-count]');
     if (unreadBadge) {
       unreadBadge.textContent = String(unreadCount);
@@ -29,8 +29,8 @@ const threadDashboardView = (() => {
     }
     const changes = document.querySelector('[data-navigation-changes]');
     if (changes) {
-      const changedProjectCount = dirtyProjectPaths.size;
-      const changedProjectNames = [...dirtyProjectPaths]
+      const changedProjectCount = visibleChangedProjectPaths.size;
+      const changedProjectNames = [...visibleChangedProjectPaths]
         .map((path) => path.split('/').filter(Boolean).at(-1) || path)
         .slice(0, 3);
       const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
@@ -40,13 +40,13 @@ const threadDashboardView = (() => {
     }
   }
 
-  function updateHeaderSummary({ unreadCount, runningThreads, dirtyProjectPaths }) {
+  function updateHeaderSummary({ unreadCount, runningThreads, visibleChangedProjectPaths }) {
     const page = document.getElementById(dashboardElements.elementIDs.page);
     if (!page) return;
     const values = {
       running: runningThreads.length,
       unread: unreadCount,
-      changed: dirtyProjectPaths.size,
+      changed: visibleChangedProjectPaths.size,
     };
     page.querySelectorAll('[data-summary-count]').forEach((count) => {
       count.textContent = String(values[count.dataset.summaryCount] ?? 0);
@@ -88,12 +88,12 @@ const threadDashboardView = (() => {
     const filterCounts = {
       running: state.runningThreads.length,
       unread: state.unreadCount,
-      changedProjects: state.changedProjectPaths.size,
+      changedProjects: state.visibleChangedProjectPaths.size,
     };
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const visibleThreads = threadDashboardState.filter({
+    const visibleThreads = taskDashboardState.filter({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,

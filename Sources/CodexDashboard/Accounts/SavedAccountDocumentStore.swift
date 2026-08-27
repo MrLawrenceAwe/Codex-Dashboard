@@ -42,6 +42,7 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
         if document != original
             || migration.requiresNameFallback
             || migration.requiresIdentitySynchronization
+            || migration.requiresRewrite
         {
             try save(document)
         }
