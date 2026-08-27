@@ -1,4 +1,4 @@
-const threadDashboardPage = (() => {
+const taskDashboardPage = (() => {
   function mount({ onFilter, onSearch, onLoadMore, onListClick }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;

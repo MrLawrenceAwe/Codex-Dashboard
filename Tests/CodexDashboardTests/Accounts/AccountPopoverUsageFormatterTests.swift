@@ -2,7 +2,7 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class AccountPopoverModelsTests: XCTestCase {
+final class AccountPopoverUsageFormatterTests: XCTestCase {
     func testUsageTitlesKeepRelativeResetTimingButRemoveVerboseAbsoluteDate() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let status = CodexAccountUsageStatus.available(CodexAccountUsageSnapshot(

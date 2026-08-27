@@ -10,17 +10,12 @@ struct SavedAccount: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct SavedAccountsDocument: Codable, Equatable, Sendable {
-    static let currentVersion = 4
+    static let currentVersion = 5
 
     var version = Self.currentVersion
     var accounts: [SavedAccount] = []
     var activeAccountID: UUID?
 
-    private enum CodingKeys: String, CodingKey {
-        case version
-        case accounts = "profiles"
-        case activeAccountID = "activeProfileID"
-    }
 }
 
 struct CodexUsageWindow: Codable, Equatable, Sendable {

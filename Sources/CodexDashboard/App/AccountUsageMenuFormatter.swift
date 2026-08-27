@@ -5,6 +5,7 @@ enum AccountUsageMenuFormatter {
         for status: CodexAccountUsageStatus,
         now: Date = .now,
         staleLabel: String = "Usage may be stale",
+        includesAbsoluteDate: Bool = true,
         locale: Locale = .current,
         timeZone: TimeZone = .current
     ) -> [String] {
@@ -15,6 +16,7 @@ enum AccountUsageMenuFormatter {
                     "5-hour",
                     window: window,
                     now: now,
+                    includesAbsoluteDate: includesAbsoluteDate,
                     locale: locale,
                     timeZone: timeZone
                 ))
@@ -24,6 +26,7 @@ enum AccountUsageMenuFormatter {
                     "Weekly",
                     window: window,
                     now: now,
+                    includesAbsoluteDate: includesAbsoluteDate,
                     locale: locale,
                     timeZone: timeZone
                 ))
@@ -34,6 +37,7 @@ enum AccountUsageMenuFormatter {
                     let deadline = deadlineDescription(
                         expiration,
                         now: now,
+                        includesAbsoluteDate: includesAbsoluteDate,
                         locale: locale,
                         timeZone: timeZone
                     )
@@ -60,6 +64,7 @@ enum AccountUsageMenuFormatter {
         _ label: String,
         window: CodexUsageWindow,
         now: Date,
+        includesAbsoluteDate: Bool,
         locale: Locale,
         timeZone: TimeZone
     ) -> String {
@@ -69,6 +74,7 @@ enum AccountUsageMenuFormatter {
             let deadline = deadlineDescription(
                 resetsAt,
                 now: now,
+                includesAbsoluteDate: includesAbsoluteDate,
                 locale: locale,
                 timeZone: timeZone
             )
@@ -80,9 +86,12 @@ enum AccountUsageMenuFormatter {
     private static func deadlineDescription(
         _ date: Date,
         now: Date,
+        includesAbsoluteDate: Bool,
         locale: Locale,
         timeZone: TimeZone
     ) -> String {
+        let relative = relativeTime(until: date, now: now)
+        guard includesAbsoluteDate else { return relative }
         let absolute = date.formatted(
             Date.FormatStyle(
                 date: .abbreviated,
@@ -91,7 +100,7 @@ enum AccountUsageMenuFormatter {
                 timeZone: timeZone
             )
         )
-        return "\(relativeTime(until: date, now: now)) (\(absolute))"
+        return "\(relative) (\(absolute))"
     }
 
     private static func relativeTime(until date: Date, now: Date) -> String {

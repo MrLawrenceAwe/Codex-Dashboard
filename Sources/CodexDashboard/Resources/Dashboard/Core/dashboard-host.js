@@ -1,10 +1,10 @@
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
-  ensureMounted: threadDashboard.ensureMounted,
-  destroy: threadDashboard.destroy,
-  open: threadDashboard.open,
-  isOpen: threadDashboard.isOpen,
-  applyThreads: threadDashboard.applyThreads,
+  ensureMounted: taskDashboard.ensureMounted,
+  destroy: taskDashboard.destroy,
+  open: taskDashboard.open,
+  isOpen: taskDashboard.isOpen,
+  applyThreads: taskDashboard.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
   waitForAccountPopoverAction: accountPopover.waitForAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
@@ -20,4 +20,4 @@ window.__codexDashboard = {
     return applied;
   },
 };
-return threadDashboard.ensureMounted();
+return taskDashboard.ensureMounted();

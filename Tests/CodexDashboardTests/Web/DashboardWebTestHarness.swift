@@ -74,7 +74,7 @@ enum DashboardWebTestHarness {
         )
     }
 
-    static func threadDashboardWebView() async throws -> WKWebView {
+    static func taskDashboardWebView() async throws -> WKWebView {
         try await mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
           <aside role="navigation"><button class="sidebar-item">New chat</button></aside>

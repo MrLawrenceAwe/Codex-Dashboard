@@ -1,9 +1,18 @@
-const threadDashboardState = (() => {
-  const preferencesKey = 'codex-dashboard.thread-preferences';
+const taskDashboardState = (() => {
+  const preferencesKey = 'codex-dashboard.task-preferences';
+  const legacyPreferencesKey = 'codex-dashboard.thread-preferences';
 
   function loadPreferences() {
     let stored = {};
-    try { stored = JSON.parse(localStorage.getItem(preferencesKey) || '{}'); } catch (_) {}
+    try {
+      const current = localStorage.getItem(preferencesKey);
+      const legacy = current === null ? localStorage.getItem(legacyPreferencesKey) : null;
+      stored = JSON.parse(current || legacy || '{}');
+      if (legacy !== null) {
+        localStorage.setItem(preferencesKey, legacy);
+        localStorage.removeItem(legacyPreferencesKey);
+      }
+    } catch (_) {}
     return {
       filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
         ? stored.filterMode : 'running',
@@ -28,7 +37,7 @@ const threadDashboardState = (() => {
     return {
       runningThreads: threads.filter((thread) => thread.runState === 'running'),
       unreadCount: threads.filter(isThreadUnread).length,
-      changedProjectPaths: new Set(
+      visibleChangedProjectPaths: new Set(
         threads
           .filter((thread) => thread.workingTreeStatus === 'hasChanges')
           .map((thread) => String(thread.projectPath).trim())
@@ -38,12 +47,6 @@ const threadDashboardState = (() => {
         threads
           .filter((thread) => thread.workingTreeStatus === 'hasChanges')
           .map((thread) => String(thread.projectPath).trim()),
-      ),
-      dirtyProjectPaths: new Set(
-        threads
-          .filter((thread) => thread.workingTreeStatus === 'hasChanges')
-          .map((thread) => String(thread.projectPath).trim())
-          .filter((path) => !ignoredProjectPaths.has(path)),
       ),
     };
   }

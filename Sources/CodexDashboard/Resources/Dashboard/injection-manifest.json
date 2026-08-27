@@ -15,15 +15,15 @@
     "Prompts/prompt-library-controller",
     "Accounts/account-popover",
     "Threads/thread-markup",
-    "Threads/thread-state",
-    "Threads/thread-view",
-    "Threads/thread-dashboard-page",
+    "Threads/task-dashboard-state",
+    "Threads/task-dashboard-view",
+    "Threads/task-dashboard-page",
     "Core/dashboard-lifecycle",
-    "Threads/thread-dashboard-controller",
+    "Threads/task-dashboard-controller",
     "Core/dashboard-host"
   ],
   "stylesheets": [
-    "Threads/thread-dashboard",
+    "Threads/task-dashboard",
     "Prompts/prompt-library",
     "Accounts/account-popover"
   ],

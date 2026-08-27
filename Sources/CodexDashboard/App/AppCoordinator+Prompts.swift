@@ -12,10 +12,10 @@ extension AppCoordinator {
         do {
             try promptLibraryStore.importDocument(from: sourceURL)
             dashboardRuntime?.preferNativePromptLibraryOnNextSynchronization()
-            setPromptLibraryStatus("Imported prompt library.")
+            promptLibraryStatusMessage = "Imported prompt library."
             await synchronizeDashboard()
         } catch {
-            setPromptLibraryStatus(error.localizedDescription)
+            promptLibraryStatusMessage = error.localizedDescription
         }
     }
 
@@ -27,9 +27,9 @@ extension AppCoordinator {
         guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
         do {
             try promptLibraryStore.exportDocument(to: destinationURL)
-            setPromptLibraryStatus("Exported prompt library.")
+            promptLibraryStatusMessage = "Exported prompt library."
         } catch {
-            setPromptLibraryStatus(error.localizedDescription)
+            promptLibraryStatusMessage = error.localizedDescription
         }
     }
 
@@ -40,7 +40,7 @@ extension AppCoordinator {
             }
             NSWorkspace.shared.activateFileViewerSelecting([promptLibraryStore.documentURL])
         } catch {
-            setPromptLibraryStatus(error.localizedDescription)
+            promptLibraryStatusMessage = error.localizedDescription
         }
     }
 }

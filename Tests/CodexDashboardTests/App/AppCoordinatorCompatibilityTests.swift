@@ -30,7 +30,7 @@ extension AppCoordinatorTests {
             runtimeFactory: { runtime }
         )
 
-        await coordinator.restartCodexAndEnableThreadDashboard()
+        await coordinator.restartCodexAndEnableTaskDashboard()
 
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertEqual(
@@ -58,7 +58,7 @@ extension AppCoordinatorTests {
         )
         await coordinator.checkCompatibility()
 
-        await coordinator.restartCodexAndEnableThreadDashboard()
+        await coordinator.restartCodexAndEnableTaskDashboard()
 
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertTrue(coordinator.connectionError?.contains("incompatible") == true)
@@ -90,7 +90,7 @@ extension AppCoordinatorTests {
         )
         await coordinator.checkCompatibility()
 
-        await coordinator.restartCodexAndEnableThreadDashboard()
+        await coordinator.restartCodexAndEnableTaskDashboard()
 
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(coordinator.compatibilityReport?.blockingCount, 0)

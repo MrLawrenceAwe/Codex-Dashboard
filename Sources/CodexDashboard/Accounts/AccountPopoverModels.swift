@@ -41,25 +41,3 @@ enum AccountPopoverActionHandlingOutcome: Equatable, Sendable {
     case timedOut
     case unavailable
 }
-
-enum AccountPopoverUsageFormatter {
-    static func titles(
-        for status: CodexAccountUsageStatus,
-        staleLabel: String,
-        now: Date = .now,
-        locale: Locale = .current,
-        timeZone: TimeZone = .current
-    ) -> [String] {
-        AccountUsageMenuFormatter.titles(
-            for: status,
-            now: now,
-            staleLabel: staleLabel,
-            locale: locale,
-            timeZone: timeZone
-        ).map { title in
-            guard title.hasSuffix(")"), let dateStart = title.range(of: " (", options: .backwards)
-            else { return title }
-            return String(title[..<dateStart.lowerBound])
-        }
-    }
-}

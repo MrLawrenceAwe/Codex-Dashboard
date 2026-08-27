@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension ThreadDashboardWebTests {
+extension TaskDashboardWebTests {
     func testChangedProjectsFilterShowsOneCommitActionPerChangedProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -349,7 +349,7 @@ extension ThreadDashboardWebTests {
     }
 
     func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "running-dirty",

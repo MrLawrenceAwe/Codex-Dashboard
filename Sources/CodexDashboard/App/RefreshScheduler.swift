@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 @MainActor
-final class PollingController {
+final class RefreshScheduler {
     enum Schedule {
         static func catalog(active: Bool, fileEventsAvailable: Bool) -> Duration {
             if fileEventsAvailable { return active ? .seconds(30) : .seconds(2 * 60) }
@@ -18,9 +18,6 @@ final class PollingController {
         }
         static let accountUsage: Duration = .seconds(30)
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
-        static func accountPopoverUnavailableRetry(active: Bool) -> Duration {
-            active ? .seconds(10) : .seconds(60)
-        }
     }
 
     private var catalogPollingTask: Task<Void, Never>?
@@ -28,13 +25,12 @@ final class PollingController {
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
-    private var accountPopoverActionPollingTask: Task<Void, Never>?
-    private let fileChanges: DataChangeMonitor?
+    private let fileChanges: FileChangeMonitor?
 
     var hasFileChangeMonitoring: Bool { fileChanges != nil }
 
     init(observeFileChanges: Bool = true) {
-        fileChanges = observeFileChanges ? DataChangeMonitor() : nil
+        fileChanges = observeFileChanges ? FileChangeMonitor() : nil
     }
 
     deinit {
@@ -43,7 +39,6 @@ final class PollingController {
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
-        accountPopoverActionPollingTask?.cancel()
     }
 
     func start(
@@ -52,67 +47,50 @@ final class PollingController {
         updateUnreadState: @escaping @MainActor () async -> Void,
         refreshAccountUsage: @escaping @MainActor () async -> Void,
         refreshInactiveAccountUsage: @escaping @MainActor () async -> Void,
-        handleAccountPopoverAction: @escaping @MainActor () async -> AccountPopoverActionHandlingOutcome,
         refreshAccountState: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
               workingTreePollingTask == nil,
               unreadPollingTask == nil,
               accountUsagePollingTask == nil,
-              inactiveAccountUsagePollingTask == nil,
-              accountPopoverActionPollingTask == nil
+              inactiveAccountUsagePollingTask == nil
         else { return }
 
-        catalogPollingTask = Task {
-            let clock = ContinuousClock()
-            while !Task.isCancelled {
-                await synchronizeDashboard()
-                try? await clock.sleep(for: Schedule.catalog(
+        catalogPollingTask = recurringTask(
+            interval: { [self] in
+                Schedule.catalog(
                     active: Self.isUserActive,
                     fileEventsAvailable: fileChanges != nil
-                ))
-            }
-        }
-        workingTreePollingTask = Task {
-            while !Task.isCancelled {
-                await updateWorkingTrees(nil)
-                try? await Task.sleep(for: Schedule.workingTree(
+                )
+            },
+            action: synchronizeDashboard
+        )
+        workingTreePollingTask = recurringTask(
+            interval: { [self] in
+                Schedule.workingTree(
                     active: Self.isUserActive,
                     fileEventsAvailable: fileChanges != nil
-                ))
-            }
-        }
-        unreadPollingTask = Task {
-            while !Task.isCancelled {
-                await updateUnreadState()
-                try? await Task.sleep(for: Schedule.unread(
+                )
+            },
+            action: { await updateWorkingTrees(nil) }
+        )
+        unreadPollingTask = recurringTask(
+            interval: { [self] in
+                Schedule.unread(
                     active: Self.isUserActive,
                     fileEventsAvailable: fileChanges != nil
-                ))
-            }
-        }
-        accountUsagePollingTask = Task {
-            while !Task.isCancelled {
-                await refreshAccountUsage()
-                try? await Task.sleep(for: Schedule.accountUsage)
-            }
-        }
-        inactiveAccountUsagePollingTask = Task {
-            while !Task.isCancelled {
-                await refreshInactiveAccountUsage()
-                try? await Task.sleep(for: Schedule.inactiveAccountUsage)
-            }
-        }
-        accountPopoverActionPollingTask = Task {
-            while !Task.isCancelled {
-                let outcome = await handleAccountPopoverAction()
-                if outcome == .unavailable {
-                    try? await Task.sleep(for: Schedule.accountPopoverUnavailableRetry(
-                        active: Self.isUserActive
-                    ))
-                }
-            }
-        }
+                )
+            },
+            action: updateUnreadState
+        )
+        accountUsagePollingTask = recurringTask(
+            interval: { Schedule.accountUsage },
+            action: refreshAccountUsage
+        )
+        inactiveAccountUsagePollingTask = recurringTask(
+            interval: { Schedule.inactiveAccountUsage },
+            action: refreshInactiveAccountUsage
+        )
         fileChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
@@ -129,9 +107,21 @@ final class PollingController {
         fileChanges?.updateProjectPaths(paths)
     }
 
-    private static var isUserActive: Bool {
+    static var isUserActive: Bool {
         NSApp?.isActive == true
             || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
+    }
+
+    private func recurringTask(
+        interval: @escaping @MainActor () -> Duration,
+        action: @escaping @MainActor () async -> Void
+    ) -> Task<Void, Never> {
+        Task {
+            while !Task.isCancelled {
+                await action()
+                try? await Task.sleep(for: interval())
+            }
+        }
     }
 
     func stop() {
@@ -140,13 +130,11 @@ final class PollingController {
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
-        accountPopoverActionPollingTask?.cancel()
         catalogPollingTask = nil
         workingTreePollingTask = nil
         unreadPollingTask = nil
         accountUsagePollingTask = nil
         inactiveAccountUsagePollingTask = nil
-        accountPopoverActionPollingTask = nil
         fileChanges?.stop()
     }
 }

@@ -63,14 +63,14 @@ extension AppCoordinator {
         do {
             let existingUsage = activeAccountUsageStatus.snapshot
             let account = try accountManager.saveCurrentAccount()
-            if let existingUsage { updateUsage(existingUsage, for: account.id) }
+            if let existingUsage { usageByAccountID[account.id] = existingUsage }
             persistAccountUsageCache(force: true)
-            setAccountStatus("Saved \(account.name) securely in Keychain.")
+            accountStatusMessage = "Saved \(account.name) securely in Keychain."
             refreshAccountState()
-            if let existingUsage { setActiveAccountUsageStatus(.available(existingUsage)) }
+            if let existingUsage { activeAccountUsageStatus = .available(existingUsage) }
             Task { await refreshAccountUsage() }
         } catch {
-            setAccountStatus(error.localizedDescription)
+            accountStatusMessage = error.localizedDescription
         }
     }
 
@@ -85,15 +85,15 @@ extension AppCoordinator {
     func deleteAccount(_ accountID: UUID) {
         do {
             try accountManager.deleteAccount(accountID)
-            setAccountStatus("Removed the saved account from Keychain.")
-            updateUsage(nil, for: accountID)
-            setRefreshingUsage(false, for: accountID)
-            setUsageError(nil, for: accountID)
+            accountStatusMessage = "Removed the saved account from Keychain."
+            usageByAccountID[accountID] = nil
+            refreshingUsageAccountIDs.remove(accountID)
+            usageErrorsByAccountID[accountID] = nil
             persistAccountUsageCache(force: true)
             refreshAccountState()
-            if activeAccountID == nil { setActiveAccountUsageStatus(.unavailable) }
+            if activeAccountID == nil { activeAccountUsageStatus = .unavailable }
         } catch {
-            setAccountStatus(error.localizedDescription)
+            accountStatusMessage = error.localizedDescription
         }
     }
 
@@ -104,9 +104,12 @@ extension AppCoordinator {
                 if $0.lastUsedAt == $1.lastUsedAt { return $0.name < $1.name }
                 return $0.lastUsedAt > $1.lastUsedAt
             }
-            setAccountState(accounts: accounts, activeAccountID: document.activeAccountID)
+            if savedAccounts != accounts { savedAccounts = accounts }
+            if activeAccountID != document.activeAccountID {
+                activeAccountID = document.activeAccountID
+            }
         } catch {
-            setAccountStatus(error.localizedDescription)
+            accountStatusMessage = error.localizedDescription
         }
     }
 
@@ -150,25 +153,24 @@ extension AppCoordinator {
         guard !isPerformingAction, let dashboardRuntime else { return }
 
         let previousUsageStatus = activeAccountUsageStatus
-        setPerformingAction(true)
-        advanceRefreshGeneration()
+        isPerformingAction = true
+        refreshGeneration += 1
         await synchronizationGate.cancel()
         await accountUsageSession.reset()
         do {
             try await loadThreadSnapshot()
         } catch {
-            setAccountStatus(
+            accountStatusMessage =
                 "Account change cancelled because active tasks could not be checked. "
                     + error.localizedDescription
-            )
             restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
-            setPerformingAction(false)
+            isPerformingAction = false
             return
         }
         guard !threads.contains(where: { $0.runState == .running }) else {
-            setAccountStatus(CodexAccountError.activeTasks.localizedDescription)
+            accountStatusMessage = CodexAccountError.activeTasks.localizedDescription
             restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
-            setPerformingAction(false)
+            isPerformingAction = false
             return
         }
 
@@ -177,16 +179,16 @@ extension AppCoordinator {
         do {
             accountTransaction = try transaction()
         } catch {
-            setAccountStatus(error.localizedDescription)
+            accountStatusMessage = error.localizedDescription
             restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
-            setPerformingAction(false)
+            isPerformingAction = false
             refreshAccountState()
             return
         }
 
         dashboardRuntime.prepareForRestart()
-        setConnectionState(.checking)
-        setConnectionError(nil)
+        connectionState = .checking
+        connectionError = nil
         let targets: [DevToolsTarget]
         do {
             targets = try await dashboardRuntime.restartCodex()
@@ -196,20 +198,19 @@ extension AppCoordinator {
             } catch let rollbackError {
                 await accountUsageSession.reset()
                 refreshAccountState()
-                setAccountStatus(
+                accountStatusMessage =
                     "Codex could not restart, and the account change could not be rolled back. "
                         + rollbackError.localizedDescription
-                )
-                setPerformingAction(false)
+                isPerformingAction = false
                 setFailure(rollbackError, lastKnownState: .codexClosed)
                 return
             }
             await accountUsageSession.reset()
             refreshAccountState()
-            setAccountStatus("Codex could not restart, so the account change was rolled back.")
+            accountStatusMessage = "Codex could not restart, so the account change was rolled back."
             dashboardRuntime.prepareForRestart()
             _ = try? await dashboardRuntime.restartCodex()
-            setPerformingAction(false)
+            isPerformingAction = false
             setFailure(restartError, lastKnownState: .codexClosed)
             return
         }
@@ -217,22 +218,21 @@ extension AppCoordinator {
         refreshAccountState()
         if let accountID = activeAccountID,
            let snapshot = usageByAccountID[accountID] {
-            setActiveAccountUsageStatus(.stale(snapshot))
+            activeAccountUsageStatus = .stale(snapshot)
         } else {
-            setActiveAccountUsageStatus(.unavailable)
+            activeAccountUsageStatus = .unavailable
         }
-        setAccountStatus(
+        accountStatusMessage =
             activeAccountName.map { "Switched to \($0)." }
                 ?? "Sign in to the other account, then save it from Accounts."
-        )
         Task { await refreshAccountUsage() }
 
         // The signed-out renderer intentionally has none of the Codex workspace hosts
         // required by the injected dashboard. Reaching it means the account transition
         // succeeded; mounting resumes through normal polling after sign-in.
         guard activeAccountID != nil else {
-            setPerformingAction(false)
-            setConnectionState(.rendererAvailable)
+            isPerformingAction = false
+            connectionState = .rendererAvailable
             return
         }
 
@@ -241,13 +241,13 @@ extension AppCoordinator {
             try await dashboardRuntime.synchronizeDashboard(
                 with: dashboardSnapshotPayload(), on: targets, forceRemount: true
             )
-            setConnectionState(.dashboardMounted)
-            setPerformingAction(false)
+            connectionState = .dashboardMounted
+            isPerformingAction = false
         } catch {
-            setPerformingAction(false)
-            setAccountStatus(activeAccountName.map {
+            isPerformingAction = false
+            accountStatusMessage = activeAccountName.map {
                 "Switched to \($0). The dashboard will reconnect when Codex is ready."
-            })
+            }
             setFailure(error, lastKnownState: .rendererAvailable)
         }
     }
@@ -255,9 +255,8 @@ extension AppCoordinator {
     private func restoreUsageStatus(
         afterAbortedTransition previousStatus: CodexAccountUsageStatus
     ) {
-        setActiveAccountUsageStatus(
-            previousStatus.snapshot.map(CodexAccountUsageStatus.stale) ?? .unavailable
-        )
+        activeAccountUsageStatus = previousStatus.snapshot.map(CodexAccountUsageStatus.stale)
+            ?? .unavailable
     }
 
     func refreshAccountUsage() async {
@@ -265,7 +264,7 @@ extension AppCoordinator {
         let generation = refreshGeneration
         let accountID = activeAccountID
         let previous = activeAccountUsageStatus.snapshot
-        setActiveAccountUsageStatus(.loading(previous: previous))
+        activeAccountUsageStatus = .loading(previous: previous)
 
         do {
             let usage = try await accountUsageSession.fetchUsage()
@@ -274,9 +273,9 @@ extension AppCoordinator {
                   accountID == activeAccountID
             else { return }
             let snapshot = CodexAccountUsageSnapshot(usage: usage, fetchedAt: .now)
-            setActiveAccountUsageStatus(.available(snapshot))
+            activeAccountUsageStatus = .available(snapshot)
             if let accountID {
-                updateUsage(snapshot, for: accountID)
+                usageByAccountID[accountID] = snapshot
                 persistAccountUsageCache()
             }
         } catch {
@@ -284,9 +283,7 @@ extension AppCoordinator {
                   generation == refreshGeneration,
                   accountID == activeAccountID
             else { return }
-            setActiveAccountUsageStatus(
-                previous.map(CodexAccountUsageStatus.stale) ?? .unavailable
-            )
+            activeAccountUsageStatus = previous.map(CodexAccountUsageStatus.stale) ?? .unavailable
         }
     }
 
@@ -308,13 +305,12 @@ extension AppCoordinator {
             return .completed
         }
         guard !isPerformingAction,
-              savedAccounts.contains(where: { $0.id == accountID }),
-              refreshingUsageAccountIDs.isEmpty
+              savedAccounts.contains(where: { $0.id == accountID })
         else { return .completed }
 
         let generation = refreshGeneration
-        setRefreshingUsage(true, for: accountID)
-        defer { setRefreshingUsage(false, for: accountID) }
+        refreshingUsageAccountIDs.insert(accountID)
+        defer { refreshingUsageAccountIDs.remove(accountID) }
         do {
             let credential = try interactionAllowed
                 ? accountManager.savedCredentialAllowingUserInteraction(for: accountID)
@@ -333,11 +329,11 @@ extension AppCoordinator {
                 for: accountID,
                 interactionAllowed: interactionAllowed
             )
-            updateUsage(
-                CodexAccountUsageSnapshot(usage: result.usage, fetchedAt: .now),
-                for: accountID
+            usageByAccountID[accountID] = CodexAccountUsageSnapshot(
+                usage: result.usage,
+                fetchedAt: .now
             )
-            setUsageError(nil, for: accountID)
+            usageErrorsByAccountID[accountID] = nil
             persistAccountUsageCache(force: true)
         } catch CodexAccountError.keychainAuthorizationRequired {
             return .authorizationRequired
@@ -346,10 +342,10 @@ extension AppCoordinator {
                   generation == refreshGeneration,
                   savedAccounts.contains(where: { $0.id == accountID })
             else { return .completed }
-            setUsageError(error.localizedDescription, for: accountID)
+            usageErrorsByAccountID[accountID] = error.localizedDescription
             if reportsFailure,
                let account = savedAccounts.first(where: { $0.id == accountID }) {
-                setAccountStatus("Could not update usage for \(account.name): \(error.localizedDescription)")
+                accountStatusMessage = "Could not update usage for \(account.name): \(error.localizedDescription)"
             }
         }
         return .completed

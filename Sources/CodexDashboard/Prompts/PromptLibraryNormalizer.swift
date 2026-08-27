@@ -1,7 +1,7 @@
 import Foundation
 
-enum PromptLibraryMigration {
-    static func migrate(_ document: PromptLibraryDocument) -> PromptLibraryDocument {
+enum PromptLibraryNormalizer {
+    static func normalize(_ document: PromptLibraryDocument) -> PromptLibraryDocument {
         PromptLibraryDocument(
             version: document.version,
             prompts: document.prompts.map { prompt in
@@ -11,7 +11,7 @@ enum PromptLibraryMigration {
                     content: prompt.content,
                     section: prompt.section,
                     scope: prompt.scope,
-                    preset: prompt.preset.map(migrate),
+                    preset: prompt.preset.map(normalize),
                     usePreset: prompt.usePreset
                 )
             },
@@ -19,7 +19,7 @@ enum PromptLibraryMigration {
         )
     }
 
-    private static func migrate(_ preset: SavedPromptPreset) -> SavedPromptPreset {
+    private static func normalize(_ preset: SavedPromptPreset) -> SavedPromptPreset {
         SavedPromptPreset(
             model: preset.model,
             reasoningEffort: preset.reasoningEffort == "low" ? "light" : preset.reasoningEffort,

@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension ThreadDashboardWebTests {
+extension TaskDashboardWebTests {
     func testCommitCompatibilityProbeVerifiesFullControlPathAndRestoresUI() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

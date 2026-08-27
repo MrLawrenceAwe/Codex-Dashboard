@@ -4,9 +4,9 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension ThreadDashboardWebTests {
+extension TaskDashboardWebTests {
     func testCompleteCatalogUsesClientPagingAndSearchesBeyondFirstPage() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let threads = (0..<65).map { index in
             ThreadSummary.fixture(
                 id: "thread-\(index)",
@@ -48,7 +48,7 @@ extension ThreadDashboardWebTests {
     }
 
     func testSearchResultsRemainPaged() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let threads = (0..<125).map { index in
             ThreadSummary.fixture(
                 id: "matching-\(index)",
@@ -168,7 +168,7 @@ extension ThreadDashboardWebTests {
     }
 
     func testRunningFilterIsDefaultAndAllFilterIsAbsent() async throws {
-        let webView = try await DashboardWebTestHarness.threadDashboardWebView()
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "running", title: "Active work", runState: .running),
             .fixture(id: "idle", title: "Archived needle", runState: .idle),
