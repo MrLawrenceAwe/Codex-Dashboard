@@ -141,15 +141,27 @@ extension AppCoordinator {
         transaction: () throws -> AccountTransition
     ) async {
         guard !isPerformingAction, let dashboardRuntime else { return }
-        guard !threads.contains(where: { $0.runState == .running }) else {
-            setAccountStatus(CodexAccountError.activeTasks.localizedDescription)
-            return
-        }
 
         setPerformingAction(true)
         advanceRefreshGeneration()
-        persistAccountUsageCache(force: true)
         await synchronizationGate.cancel()
+        do {
+            try await loadThreadSnapshot()
+        } catch {
+            setAccountStatus(
+                "Account change cancelled because active tasks could not be checked. "
+                    + error.localizedDescription
+            )
+            setPerformingAction(false)
+            return
+        }
+        guard !threads.contains(where: { $0.runState == .running }) else {
+            setAccountStatus(CodexAccountError.activeTasks.localizedDescription)
+            setPerformingAction(false)
+            return
+        }
+
+        persistAccountUsageCache(force: true)
         let accountTransaction: AccountTransition
         do {
             accountTransaction = try transaction()

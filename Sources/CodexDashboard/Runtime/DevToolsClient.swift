@@ -41,7 +41,7 @@ extension DevToolsServing {
     func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? { nil }
 }
 
-enum DevToolsEvaluationValue: Sendable {
+enum DevToolsEvaluationValue: Equatable, Sendable {
     case boolean(Bool)
     case string(String)
     case null
@@ -149,15 +149,30 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
             continuation.resume(throwing: DashboardError.invalidDevToolsResponse)
             return
         }
+        do {
+            continuation.resume(returning: try Self.evaluationValue(from: remoteResult))
+        } catch {
+            continuation.resume(throwing: error)
+        }
+    }
+
+    nonisolated static func evaluationValue(
+        from remoteResult: [String: Any]
+    ) throws -> DevToolsEvaluationValue {
+        if remoteResult["value"] is NSNull
+            || remoteResult["subtype"] as? String == "null"
+        {
+            return .null
+        }
         switch remoteResult["value"] {
         case let value as Bool:
-            continuation.resume(returning: .boolean(value))
+            return .boolean(value)
         case let value as String:
-            continuation.resume(returning: .string(value))
+            return .string(value)
         case nil where remoteResult["type"] == nil || remoteResult["type"] as? String == "undefined":
-            continuation.resume(returning: .null)
+            return .null
         default:
-            continuation.resume(throwing: DashboardError.invalidDevToolsResponse)
+            throw DashboardError.invalidDevToolsResponse
         }
     }
 
