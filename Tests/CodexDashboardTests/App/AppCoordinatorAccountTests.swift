@@ -274,6 +274,53 @@ extension AppCoordinatorTests {
         )
     }
 
+    func testBlockedAccountSwitchRestoresUsageStatusAfterCancellingRefresh() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorBlockedSwitchUsageTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let firstCredential = testAccountCredential(accountID: "account-first", name: "First")
+        let secondCredential = testAccountCredential(accountID: "account-second", name: "Second")
+        try firstCredential.write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let first = try accountManager.saveCurrentAccount()
+        _ = try accountManager.beginAddingAccount()
+        try secondCredential.write(to: authenticationURL)
+        _ = try accountManager.saveCurrentAccount()
+        let usageProvider = SuspendedAccountUsageProvider()
+        let coordinator = AppCoordinator(
+            catalogProvider: SequencedCatalogProvider(catalogs: [
+                ThreadCatalog(threads: [.fixture(runState: .idle)], totalThreadCount: 1),
+                ThreadCatalog(threads: [.fixture(runState: .running)], totalThreadCount: 1),
+            ]),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: accountManager,
+            accountUsageProvider: usageProvider,
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+        )
+        await coordinator.synchronizeDashboard()
+
+        let refresh = Task { @MainActor in await coordinator.refreshAccountUsage() }
+        try await waitUntil { await usageProvider.count() == 1 }
+        await coordinator.switchAccount(to: first.id)
+        await usageProvider.resume(with: CodexAccountUsage(fiveHour: nil, weekly: nil))
+        await refresh.value
+
+        XCTAssertEqual(coordinator.activeAccountUsageStatus, .unavailable)
+        XCTAssertEqual(
+            coordinator.accountStatusMessage,
+            CodexAccountError.activeTasks.localizedDescription
+        )
+    }
+
     func testFailedRollbackIsReportedAndDoesNotAttemptAnotherRestart() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorRollbackTests-\(UUID().uuidString)")
