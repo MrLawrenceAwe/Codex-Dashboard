@@ -62,11 +62,12 @@ extension AppCoordinatorTests {
 
         let first = Task { @MainActor in await coordinator.refreshAccountUsage() }
         try await waitUntil { await provider.count() == 1 }
-        await coordinator.refreshAccountUsage()
+        let second = Task { @MainActor in await coordinator.refreshAccountUsage() }
         let requestCount = await provider.count()
         XCTAssertEqual(requestCount, 1)
         await provider.resume(with: CodexAccountUsage(fiveHour: nil, weekly: nil))
         await first.value
+        await second.value
     }
 
     func testUsageRefreshIsSkippedWhileCodexIsClosed() async {

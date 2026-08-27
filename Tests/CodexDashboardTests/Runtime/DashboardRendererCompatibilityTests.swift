@@ -7,7 +7,9 @@ import XCTest
 extension DashboardRendererTests {
     func testLiveRendererCompatibilityWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
-            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with Codex on port 47832.")
+            throw XCTSkip(
+                "Set CODEX_DASHBOARD_LIVE_TEST=1 with Codex on port \(CodexConfiguration.devToolsPort)."
+            )
         }
         let renderer = try DashboardRenderer(
             devTools: DevToolsClient(),

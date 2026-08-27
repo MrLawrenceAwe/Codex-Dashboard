@@ -6,7 +6,9 @@ enum CodexConfiguration {
     static let codexExecutableURL = codexApplicationURL
         .appendingPathComponent("Contents/Resources/codex")
     static let devToolsAddress = "127.0.0.1"
-    static let devToolsPort = 47_832
+    // DevTools does not authenticate loopback clients. A per-launch high port avoids
+    // leaving a predictable, permanently-scanned local debugging endpoint.
+    static let devToolsPort = Int.random(in: 49_152...65_535)
 
     static let launchArguments = [
         "--remote-debugging-address=\(devToolsAddress)",

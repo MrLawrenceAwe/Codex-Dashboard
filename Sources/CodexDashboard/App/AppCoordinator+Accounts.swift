@@ -261,7 +261,7 @@ extension AppCoordinator {
         setActiveAccountUsageStatus(.loading(previous: previous))
 
         do {
-            guard let usage = try await accountUsageSession.fetchUsage() else { return }
+            let usage = try await accountUsageSession.fetchUsage()
             guard !Task.isCancelled,
                   generation == refreshGeneration,
                   accountID == activeAccountID

@@ -102,8 +102,8 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
     private func checkUnreadState() -> CompatibilityCheck {
         guard FileManager.default.fileExists(atPath: globalStateURL.path) else {
             return check(
-                "unread-state", "Unread state", .incompatible,
-                "The expected Codex global-state file is missing."
+                "unread-state", "Unread state", .warning,
+                "The expected Codex global-state file is missing; the dashboard will run without unread indicators."
             )
         }
         do {
@@ -115,8 +115,8 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
             )
         } catch {
             return check(
-                "unread-state", "Unread state", .incompatible,
-                "The global-state file could not be decoded."
+                "unread-state", "Unread state", .warning,
+                "The global-state file could not be decoded; the dashboard will retain the last known unread state."
             )
         }
     }
