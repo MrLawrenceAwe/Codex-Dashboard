@@ -474,4 +474,50 @@ extension AppCoordinatorTests {
         XCTAssertNil(coordinator.accounts.usageErrorsByAccountID[first.id])
     }
 
+    func testInactiveAccountUsageBatchPersistsCacheOnce() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorInactiveUsageBatchTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let credentials = [
+            testAccountCredential(accountID: "account-first", name: "First"),
+            testAccountCredential(accountID: "account-second", name: "Second"),
+            testAccountCredential(accountID: "account-active", name: "Active"),
+        ]
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        var accounts: [SavedAccount] = []
+        for (index, credential) in credentials.enumerated() {
+            if index > 0 { _ = try accountManager.beginAddingAccount() }
+            try credential.write(to: authenticationURL)
+            accounts.append(try accountManager.saveCurrentAccount())
+        }
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 22, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 44, resetsAt: nil)
+        )
+        let cache = RecordingUsageCache()
+        let coordinator = makeAppCoordinator(
+            accountManager: accountManager,
+            accountUsageProvider: SavedAccountRecordingUsageProvider(
+                usage: usage,
+                refreshedCredential: credentials[0]
+            ),
+            accountUsageCacheStore: cache,
+            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+        )
+
+        await coordinator.refreshInactiveAccountUsage()
+
+        XCTAssertEqual(cache.saveCount, 1)
+        XCTAssertEqual(Set(cache.savedSnapshots.keys), Set(accounts.dropLast().map(\.id)))
+        XCTAssertTrue(cache.savedSnapshots.values.allSatisfy { $0.usage == usage })
+    }
+
 }

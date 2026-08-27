@@ -135,6 +135,21 @@ const dashboardLifecycle = (() => {
     scheduleRepair({ rebindHosts: true });
   }
 
+  function containsThreadRow(node) {
+    if (!(node instanceof Element)) return false;
+    return node.matches('[data-app-action-sidebar-thread-id]')
+      || Boolean(node.querySelector('[data-app-action-sidebar-thread-id]'));
+  }
+
+  function handleSidebarMutations(records) {
+    const threadRowsChanged = records.some((record) => {
+      const target = record.target instanceof Element ? record.target : record.target?.parentElement;
+      if (target?.closest('[data-app-action-sidebar-thread-id]')) return true;
+      return [...record.addedNodes, ...record.removedNodes].some(containsThreadRow);
+    });
+    if (threadRowsChanged) scheduleRepair({ syncUnread: true });
+  }
+
   function handleComposerMutations() {
     if (composerRoot() !== observedComposerRoot) {
       scheduleRepair({ rebindHosts: true });
@@ -163,7 +178,7 @@ const dashboardLifecycle = (() => {
 
     if (!structureObserver) {
       structureObserver = new MutationObserver(handleStructureMutations);
-      sidebarObserver = new MutationObserver(() => scheduleRepair({ syncUnread: true }));
+      sidebarObserver = new MutationObserver(handleSidebarMutations);
       composerObserver = new MutationObserver(handleComposerMutations);
       observeHosts();
       navigationEvents.forEach((type) => document.addEventListener(type, handleNavigation, true));

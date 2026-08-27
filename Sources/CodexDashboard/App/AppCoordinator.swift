@@ -68,7 +68,7 @@ final class AppCoordinator: ObservableObject {
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
-        accountUsageCacheStore: UsageCache? = nil,
+        accountUsageCacheStore: (any UsageCaching)? = nil,
         runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
     ) {
         threadSnapshotService = ThreadSnapshotService(

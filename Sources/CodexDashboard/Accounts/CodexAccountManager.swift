@@ -11,14 +11,14 @@ final class CodexAccountManager: @unchecked Sendable {
     private let documentStore: SavedAccountDocumentStore
     private let now: () -> Date
     private let lock = NSLock()
-    let usageCacheStore: UsageCache
+    let usageCacheStore: any UsageCaching
 
     init(
         metadataURL: URL = CodexConfiguration.accountMetadataURL,
         authenticationURL: URL = CodexConfiguration.authenticationURL,
         vault: any AccountCredentialVault = KeychainAccountCredentialVault(),
         fileManager: FileManager = .default,
-        usageCacheStore: UsageCache? = nil,
+        usageCacheStore: (any UsageCaching)? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.vault = vault

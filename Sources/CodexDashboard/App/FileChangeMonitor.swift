@@ -139,6 +139,8 @@ final class FileChangeMonitor {
     private var accountMetadataSignature: FileSignature?
     private var authenticationSignature: FileSignature?
     private var dataRefreshTask: Task<Void, Never>?
+    private var dataRefreshTaskID: UUID?
+    private var dataRefreshGeneration: UInt64 = 0
     private var projectRefreshTask: Task<Void, Never>?
     private var projectRefreshGeneration: UInt64 = 0
     private var pendingProjectPaths: Set<String> = []
@@ -206,10 +208,12 @@ final class FileChangeMonitor {
     }
 
     func stop() {
+        dataRefreshGeneration &+= 1
         projectRefreshGeneration &+= 1
         dataRefreshTask?.cancel()
         projectRefreshTask?.cancel()
         dataRefreshTask = nil
+        dataRefreshTaskID = nil
         projectRefreshTask = nil
         pendingProjectPaths = []
         cancel(&dataWatches)
@@ -232,12 +236,28 @@ final class FileChangeMonitor {
     }
 
     private func scheduleDataRefresh() {
+        dataRefreshGeneration &+= 1
         guard dataRefreshTask == nil else { return }
+        let taskID = UUID()
+        dataRefreshTaskID = taskID
         dataRefreshTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled, let self else { return }
-            self.dataRefreshTask = nil
-            await self.refreshChangedData()
+            guard let self else { return }
+            while !Task.isCancelled {
+                let generationBeforeQuietPeriod = self.dataRefreshGeneration
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { break }
+                if self.dataRefreshGeneration != generationBeforeQuietPeriod {
+                    continue
+                }
+                await self.refreshChangedData()
+                guard !Task.isCancelled,
+                      self.dataRefreshGeneration != generationBeforeQuietPeriod
+                else { break }
+            }
+            if self.dataRefreshTaskID == taskID {
+                self.dataRefreshTask = nil
+                self.dataRefreshTaskID = nil
+            }
         }
     }
 

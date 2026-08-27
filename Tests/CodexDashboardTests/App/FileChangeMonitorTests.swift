@@ -84,6 +84,56 @@ final class FileChangeMonitorTests: XCTestCase {
         XCTAssertEqual(catalogRefreshes, 1)
     }
 
+    func testCatalogChangesWaitForInFlightRefreshAndCoalesceTrailingRefresh() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-serialized-catalog-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try Data("initial-catalog".utf8).write(to: catalogURL)
+        try Data("initial-unread".utf8).write(to: unreadURL)
+
+        let monitor = FileChangeMonitor()
+        var refreshCount = 0
+        var activeRefreshCount = 0
+        var maximumActiveRefreshCount = 0
+        var firstRefreshContinuation: CheckedContinuation<Void, Never>?
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {
+                refreshCount += 1
+                activeRefreshCount += 1
+                maximumActiveRefreshCount = max(maximumActiveRefreshCount, activeRefreshCount)
+                if refreshCount == 1 {
+                    await withCheckedContinuation { firstRefreshContinuation = $0 }
+                }
+                activeRefreshCount -= 1
+            },
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { _ in }
+        )
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        try Data("first-change".utf8).write(to: catalogURL)
+        try await waitUntil { firstRefreshContinuation != nil }
+
+        try Data("second-change".utf8).write(to: catalogURL)
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertEqual(maximumActiveRefreshCount, 1)
+
+        firstRefreshContinuation?.resume()
+        firstRefreshContinuation = nil
+        try await waitUntil { refreshCount == 2 && activeRefreshCount == 0 }
+        XCTAssertEqual(maximumActiveRefreshCount, 1)
+    }
+
     func testNestedProjectFileChangeTriggersWorkingTreeRefresh() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-nested-monitor-\(UUID().uuidString)", isDirectory: true)
