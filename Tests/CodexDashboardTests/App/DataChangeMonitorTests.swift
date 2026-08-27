@@ -119,6 +119,41 @@ final class DataChangeMonitorTests: XCTestCase {
         try await waitUntil { refreshedProjectPaths.contains(projectDirectory.path) }
     }
 
+    func testProjectFileChangeRefreshesOnlyTheAffectedProject() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-targeted-project-monitor-\(UUID().uuidString)", isDirectory: true)
+        let firstProject = root.appendingPathComponent("first", isDirectory: true)
+        let secondProject = root.appendingPathComponent("second", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: firstProject, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondProject, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = DataChangeMonitor()
+        var refreshes: [Set<String>] = []
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        )
+        monitor.updateProjectPaths([firstProject.path, secondProject.path])
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        try Data("change".utf8).write(to: firstProject.appendingPathComponent("changed.txt"))
+
+        try await waitUntil { !refreshes.isEmpty }
+        XCTAssertEqual(refreshes.flatMap { $0 }, [firstProject.path])
+    }
+
     func testLinkedWorktreeResolvesActualGitMetadataDirectory() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-worktree-monitor-\(UUID().uuidString)", isDirectory: true)
