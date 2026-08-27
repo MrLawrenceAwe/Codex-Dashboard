@@ -50,7 +50,7 @@ extension ThreadDashboardWebTests {
               document.querySelector('[data-account-save]') === null,
               document.querySelector('[data-account-add]') === null,
               document.querySelector('[data-account-notice]') === null,
-              typeof window.__codexDashboard.pollAccountPopover,
+              typeof window.__codexDashboard.waitForAccountPopoverAction,
             ]
             """
         ) as? [Any]
@@ -99,13 +99,11 @@ extension ThreadDashboardWebTests {
           const initialCard = panel.querySelector('.codex-accounts-card');
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           const retainedUnchangedCard = initialCard === panel.querySelector('.codex-accounts-card');
-          panel.querySelector('[data-account-action="update"]').click();
           return [
             trigger.textContent.trim(),
             panel.textContent.includes('Lawrence'),
             panel.textContent.includes('5-hour:') && panel.textContent.includes('88% remaining'),
             retainedUnchangedCard,
-            JSON.parse(window.__codexDashboard.pollAccountPopover()),
           ];
         })()
         """) as? [Any]
@@ -115,9 +113,21 @@ extension ThreadDashboardWebTests {
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
-        let pollState = try XCTUnwrap(values[4] as? [String: Any])
-        XCTAssertEqual(pollState["isOpen"] as? Bool, true)
-        let action = try XCTUnwrap(pollState["action"] as? [String: Any])
+        let pendingAction = Task { @MainActor in
+            try await webView.callAsyncJavaScript(
+                "return await window.__codexDashboard.waitForAccountPopoverAction();",
+                contentWorld: .page
+            ) as? String
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        _ = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-account-action=\"update\"]').click()"
+        )
+        let serializedAction = try await pendingAction.value
+        let actionData = try XCTUnwrap(serializedAction?.data(using: String.Encoding.utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
         XCTAssertEqual(action["kind"] as? String, "updateUsage")
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
     }

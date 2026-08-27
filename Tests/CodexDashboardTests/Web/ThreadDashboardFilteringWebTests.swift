@@ -19,7 +19,7 @@ extension ThreadDashboardWebTests {
         let initial = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const initialCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
               const loadMoreVisible = !document.querySelector('[data-load-more]').hidden;
@@ -60,7 +60,7 @@ extension ThreadDashboardWebTests {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const search = document.querySelector('[data-dashboard-search]');
               search.value = 'Matching';
@@ -138,7 +138,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="running"]').click();
               return [
@@ -177,7 +177,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);

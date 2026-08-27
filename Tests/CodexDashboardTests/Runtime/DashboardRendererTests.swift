@@ -78,7 +78,7 @@ actor OrderedSnapshotDevTools: DevToolsServing {
     func mainRendererTargets() -> [DevToolsTarget] { [target] }
 
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async -> Bool {
-        guard expression.contains("applySnapshot") else { return true }
+        guard expression.contains("applyThreads") else { return true }
         if expression.contains("Old snapshot") {
             await withCheckedContinuation { continuation in
                 oldSnapshotContinuation = continuation
@@ -250,10 +250,10 @@ final class DashboardRendererTests: XCTestCase {
         let marker = "unique-snapshot-payload-marker"
         let snapshot = DashboardSnapshot(threads: [.fixture(title: marker)])
 
-        let expression = try RendererScript.deliver(snapshot)
+        let expression = try RendererScript.deliverThreads(snapshot.threads)
 
         XCTAssertEqual(expression.components(separatedBy: marker).count - 1, 1)
-        XCTAssertTrue(expression.contains("const snapshot ="))
+        XCTAssertTrue(expression.contains("applyThreads"))
     }
 
     func testConsumesAccountPopoverActionFromRenderer() async throws {
@@ -266,19 +266,16 @@ final class DashboardRendererTests: XCTestCase {
         )
         let devTools = AccountPopoverRendererDevTools(
             target: target,
-            action: "{\"isOpen\":true,\"action\":{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}}"
+            action: "{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
         )
         let renderer = try DashboardRenderer(
             devTools: devTools,
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        let pollState = await renderer.pollAccountPopover()
+        let action = await renderer.waitForAccountPopoverAction()
 
-        XCTAssertEqual(pollState, AccountPopoverPollState(
-            isOpen: true,
-            action: AccountPopoverAction(kind: .updateUsage, accountID: accountID)
-        ))
+        XCTAssertEqual(action, AccountPopoverAction(kind: .updateUsage, accountID: accountID))
     }
 
     func testOpeningThreadDispatchesItsRoute() async throws {

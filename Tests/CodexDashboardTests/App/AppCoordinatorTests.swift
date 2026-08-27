@@ -41,6 +41,7 @@ actor MutableWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     }
 
     func latestPolicy() -> WorkingTreeStatusRefreshPolicy? { policies.last }
+    func requestCount() -> Int { policies.count }
 }
 
 struct StubUnreadIDProvider: UnreadThreadIDProviding {
@@ -344,18 +345,14 @@ final class StubDashboardRuntime: DashboardRuntime {
 final class AppCoordinatorTests: XCTestCase {
     enum AccountTestError: Error { case mountFailed }
 
-    func testAccountPopoverPollingBacksOffWhileClosed() {
+    func testAccountPopoverLongPollRetriesBackOffWhenNoActionArrives() {
         XCTAssertEqual(
-            PollingController.Schedule.accountPopover(panelOpen: true, active: true),
-            .milliseconds(250)
+            PollingController.Schedule.accountPopoverRetry(active: true),
+            .seconds(1)
         )
         XCTAssertEqual(
-            PollingController.Schedule.accountPopover(panelOpen: false, active: true),
-            .seconds(10)
-        )
-        XCTAssertEqual(
-            PollingController.Schedule.accountPopover(panelOpen: false, active: false),
-            .seconds(60)
+            PollingController.Schedule.accountPopoverRetry(active: false),
+            .seconds(15)
         )
     }
 

@@ -218,7 +218,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(snapshot));
+              window.__codexDashboard.applyThreads((\(snapshot)).threads);
               const composerShell = document.querySelector('.composer-shell');
               const activeThreadProps = { conversationId: 'project-a-thread' };
               composerShell.__reactFiber$test = { memoizedProps: activeThreadProps, return: null };

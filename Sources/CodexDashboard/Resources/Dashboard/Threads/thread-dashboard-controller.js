@@ -230,9 +230,8 @@ function isOpen() {
   return dashboardIsOpen;
 }
 
-function applySnapshot(nextSnapshot) {
-  const snapshot = threadDashboardState.normalizeSnapshot(nextSnapshot);
-  threads = snapshot.threads;
+function applyThreads(nextThreads) {
+  threads = threadDashboardState.normalizeThreads(nextThreads);
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
@@ -290,7 +289,7 @@ return {
   destroy,
   open: openDashboard,
   isOpen,
-  applySnapshot,
+  applyThreads,
   scopeProject,
 };
 })();

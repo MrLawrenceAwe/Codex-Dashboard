@@ -65,7 +65,7 @@ extension AppCoordinatorTests {
         XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
-    func testActivationRefreshesWorkingTreeStatusImmediately() async {
+    func testActivationRefreshUsesWorkingTreeCache() async {
         let thread = ThreadSummary.fixture(id: "thread-1", workingTreeStatus: .notRepository)
         let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
         let coordinator = AppCoordinator(
@@ -85,7 +85,26 @@ extension AppCoordinatorTests {
         await coordinator.refreshAfterActivation()
         XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .clean)
         let latestPolicy = await workingTreeStatusProvider.latestPolicy()
-        XCTAssertEqual(latestPolicy, .refresh)
+        XCTAssertEqual(latestPolicy, .useCached)
+    }
+
+    func testActivationReliesOnFileEventsWhenMonitoringIsAvailable() async {
+        let thread = ThreadSummary.fixture(id: "thread-1")
+        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .clean)
+        let coordinator = AppCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: workingTreeStatusProvider,
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: true,
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.refreshAfterActivation()
+
+        let requestCount = await workingTreeStatusProvider.requestCount()
+        XCTAssertEqual(requestCount, 0)
     }
 
     func testCatalogAndUnreadPollingUseSlowFallbacksWhenFileEventsAreAvailable() {
@@ -127,8 +146,22 @@ extension AppCoordinatorTests {
     }
 
     func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
-        XCTAssertEqual(PollingController.Schedule.workingTree(active: true), .seconds(15))
-        XCTAssertEqual(PollingController.Schedule.workingTree(active: false), .seconds(60))
+        XCTAssertEqual(
+            PollingController.Schedule.workingTree(active: true, fileEventsAvailable: true),
+            .seconds(5 * 60)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.workingTree(active: false, fileEventsAvailable: true),
+            .seconds(15 * 60)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.workingTree(active: true, fileEventsAvailable: false),
+            .seconds(15)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.workingTree(active: false, fileEventsAvailable: false),
+            .seconds(60)
+        )
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

@@ -88,7 +88,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const testStyle = document.createElement('style');
               testStyle.textContent = '#codex-dashboard-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';

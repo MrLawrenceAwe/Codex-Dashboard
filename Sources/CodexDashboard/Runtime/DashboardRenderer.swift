@@ -194,8 +194,15 @@ final class DashboardRenderer {
             )
             lastPromptLibrarySynchronization = now()
         }
+        let threadsChanged = snapshot.threads != lastSnapshot?.threads
+        let accountPopoverChanged = snapshot.accountPopover != lastSnapshot?.accountPopover
+        if mountedDashboard || threadsChanged {
+            try await deliverThreads(snapshot.threads, to: targets)
+        }
+        if mountedDashboard || accountPopoverChanged {
+            try await deliverAccountPopover(snapshot.accountPopover, to: targets)
+        }
         if mountedDashboard || snapshotChanged {
-            try await deliver(snapshot, to: targets)
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
@@ -242,15 +249,16 @@ final class DashboardRenderer {
         }
     }
 
-    func pollAccountPopover() async -> AccountPopoverPollState? {
+    func waitForAccountPopoverAction() async -> AccountPopoverAction? {
         guard let target = (await targets()).first,
               let serialized = try? await devTools.evaluateString(
-                RendererScript.pollAccountPopover,
-                in: target
+                RendererScript.waitForAccountPopoverAction,
+                in: target,
+                timeout: .seconds(35)
               ),
               let data = serialized.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder().decode(AccountPopoverPollState.self, from: data)
+        return try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {
@@ -262,8 +270,21 @@ final class DashboardRenderer {
         await compatibilityChecker.check()
     }
 
-    private func deliver(_ snapshot: DashboardSnapshot, to targets: [DevToolsTarget]) async throws {
-        let expression = try RendererScript.deliver(snapshot)
+    private func deliverThreads(
+        _ threads: [ThreadWireModel],
+        to targets: [DevToolsTarget]
+    ) async throws {
+        try await deliver(RendererScript.deliverThreads(threads), to: targets)
+    }
+
+    private func deliverAccountPopover(
+        _ snapshot: AccountPopoverSnapshot?,
+        to targets: [DevToolsTarget]
+    ) async throws {
+        try await deliver(RendererScript.deliverAccountPopover(snapshot), to: targets)
+    }
+
+    private func deliver(_ expression: String, to targets: [DevToolsTarget]) async throws {
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
                 throw DashboardError.enableFailed(

@@ -15,7 +15,7 @@ struct InjectionBundle: Sendable {
         """
         (() => Boolean(
           window.__codexDashboard?.version === \(String(reflecting: version))
-            && typeof window.__codexDashboard?.applySnapshot === 'function'
+            && typeof window.__codexDashboard?.applyThreads === 'function'
             && window.__codexDashboard.ensureMounted?.()
         ))()
         """

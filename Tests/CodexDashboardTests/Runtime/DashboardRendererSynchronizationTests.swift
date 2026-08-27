@@ -5,6 +5,44 @@ import XCTest
 
 @MainActor
 extension DashboardRendererTests {
+    func testAccountOnlySynchronizationDoesNotRedeliverThreads() async throws {
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+        let devTools = StubRendererDevTools(targets: [target])
+        await devTools.setEvaluationResult(true)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "mount")
+        )
+        let threads = [ThreadSummary.fixture(id: "thread-1")]
+
+        try await renderer.synchronize(
+            DashboardSnapshot(threads: threads),
+            on: [target],
+            forceRemount: true
+        )
+        try await renderer.synchronize(
+            DashboardSnapshot(
+                threads: threads,
+                accountPopover: AccountPopoverSnapshot(
+                    accounts: [],
+                    activeAccountID: nil,
+                    statusMessage: "Updated",
+                    isBusy: false
+                )
+            ),
+            on: [target]
+        )
+
+        let expressions = await devTools.expressions()
+        XCTAssertEqual(expressions.count { $0.contains("return dashboard?.applyThreads") }, 1)
+        XCTAssertEqual(expressions.count { $0.contains("applyAccountPopoverSnapshot") }, 2)
+    }
+
     func testDisableWaitsForInFlightSynchronizationBeforeDestroyingDashboard() async throws {
         let target = DevToolsTarget(
             id: "main",
@@ -144,14 +182,14 @@ extension DashboardRendererTests {
         try await renderer.synchronize(snapshot, on: cachedTargets)
         let cachedCounts = await devTools.counts()
         XCTAssertEqual(cachedCounts.targets, 1)
-        XCTAssertEqual(cachedCounts.evaluations, 2)
+        XCTAssertEqual(cachedCounts.evaluations, 3)
 
         currentDate.addTimeInterval(31)
         let refreshedTargets = await renderer.targets()
         try await renderer.synchronize(snapshot, on: refreshedTargets)
         let refreshedCounts = await devTools.counts()
         XCTAssertEqual(refreshedCounts.targets, 2)
-        XCTAssertEqual(refreshedCounts.evaluations, 3)
+        XCTAssertEqual(refreshedCounts.evaluations, 4)
     }
 
     func testFailedSynchronizationInvalidatesCachedTargets() async throws {
