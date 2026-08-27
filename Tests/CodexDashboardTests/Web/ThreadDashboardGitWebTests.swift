@@ -46,7 +46,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="changedProjects"]').click();
               return [
@@ -85,7 +85,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="changedProjects"]').click();
               const before = [
@@ -136,7 +136,7 @@ extension ThreadDashboardWebTests {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="changedProjects"]').click();
               document.querySelector('[data-project-commit]').click();
@@ -193,7 +193,7 @@ extension ThreadDashboardWebTests {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="changedProjects"]').click();
               document.querySelector('[data-project-commit]').click();
@@ -317,7 +317,7 @@ extension ThreadDashboardWebTests {
         let buttonCounts = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const buttons = [...document.querySelectorAll('[data-project-commit]')];
               const result = [buttons.length, buttons[0]?.textContent.trim()];
@@ -362,7 +362,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="changedProjects"]').click();
               const commit = document.querySelector('[data-project-commit]');

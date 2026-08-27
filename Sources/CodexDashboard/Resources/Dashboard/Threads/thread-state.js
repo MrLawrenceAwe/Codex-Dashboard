@@ -68,10 +68,9 @@ const threadDashboardState = (() => {
     });
   }
 
-  function normalizeSnapshot(snapshot) {
-    const threads = Array.isArray(snapshot?.threads) ? snapshot.threads : [];
-    return { threads };
+  function normalizeThreads(threads) {
+    return Array.isArray(threads) ? threads : [];
   }
 
-  return { derive, filter, loadPreferences, normalizeSnapshot, savePreferences };
+  return { derive, filter, loadPreferences, normalizeThreads, savePreferences };
 })();

@@ -59,7 +59,9 @@ extension AppCoordinator {
 
     func refreshAfterActivation() async {
         await synchronizeDashboard()
-        await updateWorkingTreeStatuses(forceRefresh: true)
+        if !pollingController.hasFileChangeMonitoring {
+            await updateWorkingTreeStatuses()
+        }
     }
 
     func updateWorkingTreeStatuses(

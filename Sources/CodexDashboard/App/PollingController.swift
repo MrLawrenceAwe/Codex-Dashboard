@@ -8,16 +8,18 @@ final class PollingController {
             if fileEventsAvailable { return active ? .seconds(30) : .seconds(2 * 60) }
             return active ? .seconds(2) : .seconds(8)
         }
-        static func workingTree(active: Bool) -> Duration { active ? .seconds(15) : .seconds(60) }
+        static func workingTree(active: Bool, fileEventsAvailable: Bool) -> Duration {
+            if fileEventsAvailable { return active ? .seconds(5 * 60) : .seconds(15 * 60) }
+            return active ? .seconds(15) : .seconds(60)
+        }
         static func unread(active: Bool, fileEventsAvailable: Bool) -> Duration {
             if fileEventsAvailable { return active ? .seconds(15) : .seconds(60) }
             return active ? .milliseconds(500) : .seconds(1)
         }
         static let accountUsage: Duration = .seconds(30)
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
-        static func accountPopover(panelOpen: Bool, active: Bool) -> Duration {
-            if panelOpen { return .milliseconds(250) }
-            return active ? .seconds(10) : .seconds(60)
+        static func accountPopoverRetry(active: Bool) -> Duration {
+            active ? .seconds(1) : .seconds(15)
         }
     }
 
@@ -28,6 +30,8 @@ final class PollingController {
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
     private var accountPopoverActionPollingTask: Task<Void, Never>?
     private let fileChanges: DataChangeMonitor?
+
+    var hasFileChangeMonitoring: Bool { fileChanges != nil }
 
     init(observeFileChanges: Bool = true) {
         fileChanges = observeFileChanges ? DataChangeMonitor() : nil
@@ -72,7 +76,10 @@ final class PollingController {
         workingTreePollingTask = Task {
             while !Task.isCancelled {
                 await updateWorkingTrees(nil)
-                try? await Task.sleep(for: Schedule.workingTree(active: Self.isUserActive))
+                try? await Task.sleep(for: Schedule.workingTree(
+                    active: Self.isUserActive,
+                    fileEventsAvailable: fileChanges != nil
+                ))
             }
         }
         unreadPollingTask = Task {
@@ -97,13 +104,13 @@ final class PollingController {
             }
         }
         accountPopoverActionPollingTask = Task {
-            var panelOpen = false
             while !Task.isCancelled {
-                panelOpen = await handleAccountPopoverAction()
-                try? await Task.sleep(for: Schedule.accountPopover(
-                    panelOpen: panelOpen,
-                    active: Self.isUserActive
-                ))
+                let handledAction = await handleAccountPopoverAction()
+                if !handledAction {
+                    try? await Task.sleep(for: Schedule.accountPopoverRetry(
+                        active: Self.isUserActive
+                    ))
+                }
             }
         }
         fileChanges?.start(

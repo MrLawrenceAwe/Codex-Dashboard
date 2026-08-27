@@ -25,7 +25,7 @@ extension ThreadDashboardWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
               return [
@@ -55,7 +55,7 @@ extension ThreadDashboardWebTests {
         let accessibleName = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
               return document.querySelector('[data-thread-id="unread-thread"]').getAttribute('aria-label');
@@ -94,7 +94,7 @@ extension ThreadDashboardWebTests {
                 memoizedProps: { conversationId: 'thread-one', isUnread: true },
                 return: null,
               };
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               row.__reactFiber$test.memoizedProps = {
                 conversationId: 'thread-one',
                 isUnread: false,

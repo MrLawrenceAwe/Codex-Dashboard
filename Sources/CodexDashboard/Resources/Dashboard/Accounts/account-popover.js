@@ -7,6 +7,7 @@ const accountPopover = (() => {
   let outsidePointerHandler;
   let escapeHandler;
   const actions = [];
+  const actionWaiters = [];
 
   function visibleAction(label) {
     return [...document.querySelectorAll('[role="menuitem"], button')].find((element) => (
@@ -29,12 +30,34 @@ const accountPopover = (() => {
     if (snapshot.isBusy || actions.length) return;
     actions.push({ kind, accountID });
     renderPanel();
+    resolveActionWaiters();
   }
 
-  function pollState() {
-    return JSON.stringify({
-      isOpen: document.getElementById(panelID) !== null,
-      action: actions.shift() || null,
+  function resolveActionWaiters() {
+    while (actions.length && actionWaiters.length) {
+      const waiter = actionWaiters.shift();
+      clearTimeout(waiter.timer);
+      waiter.resolve(JSON.stringify(actions.shift()));
+    }
+  }
+
+  function waitForAction(timeout = 30000) {
+    if (actions.length) return Promise.resolve(JSON.stringify(actions.shift()));
+    return new Promise((resolve) => {
+      const waiter = { resolve, timer: undefined };
+      waiter.timer = setTimeout(() => {
+        const index = actionWaiters.indexOf(waiter);
+        if (index >= 0) actionWaiters.splice(index, 1);
+        resolve('null');
+      }, timeout);
+      actionWaiters.push(waiter);
+    });
+  }
+
+  function releaseActionWaiters() {
+    actionWaiters.splice(0).forEach((waiter) => {
+      clearTimeout(waiter.timer);
+      waiter.resolve('null');
     });
   }
 
@@ -231,7 +254,8 @@ const accountPopover = (() => {
     observer = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();
     closePanel();
+    releaseActionWaiters();
   }
 
-  return { applySnapshot, pollState, mount, unmount };
+  return { applySnapshot, waitForAction, mount, unmount };
 })();

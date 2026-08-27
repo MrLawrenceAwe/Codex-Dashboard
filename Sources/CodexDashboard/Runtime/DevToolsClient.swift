@@ -35,10 +35,23 @@ protocol DevToolsServing: Sendable {
     func mainRendererTargets() async -> [DevToolsTarget]
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool
     func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String?
+    func evaluateString(
+        _ expression: String,
+        in target: DevToolsTarget,
+        timeout: Duration
+    ) async throws -> String?
 }
 
 extension DevToolsServing {
     func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? { nil }
+
+    func evaluateString(
+        _ expression: String,
+        in target: DevToolsTarget,
+        timeout: Duration
+    ) async throws -> String? {
+        try await evaluateString(expression, in: target)
+    }
 }
 
 enum DevToolsEvaluationValue: Equatable, Sendable {
@@ -282,7 +295,15 @@ actor DevToolsClient: DevToolsServing {
         _ expression: String,
         in target: DevToolsTarget
     ) async throws -> String? {
-        try await withDevToolsTimeout(.seconds(4)) { [self] in
+        try await evaluateString(expression, in: target, timeout: .seconds(4))
+    }
+
+    func evaluateString(
+        _ expression: String,
+        in target: DevToolsTarget,
+        timeout: Duration
+    ) async throws -> String? {
+        try await withDevToolsTimeout(timeout) { [self] in
             try await evaluateStringWithoutTimeout(expression, in: target)
         }
     }

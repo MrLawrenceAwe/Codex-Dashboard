@@ -100,7 +100,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 return: null,
               };
               unreadRow.addEventListener('click', () => { window.__openedThreadID = 'thread-unread'; });
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
               const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');

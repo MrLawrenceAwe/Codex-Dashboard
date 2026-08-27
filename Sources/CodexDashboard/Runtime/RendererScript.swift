@@ -26,25 +26,29 @@ enum RendererScript {
         """
     }
 
-    static func deliver(_ snapshot: DashboardSnapshot) throws -> String {
-        let data = try JSONEncoder().encode(snapshot)
+    static func deliverThreads(_ threads: [ThreadWireModel]) throws -> String {
+        let data = try JSONEncoder().encode(threads)
         guard let json = String(data: data, encoding: .utf8) else {
             throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")
         }
         return """
         (() => {
           const dashboard = window.__codexDashboard;
-          if (typeof dashboard?.applySnapshot !== 'function') return false;
-          const snapshot = \(json);
-          dashboard.applySnapshot(snapshot);
-          dashboard.applyAccountPopoverSnapshot?.(snapshot.accountPopover);
-          return true;
+          return dashboard?.applyThreads?.(\(json)) === true;
         })()
         """
     }
 
-    static let pollAccountPopover =
-        "window.__codexDashboard?.pollAccountPopover?.() ?? null"
+    static func deliverAccountPopover(_ snapshot: AccountPopoverSnapshot?) throws -> String {
+        let data = try JSONEncoder().encode(snapshot)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw DashboardError.enableFailed("Account data could not be encoded for the renderer.")
+        }
+        return "(() => window.__codexDashboard?.applyAccountPopoverSnapshot?.(\(json)) === true)()"
+    }
+
+    static let waitForAccountPopoverAction =
+        "window.__codexDashboard?.waitForAccountPopoverAction?.() ?? Promise.resolve('null')"
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 

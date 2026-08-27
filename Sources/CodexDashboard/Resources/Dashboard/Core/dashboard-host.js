@@ -4,9 +4,9 @@ window.__codexDashboard = {
   destroy: threadDashboard.destroy,
   open: threadDashboard.open,
   isOpen: threadDashboard.isOpen,
-  applySnapshot: threadDashboard.applySnapshot,
+  applyThreads: threadDashboard.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
-  pollAccountPopover: accountPopover.pollState,
+  waitForAccountPopoverAction: accountPopover.waitForAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   exportPendingPromptLibrary: () => {
     const library = promptStore.pendingLibrary();

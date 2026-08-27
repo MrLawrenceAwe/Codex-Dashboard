@@ -46,10 +46,10 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
             })()
             """
         )
@@ -70,7 +70,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let closedState = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               return [
                 document.querySelectorAll('[data-thread-list] .dashboard-thread').length,
                 document.querySelector('[data-navigation-count]').textContent,
@@ -123,7 +123,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               try {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
               document.querySelector('[data-filter="running"]').click();
@@ -163,7 +163,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let status = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const indicator = document.querySelector('[data-navigation-changes]');
               return [indicator.hidden, indicator.getAttribute('title')];
@@ -207,7 +207,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const row = document.querySelector('[data-thread-list] .dashboard-thread');
               const contract = [row.tagName, row.type, row.getAttribute('aria-label')];
@@ -237,7 +237,7 @@ final class ThreadDashboardWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.applySnapshot(\(payload));
+              window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               document.querySelector('[data-filter="unread"]').click();
               const row = document.querySelector('[data-thread-id="completed"]');
