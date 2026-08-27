@@ -59,7 +59,9 @@ final class DevToolsClientTests: XCTestCase {
 
     func testLiveRoundTripWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
-            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with a page target on port 47832.")
+            throw XCTSkip(
+                "Set CODEX_DASHBOARD_LIVE_TEST=1 with a page target on port \(CodexConfiguration.devToolsPort)."
+            )
         }
         let client = DevToolsClient()
         let deadline = ContinuousClock.now + .seconds(8)
@@ -77,7 +79,9 @@ final class DevToolsClientTests: XCTestCase {
 
     func testLiveDashboardInjectionWithoutCSPBypassWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
-            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 with a page target on port 47832.")
+            throw XCTSkip(
+                "Set CODEX_DASHBOARD_LIVE_TEST=1 with a page target on port \(CodexConfiguration.devToolsPort)."
+            )
         }
         let client = DevToolsClient()
         let targets = await client.mainRendererTargets()

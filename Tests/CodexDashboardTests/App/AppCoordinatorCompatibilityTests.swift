@@ -5,6 +5,40 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testRestartRefusesToInterruptRunningTask() async {
+        let runningThread = ThreadSummary(
+            id: "running-thread",
+            title: "Running",
+            preview: "Working",
+            projectName: "Project",
+            projectPath: "/tmp/project",
+            recencyEpochMillis: 1,
+            isPinned: false,
+            model: nil,
+            runState: .running,
+            latestLifecycleEvent: nil,
+            workingTreeStatus: .notRepository
+        )
+        let runtime = StubDashboardRuntime()
+        let coordinator = AppCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [runningThread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.restartCodexAndEnableThreadDashboard()
+
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertEqual(
+            coordinator.connectionError,
+            "Finish or cancel active Codex tasks before restarting."
+        )
+    }
+
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {
         let incompatible = CompatibilityCheck(
             id: "sidebar-host",

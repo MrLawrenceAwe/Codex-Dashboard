@@ -4,6 +4,11 @@ Codex Dashboard is a native macOS menu-bar utility that adds a recent-task dashb
 to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
+The DevTools connection is limited to the local machine and uses a new high port each
+time the dashboard launches, but Chromium DevTools does not authenticate local clients.
+Use this utility only on a trusted personal macOS account; do not leave Codex running
+with the dashboard enabled when untrusted local software has access to your account.
+
 ## Install
 
 Run:

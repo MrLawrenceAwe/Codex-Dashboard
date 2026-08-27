@@ -53,7 +53,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
         let checks = await checker.checkLocalContracts()
 
         XCTAssertEqual(status("thread-database", in: checks), .incompatible)
-        XCTAssertEqual(status("unread-state", in: checks), .incompatible)
+        XCTAssertEqual(status("unread-state", in: checks), .warning)
         XCTAssertEqual(status("rollout-events", in: checks), .unavailable)
     }
 
@@ -85,7 +85,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
 
         let checks = await checker.checkLocalContracts()
 
-        XCTAssertEqual(status("unread-state", in: checks), .incompatible)
+        XCTAssertEqual(status("unread-state", in: checks), .warning)
     }
 
     func testReportSeparatesBlockingAndNonBlockingResults() {

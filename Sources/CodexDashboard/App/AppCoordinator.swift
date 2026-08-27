@@ -158,6 +158,19 @@ final class AppCoordinator: ObservableObject {
 
     func restartCodexAndEnableThreadDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
+        do {
+            try await loadThreadSnapshot()
+        } catch {
+            setConnectionError(
+                "Codex was not restarted because active tasks could not be checked. "
+                    + error.localizedDescription
+            )
+            return
+        }
+        guard !threads.contains(where: { $0.runState == .running }) else {
+            setConnectionError("Finish or cancel active Codex tasks before restarting.")
+            return
+        }
         await checkCompatibility()
         guard compatibilityReport?.blockingCount ?? 0 == 0 else {
             setConnectionError(Self.incompatibleContractMessage)
