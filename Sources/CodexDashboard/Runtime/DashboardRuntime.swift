@@ -23,6 +23,7 @@ protocol DashboardRuntime: AnyObject {
     func openTaskDashboard() async
     func openThread(_ threadID: String) async
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult
+    func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
     func preferNativePromptLibraryOnNextSynchronization()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
@@ -30,6 +31,7 @@ protocol DashboardRuntime: AnyObject {
 extension DashboardRuntime {
     func preferNativePromptLibraryOnNextSynchronization() {}
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult { .unavailable }
+    func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {}
 }
 
 @MainActor
@@ -98,6 +100,10 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
 
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
         await renderer.waitForAccountPopoverAction()
+    }
+
+    func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
+        await renderer.synchronizeAccountPopover(snapshot)
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {

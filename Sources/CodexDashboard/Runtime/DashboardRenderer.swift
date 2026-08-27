@@ -268,6 +268,12 @@ final class DashboardRenderer {
         }
     }
 
+    func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
+        let targets = await targets()
+        guard !targets.isEmpty else { return }
+        try? await deliverAccountPopover(snapshot, to: targets)
+    }
+
     func preferNativePromptLibraryOnNextSynchronization() {
         promptLibraryBridge?.preferNativeLibrary()
         lastPromptLibrarySynchronization = nil

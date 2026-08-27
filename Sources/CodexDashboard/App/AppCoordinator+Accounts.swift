@@ -30,13 +30,13 @@ extension AppCoordinator {
             guard let accountID = action.accountID else { return .unavailable }
             accounts.deleteAccount(accountID)
         }
-        await publishSnapshotIfMaintained()
+        await publishAccountPopoverSnapshot()
         return .handled
     }
 
     func refreshAccountStateAfterFileChange() async {
         accounts.refreshState()
-        await publishSnapshotIfMaintained()
+        await publishAccountPopoverSnapshot()
     }
 
     func refreshAccountState() {
@@ -164,11 +164,13 @@ extension AppCoordinator {
         await accounts.refreshActiveUsage(
             codexIsRunning: dashboardRuntime?.codexIsRunning == true
         )
+        await publishAccountPopoverSnapshot()
     }
 
     func refreshInactiveAccountUsage() async {
         guard !isPerformingAction else { return }
         await accounts.refreshInactiveUsage()
+        await publishAccountPopoverSnapshot()
     }
 
     func refreshSavedAccountUsage(
@@ -185,6 +187,12 @@ extension AppCoordinator {
             accountID,
             reportsFailure: reportsFailure,
             interactionAllowed: interactionAllowed
+        )
+    }
+
+    private func publishAccountPopoverSnapshot() async {
+        await dashboardRuntime?.synchronizeAccountPopover(
+            accounts.popoverSnapshot(isBusy: isPerformingAction)
         )
     }
 }
