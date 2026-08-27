@@ -123,4 +123,14 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertEqual(counts.evaluations, 2)
         XCTAssertEqual(counts.cancellations, 0)
     }
+
+    func testExplicitNullEvaluationValueIsDecodedWithoutInvalidatingTheResponse() throws {
+        let value = try PersistentDevToolsConnection.evaluationValue(from: [
+            "type": "object",
+            "subtype": "null",
+            "value": NSNull(),
+        ])
+
+        XCTAssertEqual(value, .null)
+    }
 }
