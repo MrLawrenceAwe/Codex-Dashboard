@@ -142,9 +142,11 @@ extension AppCoordinator {
     ) async {
         guard !isPerformingAction, let dashboardRuntime else { return }
 
+        let previousUsageStatus = activeAccountUsageStatus
         setPerformingAction(true)
         advanceRefreshGeneration()
         await synchronizationGate.cancel()
+        await accountUsageSession.reset()
         do {
             try await loadThreadSnapshot()
         } catch {
@@ -152,11 +154,13 @@ extension AppCoordinator {
                 "Account change cancelled because active tasks could not be checked. "
                     + error.localizedDescription
             )
+            restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
             setPerformingAction(false)
             return
         }
         guard !threads.contains(where: { $0.runState == .running }) else {
             setAccountStatus(CodexAccountError.activeTasks.localizedDescription)
+            restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
             setPerformingAction(false)
             return
         }
@@ -165,9 +169,9 @@ extension AppCoordinator {
         let accountTransaction: AccountTransition
         do {
             accountTransaction = try transaction()
-            await accountUsageSession.reset()
         } catch {
             setAccountStatus(error.localizedDescription)
+            restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
             setPerformingAction(false)
             refreshAccountState()
             return
@@ -239,6 +243,14 @@ extension AppCoordinator {
             })
             setFailure(error, lastKnownState: .rendererAvailable)
         }
+    }
+
+    private func restoreUsageStatus(
+        afterAbortedTransition previousStatus: CodexAccountUsageStatus
+    ) {
+        setActiveAccountUsageStatus(
+            previousStatus.snapshot.map(CodexAccountUsageStatus.stale) ?? .unavailable
+        )
     }
 
     func refreshAccountUsage() async {
