@@ -1,11 +1,19 @@
 import Foundation
 
 protocol WorkingTreeStatusProviding: Sendable {
-    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus]
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) async -> [String: WorkingTreeStatus]
+}
+
+enum WorkingTreeStatusRefreshPolicy: Equatable, Sendable {
+    case useCached
+    case refresh
 }
 
 actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    static let defaultStatusCacheLifetime: TimeInterval = 0
+    static let defaultStatusCacheLifetime: TimeInterval = 60
 
     private struct CachedStatus {
         let value: WorkingTreeStatus
@@ -31,7 +39,10 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         self.cacheLifetime = cacheLifetime
     }
 
-    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) async -> [String: WorkingTreeStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
         let now = Date()
@@ -45,6 +56,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             return true
         }
         let staleProjectPaths = repositoryProjectPaths.filter { path in
+            if policy == .refresh { return true }
             guard let cached = statusByProjectPath[path] else { return true }
             return now.timeIntervalSince(cached.loadedAt) >= cacheLifetime
         }

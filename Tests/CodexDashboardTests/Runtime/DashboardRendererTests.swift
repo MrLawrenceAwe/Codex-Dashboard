@@ -172,6 +172,7 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
     private var exportedLibrary: String
     private var pendingLibrary: String?
     private var booleanExpressions: [String] = []
+    private var stringExpressions: [String] = []
 
     init(target: DevToolsTarget, exportedLibrary: String, pendingLibrary: String? = nil) {
         self.target = target
@@ -187,11 +188,14 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
     }
 
     func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+        stringExpressions.append(expression)
         if expression.contains("exportPendingPromptLibrary") { return pendingLibrary }
         return exportedLibrary
     }
 
     func expressions() -> [String] { booleanExpressions }
+
+    func stringExpressionCount() -> Int { stringExpressions.count }
 
     func setPendingLibrary(_ library: String?) {
         pendingLibrary = library

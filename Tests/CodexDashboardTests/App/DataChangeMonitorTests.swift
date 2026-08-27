@@ -154,6 +154,58 @@ final class DataChangeMonitorTests: XCTestCase {
         XCTAssertEqual(refreshes.flatMap { $0 }, [firstProject.path])
     }
 
+    func testProjectChangesWaitForInFlightRefreshBeforeStartingAnother() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-serialized-refresh-\(UUID().uuidString)", isDirectory: true)
+        let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = DataChangeMonitor()
+        var refreshCount = 0
+        var activeRefreshCount = 0
+        var maximumActiveRefreshCount = 0
+        var firstRefreshContinuation: CheckedContinuation<Void, Never>?
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { _ in
+                refreshCount += 1
+                activeRefreshCount += 1
+                maximumActiveRefreshCount = max(maximumActiveRefreshCount, activeRefreshCount)
+                if refreshCount == 1 {
+                    await withCheckedContinuation { firstRefreshContinuation = $0 }
+                }
+                activeRefreshCount -= 1
+            }
+        )
+        monitor.updateProjectPaths([projectDirectory.path])
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        try Data("first".utf8).write(to: projectDirectory.appendingPathComponent("first.txt"))
+        try await waitUntil { firstRefreshContinuation != nil }
+
+        try Data("second".utf8).write(to: projectDirectory.appendingPathComponent("second.txt"))
+        try await Task.sleep(for: .milliseconds(350))
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertEqual(maximumActiveRefreshCount, 1)
+
+        firstRefreshContinuation?.resume()
+        firstRefreshContinuation = nil
+        try await waitUntil { refreshCount >= 2 && activeRefreshCount == 0 }
+        XCTAssertEqual(maximumActiveRefreshCount, 1)
+    }
+
     func testLinkedWorktreeResolvesActualGitMetadataDirectory() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-worktree-monitor-\(UUID().uuidString)", isDirectory: true)

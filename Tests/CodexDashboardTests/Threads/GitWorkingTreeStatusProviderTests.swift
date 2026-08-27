@@ -3,8 +3,8 @@ import XCTest
 @testable import CodexDashboard
 
 final class GitWorkingTreeStatusProviderTests: XCTestCase {
-    func testDefaultStatusCacheDoesNotDelayWorkingTreeUpdates() {
-        XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 0)
+    func testDefaultStatusCacheAvoidsRepeatedPeriodicGitScans() {
+        XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 60)
     }
 
     func testDefaultProviderImmediatelyObservesCleanWorkingTree() async throws {
@@ -21,9 +21,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         try Data("uncommitted\n".utf8).write(to: changedFileURL)
         let provider = GitWorkingTreeStatusProvider()
 
-        let changed = await provider.loadStatuses(for: [projectURL.path])
+        let changed = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
         try FileManager.default.removeItem(at: changedFileURL)
-        let clean = await provider.loadStatuses(for: [projectURL.path])
+        let clean = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
         XCTAssertEqual(changed[projectURL.path], .hasChanges)
         XCTAssertEqual(clean[projectURL.path], .clean)
@@ -43,7 +43,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("uncommitted\n".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [projectURL.path])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+            for: [projectURL.path], policy: .useCached
+        )
 
         XCTAssertEqual(statuses[projectURL.path], .hasChanges)
     }
@@ -68,9 +70,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         )
         let provider = GitWorkingTreeStatusProvider()
 
-        let metadataOnly = await provider.loadStatuses(for: [projectURL.path])
+        let metadataOnly = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
         try Data("meaningful".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
-        let meaningfulChange = await provider.loadStatuses(for: [projectURL.path])
+        let meaningfulChange = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
         XCTAssertEqual(metadataOnly[projectURL.path], .clean)
         XCTAssertEqual(meaningfulChange[projectURL.path], .hasChanges)
@@ -78,7 +80,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
 
     func testReportsUnavailablePath() async {
         let missingPath = "/tmp/codex-dashboard-missing-\(UUID().uuidString)"
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [missingPath])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+            for: [missingPath], policy: .useCached
+        )
         XCTAssertEqual(statuses[missingPath], .unavailable)
     }
 
@@ -88,7 +92,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [directory.path])
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+            for: [directory.path], policy: .useCached
+        )
         XCTAssertEqual(statuses[directory.path], .notRepository)
     }
 
@@ -97,7 +103,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             "/tmp/codex-dashboard-missing-\(index)-\(UUID().uuidString)"
         })
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: paths)
+        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+            for: paths, policy: .useCached
+        )
 
         XCTAssertEqual(statuses.count, paths.count)
         XCTAssertTrue(statuses.values.allSatisfy { $0 == .unavailable })
@@ -119,18 +127,18 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         let provider = GitWorkingTreeStatusProvider(cacheLifetime: 60)
         let paths: Set<String> = [firstProjectURL.path, secondProjectURL.path]
 
-        let initial = await provider.loadStatuses(for: paths)
+        let initial = await provider.loadStatuses(for: paths, policy: .useCached)
         XCTAssertEqual(initial[firstProjectURL.path], .clean)
         XCTAssertEqual(initial[secondProjectURL.path], .clean)
 
         try Data("uncommitted\n".utf8).write(to: repositoryURL.appendingPathComponent("notes.txt"))
-        let cached = await provider.loadStatuses(for: paths)
+        let cached = await provider.loadStatuses(for: paths, policy: .useCached)
         XCTAssertEqual(cached[firstProjectURL.path], .clean)
         XCTAssertEqual(cached[secondProjectURL.path], .clean)
 
         try Data("feature change\n".utf8).write(to: firstProjectURL.appendingPathComponent("feature.txt"))
         let uncachedProvider = GitWorkingTreeStatusProvider(cacheLifetime: 0)
-        let refreshed = await uncachedProvider.loadStatuses(for: paths)
+        let refreshed = await uncachedProvider.loadStatuses(for: paths, policy: .useCached)
         XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
         XCTAssertEqual(refreshed[secondProjectURL.path], .clean)
     }
@@ -142,7 +150,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let provider = GitWorkingTreeStatusProvider()
 
-        let initial = await provider.loadStatuses(for: [directory.path])
+        let initial = await provider.loadStatuses(for: [directory.path], policy: .useCached)
         XCTAssertEqual(initial[directory.path], .notRepository)
         _ = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/git"),
@@ -150,7 +158,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             timeout: 3
         )
 
-        let refreshed = await provider.loadStatuses(for: [directory.path])
+        let refreshed = await provider.loadStatuses(for: [directory.path], policy: .useCached)
         XCTAssertEqual(refreshed[directory.path], .clean)
     }
 }

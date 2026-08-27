@@ -52,7 +52,7 @@ final class PromptLibraryBridge {
             }
         }
 
-        let storedLibrary = try store.load()
+        var storedLibrary = try store.load()
         let nativeLibraryChanged = storedLibrary != lastDeliveredLibrary
         let sourceTarget = healthyTargets.first ?? (storedLibrary == nil ? firstTarget : nil)
         if !nativeLibraryChanged,
@@ -69,6 +69,7 @@ final class PromptLibraryBridge {
                 }
             } else {
                 _ = try store.save(rendererLibrary)
+                storedLibrary = rendererLibrary
             }
         }
 
@@ -76,7 +77,7 @@ final class PromptLibraryBridge {
         if nativeWins, !discardedPendingLibrary {
             try await discardPendingLibrary(on: targets)
         }
-        guard let nativeLibrary = try store.load() else { return }
+        guard let nativeLibrary = storedLibrary else { return }
         guard nativeWins || mountedDashboard || nativeLibrary != lastDeliveredLibrary else { return }
 
         let expression = try RendererScript.deliverPromptLibrary(nativeLibrary)

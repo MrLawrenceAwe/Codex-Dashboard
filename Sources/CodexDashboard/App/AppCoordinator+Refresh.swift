@@ -59,15 +59,19 @@ extension AppCoordinator {
 
     func refreshAfterActivation() async {
         await synchronizeDashboard()
-        await updateWorkingTreeStatuses()
+        await updateWorkingTreeStatuses(forceRefresh: true)
     }
 
-    func updateWorkingTreeStatuses(projectPaths: Set<String>? = nil) async {
+    func updateWorkingTreeStatuses(
+        projectPaths: Set<String>? = nil,
+        forceRefresh: Bool = false
+    ) async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
         let generation = refreshGeneration
+        let requestedPaths = forceRefresh ? Set(threads.map(\.projectPath)) : projectPaths
         guard let statusByProjectPath = await threadSnapshotService.updateWorkingTreeStatuses(
-            in: threads, projectPaths: projectPaths
+            in: threads, projectPaths: requestedPaths
         ) else { return }
         guard !isPerformingAction, generation == refreshGeneration else { return }
         setThreadSnapshot(threads.map { thread in

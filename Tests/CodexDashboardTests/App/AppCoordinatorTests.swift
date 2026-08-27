@@ -12,25 +12,35 @@ struct StubCatalogProvider: ThreadCatalogProviding {
 }
 
 struct StubWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) async -> [String: WorkingTreeStatus] {
         [:]
     }
 }
 
 actor MutableWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     private var status: WorkingTreeStatus
+    private var policies: [WorkingTreeStatusRefreshPolicy] = []
 
     init(status: WorkingTreeStatus) {
         self.status = status
     }
 
-    func loadStatuses(for projectPaths: Set<String>) -> [String: WorkingTreeStatus] {
-        Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, status) })
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) -> [String: WorkingTreeStatus] {
+        policies.append(policy)
+        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, status) })
     }
 
     func setStatus(_ status: WorkingTreeStatus) {
         self.status = status
     }
+
+    func latestPolicy() -> WorkingTreeStatusRefreshPolicy? { policies.last }
 }
 
 struct StubUnreadIDProvider: UnreadThreadIDProviding {

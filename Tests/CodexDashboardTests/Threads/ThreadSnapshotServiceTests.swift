@@ -15,7 +15,10 @@ private actor CountingCatalogProvider: ThreadCatalogProviding {
 }
 
 private struct ChangedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    func loadStatuses(for projectPaths: Set<String>) -> [String: WorkingTreeStatus] {
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) -> [String: WorkingTreeStatus] {
         Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .hasChanges) })
     }
 }
@@ -34,7 +37,10 @@ private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     private var continuations: [Int: CheckedContinuation<[String: WorkingTreeStatus], Never>] = [:]
     private var nextRequestID = 0
 
-    func loadStatuses(for projectPaths: Set<String>) async -> [String: WorkingTreeStatus] {
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) async -> [String: WorkingTreeStatus] {
         let requestID = nextRequestID
         nextRequestID += 1
         return await withCheckedContinuation { continuation in

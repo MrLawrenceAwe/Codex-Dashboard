@@ -19,15 +19,23 @@ extension DashboardRendererTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        var currentDate = Date(timeIntervalSince1970: 1_000)
         let renderer = try DashboardRenderer(
             devTools: devTools,
             injectionBundle: InjectionBundle(version: "test", mountExpression: "mount"),
-            promptLibraryStore: store
+            promptLibraryStore: store,
+            promptLibrarySynchronizationInterval: 10,
+            now: { currentDate }
         )
         let snapshot = DashboardSnapshot(threads: [])
 
         try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
         XCTAssertEqual(try store.load()?.prompts.first?.preset?.model, "gpt-future")
+        let initialStringEvaluationCount = await devTools.stringExpressionCount()
+
+        try await renderer.synchronize(snapshot, on: [target])
+        let unchangedStringEvaluationCount = await devTools.stringExpressionCount()
+        XCTAssertEqual(unchangedStringEvaluationCount, initialStringEvaluationCount)
 
         let imported = PromptLibraryDocument(
             version: 3,
@@ -43,6 +51,7 @@ extension DashboardRendererTests {
             sections: ["General"]
         )
         try store.save(imported)
+        currentDate.addTimeInterval(11)
         try await renderer.synchronize(snapshot, on: [target])
 
         XCTAssertEqual(try store.load(), imported)
