@@ -2,6 +2,39 @@ import XCTest
 
 @testable import CodexDashboard
 
+private actor ReusableDevToolsConnection: DevToolsConnectionServing {
+    private var evaluationCount = 0
+    private var cancellationCount = 0
+
+    func evaluate(_ expression: String) -> DevToolsEvaluationValue {
+        evaluationCount += 1
+        return .boolean(true)
+    }
+
+    func cancel() {
+        cancellationCount += 1
+    }
+
+    func counts() -> (evaluations: Int, cancellations: Int) {
+        (evaluationCount, cancellationCount)
+    }
+}
+
+private final class DevToolsConnectionFactoryProbe: @unchecked Sendable {
+    let connection = ReusableDevToolsConnection()
+    private let lock = NSLock()
+    private var creationCount = 0
+
+    func make(session: URLSession, url: URL) -> any DevToolsConnectionServing {
+        lock.withLock { creationCount += 1 }
+        return connection
+    }
+
+    func creations() -> Int {
+        lock.withLock { creationCount }
+    }
+}
+
 final class DevToolsClientTests: XCTestCase {
     func testTargetDecoding() throws {
         let data = Data(#"[{"id":"page-1","type":"page","title":"Codex","url":"app://codex","webSocketDebuggerUrl":"ws://127.0.0.1/devtools/page/1"}]"#.utf8)
@@ -36,8 +69,10 @@ final class DevToolsClientTests: XCTestCase {
             if targets.isEmpty { try await Task.sleep(for: .milliseconds(200)) }
         }
         let target = try XCTUnwrap(targets.first)
-        let result = try await client.evaluateBoolean("(() => true)()", in: target)
-        XCTAssertTrue(result)
+        let firstResult = try await client.evaluateBoolean("(() => true)()", in: target)
+        let secondResult = try await client.evaluateBoolean("(() => true)()", in: target)
+        XCTAssertTrue(firstResult)
+        XCTAssertTrue(secondResult)
     }
 
     func testLiveDashboardInjectionWithoutCSPBypassWhenEnabled() async throws {
@@ -63,5 +98,29 @@ final class DevToolsClientTests: XCTestCase {
         } catch DashboardError.devToolsTimedOut {
             // Expected.
         }
+    }
+
+    func testEvaluationsReuseTheTargetConnection() async throws {
+        let factory = DevToolsConnectionFactoryProbe()
+        let client = DevToolsClient(
+            session: URLSession(configuration: .ephemeral),
+            connectionFactory: factory.make
+        )
+        let target = DevToolsTarget(
+            id: "main",
+            type: "page",
+            url: "app://-/index.html",
+            webSocketURL: "ws://127.0.0.1/main"
+        )
+
+        let firstResult = try await client.evaluateBoolean("true", in: target)
+        let secondResult = try await client.evaluateBoolean("true", in: target)
+
+        let counts = await factory.connection.counts()
+        XCTAssertTrue(firstResult)
+        XCTAssertTrue(secondResult)
+        XCTAssertEqual(factory.creations(), 1)
+        XCTAssertEqual(counts.evaluations, 2)
+        XCTAssertEqual(counts.cancellations, 0)
     }
 }

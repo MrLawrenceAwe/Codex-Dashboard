@@ -4,6 +4,8 @@ import Foundation
 
 private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
     private let projectPaths: Set<String>
+    private let standardizedProjectPathByPath: [String: String]
+    private let canonicalProjectPathByPath: [String: String]
     private let action: @MainActor @Sendable (Set<String>) async -> Void
     private var stream: FSEventStreamRef?
 
@@ -12,6 +14,12 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         action: @escaping @MainActor @Sendable (Set<String>) async -> Void
     ) {
         self.projectPaths = projectPaths
+        standardizedProjectPathByPath = Dictionary(uniqueKeysWithValues: projectPaths.map {
+            ($0, Self.standardizedPath($0))
+        })
+        canonicalProjectPathByPath = Dictionary(uniqueKeysWithValues: projectPaths.map {
+            ($0, Self.canonicalPath($0))
+        })
         self.action = action
     }
 
@@ -24,17 +32,27 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
             release: nil,
             copyDescription: nil
         )
-        let callback: FSEventStreamCallback = { _, context, _, _, _, _ in
+        let callback: FSEventStreamCallback = { _, context, _, eventPaths, _, _ in
             guard let context else { return }
             let monitor = Unmanaged<RecursiveProjectChangeMonitor>
                 .fromOpaque(context)
                 .takeUnretainedValue()
-            monitor.notifyChange()
+            let pathArray = Unmanaged<CFArray>
+                .fromOpaque(eventPaths)
+                .takeUnretainedValue()
+            let paths = (0..<CFArrayGetCount(pathArray)).compactMap { index -> String? in
+                guard let pointer = CFArrayGetValueAtIndex(pathArray, index) else { return nil }
+                return Unmanaged<CFString>
+                    .fromOpaque(pointer)
+                    .takeUnretainedValue() as String
+            }
+            monitor.notifyChanges(at: paths)
         }
         let flags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagFileEvents
                 | kFSEventStreamCreateFlagWatchRoot
                 | kFSEventStreamCreateFlagNoDefer
+                | kFSEventStreamCreateFlagUseCFTypes
         )
         guard let stream = FSEventStreamCreate(
             nil,
@@ -60,10 +78,32 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 
     deinit { stop() }
 
-    private func notifyChange() {
-        let projectPaths = projectPaths
+    private func notifyChanges(at changedPaths: [String]) {
+        let standardizedChangedPaths = changedPaths.map(Self.standardizedPath)
+        let affectedProjectPaths = Set(projectPaths.filter { projectPath in
+            let canonicalProjectPath = canonicalProjectPathByPath[projectPath] ?? projectPath
+            let standardizedProjectPath = standardizedProjectPathByPath[projectPath] ?? projectPath
+            return standardizedChangedPaths.contains { changedPath in
+                Self.contains(changedPath, in: standardizedProjectPath)
+                    || Self.contains(changedPath, in: canonicalProjectPath)
+            }
+        })
+        guard !affectedProjectPaths.isEmpty else { return }
         let action = action
-        Task { @MainActor in await action(projectPaths) }
+        Task { @MainActor in await action(affectedProjectPaths) }
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private static func standardizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+
+    private static func contains(_ changedPath: String, in projectPath: String) -> Bool {
+        changedPath == projectPath
+            || changedPath.hasPrefix(projectPath.hasSuffix("/") ? projectPath : projectPath + "/")
     }
 }
 
