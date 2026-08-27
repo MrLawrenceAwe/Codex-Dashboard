@@ -20,7 +20,7 @@ extension AppCoordinatorTests {
         ])
         let foregrounder = RecordingCodexForegrounder()
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: provider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
@@ -51,7 +51,7 @@ extension AppCoordinatorTests {
             ),
         ])
         let usageProvider = RecordingAccountUsageProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
@@ -98,7 +98,7 @@ extension AppCoordinatorTests {
         ])
         let foregrounder = RecordingCodexForegrounder()
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: provider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
@@ -117,7 +117,7 @@ extension AppCoordinatorTests {
     func testInitialCompletedSnapshotDoesNotForegroundCodex() async {
         let foregrounder = RecordingCodexForegrounder()
         let completed = ThreadLifecycleEvent(kind: .completed, timestamp: .now)
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(
                     threads: [.fixture(latestLifecycleEvent: completed)],
@@ -150,7 +150,7 @@ extension AppCoordinatorTests {
             ),
         ])
         let foregrounder = RecordingCodexForegrounder()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: provider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
@@ -182,7 +182,7 @@ extension AppCoordinatorTests {
             ),
         ])
         let foregrounder = RecordingCodexForegrounder()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: provider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),

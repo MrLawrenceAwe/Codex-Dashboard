@@ -5,6 +5,38 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testRendererPromptValidationMatchesNativeRequiredFields() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            JSON.stringify([
+              window.__codexDashboard.applyPromptLibrary({
+                version: \(PromptLibrarySchema.currentVersion),
+                prompts: [{ id: '', name: 'Name', content: 'Content', scope: { type: 'global' } }],
+                sections: [],
+              }),
+              window.__codexDashboard.applyPromptLibrary({
+                version: \(PromptLibrarySchema.currentVersion),
+                prompts: [{ id: 'id', name: '', content: 'Content', scope: { type: 'global' } }],
+                sections: [],
+              }),
+              window.__codexDashboard.applyPromptLibrary({
+                version: \(PromptLibrarySchema.currentVersion),
+                prompts: [{ id: 'id', name: 'Name', content: '', scope: { type: 'global' } }],
+                sections: [],
+              }),
+              window.__codexDashboard.applyPromptLibrary({
+                version: \(PromptLibrarySchema.currentVersion),
+                prompts: [{ id: 'id', name: 'Name', content: 'Content', scope: { type: 'global' } }],
+                sections: [],
+              }),
+            ])
+            """
+        ) as? String
+
+        XCTAssertEqual(result, "[false,false,false,true]")
+    }
+
     func testProjectPromptCanBeCreatedFromProjectNewChatBeforeThreadExists() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(

@@ -20,7 +20,7 @@ extension AppCoordinatorTests {
             workingTreeStatus: .notRepository
         )
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [runningThread], totalThreadCount: 1)
             ),
@@ -47,7 +47,7 @@ extension AppCoordinatorTests {
             detail: "Missing sidebar"
         )
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -79,7 +79,7 @@ extension AppCoordinatorTests {
         )
         let checker = SequencedCompatibilityChecker(results: [[incompatible], [compatible]])
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -104,7 +104,7 @@ extension AppCoordinatorTests {
             status: .compatible,
             detail: "Healthy"
         )
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -131,7 +131,7 @@ extension AppCoordinatorTests {
             status: .unavailable,
             detail: "Codex is closed."
         )
-        let unavailableCoordinator = AppCoordinator(
+        let unavailableCoordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -154,7 +154,7 @@ extension AppCoordinatorTests {
             status: .compatible,
             detail: "Renderer inspected."
         )
-        let compatibleCoordinator = AppCoordinator(
+        let compatibleCoordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),

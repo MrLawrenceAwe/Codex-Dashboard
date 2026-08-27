@@ -140,9 +140,7 @@ class SerializedDashboardWebTestCase: XCTestCase {
 
     override func tearDown() async throws {
         DashboardWebTestHarness.releaseWebViews()
-        // WKWebView releases its auxiliary processes asynchronously after its final
-        // strong reference goes away. Drain that teardown before this worker exits.
-        try await Task.sleep(for: .milliseconds(500))
+        await Task.yield()
         try await super.tearDown()
     }
 }

@@ -7,7 +7,7 @@ import XCTest
 extension AppCoordinatorTests {
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
@@ -29,7 +29,7 @@ extension AppCoordinatorTests {
 
     func testSynchronizationUsesInjectedDependenciesWithoutStartingPolling() async {
         let thread = ThreadSummary.fixture(id: "thread-1", title: "Injected thread")
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 4)
             ),
@@ -50,7 +50,7 @@ extension AppCoordinatorTests {
     func testUnreadRefreshUpdatesThread() async throws {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let unreadThreadIDProvider = MutableUnreadIDProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
@@ -68,7 +68,7 @@ extension AppCoordinatorTests {
     func testActivationRefreshUsesWorkingTreeCache() async {
         let thread = ThreadSummary.fixture(id: "thread-1", workingTreeStatus: .notRepository)
         let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
@@ -91,7 +91,7 @@ extension AppCoordinatorTests {
     func testActivationReliesOnFileEventsWhenMonitoringIsAvailable() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .clean)
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
@@ -166,7 +166,7 @@ extension AppCoordinatorTests {
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
@@ -183,7 +183,7 @@ extension AppCoordinatorTests {
 
     func testCancelledSynchronizationCannotClearNewSynchronizationTask() async throws {
         let catalogProvider = SuspendedCatalogProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),

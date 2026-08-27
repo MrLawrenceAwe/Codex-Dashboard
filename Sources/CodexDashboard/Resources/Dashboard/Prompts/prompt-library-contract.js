@@ -29,8 +29,11 @@ const promptLibraryContract = (() => {
   function isValidPrompt(prompt) {
     return prompt && typeof prompt === 'object' && !Array.isArray(prompt)
       && typeof prompt.id === 'string'
+      && prompt.id.length > 0
       && typeof prompt.name === 'string'
+      && prompt.name.length > 0
       && typeof prompt.content === 'string'
+      && prompt.content.length > 0
       && (prompt.section === undefined || typeof prompt.section === 'string')
       && isValidScope(prompt.scope)
       && (prompt.preset === undefined || isValidPreset(prompt.preset))
