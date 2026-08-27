@@ -14,7 +14,7 @@ extension AppCoordinatorTests {
             weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
         )
         let provider = SequencedAccountUsageProvider(outcomes: [usage, nil])
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -30,11 +30,11 @@ extension AppCoordinatorTests {
         )
 
         await coordinator.refreshAccountUsage()
-        guard case .available = coordinator.activeAccountUsageStatus else {
+        guard case .available = coordinator.accounts.activeUsageStatus else {
             return XCTFail("Expected available usage")
         }
         await coordinator.refreshAccountUsage()
-        guard case .stale(let snapshot) = coordinator.activeAccountUsageStatus else {
+        guard case .stale(let snapshot) = coordinator.accounts.activeUsageStatus else {
             return XCTFail("Expected stale usage")
         }
         XCTAssertEqual(snapshot.usage, usage)
@@ -45,7 +45,7 @@ extension AppCoordinatorTests {
             .appendingPathComponent("AppCoordinatorUsageCoalescingTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
         let provider = SuspendedAccountUsageProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -75,7 +75,7 @@ extension AppCoordinatorTests {
             .appendingPathComponent("AppCoordinatorClosedUsageTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
         let provider = SuspendedAccountUsageProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -94,7 +94,7 @@ extension AppCoordinatorTests {
 
         let requestCount = await provider.count()
         XCTAssertEqual(requestCount, 0)
-        XCTAssertEqual(coordinator.activeAccountUsageStatus, .unavailable)
+        XCTAssertEqual(coordinator.accounts.activeUsageStatus, .unavailable)
     }
 
     func testRestoresCachedUsageForActiveAccountAfterRelaunch() throws {
@@ -122,7 +122,7 @@ extension AppCoordinatorTests {
         )
         try accountManager.usageCacheStore.save([account.id: snapshot])
 
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -133,8 +133,8 @@ extension AppCoordinatorTests {
             runtimeFactory: { StubDashboardRuntime(codexIsRunning: false) }
         )
 
-        XCTAssertEqual(coordinator.usageByAccountID[account.id], snapshot)
-        XCTAssertEqual(coordinator.activeAccountUsageStatus, .stale(snapshot))
+        XCTAssertEqual(coordinator.accounts.usageByAccountID[account.id], snapshot)
+        XCTAssertEqual(coordinator.accounts.activeUsageStatus, .stale(snapshot))
     }
 
     func testAddingAccountKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
@@ -155,7 +155,7 @@ extension AppCoordinatorTests {
         )
         _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -175,7 +175,7 @@ extension AppCoordinatorTests {
         XCTAssertNil(try accountManager.document().activeAccountID)
         XCTAssertEqual(coordinator.connectionState, .rendererAvailable)
         XCTAssertEqual(
-            coordinator.accountStatusMessage,
+            coordinator.accounts.statusMessage,
             "Sign in to the other account, then save it from Accounts."
         )
     }
@@ -204,7 +204,7 @@ extension AppCoordinatorTests {
         try mumCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime(synchronizationError: AccountTestError.mountFailed)
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -224,7 +224,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(runtime.synchronizeCallCount, 1)
         XCTAssertEqual(coordinator.connectionState, .rendererAvailable)
         XCTAssertEqual(
-            coordinator.accountStatusMessage,
+            coordinator.accounts.statusMessage,
             "Switched to Lawrence. The dashboard will reconnect when Codex is ready."
         )
     }
@@ -254,7 +254,7 @@ extension AppCoordinatorTests {
             ThreadCatalog(threads: [.fixture(runState: .running)], totalThreadCount: 1),
         ])
         let runtime = StubDashboardRuntime(codexIsRunning: true)
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
@@ -270,7 +270,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertEqual(
-            coordinator.accountStatusMessage,
+            coordinator.accounts.statusMessage,
             CodexAccountError.activeTasks.localizedDescription
         )
     }
@@ -296,7 +296,7 @@ extension AppCoordinatorTests {
         try secondCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
         let usageProvider = SuspendedAccountUsageProvider()
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: SequencedCatalogProvider(catalogs: [
                 ThreadCatalog(threads: [.fixture(runState: .idle)], totalThreadCount: 1),
                 ThreadCatalog(threads: [.fixture(runState: .running)], totalThreadCount: 1),
@@ -315,9 +315,9 @@ extension AppCoordinatorTests {
         await usageProvider.resume(with: CodexAccountUsage(fiveHour: nil, weekly: nil))
         await refresh.value
 
-        XCTAssertEqual(coordinator.activeAccountUsageStatus, .unavailable)
+        XCTAssertEqual(coordinator.accounts.activeUsageStatus, .unavailable)
         XCTAssertEqual(
-            coordinator.accountStatusMessage,
+            coordinator.accounts.statusMessage,
             CodexAccountError.activeTasks.localizedDescription
         )
     }
@@ -350,7 +350,7 @@ extension AppCoordinatorTests {
                 try? FileManager.default.createDirectory(at: metadataURL, withIntermediateDirectories: true)
             }
         )
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -366,7 +366,7 @@ extension AppCoordinatorTests {
 
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertTrue(
-            coordinator.accountStatusMessage?.contains("could not be rolled back") == true
+            coordinator.accounts.statusMessage?.contains("could not be rolled back") == true
         )
         XCTAssertEqual(
             try Data(contentsOf: authenticationURL),
@@ -414,7 +414,7 @@ extension AppCoordinatorTests {
             usage: usage,
             refreshedCredential: refreshedFirstCredential
         )
-        let coordinator = AppCoordinator(
+        let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
@@ -428,12 +428,12 @@ extension AppCoordinatorTests {
         _ = await coordinator.refreshSavedAccountUsage(first.id)
         let receivedCredentials = await provider.credentials()
 
-        XCTAssertEqual(coordinator.activeAccountID, second.id)
+        XCTAssertEqual(coordinator.accounts.activeAccountID, second.id)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
         XCTAssertEqual(receivedCredentials, [firstCredential])
         XCTAssertEqual(vault.credential(for: first.id), refreshedFirstCredential)
-        XCTAssertEqual(coordinator.usageByAccountID[first.id]?.usage, usage)
-        XCTAssertNil(coordinator.usageErrorsByAccountID[first.id])
+        XCTAssertEqual(coordinator.accounts.usageByAccountID[first.id]?.usage, usage)
+        XCTAssertNil(coordinator.accounts.usageErrorsByAccountID[first.id])
     }
 
 }

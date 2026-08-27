@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 
 @MainActor
@@ -19,13 +20,6 @@ final class AppCoordinator: ObservableObject {
     @Published var rendererTargetCount = 0
     @Published var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
-    @Published var savedAccounts: [SavedAccount] = []
-    @Published var activeAccountID: UUID?
-    @Published var accountStatusMessage: String?
-    @Published var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
-    @Published var activeAccountUsageStatus: CodexAccountUsageStatus = .unavailable
-    @Published var refreshingUsageAccountIDs: Set<UUID> = []
-    @Published var usageErrorsByAccountID: [UUID: String] = [:]
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -37,14 +31,14 @@ final class AppCoordinator: ObservableObject {
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
     let promptLibraryStore: PromptLibraryFileStore
-    let accountManager: CodexAccountManager
-    let accountUsageSession: AccountUsageSession
+    let accounts: AccountCoordinator
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
     var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
+    private var accountStateObserver: AnyCancellable?
     private var taskCompletionObserver = TaskCompletionObserver()
 
     var statusPresentation: (title: String, detail: String) {
@@ -85,10 +79,10 @@ final class AppCoordinator: ObservableObject {
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
         self.promptLibraryStore = promptLibraryStore
-        self.accountManager = accountManager
-        accountUsageSession = AccountUsageSession(
-            provider: accountUsageProvider,
-            cache: accountUsageCacheStore ?? accountManager.usageCacheStore
+        accounts = AccountCoordinator(
+            manager: accountManager,
+            usageProvider: accountUsageProvider,
+            usageCacheStore: accountUsageCacheStore
         )
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
@@ -102,11 +96,8 @@ final class AppCoordinator: ObservableObject {
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }
-        usageByAccountID = accountUsageSession.loadCache()
-        refreshAccountState()
-        if let activeAccountID,
-           let snapshot = usageByAccountID[activeAccountID] {
-            activeAccountUsageStatus = .stale(snapshot)
+        accountStateObserver = accounts.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
         }
     }
 
@@ -143,7 +134,7 @@ final class AppCoordinator: ObservableObject {
 
     func stopMonitoring() {
         refreshGeneration += 1
-        persistAccountUsageCache(force: true)
+        accounts.persistUsageCache(force: true)
         refreshScheduler.stop()
         accountPopoverActionListener.stop()
         synchronizationGate.stop()
