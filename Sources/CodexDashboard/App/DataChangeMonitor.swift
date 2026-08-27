@@ -138,6 +138,7 @@ final class DataChangeMonitor {
     private var authenticationSignature: FileSignature?
     private var dataRefreshTask: Task<Void, Never>?
     private var projectRefreshTask: Task<Void, Never>?
+    private var projectRefreshGeneration: UInt64 = 0
     private var pendingProjectPaths: Set<String> = []
     private var refreshCatalog: (@MainActor () async -> Void)?
     private var refreshUnread: (@MainActor () async -> Void)?
@@ -203,6 +204,7 @@ final class DataChangeMonitor {
     }
 
     func stop() {
+        projectRefreshGeneration &+= 1
         dataRefreshTask?.cancel()
         projectRefreshTask?.cancel()
         dataRefreshTask = nil
@@ -304,13 +306,21 @@ final class DataChangeMonitor {
     private func scheduleProjectRefresh(for paths: Set<String>) {
         pendingProjectPaths.formUnion(paths)
         guard projectRefreshTask == nil else { return }
+        projectRefreshGeneration &+= 1
+        let generation = projectRefreshGeneration
         projectRefreshTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled, let self else { return }
-            self.projectRefreshTask = nil
-            let paths = self.pendingProjectPaths
-            self.pendingProjectPaths = []
-            if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
+            guard let self else { return }
+            while !Task.isCancelled {
+                let paths = self.pendingProjectPaths
+                self.pendingProjectPaths = []
+                if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
+                guard !Task.isCancelled, !self.pendingProjectPaths.isEmpty else { break }
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+            if self.projectRefreshGeneration == generation {
+                self.projectRefreshTask = nil
+            }
         }
     }
 

@@ -92,7 +92,11 @@ actor ThreadSnapshotService {
             requestGenerations[path] = generation
         }
 
-        let latestStatuses = await workingTreeStatusProvider.loadStatuses(for: projectPaths)
+        let policy: WorkingTreeStatusRefreshPolicy = requestedPaths == nil ? .useCached : .refresh
+        let latestStatuses = await workingTreeStatusProvider.loadStatuses(
+            for: projectPaths,
+            policy: policy
+        )
         guard !Task.isCancelled else { return nil }
         let currentResults = latestStatuses.filter { path, _ in
             workingTreeGenerationByPath[path] == requestGenerations[path]

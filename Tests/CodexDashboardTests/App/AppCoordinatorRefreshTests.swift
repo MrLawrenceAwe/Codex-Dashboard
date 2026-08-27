@@ -84,6 +84,8 @@ extension AppCoordinatorTests {
         await workingTreeStatusProvider.setStatus(.clean)
         await coordinator.refreshAfterActivation()
         XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .clean)
+        let latestPolicy = await workingTreeStatusProvider.latestPolicy()
+        XCTAssertEqual(latestPolicy, .refresh)
     }
 
     func testUnreadPollingScheduleMatchesLatencyBounds() {

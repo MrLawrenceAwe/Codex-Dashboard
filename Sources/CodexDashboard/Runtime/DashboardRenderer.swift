@@ -21,7 +21,9 @@ final class DashboardRenderer {
     private var lastHealthCheckByTargetID: [String: Date] = [:]
     private var cachedTargets: [DevToolsTarget] = []
     private var lastTargetRefresh: Date?
+    private var lastPromptLibrarySynchronization: Date?
     private let healthCheckInterval: TimeInterval
+    private let promptLibrarySynchronizationInterval: TimeInterval
     private let now: () -> Date
 
     private(set) var maintainsDashboard = true
@@ -31,6 +33,7 @@ final class DashboardRenderer {
         injectionBundle: InjectionBundle? = nil,
         promptLibraryStore: PromptLibraryFileStore? = nil,
         healthCheckInterval: TimeInterval = 30,
+        promptLibrarySynchronizationInterval: TimeInterval = 10,
         now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
@@ -39,6 +42,7 @@ final class DashboardRenderer {
             PromptLibraryBridge(devTools: devTools, store: $0)
         }
         self.healthCheckInterval = healthCheckInterval
+        self.promptLibrarySynchronizationInterval = promptLibrarySynchronizationInterval
         self.now = now
         compatibilityChecker = RendererCompatibilityChecker(
             devTools: devTools,
@@ -182,11 +186,14 @@ final class DashboardRenderer {
         }
 
         guard !Task.isCancelled, maintainsDashboard else { return }
-        try await promptLibraryBridge?.synchronize(
-            targets: targets,
-            healthyTargets: healthyTargets,
-            mountedDashboard: mountedDashboard
-        )
+        if mountedDashboard || promptLibrarySynchronizationIsDue() {
+            try await promptLibraryBridge?.synchronize(
+                targets: targets,
+                healthyTargets: healthyTargets,
+                mountedDashboard: mountedDashboard
+            )
+            lastPromptLibrarySynchronization = now()
+        }
         if mountedDashboard || snapshotChanged {
             try await deliver(snapshot, to: targets)
             guard !Task.isCancelled, maintainsDashboard else { return }
@@ -248,6 +255,7 @@ final class DashboardRenderer {
 
     func preferNativePromptLibraryOnNextSynchronization() {
         promptLibraryBridge?.preferNativeLibrary()
+        lastPromptLibrarySynchronization = nil
     }
 
     func compatibilityChecks() async -> [CompatibilityCheck] {
@@ -269,6 +277,7 @@ final class DashboardRenderer {
         mountedTargetIDs = []
         lastSnapshot = nil
         promptLibraryBridge?.reset()
+        lastPromptLibrarySynchronization = nil
         lastHealthCheckByTargetID = [:]
         invalidateTargetCache()
     }
@@ -281,6 +290,12 @@ final class DashboardRenderer {
     private func healthCheckIsDue(for targetID: String) -> Bool {
         guard let lastHealthCheck = lastHealthCheckByTargetID[targetID] else { return true }
         return now().timeIntervalSince(lastHealthCheck) >= healthCheckInterval
+    }
+
+    private func promptLibrarySynchronizationIsDue() -> Bool {
+        guard let lastPromptLibrarySynchronization else { return true }
+        return now().timeIntervalSince(lastPromptLibrarySynchronization)
+            >= promptLibrarySynchronizationInterval
     }
 
     private func synchronizationFinished() {
