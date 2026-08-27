@@ -6,7 +6,7 @@ window.__codexDashboard = {
   isOpen: threadDashboard.isOpen,
   applySnapshot: threadDashboard.applySnapshot,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
-  consumeAccountPopoverAction: accountPopover.consumeAction,
+  pollAccountPopover: accountPopover.pollState,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   exportPendingPromptLibrary: () => {
     const library = promptStore.pendingLibrary();

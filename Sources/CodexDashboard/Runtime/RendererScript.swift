@@ -35,15 +35,16 @@ enum RendererScript {
         (() => {
           const dashboard = window.__codexDashboard;
           if (typeof dashboard?.applySnapshot !== 'function') return false;
-          dashboard.applySnapshot(\(json));
-          dashboard.applyAccountPopoverSnapshot?.((\(json)).accountPopover);
+          const snapshot = \(json);
+          dashboard.applySnapshot(snapshot);
+          dashboard.applyAccountPopoverSnapshot?.(snapshot.accountPopover);
           return true;
         })()
         """
     }
 
-    static let consumeAccountPopoverAction =
-        "window.__codexDashboard?.consumeAccountPopoverAction?.() ?? null"
+    static let pollAccountPopover =
+        "window.__codexDashboard?.pollAccountPopover?.() ?? null"
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 

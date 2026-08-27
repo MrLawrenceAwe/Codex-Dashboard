@@ -6,13 +6,12 @@ enum SavedAccountUsageRefreshOutcome: Equatable {
 }
 
 extension AppCoordinator {
-    func handleAccountPopoverAction() async {
-        guard !isPerformingAction,
-              let action = await dashboardRuntime?.consumeAccountPopoverAction()
-        else { return }
+    func handleAccountPopoverAction() async -> Bool {
+        guard let pollState = await dashboardRuntime?.pollAccountPopover() else { return false }
+        guard !isPerformingAction, let action = pollState.action else { return pollState.isOpen }
         switch action.kind {
         case .updateUsage:
-            guard let accountID = action.accountID else { return }
+            guard let accountID = action.accountID else { return pollState.isOpen }
             _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
         case .updateSignedOutUsage:
             for account in savedAccounts where account.id != activeAccountID {
@@ -21,14 +20,20 @@ extension AppCoordinator {
         case .saveCurrentAccount:
             saveCurrentAccount()
         case .switchAccount:
-            guard let accountID = action.accountID else { return }
+            guard let accountID = action.accountID else { return pollState.isOpen }
             await switchAccount(to: accountID)
         case .addAccount:
             await beginAddingAccount()
         case .forgetAccount:
-            guard let accountID = action.accountID else { return }
+            guard let accountID = action.accountID else { return pollState.isOpen }
             deleteAccount(accountID)
         }
+        await publishSnapshotIfMaintainedForAccounts()
+        return pollState.isOpen
+    }
+
+    func refreshAccountStateAfterFileChange() async {
+        refreshAccountState()
         await publishSnapshotIfMaintainedForAccounts()
     }
 

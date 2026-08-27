@@ -334,6 +334,21 @@ final class StubDashboardRuntime: DashboardRuntime {
 final class AppCoordinatorTests: XCTestCase {
     enum AccountTestError: Error { case mountFailed }
 
+    func testAccountPopoverPollingBacksOffWhileClosed() {
+        XCTAssertEqual(
+            PollingController.Schedule.accountPopover(panelOpen: true, active: true),
+            .milliseconds(250)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.accountPopover(panelOpen: false, active: true),
+            .seconds(2)
+        )
+        XCTAssertEqual(
+            PollingController.Schedule.accountPopover(panelOpen: false, active: false),
+            .seconds(8)
+        )
+    }
+
     func waitUntil(
         timeout: Duration = .seconds(2),
         condition: @escaping () async -> Bool

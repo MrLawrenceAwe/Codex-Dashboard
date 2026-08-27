@@ -132,6 +132,19 @@ actor RendererPollingDevTools: DevToolsServing {
     }
 }
 
+actor EmptyRendererPollingDevTools: DevToolsServing {
+    private var targetRequestCount = 0
+
+    func mainRendererTargets() -> [DevToolsTarget] {
+        targetRequestCount += 1
+        return []
+    }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
+
+    func requests() -> Int { targetRequestCount }
+}
+
 actor FailingRendererDevTools: DevToolsServing {
     private let staleTarget: DevToolsTarget
     private let freshTarget: DevToolsTarget
@@ -205,6 +218,40 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testEmptyRendererTargetsAreCachedUntilRefreshDeadline() async throws {
+        let devTools = EmptyRendererPollingDevTools()
+        var currentDate = Date(timeIntervalSince1970: 1_000)
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true"),
+            healthCheckInterval: 30,
+            now: { currentDate }
+        )
+
+        let initialTargets = await renderer.targets()
+        let cachedTargets = await renderer.targets()
+        let cachedRequestCount = await devTools.requests()
+        XCTAssertTrue(initialTargets.isEmpty)
+        XCTAssertTrue(cachedTargets.isEmpty)
+        XCTAssertEqual(cachedRequestCount, 1)
+
+        currentDate.addTimeInterval(31)
+        let refreshedTargets = await renderer.targets()
+        let refreshedRequestCount = await devTools.requests()
+        XCTAssertTrue(refreshedTargets.isEmpty)
+        XCTAssertEqual(refreshedRequestCount, 2)
+    }
+
+    func testSnapshotDeliveryEmbedsThreadPayloadOnce() throws {
+        let marker = "unique-snapshot-payload-marker"
+        let snapshot = DashboardSnapshot(threads: [.fixture(title: marker)])
+
+        let expression = try RendererScript.deliver(snapshot)
+
+        XCTAssertEqual(expression.components(separatedBy: marker).count - 1, 1)
+        XCTAssertTrue(expression.contains("const snapshot ="))
+    }
+
     func testConsumesAccountPopoverActionFromRenderer() async throws {
         let accountID = UUID()
         let target = DevToolsTarget(
@@ -215,16 +262,19 @@ final class DashboardRendererTests: XCTestCase {
         )
         let devTools = AccountPopoverRendererDevTools(
             target: target,
-            action: "{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
+            action: "{\"isOpen\":true,\"action\":{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}}"
         )
         let renderer = try DashboardRenderer(
             devTools: devTools,
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        let action = await renderer.consumeAccountPopoverAction()
+        let pollState = await renderer.pollAccountPopover()
 
-        XCTAssertEqual(action, AccountPopoverAction(kind: .updateUsage, accountID: accountID))
+        XCTAssertEqual(pollState, AccountPopoverPollState(
+            isOpen: true,
+            action: AccountPopoverAction(kind: .updateUsage, accountID: accountID)
+        ))
     }
 
     func testOpeningThreadDispatchesItsRoute() async throws {

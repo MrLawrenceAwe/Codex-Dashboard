@@ -19,13 +19,17 @@ final class DataChangeMonitorTests: XCTestCase {
         let monitor = DataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
+        var accountRefreshes = 0
         var workingTreeRefreshes = 0
         var refreshedProjectPaths: Set<String> = []
         monitor.start(
             catalogURL: catalogDirectory.appendingPathComponent("state.sqlite"),
             unreadStateURL: unreadDirectory.appendingPathComponent("state.json"),
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
             refreshCatalog: { catalogRefreshes += 1 },
             refreshUnread: { unreadRefreshes += 1 },
+            refreshAccounts: { accountRefreshes += 1 },
             refreshWorkingTrees: { paths in
                 workingTreeRefreshes += 1
                 refreshedProjectPaths.formUnion(paths ?? [])
@@ -36,10 +40,12 @@ final class DataChangeMonitorTests: XCTestCase {
 
         try Data("catalog".utf8).write(to: catalogDirectory.appendingPathComponent("state.sqlite"))
         try Data("unread".utf8).write(to: unreadDirectory.appendingPathComponent("state.json"))
+        try Data("accounts".utf8).write(to: root.appendingPathComponent("accounts.json"))
         try Data("change".utf8).write(to: projectDirectory.appendingPathComponent("new-file"))
 
         try await waitUntil {
-            catalogRefreshes > 0 && unreadRefreshes > 0 && workingTreeRefreshes > 0
+            catalogRefreshes > 0 && unreadRefreshes > 0
+                && accountRefreshes > 0 && workingTreeRefreshes > 0
         }
         XCTAssertEqual(refreshedProjectPaths, [projectDirectory.path])
     }
@@ -60,8 +66,11 @@ final class DataChangeMonitorTests: XCTestCase {
         monitor.start(
             catalogURL: catalogURL,
             unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
             refreshCatalog: { catalogRefreshes += 1 },
             refreshUnread: { unreadRefreshes += 1 },
+            refreshAccounts: {},
             refreshWorkingTrees: { _ in }
         )
         defer { monitor.stop() }
@@ -94,8 +103,11 @@ final class DataChangeMonitorTests: XCTestCase {
         monitor.start(
             catalogURL: catalogURL,
             unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
             refreshCatalog: {},
             refreshUnread: {},
+            refreshAccounts: {},
             refreshWorkingTrees: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
         )
         monitor.updateProjectPaths([projectDirectory.path])
