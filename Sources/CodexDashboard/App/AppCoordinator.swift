@@ -122,7 +122,7 @@ final class AppCoordinator: ObservableObject {
                 [weak self] in await self?.refreshInactiveAccountUsage()
             },
             handleAccountPopoverAction: { [weak self] in
-                await self?.handleAccountPopoverAction() ?? false
+                await self?.handleAccountPopoverAction() ?? .unavailable
             },
             refreshAccountState: { [weak self] in
                 await self?.refreshAccountStateAfterFileChange()

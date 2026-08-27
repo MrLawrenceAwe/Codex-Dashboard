@@ -6,13 +6,19 @@ enum SavedAccountUsageRefreshOutcome: Equatable {
 }
 
 extension AppCoordinator {
-    func handleAccountPopoverAction() async -> Bool {
-        guard let action = await dashboardRuntime?.waitForAccountPopoverAction(),
-              !isPerformingAction
-        else { return false }
+    func handleAccountPopoverAction() async -> AccountPopoverActionHandlingOutcome {
+        guard let dashboardRuntime else { return .unavailable }
+        let result = await dashboardRuntime.waitForAccountPopoverAction()
+        guard !isPerformingAction else { return .unavailable }
+        let action: AccountPopoverAction
+        switch result {
+        case .action(let value): action = value
+        case .timedOut: return .timedOut
+        case .unavailable: return .unavailable
+        }
         switch action.kind {
         case .updateUsage:
-            guard let accountID = action.accountID else { return false }
+            guard let accountID = action.accountID else { return .unavailable }
             _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
         case .updateSignedOutUsage:
             for account in savedAccounts where account.id != activeAccountID {
@@ -21,16 +27,16 @@ extension AppCoordinator {
         case .saveCurrentAccount:
             saveCurrentAccount()
         case .switchAccount:
-            guard let accountID = action.accountID else { return false }
+            guard let accountID = action.accountID else { return .unavailable }
             await switchAccount(to: accountID)
         case .addAccount:
             await beginAddingAccount()
         case .forgetAccount:
-            guard let accountID = action.accountID else { return false }
+            guard let accountID = action.accountID else { return .unavailable }
             deleteAccount(accountID)
         }
         await publishSnapshotIfMaintainedForAccounts()
-        return true
+        return .handled
     }
 
     func refreshAccountStateAfterFileChange() async {

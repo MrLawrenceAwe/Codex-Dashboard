@@ -249,16 +249,23 @@ final class DashboardRenderer {
         }
     }
 
-    func waitForAccountPopoverAction() async -> AccountPopoverAction? {
-        guard let target = (await targets()).first,
-              let serialized = try? await devTools.evaluateString(
+    func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
+        guard let target = (await targets()).first else { return .unavailable }
+        do {
+            guard let serialized = try await devTools.evaluateString(
                 RendererScript.waitForAccountPopoverAction,
                 in: target,
                 timeout: .seconds(35)
-              ),
-              let data = serialized.data(using: .utf8)
-        else { return nil }
-        return try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+            ) else { return .unavailable }
+            if serialized == RendererScript.accountPopoverUnavailable { return .unavailable }
+            if serialized == "null" { return .timedOut }
+            guard let data = serialized.data(using: .utf8),
+                  let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+            else { return .unavailable }
+            return .action(action)
+        } catch {
+            return .unavailable
+        }
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {

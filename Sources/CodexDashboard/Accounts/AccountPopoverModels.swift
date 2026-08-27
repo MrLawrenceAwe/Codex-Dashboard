@@ -30,6 +30,18 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
     let accountID: UUID?
 }
 
+enum AccountPopoverActionWaitResult: Equatable, Sendable {
+    case action(AccountPopoverAction)
+    case timedOut
+    case unavailable
+}
+
+enum AccountPopoverActionHandlingOutcome: Equatable, Sendable {
+    case handled
+    case timedOut
+    case unavailable
+}
+
 enum AccountPopoverUsageFormatter {
     static func titles(
         for status: CodexAccountUsageStatus,

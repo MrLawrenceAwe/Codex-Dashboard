@@ -18,8 +18,8 @@ final class PollingController {
         }
         static let accountUsage: Duration = .seconds(30)
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
-        static func accountPopoverRetry(active: Bool) -> Duration {
-            active ? .seconds(1) : .seconds(15)
+        static func accountPopoverUnavailableRetry(active: Bool) -> Duration {
+            active ? .seconds(10) : .seconds(60)
         }
     }
 
@@ -52,7 +52,7 @@ final class PollingController {
         updateUnreadState: @escaping @MainActor () async -> Void,
         refreshAccountUsage: @escaping @MainActor () async -> Void,
         refreshInactiveAccountUsage: @escaping @MainActor () async -> Void,
-        handleAccountPopoverAction: @escaping @MainActor () async -> Bool,
+        handleAccountPopoverAction: @escaping @MainActor () async -> AccountPopoverActionHandlingOutcome,
         refreshAccountState: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
@@ -105,9 +105,9 @@ final class PollingController {
         }
         accountPopoverActionPollingTask = Task {
             while !Task.isCancelled {
-                let handledAction = await handleAccountPopoverAction()
-                if !handledAction {
-                    try? await Task.sleep(for: Schedule.accountPopoverRetry(
+                let outcome = await handleAccountPopoverAction()
+                if outcome == .unavailable {
+                    try? await Task.sleep(for: Schedule.accountPopoverUnavailableRetry(
                         active: Self.isUserActive
                     ))
                 }
