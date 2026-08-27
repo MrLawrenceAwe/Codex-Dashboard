@@ -122,7 +122,10 @@ final class AppCoordinator: ObservableObject {
                 [weak self] in await self?.refreshInactiveAccountUsage()
             },
             handleAccountPopoverAction: { [weak self] in
-                await self?.handleAccountPopoverAction()
+                await self?.handleAccountPopoverAction() ?? false
+            },
+            refreshAccountState: { [weak self] in
+                await self?.refreshAccountStateAfterFileChange()
             }
         )
         if activationObserver == nil {
@@ -150,7 +153,6 @@ final class AppCoordinator: ObservableObject {
 
     func synchronizeDashboard() async {
         guard !isPerformingAction else { return }
-        refreshAccountState()
         await synchronizationGate.perform { [weak self] in await self?.synchronizeRuntime() }
     }
 

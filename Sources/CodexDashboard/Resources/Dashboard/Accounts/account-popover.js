@@ -2,7 +2,10 @@ const accountPopover = (() => {
   const triggerAttribute = 'data-codex-accounts-trigger';
   const panelID = 'codex-accounts-panel';
   let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
+  let snapshotFingerprint = '';
   let observer;
+  let outsidePointerHandler;
+  let escapeHandler;
   const actions = [];
 
   function visibleAction(label) {
@@ -28,8 +31,11 @@ const accountPopover = (() => {
     renderPanel();
   }
 
-  function consumeAction() {
-    return actions.length ? JSON.stringify(actions.shift()) : null;
+  function pollState() {
+    return JSON.stringify({
+      isOpen: document.getElementById(panelID) !== null,
+      action: actions.shift() || null,
+    });
   }
 
   function accountMarkup(account) {
@@ -76,7 +82,7 @@ const accountPopover = (() => {
         <button data-account-global="add"${disabled}><span>＋</span>Add another account</button>
         ${snapshot.accounts.length > 1 ? `<button data-account-global="update-all"${disabled}><span>↻</span>Refresh signed-out accounts</button>` : ''}
       </footer>`;
-    panel.querySelector('[data-account-close]')?.addEventListener('click', () => panel.remove());
+    panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);
     panel.querySelectorAll('[data-account-action]').forEach((button) => button.addEventListener('click', () => {
       const id = button.closest('[data-account-id]')?.dataset.accountId;
       const action = button.dataset.accountAction;
@@ -92,7 +98,7 @@ const accountPopover = (() => {
   }
 
   function openPanel(trigger) {
-    document.getElementById(panelID)?.remove();
+    closePanel();
     const panel = document.createElement('div');
     panel.id = panelID;
     const rect = trigger.closest('[role="menu"]')?.getBoundingClientRect()
@@ -104,6 +110,26 @@ const accountPopover = (() => {
     panel.style.bottom = `${Math.max(12, innerHeight - rect.bottom)}px`;
     document.body.append(panel);
     renderPanel();
+    outsidePointerHandler = (event) => {
+      if (!panel.contains(event.target) && !trigger.contains(event.target)) closePanel();
+    };
+    escapeHandler = (event) => {
+      if (event.key === 'Escape') closePanel();
+    };
+    setTimeout(() => document.addEventListener('pointerdown', outsidePointerHandler, true), 0);
+    document.addEventListener('keydown', escapeHandler, true);
+  }
+
+  function closePanel() {
+    document.getElementById(panelID)?.remove();
+    if (outsidePointerHandler) {
+      document.removeEventListener('pointerdown', outsidePointerHandler, true);
+      outsidePointerHandler = undefined;
+    }
+    if (escapeHandler) {
+      document.removeEventListener('keydown', escapeHandler, true);
+      escapeHandler = undefined;
+    }
   }
 
   function mountTrigger() {
@@ -150,23 +176,45 @@ const accountPopover = (() => {
   }
 
   function handleMutations(records) {
-    const shouldRemount = records.some((record) => (
-      [...record.addedNodes].some((node) => {
-        const text = node.nodeType === Node.ELEMENT_NODE ? node.textContent : '';
-        return text?.includes('Log out') || text?.includes('Settings');
-      })
-      || [...record.removedNodes].some((node) => (
+    const triggerWasRemoved = records.some((record) => (
+      [...record.removedNodes].some((node) => (
         node.nodeType === Node.ELEMENT_NODE
           && (node.matches?.(`[${triggerAttribute}]`) || node.querySelector?.(`[${triggerAttribute}]`))
       ))
     ));
+    if (triggerWasRemoved) closePanel();
+    const shouldRemount = records.some((record) => (
+      [...record.addedNodes].some((node) => {
+        if (node.nodeType !== Node.ELEMENT_NODE) return false;
+        return containsMenuNode(node);
+      })
+      || triggerWasRemoved
+    ));
     if (shouldRemount) mountTrigger();
   }
 
+  function containsMenuNode(root) {
+    const pending = [{ element: root, depth: 0 }];
+    let inspected = 0;
+    while (pending.length && inspected < 40) {
+      const { element, depth } = pending.shift();
+      inspected += 1;
+      const role = element.getAttribute?.('role');
+      if (role === 'menu' || role === 'menuitem') return true;
+      if (depth >= 4) continue;
+      [...element.children].forEach((child) => pending.push({ element: child, depth: depth + 1 }));
+    }
+    return false;
+  }
+
   function applySnapshot(next) {
-    snapshot = next || snapshot;
+    const candidate = next || snapshot;
+    const candidateFingerprint = JSON.stringify(candidate);
+    const changed = candidateFingerprint !== snapshotFingerprint;
+    snapshot = candidate;
+    snapshotFingerprint = candidateFingerprint;
     mountTrigger();
-    renderPanel();
+    if (changed) renderPanel();
     return true;
   }
 
@@ -182,8 +230,8 @@ const accountPopover = (() => {
     observer?.disconnect();
     observer = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();
-    document.getElementById(panelID)?.remove();
+    closePanel();
   }
 
-  return { applySnapshot, consumeAction, mount, unmount };
+  return { applySnapshot, pollState, mount, unmount };
 })();

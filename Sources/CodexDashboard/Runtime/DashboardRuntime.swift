@@ -22,14 +22,14 @@ protocol DashboardRuntime: AnyObject {
     func disableThreadDashboard() async throws -> DashboardDisableOutcome
     func openThreadDashboard() async
     func openThread(_ threadID: String) async
-    func consumeAccountPopoverAction() async -> AccountPopoverAction?
+    func pollAccountPopover() async -> AccountPopoverPollState?
     func preferNativePromptLibraryOnNextSynchronization()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
 extension DashboardRuntime {
     func preferNativePromptLibraryOnNextSynchronization() {}
-    func consumeAccountPopoverAction() async -> AccountPopoverAction? { nil }
+    func pollAccountPopover() async -> AccountPopoverPollState? { nil }
 }
 
 @MainActor
@@ -55,7 +55,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         let launchDate = codex.launchDate
         let processChanged = launchDate != lastObservedCodexLaunchDate
         lastObservedCodexLaunchDate = launchDate
-        return await renderer.targets(forceRefresh: processChanged || !codex.isRunning)
+        return await renderer.targets(forceRefresh: processChanged)
     }
 
     func prepareForRestart() {
@@ -96,8 +96,8 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         await renderer.openThread(threadID)
     }
 
-    func consumeAccountPopoverAction() async -> AccountPopoverAction? {
-        await renderer.consumeAccountPopoverAction()
+    func pollAccountPopover() async -> AccountPopoverPollState? {
+        await renderer.pollAccountPopover()
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {

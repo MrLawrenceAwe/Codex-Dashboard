@@ -49,7 +49,6 @@ final class DashboardRenderer {
     func targets(forceRefresh: Bool = false) async -> [DevToolsTarget] {
         if
             !forceRefresh,
-            !cachedTargets.isEmpty,
             let lastTargetRefresh,
             now().timeIntervalSince(lastTargetRefresh) < healthCheckInterval
         {
@@ -236,15 +235,15 @@ final class DashboardRenderer {
         }
     }
 
-    func consumeAccountPopoverAction() async -> AccountPopoverAction? {
+    func pollAccountPopover() async -> AccountPopoverPollState? {
         guard let target = (await targets()).first,
               let serialized = try? await devTools.evaluateString(
-                RendererScript.consumeAccountPopoverAction,
+                RendererScript.pollAccountPopover,
                 in: target
               ),
               let data = serialized.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+        return try? JSONDecoder().decode(AccountPopoverPollState.self, from: data)
     }
 
     func preferNativePromptLibraryOnNextSynchronization() {

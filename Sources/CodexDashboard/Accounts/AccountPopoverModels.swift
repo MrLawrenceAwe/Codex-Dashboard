@@ -30,6 +30,11 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
     let accountID: UUID?
 }
 
+struct AccountPopoverPollState: Codable, Equatable, Sendable {
+    let isOpen: Bool
+    let action: AccountPopoverAction?
+}
+
 enum AccountPopoverUsageFormatter {
     static func titles(
         for status: CodexAccountUsageStatus,

@@ -90,30 +90,43 @@ final class DataChangeMonitor {
     private var watchedProjectPaths: Set<String> = []
     private var catalogURL: URL?
     private var unreadStateURL: URL?
+    private var accountMetadataURL: URL?
+    private var authenticationURL: URL?
     private var catalogSignature: CatalogSignature?
     private var unreadSignature: FileSignature?
+    private var accountMetadataSignature: FileSignature?
+    private var authenticationSignature: FileSignature?
     private var dataRefreshTask: Task<Void, Never>?
     private var projectRefreshTask: Task<Void, Never>?
     private var pendingProjectPaths: Set<String> = []
     private var refreshCatalog: (@MainActor () async -> Void)?
     private var refreshUnread: (@MainActor () async -> Void)?
+    private var refreshAccounts: (@MainActor () async -> Void)?
     private var refreshWorkingTrees: (@MainActor (Set<String>?) async -> Void)?
 
     func start(
         catalogURL: URL,
         unreadStateURL: URL,
+        accountMetadataURL: URL,
+        authenticationURL: URL,
         refreshCatalog: @escaping @MainActor () async -> Void,
         refreshUnread: @escaping @MainActor () async -> Void,
+        refreshAccounts: @escaping @MainActor () async -> Void,
         refreshWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void
     ) {
         stop()
         self.catalogURL = catalogURL
         self.unreadStateURL = unreadStateURL
+        self.accountMetadataURL = accountMetadataURL
+        self.authenticationURL = authenticationURL
         self.refreshCatalog = refreshCatalog
         self.refreshUnread = refreshUnread
+        self.refreshAccounts = refreshAccounts
         self.refreshWorkingTrees = refreshWorkingTrees
         catalogSignature = Self.catalogSignature(at: catalogURL)
         unreadSignature = Self.fileSignature(at: unreadStateURL)
+        accountMetadataSignature = Self.fileSignature(at: accountMetadataURL)
+        authenticationSignature = Self.fileSignature(at: authenticationURL)
 
         installDataWatches()
     }
@@ -162,10 +175,15 @@ final class DataChangeMonitor {
         watchedProjectPaths = []
         catalogURL = nil
         unreadStateURL = nil
+        accountMetadataURL = nil
+        authenticationURL = nil
         catalogSignature = nil
         unreadSignature = nil
+        accountMetadataSignature = nil
+        authenticationSignature = nil
         refreshCatalog = nil
         refreshUnread = nil
+        refreshAccounts = nil
         refreshWorkingTrees = nil
     }
 
@@ -197,19 +215,46 @@ final class DataChangeMonitor {
                 await refreshUnread?()
             }
         }
+        var accountStateChanged = false
+        if let accountMetadataURL {
+            let latest = Self.fileSignature(at: accountMetadataURL)
+            if latest != accountMetadataSignature {
+                accountMetadataSignature = latest
+                changed = true
+                accountStateChanged = true
+            }
+        }
+        if let authenticationURL {
+            let latest = Self.fileSignature(at: authenticationURL)
+            if latest != authenticationSignature {
+                authenticationSignature = latest
+                changed = true
+                accountStateChanged = true
+            }
+        }
+        if accountStateChanged { await refreshAccounts?() }
         if changed { installDataWatches() }
     }
 
     private func installDataWatches() {
         cancel(&dataWatches)
-        guard let catalogURL, let unreadStateURL else { return }
+        guard
+            let catalogURL,
+            let unreadStateURL,
+            let accountMetadataURL,
+            let authenticationURL
+        else { return }
         let writeAheadLogURL = URL(fileURLWithPath: catalogURL.path + "-wal")
         let candidates = Set([
             catalogURL.deletingLastPathComponent(),
             unreadStateURL.deletingLastPathComponent(),
+            accountMetadataURL.deletingLastPathComponent(),
+            authenticationURL.deletingLastPathComponent(),
             catalogURL,
             writeAheadLogURL,
             unreadStateURL,
+            accountMetadataURL,
+            authenticationURL,
         ]).filter { FileManager.default.fileExists(atPath: $0.path) }
         dataWatches = candidates.compactMap { url in
             makeWatch(for: url) { [weak self] in self?.scheduleDataRefresh() }

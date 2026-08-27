@@ -9,6 +9,10 @@ final class PollingController {
         static func unread(active: Bool) -> Duration { active ? .milliseconds(500) : .seconds(1) }
         static let accountUsage: Duration = .seconds(30)
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
+        static func accountPopover(panelOpen: Bool, active: Bool) -> Duration {
+            if panelOpen { return .milliseconds(250) }
+            return active ? .seconds(2) : .seconds(8)
+        }
     }
 
     private var catalogPollingTask: Task<Void, Never>?
@@ -38,7 +42,8 @@ final class PollingController {
         updateUnreadState: @escaping @MainActor () async -> Void,
         refreshAccountUsage: @escaping @MainActor () async -> Void,
         refreshInactiveAccountUsage: @escaping @MainActor () async -> Void,
-        handleAccountPopoverAction: @escaping @MainActor () async -> Void
+        handleAccountPopoverAction: @escaping @MainActor () async -> Bool,
+        refreshAccountState: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
               workingTreePollingTask == nil,
@@ -80,16 +85,23 @@ final class PollingController {
             }
         }
         accountPopoverActionPollingTask = Task {
+            var panelOpen = false
             while !Task.isCancelled {
-                await handleAccountPopoverAction()
-                try? await Task.sleep(for: .milliseconds(250))
+                panelOpen = await handleAccountPopoverAction()
+                try? await Task.sleep(for: Schedule.accountPopover(
+                    panelOpen: panelOpen,
+                    active: Self.isUserActive
+                ))
             }
         }
         fileChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
+            accountMetadataURL: CodexConfiguration.accountMetadataURL,
+            authenticationURL: CodexConfiguration.authenticationURL,
             refreshCatalog: synchronizeDashboard,
             refreshUnread: updateUnreadState,
+            refreshAccounts: refreshAccountState,
             refreshWorkingTrees: updateWorkingTrees
         )
     }
