@@ -179,21 +179,26 @@ final class FileChangeMonitor {
     func updateProjectPaths(_ paths: Set<String>) {
         guard paths != watchedProjectPaths else { return }
         watchedProjectPaths = paths
+        rebuildProjectWatches()
+    }
+
+    private func rebuildProjectWatches() {
         cancel(&projectWatches)
         projectChangeMonitor?.stop()
         projectChangeMonitor = nil
 
         var pathsByGitURL: [URL: Set<String>] = [:]
-        for path in paths {
+        for path in watchedProjectPaths {
             let projectURL = URL(fileURLWithPath: path, isDirectory: true)
             guard FileManager.default.fileExists(atPath: projectURL.path) else { continue }
             if let gitURL = GitMetadataLocator.metadataURL(for: projectURL) {
                 pathsByGitURL[gitURL, default: []].insert(path)
             }
         }
-        let existingPaths = Set(paths.filter { FileManager.default.fileExists(atPath: $0) })
+        let existingPaths = Set(watchedProjectPaths.filter { FileManager.default.fileExists(atPath: $0) })
+        let repositoryProjectPaths = Set(pathsByGitURL.values.flatMap { $0 })
         let projectChangeMonitor = RecursiveProjectChangeMonitor(
-            projectPaths: existingPaths,
+            projectPaths: repositoryProjectPaths,
             action: { [weak self] paths in self?.scheduleProjectRefresh(for: paths) }
         )
         projectChangeMonitor.start()
@@ -205,6 +210,21 @@ final class FileChangeMonitor {
                 projectWatches.append(watch)
             }
         }
+        for path in existingPaths.subtracting(repositoryProjectPaths) {
+            let projectURL = URL(fileURLWithPath: path, isDirectory: true)
+            if let watch = makeWatch(for: projectURL, action: { [weak self] in
+                await self?.handleNonRepositoryProjectChange(at: path)
+            }) {
+                projectWatches.append(watch)
+            }
+        }
+    }
+
+    private func handleNonRepositoryProjectChange(at path: String) async {
+        // A shallow directory watch is enough to notice a newly-created .git entry
+        // without recursively observing every file in historical non-repository paths.
+        rebuildProjectWatches()
+        scheduleProjectRefresh(for: [path])
     }
 
     func stop() {
