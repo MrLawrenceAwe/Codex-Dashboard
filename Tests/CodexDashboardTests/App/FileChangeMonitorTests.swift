@@ -142,6 +142,11 @@ final class FileChangeMonitorTests: XCTestCase {
         let catalogURL = root.appendingPathComponent("state.sqlite")
         let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectDirectory.path, "init", "--quiet"],
+            timeout: 3
+        )
         try Data("catalog".utf8).write(to: catalogURL)
         try Data("unread".utf8).write(to: unreadURL)
         let nestedFile = nestedDirectory.appendingPathComponent("Feature.swift")
@@ -167,6 +172,80 @@ final class FileChangeMonitorTests: XCTestCase {
         try Data("updated".utf8).write(to: nestedFile)
 
         try await waitUntil { refreshedProjectPaths.contains(projectDirectory.path) }
+    }
+
+    func testNonRepositoryNestedFileChangeDoesNotTriggerWorkingTreeRefresh() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-non-repository-monitor-\(UUID().uuidString)", isDirectory: true)
+        let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
+        let nestedDirectory = projectDirectory.appendingPathComponent("Generated/Output", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = FileChangeMonitor()
+        var workingTreeRefreshes = 0
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { _ in workingTreeRefreshes += 1 }
+        )
+        monitor.updateProjectPaths([projectDirectory.path])
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        try Data("generated".utf8).write(to: nestedDirectory.appendingPathComponent("asset.json"))
+        try await Task.sleep(for: .seconds(1))
+
+        XCTAssertEqual(workingTreeRefreshes, 0)
+    }
+
+    func testNonRepositoryWatchPromotesNewGitRepositoryToRecursiveMonitoring() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-repository-promotion-\(UUID().uuidString)", isDirectory: true)
+        let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
+        let nestedDirectory = projectDirectory.appendingPathComponent("Sources/Feature", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = FileChangeMonitor()
+        var refreshes: [Set<String>] = []
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        )
+        monitor.updateProjectPaths([projectDirectory.path])
+        defer { monitor.stop() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectDirectory.path, "init", "--quiet"],
+            timeout: 3
+        )
+        try await waitUntil { refreshes.contains([projectDirectory.path]) }
+
+        try Data("updated".utf8).write(to: nestedDirectory.appendingPathComponent("Feature.swift"))
+        try await waitUntil { refreshes.count >= 2 }
+        XCTAssertEqual(refreshes.last, [projectDirectory.path])
     }
 
     func testProjectFileChangeRefreshesOnlyTheAffectedProject() async throws {
