@@ -204,4 +204,56 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, "alpha Selected: beta gamma")
     }
 
+    func testLibraryRefreshDoesNotReplaceAnActivePromptEdit() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const library = {
+                version: \(PromptLibrarySchema.currentVersion),
+                prompts: [{
+                  id: 'prompt-1',
+                  name: 'Original name',
+                  content: 'Original content',
+                  scope: { type: 'global' },
+                }],
+                sections: [],
+              };
+              window.__codexDashboard.applyPromptLibrary(library);
+              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-prompt-edit="prompt-1"]').click();
+
+              const name = document.querySelector('[name="name"]');
+              const content = document.querySelector('[name="content"]');
+              name.value = 'Draft name';
+              content.value = 'Draft content being edited';
+              content.focus();
+              content.setSelectionRange(6, 13);
+
+              window.__codexDashboard.applyPromptLibrary({
+                ...library,
+                sections: ['New external section'],
+              });
+
+              return {
+                sameNameElement: name === document.querySelector('[name="name"]'),
+                sameContentElement: content === document.querySelector('[name="content"]'),
+                name: name.value,
+                content: content.value,
+                selection: [content.selectionStart, content.selectionEnd],
+                contentFocused: document.activeElement === content,
+              };
+            })()
+            """
+        ) as? [String: Any]
+        let values = try XCTUnwrap(result)
+
+        XCTAssertEqual(values["sameNameElement"] as? Bool, true)
+        XCTAssertEqual(values["sameContentElement"] as? Bool, true)
+        XCTAssertEqual(values["name"] as? String, "Draft name")
+        XCTAssertEqual(values["content"] as? String, "Draft content being edited")
+        XCTAssertEqual(values["selection"] as? [Int], [6, 13])
+        XCTAssertEqual(values["contentFocused"] as? Bool, true)
+    }
+
 }

@@ -15,8 +15,9 @@ window.__codexDashboard = {
   discardPendingPromptLibrary: () => promptStore.discardPendingLibrary(),
   acknowledgePendingPromptLibrary: (library) => promptStore.acknowledgePendingLibrary(library),
   applyPromptLibrary: (library) => {
+    const changed = !promptStore.matchesLibrary(library);
     const applied = promptStore.applyLibrary(library);
-    if (applied) promptLibrary.refresh();
+    if (applied && changed) promptLibrary.refresh();
     return applied;
   },
 };

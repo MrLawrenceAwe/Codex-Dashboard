@@ -391,7 +391,16 @@ function unmount() {
 }
 
 function refresh() {
-  if (document.getElementById(dashboardElements.elementIDs.promptDialog)) renderDialog();
+  const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
+  if (!dialog || dialogState.mode !== 'list') return;
+  const search = dialog.querySelector('[data-prompt-search]');
+  const searchSelection = document.activeElement === search
+    ? {
+      start: search.selectionStart ?? searchTerm.length,
+      end: search.selectionEnd ?? searchTerm.length,
+    }
+    : undefined;
+  renderDialog({ searchSelection });
 }
 
   return { mount, refresh, unmount };
