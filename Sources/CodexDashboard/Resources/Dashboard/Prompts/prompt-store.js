@@ -111,6 +111,11 @@ const promptStore = (() => {
       };
     },
 
+    matchesLibrary(library) {
+      const normalized = normalizedLibrary(library);
+      return normalized ? librariesMatch(store.exportLibrary(), normalized) : false;
+    },
+
     pendingLibrary,
 
     discardPendingLibrary() {
@@ -128,8 +133,10 @@ const promptStore = (() => {
 
     applyLibrary(library) {
       if (!promptLibraryContract.isValidLibrary(library)) return false;
-      store.prompts = normalizePrompts(library.prompts);
-      store.sections = normalizeSections(library.sections, library.prompts);
+      if (!store.matchesLibrary(library)) {
+        store.prompts = normalizePrompts(library.prompts);
+        store.sections = normalizeSections(library.sections, library.prompts);
+      }
       try { localStorage.removeItem(libraryStorageKey); } catch (_) {}
       return true;
     },
