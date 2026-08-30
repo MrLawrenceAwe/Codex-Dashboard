@@ -2,7 +2,6 @@ const taskDashboard = (() => {
 let threads = [];
 const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
-let searchTerm = '';
 const pageSize = 60;
 let visibleLimit = pageSize;
 const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
@@ -97,7 +96,6 @@ function renderDashboard() {
   const rendered = taskDashboardView.render({
     threads,
     filterMode,
-    searchTerm,
     visibleThreadLimit: visibleLimit,
     collapsedProjects,
     ignoredProjectPaths,
@@ -156,11 +154,6 @@ function mountDashboardPage() {
       filterMode = nextFilterMode;
       savePreferences();
       renderDashboard();
-    },
-    onSearch: (nextSearchTerm) => {
-      searchTerm = nextSearchTerm;
-      visibleLimit = pageSize;
-      scheduleRender();
     },
     onLoadMore: () => {
       visibleLimit += pageSize;

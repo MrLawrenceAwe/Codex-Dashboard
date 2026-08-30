@@ -40,30 +40,9 @@ const taskDashboardView = (() => {
     }
   }
 
-  function updateHeaderSummary({ unreadCount, runningThreads, visibleChangedProjectPaths }) {
-    const page = document.getElementById(dashboardElements.elementIDs.page);
-    if (!page) return;
-    const values = {
-      running: runningThreads.length,
-      unread: unreadCount,
-      changed: visibleChangedProjectPaths.size,
-    };
-    page.querySelectorAll('[data-summary-count]').forEach((count) => {
-      count.textContent = String(values[count.dataset.summaryCount] ?? 0);
-    });
-    const summary = page.querySelector('[data-dashboard-summary]');
-    if (summary) {
-      summary.setAttribute(
-        'aria-label',
-        `${values.running} running, ${values.unread} unread, ${values.changed} changed ${values.changed === 1 ? 'project' : 'projects'}`,
-      );
-    }
-  }
-
   function render({
     threads,
     filterMode,
-    searchTerm,
     visibleThreadLimit,
     collapsedProjects,
     ignoredProjectPaths,
@@ -72,7 +51,6 @@ const taskDashboardView = (() => {
     state,
   }) {
     updateSidebarStatus(state);
-    updateHeaderSummary(state);
     const page = document.getElementById(dashboardElements.elementIDs.page);
     if (!page) return false;
     const notice = page.querySelector('[data-commit-notice]');
@@ -97,7 +75,6 @@ const taskDashboardView = (() => {
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
-      searchTerm,
       isThreadUnread,
     });
     const displayedThreads = visibleThreads.slice(0, visibleThreadLimit);
@@ -105,7 +82,7 @@ const taskDashboardView = (() => {
     if (loadMore) loadMore.hidden = displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
     if (!visibleThreads.length) {
-      const emptyMessage = filterMode === 'unread' && !searchTerm.trim()
+      const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
         : 'No threads found';
       updateMarkup(list, `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`);

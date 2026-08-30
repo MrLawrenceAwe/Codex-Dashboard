@@ -55,19 +55,14 @@ const taskDashboardState = (() => {
     threads,
     allChangedProjectPaths,
     filterMode,
-    searchTerm,
     isThreadUnread,
   }) {
-    const query = searchTerm.trim().toLowerCase();
     return threads.filter((thread) => {
       const matchesFilter = (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));
-      const matchesSearch = !query
-        || `${thread.title} ${thread.preview} ${thread.projectName} ${thread.projectPath}`
-          .toLowerCase().includes(query);
-      return matchesFilter && matchesSearch;
+      return matchesFilter;
     });
   }
 
