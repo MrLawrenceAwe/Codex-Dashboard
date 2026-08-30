@@ -64,6 +64,7 @@ const taskDashboardView = (() => {
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
+      recent: state.recentCount,
       running: state.runningThreads.length,
       unread: state.unreadCount,
       changedProjects: state.visibleChangedProjectPaths.size,

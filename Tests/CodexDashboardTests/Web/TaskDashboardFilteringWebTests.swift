@@ -123,11 +123,12 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[5] as? String, "3")
     }
 
-    func testRunningFilterIsDefaultAndAllFilterIsAbsent() async throws {
+    func testRecentFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "running", title: "Active work", runState: .running),
-            .fixture(id: "idle", title: "Archived needle", runState: .idle),
+            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: 1),
+            .fixture(id: "newest", title: "Latest task", projectPath: "/tmp/a", recencyEpochMillis: 3),
+            .fixture(id: "middle", title: "Middle task", projectPath: "/tmp/b", recencyEpochMillis: 2),
         ])
 
         let result = try await webView.evaluateJavaScript(
@@ -138,12 +139,11 @@ extension TaskDashboardWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="running"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="all"]') === null,
                 initialIDs,
-                [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                  .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter-count="running"]').textContent,
+                document.querySelector('[data-filter-count="recent"]').textContent,
+                document.querySelector('[data-thread-list] .dashboard-project-group') === null,
               ];
             })()
             """
@@ -152,9 +152,9 @@ extension TaskDashboardWebTests {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
-        XCTAssertEqual(values[2] as? [String], ["running"])
-        XCTAssertEqual(values[3] as? [String], ["running"])
-        XCTAssertEqual(values[4] as? String, "1")
+        XCTAssertEqual(values[2] as? [String], ["newest", "middle", "oldest"])
+        XCTAssertEqual(values[3] as? String, "3")
+        XCTAssertEqual(values[4] as? Bool, true)
     }
 
 }
