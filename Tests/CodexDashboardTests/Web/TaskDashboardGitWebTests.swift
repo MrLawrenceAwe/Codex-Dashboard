@@ -367,7 +367,6 @@ extension TaskDashboardWebTests {
               document.querySelector('[data-filter="changedProjects"]').click();
               const commit = document.querySelector('[data-project-commit]');
               return [
-                document.querySelector('[data-summary-count="changed"]').textContent,
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 Boolean(document.querySelector('.dashboard-git-project')),
                 commit.disabled,
@@ -377,7 +376,7 @@ extension TaskDashboardWebTests {
             """
         ) as? [Any]
 
-        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", "1", true, true, "Task running"])
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", true, true, "Task running"])
     }
 
 }

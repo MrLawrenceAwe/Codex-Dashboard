@@ -90,29 +90,19 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 
 #codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; }
 #codex-dashboard-page h1 { margin: 0; color: var(--dashboard-text); font-size: 28px; font-weight: 590; line-height: 1.15; letter-spacing: -.025em; }
-#codex-dashboard-page .dashboard-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; color: var(--dashboard-dim); font-size: 11px; }
-#codex-dashboard-page .dashboard-summary span { display: inline-flex; align-items: center; gap: 3px; }
-#codex-dashboard-page .dashboard-summary span + span::before { width: 2px; height: 2px; margin-right: 4px; content: ""; border-radius: 50%; background: currentColor; }
-#codex-dashboard-page .dashboard-summary strong { color: var(--dashboard-muted); font-weight: 620; }
 #codex-dashboard-page .dashboard-notice { margin-top: 16px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 30%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--dashboard-amber) 8%, transparent); color: var(--dashboard-muted); font-size: 11px; }
 #codex-dashboard-page .dashboard-notice[hidden] { display: none; }
 
 #codex-dashboard-page .dashboard-section-header { position: sticky; z-index: 4; top: -1px; margin: 14px 0 0; padding: 12px 0 15px; background: color-mix(in srgb, var(--dashboard-bg) 92%, transparent); backdrop-filter: blur(14px); }
-#codex-dashboard-page .dashboard-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) auto; grid-template-areas: "search filters"; align-items: end; gap: 14px; }
+#codex-dashboard-page .dashboard-toolbar { display: flex; align-items: end; }
 #codex-dashboard-page .dashboard-toolbar-group { display: grid; gap: 6px; }
 #codex-dashboard-page .dashboard-control-label { padding-left: 2px; color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
 #codex-dashboard-page .dashboard-filters { display: flex; gap: 1px; padding: 2px; border: 1px solid var(--dashboard-line); border-radius: 7px; background: var(--dashboard-control); }
-#codex-dashboard-page .dashboard-filter-group { grid-area: filters; }
 #codex-dashboard-page .dashboard-filters button { display: inline-flex; min-height: 30px; align-items: center; gap: 5px; padding: 5px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--dashboard-dim); font-size: 11px; cursor: pointer; transition: background 100ms ease, color 100ms ease; }
 #codex-dashboard-page .dashboard-filters button:hover { color: var(--dashboard-muted); }
 #codex-dashboard-page .dashboard-filters button.is-active { background: var(--dashboard-active); color: var(--dashboard-text); }
 #codex-dashboard-page .dashboard-filter-count { min-width: 14px; color: var(--dashboard-dim); font-size: 10px; text-align: center; }
 #codex-dashboard-page .dashboard-filters button.is-active .dashboard-filter-count { color: var(--dashboard-muted); }
-#codex-dashboard-page .dashboard-search { display: flex; width: 100%; min-height: 36px; align-items: center; gap: 7px; grid-area: search; padding: 7px 9px; border: 1px solid var(--dashboard-line); border-radius: 7px; background: var(--dashboard-control); transition: border-color 100ms ease; }
-#codex-dashboard-page .dashboard-search:focus-within { border-color: var(--dashboard-line-strong); }
-#codex-dashboard-page .dashboard-search svg { width: 13px; flex: 0 0 13px; color: var(--dashboard-dim); }
-#codex-dashboard-page .dashboard-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--dashboard-text); font-size: 12px; }
-#codex-dashboard-page .dashboard-search input::placeholder { color: var(--dashboard-dim); }
 #codex-dashboard-page .dashboard-list { display: grid; gap: 22px; }
 #codex-dashboard-page .dashboard-project-group { display: grid; gap: 8px; }
 #codex-dashboard-page .dashboard-project-heading { display: flex; min-width: 0; align-items: center; gap: 8px; }
@@ -190,7 +180,6 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 @container dashboard-page (max-width: 760px) {
   #codex-dashboard-page .dashboard-header { align-items: flex-start; flex-direction: column; gap: 18px; }
   #codex-dashboard-page .dashboard-account-area { width: 100%; justify-items: start; }
-  #codex-dashboard-page .dashboard-toolbar { grid-template-columns: 1fr; grid-template-areas: "search" "filters"; }
   #codex-dashboard-page .dashboard-project-path { display: none; }
   #codex-dashboard-page [data-filter="changedProjects"] .dashboard-filter-label { display: none; }
   #codex-dashboard-page [data-filter="changedProjects"]::before { content: "Changed projects"; }
@@ -199,7 +188,6 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 @container dashboard-page (max-width: 560px) {
   #codex-dashboard-page .dashboard-shell { width: min(100% - 28px, 620px); padding-top: 25px; }
   #codex-dashboard-page h1 { font-size: 25px; }
-  #codex-dashboard-page .dashboard-toolbar { grid-template-columns: 1fr; grid-template-areas: "search" "filters"; gap: 11px; }
   #codex-dashboard-page .dashboard-toolbar-group { gap: 5px; }
   #codex-dashboard-page .dashboard-filters { overflow-x: auto; }
   #codex-dashboard-page .dashboard-filters button { flex: 1; justify-content: center; }
