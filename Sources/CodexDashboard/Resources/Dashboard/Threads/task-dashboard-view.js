@@ -64,7 +64,7 @@ const taskDashboardView = (() => {
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
-      recent: state.recentCount,
+      today: state.todayCount,
       running: state.runningThreads.length,
       unread: state.unreadCount,
       changedProjects: state.visibleChangedProjectPaths.size,
@@ -82,6 +82,7 @@ const taskDashboardView = (() => {
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
+    list.classList.toggle('is-compact', filterMode === 'today');
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'

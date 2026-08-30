@@ -63,8 +63,9 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
 
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "deferred-thread", isUnread: true, runState: .running),
+            .fixture(id: "deferred-thread", recencyEpochMillis: now, isUnread: true, runState: .running),
         ])
 
         let closedState = try await webView.evaluateJavaScript(
@@ -202,6 +203,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         let thread = ThreadSummary.fixture(
             id: "thread-one",
             title: "Keyboard target",
+            recencyEpochMillis: Int64(Date().timeIntervalSince1970 * 1_000),
             runState: .running
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [thread])

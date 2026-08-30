@@ -60,8 +60,9 @@ const threadMarkup = (() => {
     ignoredProjectPaths,
     isUnread,
   }) {
-    if (filterMode === 'recent') {
+    if (filterMode === 'today') {
       return visibleThreads.map((item) => thread(item, {
+        compact: true,
         showProject: true,
         isUnread: isUnread(item),
       })).join('');
