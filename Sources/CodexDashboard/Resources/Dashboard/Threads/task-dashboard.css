@@ -146,7 +146,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-ignored-project-count { color: var(--dashboard-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
 #codex-dashboard-page .dashboard-ignored-project-list { display: grid; gap: 8px; padding-top: 4px; }
 #codex-dashboard-page .dashboard-list > .dashboard-thread { border: 1px solid var(--dashboard-line); border-radius: 12px; }
-#codex-dashboard-page .dashboard-thread { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; min-height: 86px; align-items: center; padding: 15px 18px; appearance: none; border: 0; background: var(--dashboard-surface); color: inherit; cursor: pointer; text-align: left; transition: background 120ms ease, box-shadow 120ms ease; }
+#codex-dashboard-page .dashboard-thread { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; min-height: 70px; align-items: center; padding: 10px 16px; appearance: none; border: 0; background: var(--dashboard-surface); color: inherit; cursor: pointer; text-align: left; transition: background 120ms ease, box-shadow 120ms ease; }
 #codex-dashboard-page .dashboard-thread + .dashboard-thread { border-top: 1px solid var(--dashboard-line); }
 #codex-dashboard-page .dashboard-thread:hover { background: var(--dashboard-surface-hover); box-shadow: inset 2px 0 color-mix(in srgb, var(--dashboard-text) 22%, transparent); }
 #codex-dashboard-page .dashboard-thread:focus-visible { z-index: 1; outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: -2px; box-shadow: 0 0 0 3px rgba(121, 201, 140, .08); }
@@ -154,7 +154,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-thread[data-unread="true"]:hover { background: color-mix(in srgb, var(--dashboard-unread) 10%, var(--dashboard-surface-hover)); }
 #codex-dashboard-page .dashboard-thread[data-run-state="running"] { background: var(--dashboard-surface); }
 #codex-dashboard-page .dashboard-thread[data-run-state="running"]:hover { background: var(--dashboard-surface-hover); }
-#codex-dashboard-page .dashboard-thread.is-compact { min-height: 62px; padding-block: 11px; }
+#codex-dashboard-page .dashboard-thread.is-compact { min-height: 54px; padding-block: 8px; }
 #codex-dashboard-page .dashboard-thread-copy { display: block; min-width: 0; }
 #codex-dashboard-page .dashboard-thread-title-row { display: flex; min-width: 0; align-items: center; gap: 7px; }
 #codex-dashboard-page .dashboard-thread-heading { min-width: 0; overflow: hidden; color: var(--dashboard-text); font-size: 14px; font-weight: 590; letter-spacing: -.005em; text-overflow: ellipsis; white-space: nowrap; }
@@ -162,7 +162,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-unread-dot { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: var(--dashboard-unread); }
 #codex-dashboard-page .dashboard-pin { display: inline-flex; flex: 0 0 auto; color: var(--dashboard-dim); }
 #codex-dashboard-page .dashboard-pin svg { width: 11px; height: 11px; }
-#codex-dashboard-page .dashboard-thread-preview { display: block; max-width: 660px; margin: 6px 0 9px; overflow: hidden; color: var(--dashboard-muted); font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+#codex-dashboard-page .dashboard-thread-preview { display: block; max-width: 660px; margin: 3px 0 5px; overflow: hidden; color: var(--dashboard-muted); font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 #codex-dashboard-page .dashboard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--dashboard-dim); font-size: 11px; }
 #codex-dashboard-page .dashboard-meta span { display: inline-flex; align-items: center; gap: 5px; }
 #codex-dashboard-page .dashboard-meta span + span::before { width: 2px; height: 2px; margin-right: 1px; content: ""; border-radius: 50%; background: currentColor; }
