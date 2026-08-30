@@ -142,6 +142,7 @@ final class FileChangeMonitor {
     private var dataRefreshTaskID: UUID?
     private var dataRefreshGeneration: UInt64 = 0
     private var projectRefreshTask: Task<Void, Never>?
+    private var projectRefreshTaskID: UUID?
     private var projectRefreshGeneration: UInt64 = 0
     private var pendingProjectPaths: Set<String> = []
     private var refreshCatalog: (@MainActor () async -> Void)?
@@ -235,6 +236,7 @@ final class FileChangeMonitor {
         dataRefreshTask = nil
         dataRefreshTaskID = nil
         projectRefreshTask = nil
+        projectRefreshTaskID = nil
         pendingProjectPaths = []
         cancel(&dataWatches)
         cancel(&projectWatches)
@@ -349,6 +351,8 @@ final class FileChangeMonitor {
         pendingProjectPaths.formUnion(paths)
         projectRefreshGeneration &+= 1
         guard projectRefreshTask == nil else { return }
+        let taskID = UUID()
+        projectRefreshTaskID = taskID
         projectRefreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
@@ -363,7 +367,10 @@ final class FileChangeMonitor {
                 if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
                 guard !Task.isCancelled, !self.pendingProjectPaths.isEmpty else { break }
             }
-            self.projectRefreshTask = nil
+            if self.projectRefreshTaskID == taskID {
+                self.projectRefreshTask = nil
+                self.projectRefreshTaskID = nil
+            }
         }
     }
 

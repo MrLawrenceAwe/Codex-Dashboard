@@ -5,6 +5,7 @@ const accountPopover = (() => {
   let snapshotFingerprint = '';
   let observer;
   let outsidePointerHandler;
+  let outsidePointerTimer;
   let escapeHandler;
   const actions = [];
   const actionWaiters = [];
@@ -139,12 +140,22 @@ const accountPopover = (() => {
     escapeHandler = (event) => {
       if (event.key === 'Escape') closePanel();
     };
-    setTimeout(() => document.addEventListener('pointerdown', outsidePointerHandler, true), 0);
+    const handler = outsidePointerHandler;
+    outsidePointerTimer = setTimeout(() => {
+      outsidePointerTimer = undefined;
+      if (outsidePointerHandler === handler) {
+        document.addEventListener('pointerdown', handler, true);
+      }
+    }, 0);
     document.addEventListener('keydown', escapeHandler, true);
   }
 
   function closePanel() {
     document.getElementById(panelID)?.remove();
+    if (outsidePointerTimer !== undefined) {
+      clearTimeout(outsidePointerTimer);
+      outsidePointerTimer = undefined;
+    }
     if (outsidePointerHandler) {
       document.removeEventListener('pointerdown', outsidePointerHandler, true);
       outsidePointerHandler = undefined;

@@ -44,11 +44,7 @@ final class PromptLibraryBridge {
                 let acknowledgement = try RendererScript.acknowledgePendingPromptLibrary(
                     pendingLibrary
                 )
-                guard try await devTools.evaluateBoolean(acknowledgement, in: firstTarget) else {
-                    throw DashboardError.enableFailed(
-                        "The prompt library save could not be acknowledged by the renderer."
-                    )
-                }
+                try await acknowledgePendingLibrary(acknowledgement, on: targets)
             }
         }
 
@@ -113,6 +109,19 @@ final class PromptLibraryBridge {
             ) else {
                 throw DashboardError.enableFailed(
                     "The pending prompt library could not be cleared from the renderer."
+                )
+            }
+        }
+    }
+
+    private func acknowledgePendingLibrary(
+        _ acknowledgement: String,
+        on targets: [DevToolsTarget]
+    ) async throws {
+        for target in targets {
+            guard try await devTools.evaluateBoolean(acknowledgement, in: target) else {
+                throw DashboardError.enableFailed(
+                    "The prompt library save could not be acknowledged by the renderer."
                 )
             }
         }

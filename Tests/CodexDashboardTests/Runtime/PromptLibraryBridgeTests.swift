@@ -112,6 +112,49 @@ extension DashboardRendererTests {
         XCTAssertTrue(expressions.contains { $0.contains("acknowledgePendingPromptLibrary") })
     }
 
+    func testPendingPromptLibraryIsAcknowledgedAcrossRendererTargets() async throws {
+        let firstTarget = DevToolsTarget(
+            id: "first", type: "page", url: "app://-/index.html", webSocketURL: "ws://127.0.0.1/first"
+        )
+        let secondTarget = DevToolsTarget(
+            id: "second", type: "page", url: "app://-/index.html", webSocketURL: "ws://127.0.0.1/second"
+        )
+        let pendingLibrary = PromptLibraryDocument(
+            version: 3,
+            prompts: [SavedPrompt(
+                id: "pending", name: "Pending", content: "Persist me", section: nil,
+                scope: SavedPromptScope(type: "global", projectPath: nil), preset: nil, usePreset: nil
+            )],
+            sections: []
+        )
+        let pendingJSON = try XCTUnwrap(String(data: JSONEncoder().encode(pendingLibrary), encoding: .utf8))
+        let devTools = MultiTargetPromptLibraryRendererDevTools(
+            targets: [firstTarget, secondTarget],
+            exportedLibrary: #"{"version":3,"prompts":[],"sections":[]}"#,
+            pendingLibraryByTargetID: [firstTarget.id: pendingJSON, secondTarget.id: pendingJSON]
+        )
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("multi-target-pending-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "mount"),
+            promptLibraryStore: PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        )
+
+        try await renderer.synchronize(
+            DashboardSnapshot(threads: []), on: [firstTarget, secondTarget], forceRemount: true
+        )
+
+        let acknowledgementTargetIDs = await devTools.acknowledgementTargetIDs()
+        let firstPendingLibrary = await devTools.pendingLibrary(for: firstTarget.id)
+        let secondPendingLibrary = await devTools.pendingLibrary(for: secondTarget.id)
+        XCTAssertEqual(acknowledgementTargetIDs, [firstTarget.id, secondTarget.id])
+        XCTAssertNil(firstPendingLibrary)
+        XCTAssertNil(secondPendingLibrary)
+    }
+
     func testNativePromptLibraryImportOverridesPendingRendererEdits() async throws {
         let target = DevToolsTarget(
             id: "main",
