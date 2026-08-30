@@ -21,6 +21,7 @@ extension TaskDashboardWebTests {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="running"]').click();
               const initialCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
               const loadMoreVisible = !document.querySelector('[data-load-more]').hidden;
               document.querySelector('[data-load-more]').click();
@@ -123,12 +124,14 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[5] as? String, "3")
     }
 
-    func testRecentFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
+    func testTodayFilterIsDefaultAndKeepsOnlyTodaysTasksInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: 1),
-            .fixture(id: "newest", title: "Latest task", projectPath: "/tmp/a", recencyEpochMillis: 3),
-            .fixture(id: "middle", title: "Middle task", projectPath: "/tmp/b", recencyEpochMillis: 2),
+            .fixture(id: "yesterday", title: "Yesterday's task", projectPath: "/tmp/a", recencyEpochMillis: now - 86_400_000),
+            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: now - 3_000),
+            .fixture(id: "newest", title: "Latest task", projectPath: "/tmp/a", recencyEpochMillis: now - 1_000),
+            .fixture(id: "middle", title: "Middle task", projectPath: "/tmp/b", recencyEpochMillis: now - 2_000),
         ])
 
         let result = try await webView.evaluateJavaScript(
@@ -139,10 +142,10 @@ extension TaskDashboardWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="today"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="all"]') === null,
                 initialIDs,
-                document.querySelector('[data-filter-count="recent"]').textContent,
+                document.querySelector('[data-filter-count="today"]').textContent,
                 document.querySelector('[data-thread-list] .dashboard-project-group') === null,
               ];
             })()

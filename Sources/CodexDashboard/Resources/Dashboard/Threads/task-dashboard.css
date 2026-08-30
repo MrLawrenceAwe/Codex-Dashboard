@@ -106,6 +106,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-filter-count { min-width: 14px; color: var(--dashboard-dim); font-size: 10px; text-align: center; }
 #codex-dashboard-page .dashboard-filters button.is-active .dashboard-filter-count { color: var(--dashboard-muted); }
 #codex-dashboard-page .dashboard-list { display: grid; gap: 26px; }
+#codex-dashboard-page .dashboard-list.is-compact { gap: 0; border: 1px solid var(--dashboard-line); border-radius: 10px; overflow: hidden; background: var(--dashboard-surface); }
 #codex-dashboard-page .dashboard-project-group { display: grid; gap: 7px; }
 #codex-dashboard-page .dashboard-project-heading { display: flex; min-width: 0; align-items: center; gap: 8px; }
 #codex-dashboard-page .dashboard-project-toggle { display: flex; min-width: 0; min-height: 36px; flex: 1; align-items: center; gap: 16px; padding: 5px 6px; border: 0; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
@@ -146,6 +147,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-ignored-project-count { color: var(--dashboard-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
 #codex-dashboard-page .dashboard-ignored-project-list { display: grid; gap: 8px; padding-top: 4px; }
 #codex-dashboard-page .dashboard-list > .dashboard-thread { border: 1px solid var(--dashboard-line); border-radius: 12px; }
+#codex-dashboard-page .dashboard-list.is-compact > .dashboard-thread { min-height: 48px; padding: 7px 12px; border: 0; border-radius: 0; }
 #codex-dashboard-page .dashboard-thread { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; min-height: 70px; align-items: center; padding: 10px 16px; appearance: none; border: 0; background: var(--dashboard-surface); color: inherit; cursor: pointer; text-align: left; transition: background 120ms ease, box-shadow 120ms ease; }
 #codex-dashboard-page .dashboard-thread + .dashboard-thread { border-top: 1px solid var(--dashboard-line); }
 #codex-dashboard-page .dashboard-thread:hover { background: var(--dashboard-surface-hover); box-shadow: inset 2px 0 color-mix(in srgb, var(--dashboard-text) 22%, transparent); }

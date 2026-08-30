@@ -14,8 +14,8 @@ const taskDashboardState = (() => {
       }
     } catch (_) {}
     return {
-      filterMode: ['recent', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'recent',
+      filterMode: ['today', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'today',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
@@ -35,7 +35,7 @@ const taskDashboardState = (() => {
 
   function derive(threads, isThreadUnread, ignoredProjectPaths) {
     return {
-      recentCount: threads.length,
+      todayCount: threads.filter(isToday).length,
       runningThreads: threads.filter((thread) => thread.runState === 'running'),
       unreadCount: threads.filter(isThreadUnread).length,
       visibleChangedProjectPaths: new Set(
@@ -59,7 +59,7 @@ const taskDashboardState = (() => {
     isThreadUnread,
   }) {
     return threads.filter((thread) => {
-      const matchesFilter = filterMode === 'recent'
+      const matchesFilter = (filterMode === 'today' && isToday(thread))
         || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
@@ -69,6 +69,16 @@ const taskDashboardState = (() => {
       const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
       return recencyDifference || String(left.id).localeCompare(String(right.id));
     });
+  }
+
+  function isToday(thread) {
+    const recency = Number(thread.recencyEpochMillis || 0);
+    if (!Number.isFinite(recency)) return false;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+    return recency >= startOfToday.getTime() && recency < startOfTomorrow.getTime();
   }
 
   function normalizeThreads(threads) {
