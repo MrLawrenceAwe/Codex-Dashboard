@@ -202,6 +202,44 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
     }
 }
 
+actor MultiTargetPromptLibraryRendererDevTools: DevToolsServing {
+    private let targets: [DevToolsTarget]
+    private let exportedLibrary: String
+    private var pendingLibraryByTargetID: [String: String?]
+    private var acknowledgements: [String] = []
+
+    init(
+        targets: [DevToolsTarget],
+        exportedLibrary: String,
+        pendingLibraryByTargetID: [String: String?]
+    ) {
+        self.targets = targets
+        self.exportedLibrary = exportedLibrary
+        self.pendingLibraryByTargetID = pendingLibraryByTargetID
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] { targets }
+
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool {
+        if expression.contains("acknowledgePendingPromptLibrary") {
+            acknowledgements.append(target.id)
+            pendingLibraryByTargetID[target.id] = nil
+        }
+        return true
+    }
+
+    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+        if expression.contains("exportPendingPromptLibrary") {
+            return pendingLibraryByTargetID[target.id] ?? nil
+        }
+        return exportedLibrary
+    }
+
+    func acknowledgementTargetIDs() -> [String] { acknowledgements }
+
+    func pendingLibrary(for targetID: String) -> String? { pendingLibraryByTargetID[targetID] ?? nil }
+}
+
 actor AccountPopoverRendererDevTools: DevToolsServing {
     private let target: DevToolsTarget
     private let action: String?
