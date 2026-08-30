@@ -14,8 +14,8 @@ const taskDashboardState = (() => {
       }
     } catch (_) {}
     return {
-      filterMode: ['running', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'running',
+      filterMode: ['recent', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'recent',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
@@ -35,6 +35,7 @@ const taskDashboardState = (() => {
 
   function derive(threads, isThreadUnread, ignoredProjectPaths) {
     return {
+      recentCount: threads.length,
       runningThreads: threads.filter((thread) => thread.runState === 'running'),
       unreadCount: threads.filter(isThreadUnread).length,
       visibleChangedProjectPaths: new Set(
@@ -58,11 +59,15 @@ const taskDashboardState = (() => {
     isThreadUnread,
   }) {
     return threads.filter((thread) => {
-      const matchesFilter = (filterMode === 'running' && thread.runState === 'running')
+      const matchesFilter = filterMode === 'recent'
+        || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));
       return matchesFilter;
+    }).sort((left, right) => {
+      const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
+      return recencyDifference || String(left.id).localeCompare(String(right.id));
     });
   }
 

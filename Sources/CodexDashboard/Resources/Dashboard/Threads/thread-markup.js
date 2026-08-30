@@ -60,6 +60,12 @@ const threadMarkup = (() => {
     ignoredProjectPaths,
     isUnread,
   }) {
+    if (filterMode === 'recent') {
+      return visibleThreads.map((item) => thread(item, {
+        showProject: true,
+        isUnread: isUnread(item),
+      })).join('');
+    }
     if (filterMode === 'changedProjects') {
       const projects = new Map();
       visibleThreads.forEach((item) => {

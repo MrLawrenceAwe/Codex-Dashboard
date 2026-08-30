@@ -319,6 +319,7 @@ extension TaskDashboardWebTests {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
               const buttons = [...document.querySelectorAll('[data-project-commit]')];
               const result = [buttons.length, buttons[0]?.textContent.trim()];
               buttons[0].click();
