@@ -132,6 +132,35 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
     }
 
+    func testAccountsPanelStaysWithinANarrowWindow() async throws {
+        let webView = DashboardWebTestHarness.makeWebView()
+        webView.frame = NSRect(x: 0, y: 0, width: 320, height: 600)
+        webView.loadHTMLString("""
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <div role="menu">
+            <div role="menuitem"><span>Show pet</span></div>
+            <div role="menuitem"><span>Settings</span></div>
+            <div role="menuitem"><span>Log out</span></div>
+          </div>
+        </body></html>
+        """, baseURL: nil)
+        try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        let injection = try InjectionBundle.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+
+        let values = try await webView.evaluateJavaScript("""
+        (() => {
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const rect = document.querySelector('#codex-accounts-panel').getBoundingClientRect();
+          return [rect.left, rect.right, innerWidth];
+        })()
+        """) as? [Double]
+
+        let bounds = try XCTUnwrap(values)
+        XCTAssertGreaterThanOrEqual(bounds[0], 12)
+        XCTAssertLessThanOrEqual(bounds[1], bounds[2] - 12)
+    }
+
     func testRefreshingUsageKeepsAccountPanelOpenWhenCodexClosesProfileMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>

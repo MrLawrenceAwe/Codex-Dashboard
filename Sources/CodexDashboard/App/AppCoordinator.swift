@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 final class AppCoordinator: ObservableObject {
     static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
+    private static let maximumLiveMonitoredProjectCount = 60
 
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
@@ -242,10 +243,25 @@ final class AppCoordinator: ObservableObject {
         totalCount: Int? = nil,
         refreshedAt: Date? = nil
     ) {
-        refreshScheduler.updateProjectPaths(Set(updatedThreads.map(\.projectPath)))
+        refreshScheduler.updateProjectPaths(Self.liveMonitoredProjectPaths(in: updatedThreads))
         if threads != updatedThreads { threads = updatedThreads }
         if let totalCount, totalThreadCount != totalCount { totalThreadCount = totalCount }
         if let refreshedAt { lastSuccessfulRefresh = refreshedAt }
+    }
+
+    static func liveMonitoredProjectPaths(in threads: [ThreadSummary]) -> Set<String> {
+        let prioritizedThreads = threads.sorted { left, right in
+            let leftIsPriority = left.runState == .running || left.isUnread
+            let rightIsPriority = right.runState == .running || right.isUnread
+            if leftIsPriority != rightIsPriority { return leftIsPriority }
+            if left.recencyEpochMillis == right.recencyEpochMillis { return left.id < right.id }
+            return left.recencyEpochMillis > right.recencyEpochMillis
+        }
+        var paths: Set<String> = []
+        for thread in prioritizedThreads where paths.count < Self.maximumLiveMonitoredProjectCount {
+            paths.insert(thread.projectPath)
+        }
+        return paths
     }
 
     func newestCompletedThreadID(in threads: [ThreadSummary]) -> String? {

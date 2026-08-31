@@ -4,6 +4,7 @@ const accountPopover = (() => {
   let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
   let snapshotFingerprint = '';
   let observer;
+  let observedRoot;
   let outsidePointerHandler;
   let outsidePointerTimer;
   let escapeHandler;
@@ -134,10 +135,16 @@ const accountPopover = (() => {
     panel.id = panelID;
     const rect = trigger.closest('[role="menu"]')?.getBoundingClientRect()
       || trigger.getBoundingClientRect();
-    const width = 328;
-    panel.style.left = `${rect.right + width + 20 <= innerWidth
+    const inset = 12;
+    const width = Math.min(328, Math.max(0, innerWidth - inset * 2));
+    const preferredLeft = rect.right + width + 20 <= innerWidth
       ? rect.right + 8
-      : Math.max(12, rect.left - width - 8)}px`;
+      : rect.left - width - 8;
+    panel.style.width = `${width}px`;
+    panel.style.left = `${Math.min(
+      Math.max(inset, preferredLeft),
+      Math.max(inset, innerWidth - width - inset),
+    )}px`;
     panel.style.bottom = `${Math.max(12, innerHeight - rect.bottom)}px`;
     document.body.append(panel);
     renderPanel();
@@ -204,6 +211,7 @@ const accountPopover = (() => {
       openPanel(trigger);
     });
     insertionParent.insertBefore(trigger, showPet);
+    observeMutations(host.parentElement);
   }
 
   function accountIcon() {
@@ -223,15 +231,17 @@ const accountPopover = (() => {
           && (node.matches?.(`[${triggerAttribute}]`) || node.querySelector?.(`[${triggerAttribute}]`))
       ))
     ));
-    if (triggerWasRemoved && !retainPanelAfterRefresh) closePanel();
-    const shouldRemount = records.some((record) => (
+    if (triggerWasRemoved) {
+      if (!retainPanelAfterRefresh) closePanel();
+      observeMutations();
+    }
+    const shouldMountTrigger = !document.querySelector(`[${triggerAttribute}]`) && records.some((record) => (
       [...record.addedNodes].some((node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return false;
         return containsMenuNode(node);
       })
-      || triggerWasRemoved
     ));
-    if (shouldRemount) mountTrigger();
+    if (shouldMountTrigger) mountTrigger();
   }
 
   function containsMenuNode(root) {
@@ -261,17 +271,27 @@ const accountPopover = (() => {
     return true;
   }
 
+  function observeMutations(root = document.body) {
+    if (!observer) return;
+    const nextRoot = root?.isConnected ? root : document.body;
+    if (nextRoot === observedRoot) return;
+    observer.disconnect();
+    observer.observe(nextRoot, { childList: true, subtree: true });
+    observedRoot = nextRoot;
+  }
+
   function mount() {
-    mountTrigger();
     if (!observer) {
       observer = new MutationObserver(handleMutations);
-      observer.observe(document.body, { childList: true, subtree: true });
+      observeMutations();
     }
+    mountTrigger();
   }
 
   function unmount() {
     observer?.disconnect();
     observer = undefined;
+    observedRoot = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();
     closePanel();
     releaseActionWaiters();

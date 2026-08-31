@@ -1,4 +1,4 @@
-#codex-accounts-panel { position:fixed; z-index:2147483646; width:328px; max-height:min(520px,calc(100vh - 24px)); overflow:auto; padding:5px; border:.5px solid rgba(255,255,255,.14); border-radius:12px; background:rgba(28,28,28,.97); color:#f2f2f2; box-shadow:0 18px 50px rgba(0,0,0,.42); font:12px system-ui,sans-serif; backdrop-filter:blur(18px); }
+#codex-accounts-panel { position:fixed; z-index:2147483646; box-sizing:border-box; width:min(328px,calc(100vw - 24px)); max-height:min(520px,calc(100vh - 24px)); overflow:auto; padding:5px; border:.5px solid rgba(255,255,255,.14); border-radius:12px; background:rgba(28,28,28,.97); color:#f2f2f2; box-shadow:0 18px 50px rgba(0,0,0,.42); font:12px system-ui,sans-serif; backdrop-filter:blur(18px); }
 #codex-accounts-panel header,#codex-accounts-panel footer,.codex-accounts-heading,.codex-accounts-actions { display:flex; align-items:center; }
 #codex-accounts-panel header { justify-content:space-between; height:34px; padding:0 7px 0 9px; }
 #codex-accounts-panel header strong { font-size:13px; font-weight:600; }
