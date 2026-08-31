@@ -124,14 +124,18 @@ const dashboardLifecycle = (() => {
     });
   }
 
-  function handleStructureMutations() {
-    const launcher = document.querySelector('[data-codex-prompt-launcher]');
-    if (
-      document.getElementById(dashboardElements.elementIDs.page)
-        && document.getElementById(dashboardElements.elementIDs.navButton)
-        && launcher?.isConnected
-        && observedComposerRoot?.isConnected
-    ) return;
+  function containsDashboardElement(node) {
+    if (!(node instanceof Element)) return false;
+    return Object.values(dashboardElements.elementIDs).some((id) => (
+      node.id === id || Boolean(node.querySelector(`#${id}`))
+    ));
+  }
+
+  function handleStructureMutations(records) {
+    const dashboardWasRemoved = records.some((record) => (
+      [...record.removedNodes].some(containsDashboardElement)
+    ));
+    if (!dashboardWasRemoved && observedStructureRoot?.isConnected) return;
     scheduleRepair({ rebindHosts: true });
   }
 

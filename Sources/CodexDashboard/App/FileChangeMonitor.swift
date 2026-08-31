@@ -51,7 +51,6 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         let flags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagFileEvents
                 | kFSEventStreamCreateFlagWatchRoot
-                | kFSEventStreamCreateFlagNoDefer
                 | kFSEventStreamCreateFlagUseCFTypes
         )
         guard let stream = FSEventStreamCreate(
@@ -60,7 +59,7 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
             &context,
             Array(projectPaths) as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.1,
+            0.5,
             flags
         ) else { return }
         self.stream = stream

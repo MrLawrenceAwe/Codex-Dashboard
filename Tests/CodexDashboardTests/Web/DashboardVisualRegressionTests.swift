@@ -49,9 +49,21 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
             baseURL: nil
         )
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        let now: Int64 = 1_735_819_200
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          const fixedNow = \(now * 1_000);
+          const NativeDate = Date;
+          window.Date = class FixedDate extends NativeDate {
+            constructor(...arguments_) {
+              super(...(arguments_.length ? arguments_ : [fixedNow]));
+            }
+            static now() { return fixedNow; }
+          };
+        })()
+        """)
         let injection = try InjectionBundle.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let now = Int64(Date().timeIntervalSince1970)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "running",
