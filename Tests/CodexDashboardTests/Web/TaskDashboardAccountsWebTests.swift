@@ -132,6 +132,39 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
     }
 
+    func testRefreshingUsageKeepsAccountPanelOpenWhenCodexClosesProfileMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <div role="menu" id="profile-menu">
+            <div role="menuitem"><span>Show pet</span></div>
+            <div role="menuitem"><span>Settings</span></div>
+            <div role="menuitem"><span>Log out</span></div>
+          </div>
+        </body></html>
+        """)
+
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyAccountPopoverSnapshot({
+            accounts: [{
+              id: '00000000-0000-0000-0000-000000000001', name: 'Lawrence',
+              isActive: false, usageLines: [], isRefreshing: false, errorMessage: null,
+            }],
+            activeAccountID: null, statusMessage: null, isBusy: false,
+          });
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          document.querySelector('[data-account-action="update"]').click();
+          document.querySelector('#profile-menu').remove();
+        })()
+        """)
+        try await Task.sleep(for: .milliseconds(50))
+        let panelIsOpen = try await webView.evaluateJavaScript(
+            "document.querySelector('#codex-accounts-panel') !== null"
+        ) as? Bool
+
+        XCTAssertEqual(panelIsOpen, true)
+    }
+
     func testCommitNoticeRemainsAvailable() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let result = try await webView.evaluateJavaScript(
