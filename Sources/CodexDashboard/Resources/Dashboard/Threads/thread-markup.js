@@ -41,12 +41,18 @@ const threadMarkup = (() => {
             <span class="dashboard-thread-heading" role="heading" aria-level="2">${dashboardElements.escapeHTML(thread.title)}</span>
             ${thread.isPinned ? `<span class="dashboard-pin" title="Pinned">${icon('pin')}</span>` : ''}
           </span>
-          ${compact ? '' : `<span class="dashboard-thread-preview">${dashboardElements.escapeHTML(thread.preview || 'No preview available')}</span>`}
-          <span class="dashboard-meta">
-            ${showProject ? `<span>${dashboardElements.escapeHTML(thread.projectName)}</span>` : ''}
-            <span>${formatRelativeTime(Number(thread.recencyEpochMillis || 0) / 1000)}</span>
-            ${!compact && thread.model ? `<span>${dashboardElements.escapeHTML(thread.model)}</span>` : ''}
-          </span>
+          ${compact
+            ? `<span class="dashboard-meta">
+                ${showProject ? `<span>${dashboardElements.escapeHTML(thread.projectName)}</span>` : ''}
+                <span>${formatRelativeTime(Number(thread.recencyEpochMillis || 0) / 1000)}</span>
+              </span>`
+            : `<span class="dashboard-thread-details">
+                <span class="dashboard-thread-preview">${dashboardElements.escapeHTML(thread.preview || 'No preview available')}</span>
+                <span class="dashboard-meta">
+                  <span>${formatRelativeTime(Number(thread.recencyEpochMillis || 0) / 1000)}</span>
+                  ${thread.model ? `<span>${dashboardElements.escapeHTML(thread.model)}</span>` : ''}
+                </span>
+              </span>`}
         </span>
         <span class="dashboard-thread-actions">
           ${statusMarkup}
