@@ -7,6 +7,7 @@ const accountPopover = (() => {
   let outsidePointerHandler;
   let outsidePointerTimer;
   let escapeHandler;
+  let retainPanelAfterRefresh = false;
   const actions = [];
   const actionWaiters = [];
 
@@ -29,6 +30,12 @@ const accountPopover = (() => {
 
   function queue(kind, accountID = null) {
     if (snapshot.isBusy || actions.length) return;
+    if (kind === 'updateUsage' || kind === 'updateSignedOutUsage') {
+      // Codex closes its profile menu for this click, which removes our trigger.
+      // The account panel is a separate overlay and must remain available while
+      // the requested usage refresh completes.
+      retainPanelAfterRefresh = true;
+    }
     actions.push({ kind, accountID });
     renderPanel();
     resolveActionWaiters();
@@ -216,7 +223,7 @@ const accountPopover = (() => {
           && (node.matches?.(`[${triggerAttribute}]`) || node.querySelector?.(`[${triggerAttribute}]`))
       ))
     ));
-    if (triggerWasRemoved) closePanel();
+    if (triggerWasRemoved && !retainPanelAfterRefresh) closePanel();
     const shouldRemount = records.some((record) => (
       [...record.addedNodes].some((node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return false;
@@ -247,6 +254,8 @@ const accountPopover = (() => {
     const changed = candidateFingerprint !== snapshotFingerprint;
     snapshot = candidate;
     snapshotFingerprint = candidateFingerprint;
+    // The native refresh has completed once its resulting snapshot arrives.
+    retainPanelAfterRefresh = false;
     mountTrigger();
     if (changed) renderPanel();
     return true;
