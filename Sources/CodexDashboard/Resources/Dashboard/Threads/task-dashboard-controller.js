@@ -123,7 +123,8 @@ function requestRender() {
   taskDashboardView.updateSidebarStatus(deriveViewState());
 }
 
-function mountNavigationButton() {
+function mountTaskNavigationButton() {
+  if (document.getElementById(dashboardElements.elementIDs.navButton)) return true;
   const insertionPoint = codexHost.navigationInsertionPoint();
   if (!insertionPoint?.element?.parentElement) return false;
   const button = document.createElement('button');
@@ -144,12 +145,20 @@ function mountNavigationButton() {
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
   else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
   taskDashboardView.updateSidebarStatus(deriveViewState());
+  if (dashboardIsOpen) button.setAttribute('aria-current', 'page');
   return true;
 }
 
-function mountDashboardPage() {
+function mountNavigation() {
+  const taskMounted = mountTaskNavigationButton();
+  const todosMounted = todoList.mountNavigation();
+  return taskMounted && todosMounted;
+}
+
+function mountTaskDashboardPage() {
+  if (document.getElementById(dashboardElements.elementIDs.page)) return true;
   viewNeedsRender = true;
-  return taskDashboardPage.mount({
+  const mounted = taskDashboardPage.mount({
     onFilter: (nextFilterMode) => {
       filterMode = nextFilterMode;
       savePreferences();
@@ -189,6 +198,18 @@ function mountDashboardPage() {
       openThreadFromEvent(event);
     },
   });
+  if (mounted && dashboardIsOpen) {
+    document.getElementById(dashboardElements.elementIDs.page)?.classList.add('is-open');
+    document.documentElement.classList.add('codex-dashboard-open');
+  }
+  return mounted;
+}
+
+function mountPages() {
+  const taskMounted = mountTaskDashboardPage();
+  const todosMounted = todoList.mountPage();
+  todoList.restoreOpenState();
+  return taskMounted && todosMounted;
 }
 
 function openThreadFromEvent(event) {
@@ -202,6 +223,7 @@ function openThreadFromEvent(event) {
 function openDashboard() {
   const page = document.getElementById(dashboardElements.elementIDs.page);
   if (!page) return;
+  todoList.close();
   dashboardIsOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
@@ -219,12 +241,31 @@ function closeDashboard() {
   scheduleUnreadSync();
 }
 
+function closeAllPages() {
+  closeDashboard();
+  todoList.close();
+}
+
+function restoreOpenState() {
+  if (dashboardIsOpen) {
+    document.getElementById(dashboardElements.elementIDs.page)?.classList.add('is-open');
+    document.documentElement.classList.add('codex-dashboard-open');
+    document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
+  }
+  todoList.restoreOpenState();
+}
+
 function isOpen() {
   return dashboardIsOpen;
 }
 
+function anyPageIsOpen() {
+  return dashboardIsOpen || todoList.isOpen();
+}
+
 function applyThreads(nextThreads) {
   threads = taskDashboardState.normalizeThreads(nextThreads);
+  todoList.setProjects(threads);
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
@@ -248,12 +289,13 @@ function scopeProject() {
 
 function ensureMounted() {
   const mounted = dashboardLifecycle.ensureMounted({
-    close: closeDashboard,
-    isOpen,
-    mountNavigation: mountNavigationButton,
-    mountPage: mountDashboardPage,
+    close: closeAllPages,
+    isOpen: anyPageIsOpen,
+    mountNavigation,
+    mountPage: mountPages,
     open: openDashboard,
     requestRender,
+    restoreOpenState,
     syncUnread: syncUnreadFromSidebar,
   });
   if (!unreadMonitoringStarted) {
@@ -273,6 +315,7 @@ function destroy() {
   unreadMonitoringStarted = false;
   viewNeedsRender = true;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  todoList.destroy();
   dashboardLifecycle.destroy();
   delete window.__codexDashboard;
 }
@@ -281,6 +324,7 @@ return {
   ensureMounted,
   destroy,
   open: openDashboard,
+  close: closeDashboard,
   isOpen,
   applyThreads,
   scopeProject,
