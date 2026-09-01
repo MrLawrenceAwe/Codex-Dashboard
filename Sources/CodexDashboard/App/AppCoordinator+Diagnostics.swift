@@ -16,6 +16,7 @@ extension AppCoordinator {
             lastCompatibilityCheck: lastCompatibilityCheck,
             compatibilitySummary: compatibilityReport?.summary ?? "not checked",
             connectionError: connectionError,
+            connectionNotice: connectionNotice,
             threadWarning: threadDataWarning
         )
         NSPasteboard.general.clearContents()

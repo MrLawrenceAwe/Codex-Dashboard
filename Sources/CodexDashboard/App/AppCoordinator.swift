@@ -9,6 +9,7 @@ final class AppCoordinator: ObservableObject {
 
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
+    @Published var connectionNotice: String?
     @Published var isPerformingAction = false
     @Published var threadDataWarning: String?
     @Published var threads: [ThreadSummary] = []
@@ -170,6 +171,7 @@ final class AppCoordinator: ObservableObject {
 
     func restartCodexAndEnableTaskDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
+        connectionNotice = nil
         do {
             try await loadThreadSnapshot()
         } catch {
@@ -179,7 +181,7 @@ final class AppCoordinator: ObservableObject {
             return
         }
         guard !threads.contains(where: { $0.runState == .running }) else {
-            connectionError = "Finish or cancel active Codex tasks before restarting."
+            connectionNotice = "Finish or cancel active Codex tasks before restarting."
             return
         }
         await checkCompatibility()

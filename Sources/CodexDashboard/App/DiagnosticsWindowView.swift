@@ -208,16 +208,26 @@ struct DiagnosticsWindowView: View {
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
 
-            if coordinator.connectionError != nil || coordinator.threadDataWarning != nil {
+            if coordinator.connectionError != nil || coordinator.connectionNotice != nil || coordinator.threadDataWarning != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     if let error = coordinator.connectionError { Text(error) }
+                    if let notice = coordinator.connectionNotice { Text(notice) }
                     if let warning = coordinator.threadDataWarning { Text(warning) }
                 }
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.60))
+                .foregroundStyle(
+                    coordinator.connectionError == nil && coordinator.threadDataWarning == nil
+                        ? .secondary
+                        : Color(red: 1.0, green: 0.60, blue: 0.60)
+                )
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    (coordinator.connectionError == nil && coordinator.threadDataWarning == nil
+                        ? Color.secondary.opacity(0.08)
+                        : Color.red.opacity(0.07)),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
             }
 
             Text("The app runs from the menu bar. The Task Dashboard reads local Codex thread metadata and activity logs; the signed Codex application bundle is never modified.")
