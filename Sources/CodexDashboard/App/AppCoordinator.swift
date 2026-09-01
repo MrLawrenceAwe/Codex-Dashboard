@@ -39,6 +39,7 @@ final class AppCoordinator: ObservableObject {
     var catalogWarning: String?
     var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
+    private var codexActivationObserver: NSObjectProtocol?
     private var accountStateObserver: AnyCancellable?
     private var taskCompletionObserver = TaskCompletionObserver()
 
@@ -130,6 +131,19 @@ final class AppCoordinator: ObservableObject {
                 Task { @MainActor in await self?.refreshAfterActivation() }
             }
         }
+        if codexActivationObserver == nil {
+            codexActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication,
+                      application.bundleIdentifier == CodexConfiguration.bundleIdentifier
+                else { return }
+                Task { @MainActor in await self?.refreshAfterActivation() }
+            }
+        }
         Task { await checkCompatibility() }
     }
 
@@ -142,6 +156,10 @@ final class AppCoordinator: ObservableObject {
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
             self.activationObserver = nil
+        }
+        if let codexActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(codexActivationObserver)
+            self.codexActivationObserver = nil
         }
     }
 
