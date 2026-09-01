@@ -15,6 +15,7 @@ final class DashboardDiagnosticsTests: XCTestCase {
             lastCompatibilityCheck: nil,
             compatibilitySummary: "not checked",
             connectionError: nil,
+            connectionNotice: nil,
             threadWarning: nil
         )
 

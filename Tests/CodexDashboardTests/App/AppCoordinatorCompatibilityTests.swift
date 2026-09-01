@@ -33,10 +33,8 @@ extension AppCoordinatorTests {
         await coordinator.restartCodexAndEnableTaskDashboard()
 
         XCTAssertEqual(runtime.restartCallCount, 0)
-        XCTAssertEqual(
-            coordinator.connectionError,
-            "Finish or cancel active Codex tasks before restarting."
-        )
+        XCTAssertNil(coordinator.connectionError)
+        XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex tasks before restarting.")
     }
 
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {

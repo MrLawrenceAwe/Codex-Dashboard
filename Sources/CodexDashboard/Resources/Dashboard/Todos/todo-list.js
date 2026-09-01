@@ -145,9 +145,9 @@ const todoList = (() => {
           <div><h1>To-dos</h1><p data-todo-summary>0 open</p></div>
         </header>
         <form class="todo-add" data-todo-form>
-          <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="What needs doing?" autocomplete="off">
+          <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do…" autocomplete="off">
           <select data-todo-project aria-label="Attach to project"><option value="">No project</option></select>
-          <button type="submit">Add to-do</button>
+          <button type="submit">Add</button>
         </form>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
         <div class="todo-toolbar">

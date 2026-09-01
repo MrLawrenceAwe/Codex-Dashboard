@@ -11,6 +11,7 @@ struct DashboardDiagnostics {
     let lastCompatibilityCheck: Date?
     let compatibilitySummary: String
     let connectionError: String?
+    let connectionNotice: String?
     let threadWarning: String?
 
     var text: String {
@@ -25,6 +26,7 @@ struct DashboardDiagnostics {
             "Last compatibility check: \(lastCompatibilityCheck.map(formatter.string(from:)) ?? "never")",
             "Compatibility: \(compatibilitySummary)",
             "Connection error: \(connectionError ?? "none")",
+            "Connection notice: \(connectionNotice ?? "none")",
             "Thread warning: \(threadWarning ?? "none")",
         ].joined(separator: "\n")
     }
