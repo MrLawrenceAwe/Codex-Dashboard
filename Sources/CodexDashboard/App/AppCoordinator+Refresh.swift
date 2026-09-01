@@ -37,7 +37,10 @@ extension AppCoordinator {
                 updatePublished(\.connectionError, to: nil)
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
-                setFailure(error, lastKnownState: .rendererAvailable)
+                setFailure(
+                    error,
+                    lastKnownState: connectionState.dashboardIsMounted ? .dashboardMounted : .rendererAvailable
+                )
             }
             return
         }

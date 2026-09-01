@@ -35,8 +35,7 @@ It moves the installed app to the Trash.
 
 Select **To-dos** in the same sidebar area to keep a personal task list in Codex's
 local renderer storage.
-Each to-do can be attached to one of the projects currently open in Codex, reassigned,
-edited, completed, filtered, or deleted without leaving the app.
+Each to-do can be edited, completed, filtered, or deleted without leaving the app.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
 All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion; this can be disabled from the menu bar. Use
@@ -72,8 +71,7 @@ removes it.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
 - A native-looking **Task Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
-- A neighboring **To-dos** destination stores a lightweight task list locally and
-  offers project assignments derived from the projects currently open in Codex.
+- A neighboring **To-dos** destination stores a lightweight personal task list locally.
 - Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard

@@ -1,23 +1,7 @@
 const todoList = (() => {
   let items = todoListState.load();
-  let projects = [];
   let filterMode = 'open';
   let pageIsOpen = false;
-
-  function projectForPath(path) {
-    return projects.find((project) => project.path === path) || null;
-  }
-
-  function projectOptions(selectedPath = '', includeUnassigned = true) {
-    const options = projects.slice();
-    const item = items.find((candidate) => candidate.projectPath === selectedPath);
-    if (selectedPath && !options.some((project) => project.path === selectedPath)) {
-      options.push({ path: selectedPath, name: item?.projectName || selectedPath });
-    }
-    return `${includeUnassigned ? '<option value="">No project</option>' : ''}${options.map((project) => `
-      <option value="${dashboardElements.escapeHTML(project.path)}"${project.path === selectedPath ? ' selected' : ''}>${dashboardElements.escapeHTML(project.name)}</option>
-    `).join('')}`;
-  }
 
   function visibleItems() {
     if (filterMode === 'open') return items.filter((item) => !item.completed);
@@ -48,7 +32,6 @@ const todoList = (() => {
     const openCount = items.filter((item) => !item.completed).length;
     const completedCount = items.length - openCount;
     page.querySelector('[data-todo-summary]').textContent = `${openCount} open`;
-    page.querySelector('[data-todo-project]').innerHTML = projectOptions('', true);
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       const active = button.dataset.todoFilter === filterMode;
       button.classList.toggle('is-active', active);
@@ -72,10 +55,6 @@ const todoList = (() => {
         </label>
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${dashboardElements.escapeHTML(item.title)}" aria-label="To-do title">
-          <label class="todo-project-label">
-            <span>${threadMarkup.icon('project')}</span>
-            <select data-todo-project-assignment aria-label="Project for ${dashboardElements.escapeHTML(item.title)}">${projectOptions(item.projectPath, true)}</select>
-          </label>
         </div>
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${dashboardElements.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
@@ -84,8 +63,8 @@ const todoList = (() => {
     `).join('');
   }
 
-  function add(title, projectPath) {
-    const item = todoListState.create(title, projectForPath(projectPath));
+  function add(title) {
+    const item = todoListState.create(title);
     if (!item) return false;
     items.unshift(item);
     persist();
@@ -146,7 +125,6 @@ const todoList = (() => {
         </header>
         <form class="todo-add" data-todo-form>
           <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do…" autocomplete="off">
-          <select data-todo-project aria-label="Attach to project"><option value="">No project</option></select>
           <button type="submit">Add</button>
         </form>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
@@ -163,8 +141,7 @@ const todoList = (() => {
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       const title = page.querySelector('[data-todo-new-title]');
-      const project = page.querySelector('[data-todo-project]');
-      if (!add(title.value, project.value)) return;
+      if (!add(title.value)) return;
       title.value = '';
       title.focus();
     });
@@ -184,12 +161,6 @@ const todoList = (() => {
       if (!row) return;
       if (event.target.matches('[data-todo-completed]')) {
         updateItem(row.dataset.todoId, { completed: event.target.checked });
-      } else if (event.target.matches('[data-todo-project-assignment]')) {
-        const project = projectForPath(event.target.value);
-        updateItem(row.dataset.todoId, {
-          projectPath: project?.path || '',
-          projectName: project?.name || '',
-        });
       } else if (event.target.matches('[data-todo-title]')) {
         const title = event.target.value.trim();
         if (title) updateItem(row.dataset.todoId, { title });
@@ -220,9 +191,6 @@ const todoList = (() => {
     document.documentElement.classList.add('codex-todo-open');
     document.getElementById(dashboardElements.elementIDs.todoNavButton)?.setAttribute('aria-current', 'page');
     render();
-    const scopedProject = taskDashboard.scopeProject();
-    const selector = page.querySelector('[data-todo-project]');
-    if (scopedProject && projectForPath(scopedProject.path)) selector.value = scopedProject.path;
   }
 
   function close() {
@@ -239,11 +207,6 @@ const todoList = (() => {
     document.getElementById(dashboardElements.elementIDs.todoNavButton)?.setAttribute('aria-current', 'page');
   }
 
-  function setProjects(threads) {
-    projects = todoListState.projectsFromThreads(threads);
-    if (pageIsOpen) render();
-  }
-
   function destroy() {
     pageIsOpen = false;
     document.documentElement.classList.remove('codex-todo-open');
@@ -257,6 +220,5 @@ const todoList = (() => {
     mountPage,
     open,
     restoreOpenState,
-    setProjects,
   };
 })();
