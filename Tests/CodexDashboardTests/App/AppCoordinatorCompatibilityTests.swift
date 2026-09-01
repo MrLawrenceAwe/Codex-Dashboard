@@ -37,6 +37,28 @@ extension AppCoordinatorTests {
         XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex tasks before restarting.")
     }
 
+    func testMountedDashboardFailureIsReportedAsANotice() {
+        let coordinator = makeAppCoordinator(
+            catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(threads: [], totalThreadCount: 0)),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            compatibilityChecker: StubCompatibilityChecker(checks: []),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        coordinator.setFailure(
+            DashboardError.enableFailed("A background snapshot could not be delivered."),
+            lastKnownState: .dashboardMounted
+        )
+
+        XCTAssertNil(coordinator.connectionError)
+        XCTAssertEqual(
+            coordinator.connectionNotice,
+            "Dashboard enablement failed: A background snapshot could not be delivered."
+        )
+        XCTAssertEqual(coordinator.statusPresentation.title, "Task Dashboard is live")
+    }
+
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {
         let incompatible = CompatibilityCheck(
             id: "sidebar-host",

@@ -265,13 +265,13 @@ function anyPageIsOpen() {
 
 function applyThreads(nextThreads) {
   threads = taskDashboardState.normalizeThreads(nextThreads);
-  todoList.setProjects(threads);
   unreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
   requestRender();
+  return true;
 }
 
 function scopeProject() {

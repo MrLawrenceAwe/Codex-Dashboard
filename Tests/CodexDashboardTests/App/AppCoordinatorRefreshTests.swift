@@ -5,6 +5,44 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testLiveCoordinatorSynchronizationWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
+            throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to synchronize with the live Codex renderer.")
+        }
+        let coordinator = AppCoordinator(observeFileChanges: false)
+
+        await coordinator.checkCompatibility()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(
+            coordinator.connectionState,
+            .dashboardMounted,
+            coordinator.connectionError ?? coordinator.connectionNotice ?? "No connection detail was reported."
+        )
+        XCTAssertNil(coordinator.connectionError)
+    }
+
+    func testFailedRefreshPreservesAnAlreadyMountedDashboardState() async {
+        let runtime = StubDashboardRuntime(
+            maintainsDashboard: true,
+            synchronizationError: AccountTestError.mountFailed
+        )
+        let coordinator = makeAppCoordinator(
+            catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(threads: [], totalThreadCount: 0)),
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { runtime }
+        )
+        coordinator.connectionState = .dashboardMounted
+
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(coordinator.connectionState, .dashboardMounted)
+        XCTAssertNil(coordinator.connectionError)
+        XCTAssertEqual(coordinator.connectionNotice, AccountTestError.mountFailed.localizedDescription)
+        XCTAssertEqual(coordinator.statusPresentation.title, "Task Dashboard is live")
+    }
+
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let coordinator = makeAppCoordinator(

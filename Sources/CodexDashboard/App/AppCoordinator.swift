@@ -246,7 +246,13 @@ final class AppCoordinator: ObservableObject {
 
     func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {
         updatePublished(\.connectionState, to: lastKnownState)
-        updatePublished(\.connectionError, to: error.localizedDescription)
+        if lastKnownState.dashboardIsMounted {
+            updatePublished(\.connectionError, to: nil)
+            updatePublished(\.connectionNotice, to: error.localizedDescription)
+        } else {
+            updatePublished(\.connectionNotice, to: nil)
+            updatePublished(\.connectionError, to: error.localizedDescription)
+        }
         lastErrorDate = .now
     }
 
