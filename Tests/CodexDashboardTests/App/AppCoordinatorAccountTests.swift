@@ -412,8 +412,9 @@ extension AppCoordinatorTests {
         )
     }
 
-    func testAccountUsagePollingScheduleRefreshesEveryThirtySeconds() {
-        XCTAssertEqual(RefreshScheduler.Schedule.accountUsage, .seconds(30))
+    func testAccountUsagePollingScheduleDefersBackgroundRefreshes() {
+        XCTAssertEqual(RefreshScheduler.Schedule.accountUsage(active: true), .seconds(2 * 60))
+        XCTAssertEqual(RefreshScheduler.Schedule.accountUsage(active: false), .seconds(15 * 60))
     }
 
     func testInactiveAccountUsagePollingScheduleRefreshesEveryFiveMinutes() {

@@ -75,6 +75,7 @@ const taskDashboardView = (() => {
     const visibleThreads = taskDashboardState.filter({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
+      dayRange: state.dayRange,
       filterMode,
       isThreadUnread,
     });

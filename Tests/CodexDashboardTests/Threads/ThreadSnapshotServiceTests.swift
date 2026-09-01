@@ -55,6 +55,20 @@ private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     }
 }
 
+private actor CountingWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+    private var requests = 0
+
+    func loadStatuses(
+        for projectPaths: Set<String>,
+        policy: WorkingTreeStatusRefreshPolicy
+    ) -> [String: WorkingTreeStatus] {
+        requests += 1
+        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .hasChanges) })
+    }
+
+    func requestCount() -> Int { requests }
+}
+
 private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
     private var continuation: CheckedContinuation<ThreadCatalog, Never>?
 
@@ -140,6 +154,25 @@ final class ThreadSnapshotServiceTests: XCTestCase {
 
         let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
         XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
+    }
+
+    func testEventDrivenWorkingTreeRefreshesAreThrottledPerProject() async {
+        let statusProvider = CountingWorkingTreeStatusProvider()
+        let service = ThreadSnapshotService(
+            catalogProvider: CountingCatalogProvider(),
+            workingTreeStatusProvider: statusProvider,
+            unreadThreadIDProvider: EmptyUnreadIDProvider()
+        )
+        let threads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
+        let paths: Set<String> = ["/tmp/project"]
+
+        let initial = await service.updateWorkingTreeStatuses(in: threads, projectPaths: paths)
+        let repeated = await service.updateWorkingTreeStatuses(in: threads, projectPaths: paths)
+        let requestCount = await statusProvider.requestCount()
+
+        XCTAssertEqual(initial?["/tmp/project"], .hasChanges)
+        XCTAssertNil(repeated)
+        XCTAssertEqual(requestCount, 1)
     }
 
     func testUnreadFailureKeepsCatalogAvailableAndReportsWarning() async throws {
