@@ -69,9 +69,11 @@ const dashboardLifecycle = (() => {
   }
 
   function attachPage() {
-    const page = document.getElementById(dashboardElements.elementIDs.page);
     const pageHost = codexHost.pageHost();
-    if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
+    [dashboardElements.elementIDs.page, dashboardElements.elementIDs.todoPage].forEach((id) => {
+      const page = document.getElementById(id);
+      if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
+    });
   }
 
   function composerRoot() {
@@ -110,11 +112,13 @@ const dashboardLifecycle = (() => {
       const shouldRebindHosts = pendingHostRebind;
       pendingUnreadSync = false;
       pendingHostRebind = false;
-      const restoredPage = !document.getElementById(dashboardElements.elementIDs.page);
+      const restoredPage = !document.getElementById(dashboardElements.elementIDs.page)
+        || !document.getElementById(dashboardElements.elementIDs.todoPage);
       if (restoredPage) hooks.mountPage();
-      if (!document.getElementById(dashboardElements.elementIDs.navButton)) hooks.mountNavigation();
-      if (hooks.isOpen() && restoredPage) hooks.open();
+      if (!document.getElementById(dashboardElements.elementIDs.navButton)
+        || !document.getElementById(dashboardElements.elementIDs.todoNavButton)) hooks.mountNavigation();
       attachPage();
+      hooks.restoreOpenState?.();
       observeSidebarSize();
       if (shouldRebindHosts) {
         observeHosts();
@@ -135,7 +139,13 @@ const dashboardLifecycle = (() => {
     const dashboardWasRemoved = records.some((record) => (
       [...record.removedNodes].some(containsDashboardElement)
     ));
-    if (!dashboardWasRemoved && observedStructureRoot?.isConnected) return;
+    const dashboardElementIsMissing = [
+      dashboardElements.elementIDs.page,
+      dashboardElements.elementIDs.todoPage,
+      dashboardElements.elementIDs.navButton,
+      dashboardElements.elementIDs.todoNavButton,
+    ].some((id) => !document.getElementById(id));
+    if (!dashboardWasRemoved && !dashboardElementIsMissing && observedStructureRoot?.isConnected) return;
     scheduleRepair({ rebindHosts: true });
   }
 
@@ -171,15 +181,16 @@ const dashboardLifecycle = (() => {
       style.textContent = DASHBOARD_CSS;
       document.head.append(style);
     }
-    const pageWasMissing = !document.getElementById(dashboardElements.elementIDs.page);
+    const pageWasMissing = !document.getElementById(dashboardElements.elementIDs.page)
+      || !document.getElementById(dashboardElements.elementIDs.todoPage);
     if (pageWasMissing) hooks.mountPage();
-    if (!document.getElementById(dashboardElements.elementIDs.navButton)) hooks.mountNavigation();
+    if (!document.getElementById(dashboardElements.elementIDs.navButton)
+      || !document.getElementById(dashboardElements.elementIDs.todoNavButton)) hooks.mountNavigation();
     attachPage();
+    hooks.restoreOpenState?.();
     syncContentInset();
     promptLibrary.mount();
     accountPopover.mount();
-    if (hooks.isOpen() && pageWasMissing) hooks.open();
-
     if (!structureObserver) {
       structureObserver = new MutationObserver(handleStructureMutations);
       sidebarObserver = new MutationObserver(handleSidebarMutations);
@@ -196,6 +207,8 @@ const dashboardLifecycle = (() => {
       document.getElementById(dashboardElements.elementIDs.style)
         && document.getElementById(dashboardElements.elementIDs.page)
         && document.getElementById(dashboardElements.elementIDs.navButton)
+        && document.getElementById(dashboardElements.elementIDs.todoPage)
+        && document.getElementById(dashboardElements.elementIDs.todoNavButton)
     );
   }
 

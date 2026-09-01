@@ -18,12 +18,15 @@
     "Threads/task-dashboard-state",
     "Threads/task-dashboard-view",
     "Threads/task-dashboard-page",
+    "Todos/todo-list-state",
+    "Todos/todo-list",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
     "Core/dashboard-host"
   ],
   "stylesheets": [
     "Threads/task-dashboard",
+    "Todos/todo-list",
     "Prompts/prompt-library",
     "Accounts/account-popover"
   ],
