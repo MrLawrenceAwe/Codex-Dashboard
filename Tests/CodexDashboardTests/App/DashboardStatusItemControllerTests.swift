@@ -4,6 +4,19 @@ import XCTest
 
 @MainActor
 final class DashboardStatusItemControllerTests: XCTestCase {
+    func testStatusIconStaysFilledForAnEnabledDashboardWithAnAvailableRenderer() {
+        XCTAssertTrue(
+            DashboardConnectionState.rendererAvailable.statusIconIsFilled(
+                dashboardMaintenanceIsEnabled: true
+            )
+        )
+        XCTAssertFalse(
+            DashboardConnectionState.rendererAvailable.statusIconIsFilled(
+                dashboardMaintenanceIsEnabled: false
+            )
+        )
+    }
+
     private let positionKey = "NSStatusItem Preferred Position CodexDashboardStatusItem"
 
     func testRegistersVisibleDefaultStatusItemPosition() throws {

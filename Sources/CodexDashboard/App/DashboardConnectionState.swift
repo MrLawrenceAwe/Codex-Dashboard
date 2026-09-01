@@ -13,6 +13,10 @@ enum DashboardConnectionState: Equatable {
 
     var dashboardIsMounted: Bool { self == .dashboardMounted }
 
+    func statusIconIsFilled(dashboardMaintenanceIsEnabled: Bool) -> Bool {
+        dashboardIsMounted || (rendererIsAvailable && dashboardMaintenanceIsEnabled)
+    }
+
     func presentation(hasError: Bool, mountedSummary: String) -> (title: String, detail: String) {
         if hasError {
             return ("Task Dashboard needs attention", "Review the message below and try again.")

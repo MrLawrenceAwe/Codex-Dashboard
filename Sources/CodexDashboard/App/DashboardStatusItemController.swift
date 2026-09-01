@@ -101,7 +101,10 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     private func updateIcon(for state: DashboardConnectionState) {
-        let symbolName = state.dashboardIsMounted ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2"
+        let dashboardMaintenanceIsEnabled = coordinator.dashboardRuntime?.maintainsDashboard ?? false
+        let symbolName = state.statusIconIsFilled(
+            dashboardMaintenanceIsEnabled: dashboardMaintenanceIsEnabled
+        ) ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2"
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Codex Dashboard")
         image?.isTemplate = true
         statusItem.button?.image = image
