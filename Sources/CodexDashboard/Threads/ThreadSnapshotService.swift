@@ -11,6 +11,7 @@ struct UnreadStateUpdate: Sendable {
 }
 
 actor ThreadSnapshotService {
+    static let minimumEventDrivenWorkingTreeRefreshInterval: TimeInterval = 2
     private let catalogProvider: any ThreadCatalogProviding
     private let workingTreeStatusProvider: any WorkingTreeStatusProviding
     private let unreadThreadIDProvider: any UnreadThreadIDProviding
@@ -19,6 +20,7 @@ actor ThreadSnapshotService {
     private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
     private var workingTreeGenerationByPath: [String: UInt64] = [:]
+    private var lastEventDrivenWorkingTreeRefreshByPath: [String: Date] = [:]
 
     init(
         catalogProvider: any ThreadCatalogProviding,
@@ -82,7 +84,23 @@ actor ThreadSnapshotService {
         projectPaths requestedPaths: Set<String>? = nil
     ) async -> [String: WorkingTreeStatus]? {
         let allProjectPaths = Set(threads.map(\.projectPath))
-        let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
+        let requestedProjectPaths = requestedPaths.map { $0.intersection(allProjectPaths) }
+        let projectPaths: Set<String>
+        if let requestedProjectPaths {
+            let now = Date()
+            projectPaths = requestedProjectPaths.filter { path in
+                guard let lastRefresh = lastEventDrivenWorkingTreeRefreshByPath[path] else {
+                    return true
+                }
+                return now.timeIntervalSince(lastRefresh)
+                    >= Self.minimumEventDrivenWorkingTreeRefreshInterval
+            }
+            for path in projectPaths {
+                lastEventDrivenWorkingTreeRefreshByPath[path] = now
+            }
+        } else {
+            projectPaths = allProjectPaths
+        }
         guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }
 
         var requestGenerations: [String: UInt64] = [:]
@@ -106,6 +124,9 @@ actor ThreadSnapshotService {
         if requestedPaths == nil {
             workingTreeStatuses = workingTreeStatuses.filter { allProjectPaths.contains($0.key) }
             workingTreeGenerationByPath = workingTreeGenerationByPath.filter { allProjectPaths.contains($0.key) }
+            lastEventDrivenWorkingTreeRefreshByPath = lastEventDrivenWorkingTreeRefreshByPath.filter {
+                allProjectPaths.contains($0.key)
+            }
         }
         let changedResults = currentResults.filter { workingTreeStatuses[$0.key] != $0.value }
         for (path, status) in currentResults {

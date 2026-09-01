@@ -33,56 +33,60 @@ const taskDashboardState = (() => {
     } catch (_) {}
   }
 
-  function derive(threads, isThreadUnread, ignoredProjectPaths) {
-    return {
-      todayCount: threads.filter(isToday).length,
-      runningThreads: threads.filter((thread) => thread.runState === 'running'),
-      unreadCount: threads.filter(isThreadUnread).length,
-      visibleChangedProjectPaths: new Set(
-        threads
-          .filter((thread) => thread.workingTreeStatus === 'hasChanges')
-          .map((thread) => String(thread.projectPath).trim())
-          .filter((path) => !ignoredProjectPaths.has(path)),
-      ),
-      allChangedProjectPaths: new Set(
-        threads
-          .filter((thread) => thread.workingTreeStatus === 'hasChanges')
-          .map((thread) => String(thread.projectPath).trim()),
-      ),
-    };
+  function derive(threads, isThreadUnread, ignoredProjectPaths, now = new Date()) {
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+    const dayRange = { start: startOfToday.getTime(), end: startOfTomorrow.getTime() };
+    const runningThreads = [];
+    const visibleChangedProjectPaths = new Set();
+    const allChangedProjectPaths = new Set();
+    let todayCount = 0;
+    let unreadCount = 0;
+
+    threads.forEach((thread) => {
+      if (isToday(thread, dayRange)) todayCount += 1;
+      if (thread.runState === 'running') runningThreads.push(thread);
+      if (isThreadUnread(thread)) unreadCount += 1;
+      if (thread.workingTreeStatus === 'hasChanges') {
+        const projectPath = String(thread.projectPath).trim();
+        allChangedProjectPaths.add(projectPath);
+        if (!ignoredProjectPaths.has(projectPath)) visibleChangedProjectPaths.add(projectPath);
+      }
+    });
+    return { todayCount, runningThreads, unreadCount, visibleChangedProjectPaths, allChangedProjectPaths, dayRange };
   }
 
   function filter({
     threads,
     allChangedProjectPaths,
+    dayRange,
     filterMode,
     isThreadUnread,
   }) {
     return threads.filter((thread) => {
-      const matchesFilter = (filterMode === 'today' && isToday(thread))
+      const matchesFilter = (filterMode === 'today' && isToday(thread, dayRange))
         || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));
       return matchesFilter;
-    }).sort((left, right) => {
-      const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
-      return recencyDifference || String(left.id).localeCompare(String(right.id));
     });
   }
 
-  function isToday(thread) {
+  function isToday(thread, { start, end }) {
     const recency = Number(thread.recencyEpochMillis || 0);
     if (!Number.isFinite(recency)) return false;
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-    return recency >= startOfToday.getTime() && recency < startOfTomorrow.getTime();
+    return recency >= start && recency < end;
   }
 
   function normalizeThreads(threads) {
-    return Array.isArray(threads) ? threads : [];
+    if (!Array.isArray(threads)) return [];
+    return [...threads].sort((left, right) => {
+      const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
+      return recencyDifference || String(left.id).localeCompare(String(right.id));
+    });
   }
 
   return { derive, filter, loadPreferences, normalizeThreads, savePreferences };

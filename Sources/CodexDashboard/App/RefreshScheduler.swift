@@ -16,7 +16,9 @@ final class RefreshScheduler {
             if fileEventsAvailable { return active ? .seconds(15) : .seconds(60) }
             return active ? .milliseconds(500) : .seconds(1)
         }
-        static let accountUsage: Duration = .seconds(30)
+        static func accountUsage(active: Bool) -> Duration {
+            active ? .seconds(2 * 60) : .seconds(15 * 60)
+        }
         static let inactiveAccountUsage: Duration = .seconds(5 * 60)
     }
 
@@ -84,8 +86,11 @@ final class RefreshScheduler {
             action: updateUnreadState
         )
         accountUsagePollingTask = recurringTask(
-            interval: { Schedule.accountUsage },
-            action: refreshAccountUsage
+            interval: { Self.Schedule.accountUsage(active: Self.isUserActive) },
+            action: {
+                guard Self.isUserActive else { return }
+                await refreshAccountUsage()
+            }
         )
         inactiveAccountUsagePollingTask = recurringTask(
             interval: { Schedule.inactiveAccountUsage },

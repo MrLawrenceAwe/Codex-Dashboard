@@ -68,6 +68,7 @@ extension AppCoordinator {
 
     func refreshAfterActivation() async {
         await synchronizeDashboard()
+        await refreshAccountUsage()
         if !refreshScheduler.hasFileChangeMonitoring {
             await updateWorkingTreeStatuses()
         }

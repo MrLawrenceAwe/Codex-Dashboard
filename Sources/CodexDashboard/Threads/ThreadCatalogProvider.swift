@@ -26,6 +26,7 @@ enum ThreadCatalogError: LocalizedError {
 
 actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     static let defaultLoadedThreadLimit = 500
+    static let maximumRolloutInspectionsPerRefresh = 80
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
         "model", "rollout_path", "archived", "recency_at_ms",
@@ -120,13 +121,13 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let launchMilliseconds = codexLaunchDate.map {
             Int64($0.timeIntervalSince1970 * 1_000)
         }
-        let activityPaths: Set<String> = Set(threads.compactMap { thread -> String? in
+        let activityPaths: Set<String> = Set(threads.lazy.compactMap { thread -> String? in
             guard
                 let launchMilliseconds,
                 thread.recencyAtMilliseconds >= launchMilliseconds
             else { return nil }
             return thread.rolloutPath
-        })
+        }.prefix(Self.maximumRolloutInspectionsPerRefresh))
         rolloutActivityReader.retainCache(for: activityPaths)
         let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
