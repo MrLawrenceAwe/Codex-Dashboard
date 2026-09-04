@@ -20,12 +20,14 @@
     "Threads/task-dashboard-page",
     "Todos/todo-list-state",
     "Todos/todo-list",
+    "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
     "Core/dashboard-host"
   ],
   "stylesheets": [
     "Threads/task-dashboard",
+    "Sidebar/project-highlights",
     "Todos/todo-list",
     "Prompts/prompt-library",
     "Accounts/account-popover"

@@ -189,6 +189,7 @@ const dashboardLifecycle = (() => {
     attachPage();
     hooks.restoreOpenState?.();
     syncContentInset();
+    sidebarProjectHighlights.mount();
     promptLibrary.mount();
     accountPopover.mount();
     if (!structureObserver) {
@@ -213,6 +214,7 @@ const dashboardLifecycle = (() => {
   }
 
   function destroy() {
+    sidebarProjectHighlights.destroy();
     structureObserver?.disconnect();
     sidebarObserver?.disconnect();
     composerObserver?.disconnect();
