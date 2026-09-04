@@ -18,6 +18,7 @@ final class AccountCoordinator: ObservableObject {
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
     private var usageGeneration = 0
+    private var activeAccountIdentifier: String?
 
     init(
         manager: CodexAccountManager,
@@ -41,13 +42,20 @@ final class AccountCoordinator: ObservableObject {
     func refreshState() {
         do {
             let document = try manager.document()
+            let identifier = try manager.activeAccountIdentifier()
             let accounts = document.accounts.sorted {
                 if $0.lastUsedAt == $1.lastUsedAt { return $0.name < $1.name }
                 return $0.lastUsedAt > $1.lastUsedAt
             }
             if savedAccounts != accounts { savedAccounts = accounts }
-            if activeAccountID != document.activeAccountID {
-                activeAccountID = document.activeAccountID
+            let identityChanged = activeAccountIdentifier != identifier
+            let savedAccountChanged = activeAccountID != document.activeAccountID
+            activeAccountIdentifier = identifier
+            if savedAccountChanged { activeAccountID = document.activeAccountID }
+            if identityChanged || savedAccountChanged {
+                usageGeneration += 1
+                usageSession.invalidate()
+                restoreActiveUsageFromCache()
             }
         } catch {
             statusMessage = error.localizedDescription
@@ -57,12 +65,13 @@ final class AccountCoordinator: ObservableObject {
     @discardableResult
     func saveCurrentAccount() -> Bool {
         do {
+            refreshState()
             let existingUsage = activeUsageStatus.snapshot
             let account = try manager.saveCurrentAccount()
             if let existingUsage { usageByAccountID[account.id] = existingUsage }
+            refreshState()
             persistUsageCache(force: true)
             statusMessage = "Saved \(account.name) securely in Keychain."
-            refreshState()
             if let existingUsage { activeUsageStatus = .available(existingUsage) }
             return true
         } catch {
@@ -122,6 +131,7 @@ final class AccountCoordinator: ObservableObject {
 
     func refreshActiveUsage(codexIsRunning: Bool) async {
         guard codexIsRunning else { return }
+        refreshState()
         let generation = usageGeneration
         let accountID = activeAccountID
         let previous = activeUsageStatus.snapshot

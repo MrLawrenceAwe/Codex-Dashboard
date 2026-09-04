@@ -3,6 +3,46 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testEmptyCatalogReturnsEmptySnapshotAfterArchivingAllThreads() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
+        let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        XCTAssertFalse(initial.threads.isEmpty)
+
+        for sql in ["UPDATE threads SET archived = 1;", "DELETE FROM threads;"] {
+            let result = try await Subprocess.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+                arguments: [url.path, sql], timeout: 3
+            )
+            XCTAssertEqual(result.terminationStatus, 0)
+            let catalog = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+            XCTAssertEqual(catalog.threads.count, 0)
+            XCTAssertEqual(catalog.totalThreadCount, 0)
+        }
+    }
+
+    func testRunningThreadSurvivesInspectionAndCatalogLimits() async throws {
+        let now: Int64 = 2_000_000_000
+        let url = try CodexTestFixtures.makeStateDatabase(now: now, additionalThreadCount: 81, testCase: self)
+        let result = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, "UPDATE threads SET recency_at_ms = 2000000000000 WHERE id LIKE 'extra-%';"],
+            timeout: 3
+        )
+        XCTAssertEqual(result.terminationStatus, 0)
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: url, loadedThreadLimit: 25)
+        let bounded = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        XCTAssertEqual(bounded.threads.count, 25)
+
+        // A launch-date change must invalidate the cached query, even without a database write.
+        let catalog = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.runState, .running)
+        let afterRestart = try await provider.loadCatalog(
+            codexLaunchDate: Date(timeIntervalSince1970: TimeInterval(now + 1)), requiredThreadIDs: []
+        )
+        XCTAssertEqual(afterRestart.threads.count, 25)
+    }
+
     func testLiveCatalogWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex thread catalog.")
@@ -100,7 +140,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL,
             loadedThreadLimit: 25
-        ).loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        ).loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
 
         XCTAssertEqual(catalog.threads.count, 25)
         XCTAssertEqual(catalog.totalThreadCount, 63)
@@ -119,13 +159,13 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         )
 
         let bounded = try await provider.loadCatalog(
-            codexLaunchDate: .distantPast,
+            codexLaunchDate: nil,
             requiredThreadIDs: []
         )
         XCTAssertFalse(bounded.threads.contains { $0.id == "idle" })
 
         let includingRequired = try await provider.loadCatalog(
-            codexLaunchDate: .distantPast,
+            codexLaunchDate: nil,
             requiredThreadIDs: ["idle"]
         )
         XCTAssertEqual(includingRequired.threads.count, 26)
