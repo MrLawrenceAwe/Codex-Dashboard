@@ -26,7 +26,6 @@ enum ThreadCatalogError: LocalizedError {
 
 actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     static let defaultLoadedThreadLimit = 500
-    static let maximumRolloutInspectionsPerRefresh = 80
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
         "model", "rollout_path", "archived", "recency_at_ms",
@@ -58,6 +57,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private let loadedThreadLimit: Int
     private var rolloutActivityReader = RolloutActivityReader()
     private var cachedDatabaseSignature: DatabaseSignature?
+    private var cachedLaunchMilliseconds: Int64?
     private var cachedRequiredThreadIDs: Set<String>?
     private var cachedStoredThreads: [StoredThread]?
     private let subprocessTimeout: TimeInterval
@@ -76,6 +76,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         codexLaunchDate: Date?,
         requiredThreadIDs: Set<String>
     ) async throws -> ThreadCatalog {
+        let launchMilliseconds = codexLaunchDate.map {
+            Int64($0.timeIntervalSince1970 * 1_000)
+        }
+        let currentLaunchPredicate = launchMilliseconds.map { "recency_at_ms >= \($0)" } ?? "0"
         let requiredThreadPredicate = requiredThreadIDs.isEmpty
             ? "0"
             : "id IN (\(requiredThreadIDs.sorted().map(Self.sqlStringLiteral).joined(separator: ", ")))"
@@ -103,23 +107,22 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         FROM threads
         WHERE archived = 0
           AND preview <> ''
-          AND (id IN (SELECT id FROM recent_threads) OR \(requiredThreadPredicate))
+          AND (id IN (SELECT id FROM recent_threads) OR \(requiredThreadPredicate) OR \(currentLaunchPredicate))
         ORDER BY recency_at_ms DESC
         """
         let databaseSignature = try signature(for: stateDatabaseURL)
         let threads: [StoredThread]
         if databaseSignature == cachedDatabaseSignature,
            requiredThreadIDs == cachedRequiredThreadIDs,
+           launchMilliseconds == cachedLaunchMilliseconds,
            let cachedStoredThreads {
             threads = cachedStoredThreads
         } else {
             threads = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
             cachedDatabaseSignature = databaseSignature
             cachedRequiredThreadIDs = requiredThreadIDs
+            cachedLaunchMilliseconds = launchMilliseconds
             cachedStoredThreads = threads
-        }
-        let launchMilliseconds = codexLaunchDate.map {
-            Int64($0.timeIntervalSince1970 * 1_000)
         }
         let activityPaths: Set<String> = Set(threads.lazy.compactMap { thread -> String? in
             guard
@@ -127,7 +130,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 thread.recencyAtMilliseconds >= launchMilliseconds
             else { return nil }
             return thread.rolloutPath
-        }.prefix(Self.maximumRolloutInspectionsPerRefresh))
+        })
         rolloutActivityReader.retainCache(for: activityPaths)
         let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
@@ -186,7 +189,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         return FileSignature(size: size, modifiedAt: modifiedAt)
     }
 
-    private func query<T: Decodable>(databaseURL: URL, sql: String) async throws -> T {
+    private func query(databaseURL: URL, sql: String) async throws -> [StoredThread] {
         do {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
@@ -200,8 +203,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                     ?? "sqlite3 exited with status \(result.terminationStatus)"
                 throw ThreadCatalogError.queryFailed(databaseURL, detail)
             }
+            if result.standardOutput.isEmpty { return [] }
             do {
-                return try JSONDecoder().decode(T.self, from: result.standardOutput)
+                return try JSONDecoder().decode([StoredThread].self, from: result.standardOutput)
             } catch {
                 throw ThreadCatalogError.invalidResponse(databaseURL)
             }

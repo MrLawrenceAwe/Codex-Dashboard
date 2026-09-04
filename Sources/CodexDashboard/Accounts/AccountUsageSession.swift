@@ -8,6 +8,7 @@ final class AccountUsageSession {
     private var activeUsageTaskID: UUID?
     private var savedAccountUsageTask: Task<SavedAccountUsageResult, Error>?
     private var savedAccountUsageTaskID: UUID?
+    private var resetTask: Task<Void, Never>?
     private var lastCacheSaveAt: Date?
 
     init(provider: any AccountUsageProviding, cache: any UsageCaching) {
@@ -24,7 +25,12 @@ final class AccountUsageSession {
             return try await activeUsageTask.value
         }
         let taskID = UUID()
-        let task = Task { try await provider.usage() }
+        let resetTask = resetTask
+        let task = Task {
+            await resetTask?.value
+            try Task.checkCancellation()
+            return try await provider.usage()
+        }
         activeUsageTask = task
         activeUsageTaskID = taskID
         defer {
@@ -39,7 +45,12 @@ final class AccountUsageSession {
     func fetchUsage(using credential: Data) async throws -> SavedAccountUsageResult? {
         guard savedAccountUsageTask == nil else { return nil }
         let taskID = UUID()
-        let task = Task { try await provider.usage(using: credential) }
+        let resetTask = resetTask
+        let task = Task {
+            await resetTask?.value
+            try Task.checkCancellation()
+            return try await provider.usage(using: credential)
+        }
         savedAccountUsageTask = task
         savedAccountUsageTaskID = taskID
         defer {
@@ -51,14 +62,23 @@ final class AccountUsageSession {
         return try await task.value
     }
 
-    func reset() async {
+    func invalidate() {
         activeUsageTask?.cancel()
         activeUsageTask = nil
         activeUsageTaskID = nil
         savedAccountUsageTask?.cancel()
         savedAccountUsageTask = nil
         savedAccountUsageTaskID = nil
-        await provider.reset()
+        let previousReset = resetTask
+        resetTask = Task {
+            await previousReset?.value
+            await provider.reset()
+        }
+    }
+
+    func reset() async {
+        invalidate()
+        await resetTask?.value
     }
 
     func saveCache(

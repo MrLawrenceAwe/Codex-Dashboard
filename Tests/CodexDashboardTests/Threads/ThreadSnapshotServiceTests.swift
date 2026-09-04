@@ -63,7 +63,7 @@ private actor CountingWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         policy: WorkingTreeStatusRefreshPolicy
     ) -> [String: WorkingTreeStatus] {
         requests += 1
-        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .hasChanges) })
+        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, requests == 1 ? .hasChanges : .clean) })
     }
 
     func requestCount() -> Int { requests }
@@ -156,7 +156,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
     }
 
-    func testEventDrivenWorkingTreeRefreshesAreThrottledPerProject() async {
+    func testRapidEventDrivenWorkingTreeRefreshPublishesFinalCleanStatus() async {
         let statusProvider = CountingWorkingTreeStatusProvider()
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
@@ -171,8 +171,8 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let requestCount = await statusProvider.requestCount()
 
         XCTAssertEqual(initial?["/tmp/project"], .hasChanges)
-        XCTAssertNil(repeated)
-        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(repeated?["/tmp/project"], .clean)
+        XCTAssertEqual(requestCount, 2)
     }
 
     func testUnreadFailureKeepsCatalogAvailableAndReportsWarning() async throws {
