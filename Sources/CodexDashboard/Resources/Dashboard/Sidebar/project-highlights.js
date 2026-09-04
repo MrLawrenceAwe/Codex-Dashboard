@@ -1,7 +1,7 @@
 const sidebarProjectHighlights = (() => {
   const key = 'codex-dashboard.sidebar-project-highlights';
   const selector = 'aside [data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
-  const palette = { Yellow: '#d6b64c', Green: '#69b883', Blue: '#719fe8', Purple: '#ae87d9', Pink: '#d781af', Orange: '#d89459' };
+  const palette = { Yellow: '#d6b64c', Green: '#69b883', Blue: '#719fe8', Purple: '#ae87d9', Pink: '#d781af', Red: '#dc6b6b', Orange: '#d89459' };
   let colours = new Map();
   let observer;
   let frame;
