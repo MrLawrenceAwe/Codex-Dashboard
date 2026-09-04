@@ -119,13 +119,13 @@ extension PromptLibraryWebTests {
                 viewToggle.textContent = 'Select model';
                 viewToggle.addEventListener('click', () => showView('advanced'));
                 compact.append(viewToggle);
-                ['5.6 Sol', '5.6 Terra', '5.6 Luna'].forEach((label) => {
+                ['GPT-6 Astra', 'GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna'].forEach((label) => {
                   const option = document.createElement('div');
                   option.setAttribute('role', 'menuitemradio');
                   const name = document.createElement('span');
                   name.textContent = label;
                   option.append(name, ' Model description');
-                  if (\(locked) && label === '5.6 Luna') {
+                  if (\(locked) && label === 'GPT-5.6 Luna') {
                     const description = document.createElement('span');
                     description.id = 'locked-model-description';
                     description.textContent = 'Locked, opens access options';
@@ -269,12 +269,12 @@ extension PromptLibraryWebTests {
             values["preset"] as? [String: String],
             ["model": "gpt-5.6-luna", "reasoningEffort": "light", "speed": "fast"]
         )
-        XCTAssertEqual(values["summary"] as? [String], ["5.6 Luna", "Light", "Fast"])
+        XCTAssertEqual(values["summary"] as? [String], ["GPT-5.6 Luna", "Light", "Fast"])
         XCTAssertEqual(values["usesPresetByDefault"] as? Bool, false)
         XCTAssertEqual(values["usesPresetAfterToggle"] as? Bool, true)
         XCTAssertEqual(
             values["applied"] as? [String],
-            ["Model:5.6 Luna", "Effort:Light", "Speed:Fast"]
+            ["Model:GPT-5.6 Luna", "Effort:Light", "Speed:Fast"]
         )
         XCTAssertEqual(values["promptDialogStates"] as? [Bool], [false, false, false])
         XCTAssertEqual(values["triggerDialogStates"] as? [Bool], [false])
