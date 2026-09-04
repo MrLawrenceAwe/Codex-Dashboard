@@ -85,9 +85,11 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-item.is-completed .todo-title { color: var(--todo-dim); text-decoration: line-through; }
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 28px; height: 28px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
 #codex-dashboard-todo-page .todo-item:hover .todo-delete,
-#codex-dashboard-todo-page .todo-delete:focus-visible { opacity: 1; }
+#codex-dashboard-todo-page .todo-delete:focus-visible,
+#codex-dashboard-todo-page .todo-delete[data-todo-delete-confirm] { opacity: 1; }
 #codex-dashboard-todo-page .todo-delete:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-delete svg { width: 14px; height: 14px; }
+#codex-dashboard-todo-page .todo-delete[data-todo-delete-confirm] { width: auto; padding: 0 8px; color: var(--todo-text); font-size: 11px; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-empty { display: grid; min-height: 200px; place-items: center; align-content: center; gap: 6px; color: var(--todo-dim); font-size: 12px; text-align: center; }
 #codex-dashboard-todo-page .todo-empty strong { color: var(--todo-muted); font-size: 13px; font-weight: 580; }
 
