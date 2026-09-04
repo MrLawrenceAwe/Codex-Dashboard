@@ -189,7 +189,7 @@ const dashboardLifecycle = (() => {
     attachPage();
     hooks.restoreOpenState?.();
     syncContentInset();
-    sidebarProjectHighlights.mount();
+    sidebarProjectHighlights.start();
     promptLibrary.mount();
     accountPopover.mount();
     if (!structureObserver) {
