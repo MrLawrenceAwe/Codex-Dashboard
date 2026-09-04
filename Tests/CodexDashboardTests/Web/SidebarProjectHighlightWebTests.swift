@@ -81,7 +81,7 @@ final class SidebarProjectHighlightWebTests: SerializedDashboardWebTestCase {
 
     func testKeyboardOpensPickerAndEscapeDismissesWithoutTogglingProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
-        <html><body><aside><button>New chat</button>
+        <html><body><aside role="navigation"><button>New chat</button>
           <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="first"
             data-app-action-sidebar-project-label="Project" aria-expanded="false">
             <span data-marquee-text>Project</span>
@@ -105,5 +105,35 @@ final class SidebarProjectHighlightWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? Bool
         XCTAssertEqual(closed, true)
+        let ariaExpanded = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-codex-project-colour]').getAttribute('aria-expanded')"
+        ) as? String
+        XCTAssertEqual(ariaExpanded, "false")
+    }
+
+    func testHighlightsRebindWhenCodexReplacesTheSidebar() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <html><body><aside role="navigation"><button>New chat</button>
+          <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project"
+            data-app-action-sidebar-project-label="Project"><span data-marquee-text>Project</span></div>
+        </aside><main></main></body></html>
+        """, clearLocalStorage: true)
+        _ = try await webView.evaluateJavaScript("""
+        document.querySelector('[data-codex-project-colour]').click();
+        document.querySelector('[data-colour="Green"]').click();
+        document.querySelector('aside').outerHTML = `<aside role="navigation"><button>New chat</button>
+          <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project"
+            data-app-action-sidebar-project-label="Project"><span data-marquee-text>Project</span></div>
+        </aside>`;
+        """)
+        _ = try await webView.evaluateJavaScript(InjectionBundle.load().mountExpression)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-codex-project-colour]')?.getAttribute('aria-expanded') === 'false'",
+            in: webView
+        )
+        let colour = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-marquee-text]').style.getPropertyValue('--codex-project-highlight')"
+        ) as? String
+        XCTAssertEqual(colour, "#69b883")
     }
 }
