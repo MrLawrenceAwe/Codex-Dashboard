@@ -6,7 +6,7 @@ enum PromptLibrarySchema {
     static let defaultModel = "gpt-5.6-sol"
     static let defaultReasoningEffort = "medium"
     static let defaultSpeed = "standard"
-    static let reasoningEfforts = ["light", "medium", "high", "xhigh"]
+    static let reasoningEfforts = ["light", "medium", "high", "xhigh", "max", "ultra"]
     static let speeds = ["standard", "fast"]
 
     static var javascriptDeclaration: String {

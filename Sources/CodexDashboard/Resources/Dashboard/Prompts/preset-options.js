@@ -12,6 +12,8 @@ const presetOptions = (() => {
     medium: 'Medium',
     high: 'High',
     xhigh: 'Extra High',
+    max: 'Max',
+    ultra: 'Ultra',
     standard: 'Standard',
     fast: 'Fast',
   };

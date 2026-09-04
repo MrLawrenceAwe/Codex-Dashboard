@@ -53,6 +53,18 @@ extension PromptLibraryWebTests {
     }
 
     func testPromptPresetIsStoredDisplayedAndAppliedBeforeInsertion() async throws {
+        try await checkPresetApplication(speedFlyout: false)
+    }
+
+    func testPromptPresetUsesAssociatedSpeedFlyout() async throws {
+        try await checkPresetApplication(speedFlyout: true)
+    }
+
+    func testLockedModelDoesNotOpenAccessOptionsOrInsertPrompt() async throws {
+        try await checkPresetApplication(speedFlyout: false, locked: true)
+    }
+
+    private func checkPresetApplication(speedFlyout: Bool, locked: Bool = false) async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
@@ -61,16 +73,12 @@ extension PromptLibraryWebTests {
               const trigger = document.createElement('button');
               trigger.dataset.codexIntelligenceTrigger = 'true';
               trigger.setAttribute('aria-expanded', 'false');
+              trigger.dataset.selectedReasoningEffort = 'medium';
               trigger.textContent = 'Current model';
               shell.append(trigger);
               const applied = [];
               const promptDialogStates = [];
               const triggerDialogStates = [];
-              const optionSets = {
-                Model: ['5.6 Sol', '5.6 Terra', '5.6 Luna'],
-                Effort: ['Light', 'Medium', 'High', 'Extra High'],
-                Speed: ['Standard', 'Fast'],
-              };
               const removeMenus = () => {
                 document.querySelectorAll('[role="menu"]').forEach((menu) => menu.remove());
                 trigger.setAttribute('aria-expanded', 'false');
@@ -87,40 +95,102 @@ extension PromptLibraryWebTests {
                 trigger.setAttribute('aria-expanded', 'true');
                 const menu = document.createElement('div');
                 menu.setAttribute('role', 'menu');
+                menu.dataset.modelPickerView = 'simple';
+                const compact = document.createElement('div');
+                const models = document.createElement('div');
+                models.inert = true;
+                models.setAttribute('aria-hidden', 'true');
+                const showView = (view) => {
+                  menu.dataset.modelPickerView = view;
+                  compact.inert = view !== 'simple';
+                  models.inert = view !== 'advanced';
+                  compact.setAttribute('aria-hidden', String(compact.inert));
+                  models.setAttribute('aria-hidden', String(models.inert));
+                };
+                const record = (value) => {
+                  applied.push(value);
+                  promptDialogStates.push(Boolean(document.getElementById(
+                    'codex-dashboard-prompt-library-dialog'
+                  )));
+                };
                 const viewToggle = document.createElement('div');
                 viewToggle.dataset.modelPickerViewToggle = 'true';
                 viewToggle.setAttribute('role', 'menuitem');
-                menu.append(viewToggle);
-                Object.entries(optionSets).forEach(([kind, labels]) => {
-                  const item = document.createElement('div');
-                  item.setAttribute('role', 'menuitem');
-                  item.setAttribute('aria-label', `${kind} Current`);
-                  item.setAttribute('aria-expanded', 'false');
-                  item.addEventListener('pointermove', () => {
-                    document.querySelectorAll('[data-test-preset-submenu]').forEach((node) => node.remove());
-                    item.setAttribute('aria-expanded', 'true');
+                viewToggle.textContent = 'Select model';
+                viewToggle.addEventListener('click', () => showView('advanced'));
+                compact.append(viewToggle);
+                ['5.6 Sol', '5.6 Terra', '5.6 Luna'].forEach((label) => {
+                  const option = document.createElement('div');
+                  option.setAttribute('role', 'menuitemradio');
+                  const name = document.createElement('span');
+                  name.textContent = label;
+                  option.append(name, ' Model description');
+                  if (\(locked) && label === '5.6 Luna') {
+                    const description = document.createElement('span');
+                    description.id = 'locked-model-description';
+                    description.textContent = 'Locked, opens access options';
+                    menu.append(description);
+                    option.setAttribute('aria-describedby', description.id);
+                  }
+                  option.addEventListener('click', () => {
+                    record(`Model:${label}`);
+                    showView('simple');
+                  });
+                  models.append(option);
+                });
+                const slider = document.createElement('div');
+                slider.dataset.reasoningSlider = 'true';
+                slider.setAttribute('role', 'menuitem');
+                slider.textContent = 'Power';
+                slider.addEventListener('keydown', (event) => {
+                  if (event.key !== 'ArrowLeft') return;
+                  setTimeout(() => {
+                    trigger.dataset.selectedReasoningEffort = 'low';
+                    record('Effort:Light');
+                  }, 50);
+                });
+                const speed = document.createElement('div');
+                speed.setAttribute('role', 'menuitemcheckbox');
+                speed.setAttribute('aria-label', 'Enable fast mode');
+                speed.setAttribute('aria-checked', 'false');
+                speed.textContent = 'Fast mode';
+                speed.addEventListener('click', () => {
+                  speed.setAttribute('aria-checked', 'true');
+                  speed.setAttribute('aria-label', 'Enable standard mode');
+                  record('Speed:Fast');
+                });
+                compact.append(slider, speed);
+                if (\(speedFlyout)) {
+                  speed.remove();
+                  const flyout = document.createElement('div');
+                  flyout.setAttribute('role', 'menuitem');
+                  flyout.setAttribute('aria-label', 'Speed Standard');
+                  flyout.setAttribute('aria-controls', 'speed-options');
+                  flyout.textContent = 'Speed';
+                  flyout.addEventListener('pointermove', () => {
                     const submenu = document.createElement('div');
+                    submenu.id = 'speed-options';
                     submenu.setAttribute('role', 'menu');
-                    submenu.dataset.testPresetSubmenu = kind;
-                    labels.forEach((label) => {
+                    ['Fastest', 'Fast'].forEach((label) => {
                       const option = document.createElement('div');
-                      option.setAttribute('role', 'menuitemradio');
-                      option.textContent = label;
-                      option.addEventListener('click', () => {
-                        applied.push(`${kind}:${label}`);
-                        promptDialogStates.push(Boolean(document.getElementById(
-                          'codex-dashboard-prompt-library-dialog'
-                        )));
-                        viewToggle.remove();
-                        menu.style.display = 'none';
-                        setTimeout(() => { menu.style.display = ''; }, 75);
-                      });
+                      option.setAttribute('role', 'menuitem');
+                      const name = document.createElement('div');
+                      name.textContent = label;
+                      option.append(name, ' More usage');
+                      option.addEventListener('click', () => record(`Speed:${label}`));
                       submenu.append(option);
                     });
                     document.body.append(submenu);
+                    // An unrelated portal must not be mistaken for the speed flyout.
+                    const unrelated = document.createElement('div');
+                    unrelated.setAttribute('role', 'menu');
+                    unrelated.textContent = 'Unrelated menu';
+                    document.body.append(unrelated);
+                    flyout.setAttribute('aria-expanded', 'true');
                   });
-                  menu.append(item);
-                });
+                  compact.append(flyout);
+                }
+                menu.append(compact, models);
                 document.body.append(menu);
               });
 
@@ -151,6 +221,7 @@ extension PromptLibraryWebTests {
               const deadline = performance.now() + 4000;
               while (document.querySelector('textarea').value !== 'Review this change'
                 && performance.now() < deadline) {
+                if (document.querySelector('[data-prompt-storage-error]:not([hidden])')) break;
                 await new Promise((resolve) => setTimeout(resolve, 20));
               }
               window.__promptPresetTestResult = {
@@ -180,6 +251,13 @@ extension PromptLibraryWebTests {
         ) as? String
         let values = try decodeJSONObject(try XCTUnwrap(result))
         let presetDefaults = try XCTUnwrap(values["presetDefaults"] as? [String: Any])
+
+        if locked {
+            XCTAssertEqual(values["applied"] as? [String], [])
+            XCTAssertEqual(values["content"] as? String, "")
+            XCTAssertEqual(values["dialogClosed"] as? Bool, false)
+            return
+        }
 
         XCTAssertEqual(values["version"] as? Int, 3)
         XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-5.6-sol")
