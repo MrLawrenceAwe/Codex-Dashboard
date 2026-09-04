@@ -4,8 +4,7 @@ import Foundation
 
 private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
     private let projectPaths: Set<String>
-    private let standardizedProjectPathByPath: [String: String]
-    private let canonicalProjectPathByPath: [String: String]
+    private let projectPathsByObservedRoot: [String: Set<String>]
     private let action: @MainActor @Sendable (Set<String>) async -> Void
     private var stream: FSEventStreamRef?
 
@@ -14,12 +13,12 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         action: @escaping @MainActor @Sendable (Set<String>) async -> Void
     ) {
         self.projectPaths = projectPaths
-        standardizedProjectPathByPath = Dictionary(uniqueKeysWithValues: projectPaths.map {
-            ($0, Self.standardizedPath($0))
-        })
-        canonicalProjectPathByPath = Dictionary(uniqueKeysWithValues: projectPaths.map {
-            ($0, Self.canonicalPath($0))
-        })
+        var pathsByObservedRoot: [String: Set<String>] = [:]
+        for projectPath in projectPaths {
+            pathsByObservedRoot[Self.standardizedPath(projectPath), default: []].insert(projectPath)
+            pathsByObservedRoot[Self.canonicalPath(projectPath), default: []].insert(projectPath)
+        }
+        projectPathsByObservedRoot = pathsByObservedRoot
         self.action = action
     }
 
@@ -78,15 +77,11 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
     deinit { stop() }
 
     private func notifyChanges(at changedPaths: [String]) {
-        let standardizedChangedPaths = changedPaths.map(Self.standardizedPath)
-        let affectedProjectPaths = Set(projectPaths.filter { projectPath in
-            let canonicalProjectPath = canonicalProjectPathByPath[projectPath] ?? projectPath
-            let standardizedProjectPath = standardizedProjectPathByPath[projectPath] ?? projectPath
-            return standardizedChangedPaths.contains { changedPath in
-                Self.contains(changedPath, in: standardizedProjectPath)
-                    || Self.contains(changedPath, in: canonicalProjectPath)
-            }
-        })
+        var affectedProjectPaths: Set<String> = []
+        for changedPath in changedPaths {
+            affectedProjectPaths.formUnion(projectPaths(containing: Self.standardizedPath(changedPath)))
+            affectedProjectPaths.formUnion(projectPaths(containing: Self.canonicalPath(changedPath)))
+        }
         guard !affectedProjectPaths.isEmpty else { return }
         let action = action
         Task { @MainActor in await action(affectedProjectPaths) }
@@ -100,9 +95,15 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
-    private static func contains(_ changedPath: String, in projectPath: String) -> Bool {
-        changedPath == projectPath
-            || changedPath.hasPrefix(projectPath.hasSuffix("/") ? projectPath : projectPath + "/")
+    private func projectPaths(containing changedPath: String) -> Set<String> {
+        var candidate = changedPath
+        var matches: Set<String> = []
+        while true {
+            matches.formUnion(projectPathsByObservedRoot[candidate] ?? [])
+            let parent = URL(fileURLWithPath: candidate).deletingLastPathComponent().path
+            guard parent != candidate else { return matches }
+            candidate = parent
+        }
     }
 }
 

@@ -7,6 +7,7 @@ let visibleLimit = pageSize;
 const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
 let unreadSyncTimer;
 let renderFrame;
+let renderFallbackTimer;
 let unreadMonitoringStarted = false;
 let dashboardIsOpen = false;
 let viewNeedsRender = true;
@@ -138,6 +139,7 @@ async function openCommitOrPushForProject(projectPath) {
 }
 
 function renderDashboard() {
+  cancelScheduledRender();
   const state = deriveViewState();
   const rendered = taskDashboardView.render({
     threads,
@@ -153,12 +155,29 @@ function renderDashboard() {
   if (rendered) viewNeedsRender = false;
 }
 
+function cancelScheduledRender() {
+  if (renderFrame !== undefined) cancelAnimationFrame(renderFrame);
+  if (renderFallbackTimer !== undefined) clearTimeout(renderFallbackTimer);
+  renderFrame = undefined;
+  renderFallbackTimer = undefined;
+}
+
 function scheduleRender() {
   if (renderFrame !== undefined) return;
   renderFrame = requestAnimationFrame(() => {
     renderFrame = undefined;
     renderDashboard();
   });
+  // WebKit may heavily throttle animation frames for an occluded renderer.
+  // Keep state updates timely there without affecting the normal visible-frame
+  // path, which remains coalesced through requestAnimationFrame.
+  renderFallbackTimer = window.setTimeout(() => {
+    if (renderFrame === undefined) return;
+    cancelAnimationFrame(renderFrame);
+    renderFrame = undefined;
+    renderFallbackTimer = undefined;
+    renderDashboard();
+  }, 100);
 }
 
 function requestRender() {
@@ -321,8 +340,16 @@ function applyThreads(nextThreads) {
   });
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
-  if (dashboardIsOpen) renderDashboard();
-  else requestRender();
+  // A native refresh can update the catalog, unread state, and Git state in a
+  // short burst. Keep the renderer responsive by applying only the latest
+  // snapshot in the next frame instead of rebuilding the task list for each
+  // delivery.
+  if (dashboardIsOpen) {
+    viewNeedsRender = true;
+    scheduleRender();
+  } else {
+    requestRender();
+  }
   return true;
 }
 
@@ -360,10 +387,9 @@ function ensureMounted() {
 
 function destroy() {
   dashboardIsOpen = false;
-  if (renderFrame !== undefined) cancelAnimationFrame(renderFrame);
+  cancelScheduledRender();
   if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
   if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
-  renderFrame = undefined;
   unreadSyncTimer = undefined;
   completedTickTimer = undefined;
   completedTickExpiryByThreadID.clear();
