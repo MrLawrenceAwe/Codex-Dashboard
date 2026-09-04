@@ -11,6 +11,9 @@ let unreadMonitoringStarted = false;
 let dashboardIsOpen = false;
 let viewNeedsRender = true;
 let unreadThreadIDs = new Set();
+const completedTickDuration = 60_000;
+const completedTickExpiryByThreadID = new Map();
+let completedTickTimer;
 let commitOrPushError = '';
 
 function savePreferences() {
@@ -23,14 +26,57 @@ function savePreferences() {
 
 function syncUnreadFromSidebar() {
   const readStates = codexHost.threadReadStates();
-  let changed = false;
+  const nextUnreadThreadIDs = new Set(unreadThreadIDs);
   readStates.forEach((isUnread, id) => {
-    if (isUnread === unreadThreadIDs.has(id)) return;
-    changed = true;
-    if (isUnread) unreadThreadIDs.add(id);
-    else unreadThreadIDs.delete(id);
+    if (isUnread) nextUnreadThreadIDs.add(id);
+    else nextUnreadThreadIDs.delete(id);
   });
+  return updateUnreadThreadIDs(nextUnreadThreadIDs);
+}
+
+function updateUnreadThreadIDs(nextUnreadThreadIDs) {
+  let changed = false;
+  unreadThreadIDs.forEach((threadID) => {
+    if (nextUnreadThreadIDs.has(threadID)) return;
+    changed = true;
+    const thread = threads.find((item) => item.id === threadID);
+    if (thread?.latestLifecycleEventKind === 'completed') {
+      completedTickExpiryByThreadID.set(threadID, Date.now() + completedTickDuration);
+    }
+  });
+  nextUnreadThreadIDs.forEach((threadID) => {
+    if (!unreadThreadIDs.has(threadID)) changed = true;
+    completedTickExpiryByThreadID.delete(threadID);
+  });
+  unreadThreadIDs = nextUnreadThreadIDs;
+  scheduleCompletedTickExpiry();
   return changed;
+}
+
+function isCompletionTickVisible(thread) {
+  if (thread.latestLifecycleEventKind !== 'completed') return false;
+  if (isThreadUnread(thread)) return true;
+  const expiry = completedTickExpiryByThreadID.get(thread.id);
+  if (!expiry) return false;
+  if (expiry > Date.now()) return true;
+  completedTickExpiryByThreadID.delete(thread.id);
+  scheduleCompletedTickExpiry();
+  return false;
+}
+
+function scheduleCompletedTickExpiry() {
+  if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
+  const now = Date.now();
+  const expiries = [...completedTickExpiryByThreadID.values()].filter((expiry) => expiry > now);
+  if (!expiries.length) {
+    completedTickTimer = undefined;
+    return;
+  }
+  completedTickTimer = window.setTimeout(() => {
+    completedTickTimer = undefined;
+    requestRender();
+    scheduleCompletedTickExpiry();
+  }, Math.min(...expiries) - now);
 }
 
 function refreshUnreadFromSidebar() {
@@ -101,6 +147,7 @@ function renderDashboard() {
     ignoredProjectPaths,
     commitOrPushError,
     isThreadUnread,
+    isCompletionTickVisible,
     state,
   });
   if (rendered) viewNeedsRender = false;
@@ -265,12 +312,17 @@ function anyPageIsOpen() {
 
 function applyThreads(nextThreads) {
   threads = taskDashboardState.normalizeThreads(nextThreads);
-  unreadThreadIDs = new Set(
+  updateUnreadThreadIDs(new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
-  );
+  ));
+  const currentThreadIDs = new Set(threads.map((thread) => thread.id));
+  completedTickExpiryByThreadID.forEach((_, threadID) => {
+    if (!currentThreadIDs.has(threadID)) completedTickExpiryByThreadID.delete(threadID);
+  });
   syncUnreadFromSidebar();
   scheduleUnreadSync(1500);
-  requestRender();
+  if (dashboardIsOpen) renderDashboard();
+  else requestRender();
   return true;
 }
 
@@ -310,8 +362,11 @@ function destroy() {
   dashboardIsOpen = false;
   if (renderFrame !== undefined) cancelAnimationFrame(renderFrame);
   if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
+  if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
   renderFrame = undefined;
   unreadSyncTimer = undefined;
+  completedTickTimer = undefined;
+  completedTickExpiryByThreadID.clear();
   unreadMonitoringStarted = false;
   viewNeedsRender = true;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
