@@ -219,8 +219,16 @@ final class CodexAccountManager: @unchecked Sendable {
             do {
                 try vault.deleteCredential(for: accountID)
             } catch {
-                try? documentStore.save(previousDocument)
-                throw error
+                let deletionError = error
+                do {
+                    try documentStore.save(previousDocument)
+                } catch {
+                    throw CodexAccountError.recoveryFailed(
+                        "Deleting the Keychain credential failed: \(deletionError.localizedDescription) "
+                            + "Restoring the saved account list also failed: \(error.localizedDescription)"
+                    )
+                }
+                throw deletionError
             }
         }
     }

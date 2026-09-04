@@ -191,9 +191,7 @@ final class AccountCoordinator: ObservableObject {
             let credential = try interactionAllowed
                 ? manager.savedCredentialAllowingUserInteraction(for: accountID)
                 : manager.savedCredentialWithoutUserInteraction(for: accountID)
-            guard let result = try await usageSession.fetchUsage(using: credential) else {
-                return .completed
-            }
+            let result = try await usageSession.fetchUsage(using: credential, for: accountID)
             guard !Task.isCancelled,
                   generation == usageGeneration,
                   accountID != activeAccountID,
