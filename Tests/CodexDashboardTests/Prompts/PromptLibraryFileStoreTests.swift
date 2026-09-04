@@ -4,6 +4,21 @@ import XCTest
 @testable import CodexDashboard
 
 final class PromptLibraryFileStoreTests: XCTestCase {
+    func testMaxAndUltraEffortsPersistWithoutChangingSavedIdentifiers() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("prompt-efforts-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(
+            documentURL: directory.appendingPathComponent("prompt-library.json")
+        )
+        for effort in ["max", "ultra"] {
+            let document = library(model: "gpt-5.6-sol", reasoningEffort: effort)
+            XCTAssertTrue(document.isValid)
+            XCTAssertTrue(try store.save(document))
+            XCTAssertEqual(try store.load(), document)
+        }
+    }
+
     func testPersistsUnknownModelIdentifiersAndCreatesBackup() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("prompt-store-\(UUID().uuidString)", isDirectory: true)
