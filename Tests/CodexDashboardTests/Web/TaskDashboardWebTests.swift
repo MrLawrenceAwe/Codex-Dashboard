@@ -61,6 +61,40 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(retained, true)
     }
 
+    func testOpenDashboardCoalescesSnapshotBurstToLatestTaskList() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let now = Int64(Date.now.timeIntervalSince1970 * 1_000)
+        let initial = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "initial", title: "Initial task", recencyEpochMillis: now),
+        ])
+        let latest = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "latest", title: "Latest task", recencyEpochMillis: now),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.open();
+              const list = document.querySelector('[data-thread-list]');
+              window.__taskListRenderCount = 0;
+              new MutationObserver(() => { window.__taskListRenderCount += 1; })
+                .observe(list, { childList: true });
+              window.__codexDashboard.applyThreads((\(initial)).threads);
+              window.__codexDashboard.applyThreads((\(latest)).threads);
+            })()
+            """
+        )
+
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-thread-id=\"latest\"]') !== null",
+            in: webView
+        )
+        let renderCount = try await webView.evaluateJavaScript(
+            "window.__taskListRenderCount"
+        ) as? Int
+        XCTAssertEqual(renderCount, 1)
+    }
+
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
@@ -290,7 +324,10 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(30))
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-thread-id=\"completed\"] .dashboard-completed-status'))",
+            in: webView
+        )
         let afterReadResult = try await webView.evaluateJavaScript(
             """
             Boolean(document.querySelector('[data-thread-id="completed"] .dashboard-completed-status'))
@@ -311,7 +348,10 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(30))
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-thread-id=\"completed\"] .dashboard-open-affordance'))",
+            in: webView
+        )
         let expiryResult = try await webView.evaluateJavaScript(
             """
             (() => {

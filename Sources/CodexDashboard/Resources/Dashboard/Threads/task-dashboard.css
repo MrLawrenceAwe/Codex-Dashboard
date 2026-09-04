@@ -95,7 +95,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-notice { margin-top: 16px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 30%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--dashboard-amber) 8%, transparent); color: var(--dashboard-muted); font-size: 11px; }
 #codex-dashboard-page .dashboard-notice[hidden] { display: none; }
 
-#codex-dashboard-page .dashboard-section-header { position: sticky; z-index: 4; top: -1px; margin: 18px 0 0; padding: 10px 0 13px; border-top: 1px solid var(--dashboard-line); background: color-mix(in srgb, var(--dashboard-bg) 92%, transparent); backdrop-filter: blur(14px); }
+#codex-dashboard-page .dashboard-section-header { position: sticky; z-index: 4; top: -1px; margin: 18px 0 0; padding: 10px 0 13px; border-top: 1px solid var(--dashboard-line); background: var(--dashboard-bg); }
 #codex-dashboard-page .dashboard-toolbar { display: flex; align-items: end; }
 #codex-dashboard-page .dashboard-toolbar-group { display: grid; gap: 6px; }
 #codex-dashboard-page .dashboard-control-label { padding-left: 2px; color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
