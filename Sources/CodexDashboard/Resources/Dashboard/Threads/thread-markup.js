@@ -25,9 +25,14 @@ const threadMarkup = (() => {
     return `${Math.floor(hours / 24)}d ago`;
   }
 
-  function thread(thread, { showProject = false, isUnread = false, compact = false } = {}) {
+  function thread(thread, {
+    showProject = false,
+    isUnread = false,
+    isCompletionTickVisible = () => false,
+    compact = false,
+  } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open thread: ${thread.title}`;
-    const isCompleted = thread.latestLifecycleEventKind === 'completed';
+    const isCompleted = isCompletionTickVisible(thread);
     const statusMarkup = thread.runState === 'running'
       ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${icon('arrow')}</span>`
       : isCompleted
@@ -65,12 +70,14 @@ const threadMarkup = (() => {
     collapsedProjects,
     ignoredProjectPaths,
     isUnread,
+    isCompletionTickVisible,
   }) {
     if (filterMode === 'today') {
       return visibleThreads.map((item) => thread(item, {
         compact: true,
         showProject: true,
         isUnread: isUnread(item),
+        isCompletionTickVisible,
       })).join('');
     }
     if (filterMode === 'changedProjects') {
@@ -146,7 +153,7 @@ const threadMarkup = (() => {
             ${hasChanges && !isIgnored ? `<button type="button" class="dashboard-project-commit" data-project-commit="${dashboardElements.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${icon('gitChanges')}<span>Commit or push</span></button>` : ''}
           </span>
         </header>
-        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item) })).join('')}</div>
+        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>
       </section>`;
     }).join('');
   }

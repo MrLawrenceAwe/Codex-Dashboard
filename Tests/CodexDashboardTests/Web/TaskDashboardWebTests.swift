@@ -257,6 +257,82 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], [true, false, "Completed"])
     }
 
+    func testCompletedTickExpiresOneMinuteAfterThreadIsRead() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let unreadPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "completed",
+                title: "Finished work",
+                recencyEpochMillis: Int64(Date.now.timeIntervalSince1970 * 1_000),
+                isUnread: true,
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: .now)
+            ),
+        ])
+
+        let initialResult = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const completed = (\(unreadPayload)).threads[0];
+              window.__codexDashboard.applyThreads([completed]);
+              window.__codexDashboard.open();
+              const row = () => document.querySelector('[data-thread-id="completed"]');
+              return Boolean(row().querySelector('.dashboard-completed-status'));
+            })()
+            """
+        ) as? Bool
+        XCTAssertEqual(initialResult, true)
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const completed = (\(unreadPayload)).threads[0];
+              window.__codexDashboard.applyThreads([{ ...completed, isUnread: false }]);
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        let afterReadResult = try await webView.evaluateJavaScript(
+            """
+            Boolean(document.querySelector('[data-thread-id="completed"] .dashboard-completed-status'))
+            """
+        ) as? Bool
+        XCTAssertEqual(afterReadResult, true)
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const completed = (\(unreadPayload)).threads[0];
+              window.__codexDashboard.testRealDateNow = Date.now;
+              Object.defineProperty(Date, 'now', {
+                configurable: true,
+                value: () => window.__codexDashboard.testRealDateNow() + 60_001,
+              });
+              window.__codexDashboard.applyThreads([{ ...completed, isUnread: false }]);
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        let expiryResult = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-thread-id="completed"]');
+              const result = [
+                Boolean(row.querySelector('.dashboard-completed-status')),
+                Boolean(row.querySelector('.dashboard-open-affordance')),
+              ];
+              Object.defineProperty(Date, 'now', {
+                configurable: true,
+                value: window.__codexDashboard.testRealDateNow,
+              });
+              delete window.__codexDashboard.testRealDateNow;
+              return result;
+            })()
+            """
+        ) as? [Bool]
+
+        XCTAssertEqual(expiryResult, [false, true])
+    }
+
     func testCompletionRouteDoesNotReplaceOpenDashboard() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))

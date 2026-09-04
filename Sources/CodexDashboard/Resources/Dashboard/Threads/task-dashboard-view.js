@@ -48,6 +48,7 @@ const taskDashboardView = (() => {
     ignoredProjectPaths,
     commitOrPushError,
     isThreadUnread,
+    isCompletionTickVisible,
     state,
   }) {
     updateSidebarStatus(state);
@@ -98,6 +99,7 @@ const taskDashboardView = (() => {
         collapsedProjects,
         ignoredProjectPaths,
         isUnread: isThreadUnread,
+        isCompletionTickVisible,
       }),
     );
     return true;
