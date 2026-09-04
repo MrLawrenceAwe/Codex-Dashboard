@@ -13,6 +13,7 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     private var interactiveStoreCount = 0
     private var backgroundStoreCount = 0
     private var deletionShouldFail = false
+    private var beforeDeletionFailure: (() -> Void)?
     private let lock = NSLock()
 
     func credential(for accountID: UUID) -> Data? {
@@ -45,7 +46,10 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
 
     func deleteCredential(for accountID: UUID) throws {
         try lock.withLock {
-            if deletionShouldFail { throw TestError.deletionFailed }
+            if deletionShouldFail {
+                beforeDeletionFailure?()
+                throw TestError.deletionFailed
+            }
             deletionCount += 1
             values.removeValue(forKey: accountID)
         }
@@ -57,8 +61,11 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
     var interactiveStores: Int { lock.withLock { interactiveStoreCount } }
     var backgroundStores: Int { lock.withLock { backgroundStoreCount } }
 
-    func failDeletion() {
-        lock.withLock { deletionShouldFail = true }
+    func failDeletion(beforeFailure: (() -> Void)? = nil) {
+        lock.withLock {
+            deletionShouldFail = true
+            beforeDeletionFailure = beforeFailure
+        }
     }
 }
 
@@ -206,6 +213,32 @@ final class CodexAccountManagerTests: XCTestCase {
             XCTAssertTrue(error is MemoryAccountCredentialVault.TestError)
         }
         XCTAssertEqual(try manager.document().accounts, [account])
+        XCTAssertEqual(vault.credential(for: account.id), credential)
+    }
+
+    func testDeleteReportsUnsafeRecoveryWhenMetadataCannotBeRestored() throws {
+        let credential = credential(accountID: "account-personal", name: "Personal")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        let supportDirectory = metadataURL.deletingLastPathComponent()
+        vault.failDeletion {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o500],
+                ofItemAtPath: supportDirectory.path
+            )
+        }
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: supportDirectory.path
+            )
+        }
+
+        XCTAssertThrowsError(try manager.deleteAccount(account.id)) { error in
+            guard case CodexAccountError.recoveryFailed = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
         XCTAssertEqual(vault.credential(for: account.id), credential)
     }
 

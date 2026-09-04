@@ -6,8 +6,8 @@ final class AccountUsageSession {
     private let cache: any UsageCaching
     private var activeUsageTask: Task<CodexAccountUsage, Error>?
     private var activeUsageTaskID: UUID?
-    private var savedAccountUsageTask: Task<SavedAccountUsageResult, Error>?
-    private var savedAccountUsageTaskID: UUID?
+    private var savedAccountUsageTasks: [UUID: Task<SavedAccountUsageResult, Error>] = [:]
+    private var savedAccountUsageTaskIDs: [UUID: UUID] = [:]
     private var resetTask: Task<Void, Never>?
     private var lastCacheSaveAt: Date?
 
@@ -42,8 +42,13 @@ final class AccountUsageSession {
         return try await task.value
     }
 
-    func fetchUsage(using credential: Data) async throws -> SavedAccountUsageResult? {
-        guard savedAccountUsageTask == nil else { return nil }
+    func fetchUsage(
+        using credential: Data,
+        for accountID: UUID
+    ) async throws -> SavedAccountUsageResult {
+        if let task = savedAccountUsageTasks[accountID] {
+            return try await task.value
+        }
         let taskID = UUID()
         let resetTask = resetTask
         let task = Task {
@@ -51,12 +56,12 @@ final class AccountUsageSession {
             try Task.checkCancellation()
             return try await provider.usage(using: credential)
         }
-        savedAccountUsageTask = task
-        savedAccountUsageTaskID = taskID
+        savedAccountUsageTasks[accountID] = task
+        savedAccountUsageTaskIDs[accountID] = taskID
         defer {
-            if savedAccountUsageTaskID == taskID {
-                savedAccountUsageTask = nil
-                savedAccountUsageTaskID = nil
+            if savedAccountUsageTaskIDs[accountID] == taskID {
+                savedAccountUsageTasks[accountID] = nil
+                savedAccountUsageTaskIDs[accountID] = nil
             }
         }
         return try await task.value
@@ -66,9 +71,9 @@ final class AccountUsageSession {
         activeUsageTask?.cancel()
         activeUsageTask = nil
         activeUsageTaskID = nil
-        savedAccountUsageTask?.cancel()
-        savedAccountUsageTask = nil
-        savedAccountUsageTaskID = nil
+        savedAccountUsageTasks.values.forEach { $0.cancel() }
+        savedAccountUsageTasks = [:]
+        savedAccountUsageTaskIDs = [:]
         let previousReset = resetTask
         resetTask = Task {
             await previousReset?.value
