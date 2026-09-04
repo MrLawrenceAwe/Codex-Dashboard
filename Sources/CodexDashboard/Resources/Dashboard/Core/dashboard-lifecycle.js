@@ -122,6 +122,7 @@ const dashboardLifecycle = (() => {
       observeSidebarSize();
       if (shouldRebindHosts) {
         observeHosts();
+        sidebarProjectHighlights.mount();
         promptLauncher.scheduleSync();
       }
       if (shouldSyncUnread && hooks.syncUnread()) hooks.requestRender();

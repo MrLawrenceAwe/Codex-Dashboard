@@ -50,7 +50,7 @@ const sidebarProjectHighlights = (() => {
     setAttribute(button, 'aria-label', `Highlight colour for ${name}`);
     setAttribute(button, 'title', `Highlight colour for ${name}`);
     setAttribute(button, 'aria-haspopup', 'dialog');
-    setAttribute(button, 'aria-expanded', String(dialog && activeID === id));
+    setAttribute(button, 'aria-expanded', String(Boolean(dialog && activeID === id)));
     if (button.style.color !== (colour || '')) button.style.color = colour || '';
   }
 
