@@ -171,6 +171,14 @@ const todoList = (() => {
       const button = event.target.closest('[data-todo-delete]');
       if (!button) return;
       const row = button.closest('[data-todo-id]');
+      if (!row) return;
+      if (!button.dataset.todoDeleteConfirm) {
+        button.dataset.todoDeleteConfirm = row.dataset.todoId;
+        button.textContent = 'Confirm delete';
+        button.setAttribute('aria-label', 'Confirm to-do deletion');
+        button.title = 'Confirm delete to-do';
+        return;
+      }
       items = items.filter((item) => item.id !== row.dataset.todoId);
       persist();
       render();

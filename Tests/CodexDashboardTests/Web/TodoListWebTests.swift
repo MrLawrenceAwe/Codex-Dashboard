@@ -72,12 +72,19 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-todo-filter="completed"]').click();
               const completedTitle = document.querySelector('[data-todo-title]').value;
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              document.querySelector('[data-todo-delete]').click();
+              const deleteButton = document.querySelector('[data-todo-delete]');
+              deleteButton.click();
+              const deletionWasConfirmed = deleteButton.dataset.todoDeleteConfirm === stored.id
+                && deleteButton.textContent.trim() === 'Confirm delete';
+              const remainsAfterFirstClick = document.querySelectorAll('[data-todo-id]').length === 1;
+              deleteButton.click();
               return [
                 hiddenFromOpen,
                 completedTitle,
                 stored.completed,
                 Object.hasOwn(stored, 'projectName'),
+                deletionWasConfirmed,
+                remainsAfterFirstClick,
                 document.querySelectorAll('[data-todo-id]').length,
               ];
             })()
@@ -89,7 +96,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Ship project to-dos")
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, false)
-        XCTAssertEqual(values[4] as? Int, 0)
+        XCTAssertEqual(values[4] as? Bool, true)
+        XCTAssertEqual(values[5] as? Bool, true)
+        XCTAssertEqual(values[6] as? Int, 0)
     }
 
     func testOpenTodoPageIsRepairedAndClosesForCodexNavigation() async throws {
