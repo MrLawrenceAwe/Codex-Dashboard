@@ -52,11 +52,12 @@ const todoListState = (() => {
     }
   }
 
-  function create(title) {
+  function create(title, image = null) {
     const now = Date.now();
     return normalizeItem({
       id: crypto.randomUUID(),
       title,
+      image,
       createdAt: now,
       updatedAt: now,
     });

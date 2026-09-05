@@ -103,7 +103,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Int, 0)
     }
 
-    func testTodoImageCanBeUploadedPreviewedPersistedAndRemoved() async throws {
+    func testTodoImageCanBeUploadedDuringAdditionPreviewedAndPreservedWhenCompleted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -120,8 +120,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Review design';
-              form.requestSubmit();
-              const input = document.querySelector('[data-todo-image-input]');
+              const input = form.querySelector('[data-todo-new-image]');
               const file = new File(
                 [new Uint8Array([137, 80, 78, 71])],
                 'mockup.png',
@@ -129,6 +128,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               );
               Object.defineProperty(input, 'files', { value: [file] });
               input.dispatchEvent(new Event('change', { bubbles: true }));
+              form.requestSubmit();
             })()
             """
         )
@@ -144,18 +144,20 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const preview = document.querySelector('[data-todo-image-preview]');
               preview.click();
               const dialog = document.querySelector('[data-todo-image-dialog]');
+              const checkbox = document.querySelector('[data-todo-completed]');
+              checkbox.checked = true;
+              checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+              document.querySelector('[data-todo-filter="completed"]').click();
               const values = [
                 stored.image.name,
                 stored.image.type,
                 stored.image.dataURL.startsWith('data:image/png;base64,'),
                 dialog.open,
                 dialog.querySelector('img').alt,
+                document.querySelector('[data-todo-image-preview]') !== null,
+                document.querySelector('[data-todo-image-actions]') === null,
               ];
               dialog.close();
-              document.querySelector('[data-todo-image-remove]').click();
-              const updated = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              values.push(updated.image === null);
-              values.push(document.querySelector('[data-todo-image-preview]') === null);
               return values;
             })()
             """
@@ -188,15 +190,15 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Review notes';
-              form.requestSubmit();
-              const input = document.querySelector('[data-todo-image-input]');
+              const input = form.querySelector('[data-todo-new-image]');
               Object.defineProperty(input, 'files', {
                 value: [new File(['notes'], 'notes.txt', { type: 'text/plain' })],
               });
               input.dispatchEvent(new Event('change', { bubbles: true }));
+              form.requestSubmit();
               return [
                 document.querySelector('[data-todo-image-error]').textContent,
-                JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].image === null,
+                document.querySelectorAll('[data-todo-id]').length === 0,
               ];
             })()
             """

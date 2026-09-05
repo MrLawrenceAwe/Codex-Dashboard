@@ -79,13 +79,13 @@ const todoList = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${dashboardElements.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           ${imageMarkup(item)}
-          <div class="todo-image-actions">
+          ${item.completed ? '' : `<div class="todo-image-actions">
             <label class="todo-image-action" title="${item.image ? 'Replace' : 'Attach'} image">
               <input type="file" data-todo-image-input accept="image/jpeg,image/png,image/gif,image/webp">
               ${item.image ? 'Replace image' : 'Add image'}
             </label>
             ${item.image ? '<button type="button" data-todo-image-remove>Remove image</button>' : ''}
-          </div>
+          </div>`}
         </div>
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${dashboardElements.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
@@ -94,8 +94,8 @@ const todoList = (() => {
     `).join('');
   }
 
-  function add(title) {
-    const item = todoListState.create(title);
+  function add(title, image = null) {
+    const item = todoListState.create(title, image);
     if (!item) return false;
     items.unshift(item);
     persist();
@@ -116,15 +116,22 @@ const todoList = (() => {
     render();
   }
 
-  function attachImage(id, file) {
-    showImageError();
+  function imageValidationError(file) {
     if (!acceptedImageTypes.has(file?.type)) {
-      showImageError('Choose a JPEG, PNG, GIF, or WebP image.');
-      return;
+      return 'Choose a JPEG, PNG, GIF, or WebP image.';
     }
     if (file.size > maximumImageBytes) {
-      showImageError('Images must be 2 MB or smaller.');
-      return;
+      return 'Images must be 2 MB or smaller.';
+    }
+    return '';
+  }
+
+  function readImage(file, onLoad) {
+    showImageError();
+    const validationError = imageValidationError(file);
+    if (validationError) {
+      showImageError(validationError);
+      return false;
     }
     const reader = new FileReader();
     reader.addEventListener('load', () => {
@@ -138,10 +145,17 @@ const todoList = (() => {
         showImageError('Codex could not read that image.');
         return;
       }
-      updateItem(id, { image });
+      onLoad(image);
     });
     reader.addEventListener('error', () => showImageError('Codex could not read that image.'));
     reader.readAsDataURL(file);
+    return true;
+  }
+
+  function attachImage(id, file) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item || item.completed) return;
+    readImage(file, (image) => updateItem(id, { image }));
   }
 
   function mountNavigation() {
@@ -184,6 +198,10 @@ const todoList = (() => {
         </header>
         <form class="todo-add" data-todo-form>
           <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do…" autocomplete="off">
+          <label class="todo-add-image" title="Attach an image to this to-do">
+            <input type="file" data-todo-new-image accept="image/jpeg,image/png,image/gif,image/webp">
+            <span data-todo-new-image-label>Add image</span>
+          </label>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
@@ -201,9 +219,31 @@ const todoList = (() => {
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       const title = page.querySelector('[data-todo-new-title]');
-      if (!add(title.value)) return;
-      title.value = '';
-      title.focus();
+      const imageInput = page.querySelector('[data-todo-new-image]');
+      const imageLabel = page.querySelector('[data-todo-new-image-label]');
+      const finishAdding = (image = null) => {
+        if (!add(title.value, image)) return;
+        title.value = '';
+        imageInput.value = '';
+        imageLabel.textContent = 'Add image';
+        title.focus();
+      };
+      const file = imageInput.files?.[0];
+      if (file) readImage(file, finishAdding);
+      else finishAdding();
+    });
+    page.querySelector('[data-todo-new-image]').addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      const label = page.querySelector('[data-todo-new-image-label]');
+      const validationError = file ? imageValidationError(file) : '';
+      if (validationError) {
+        showImageError(validationError);
+        event.target.value = '';
+        label.textContent = 'Add image';
+        return;
+      }
+      showImageError();
+      label.textContent = file ? file.name : 'Add image';
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {
