@@ -110,6 +110,7 @@ private final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 @MainActor
 final class FileChangeMonitor {
     static let projectRefreshQuietPeriod: Duration = .milliseconds(500)
+    static let projectRefreshMaximumDelay: Duration = .seconds(2)
 
     private struct Watch {
         let descriptor: Int32
@@ -149,6 +150,16 @@ final class FileChangeMonitor {
     private var refreshUnread: (@MainActor () async -> Void)?
     private var refreshAccounts: (@MainActor () async -> Void)?
     private var refreshWorkingTrees: (@MainActor (Set<String>?) async -> Void)?
+    private let projectRefreshQuietPeriod: Duration
+    private let projectRefreshMaximumDelay: Duration
+
+    init(
+        projectRefreshQuietPeriod: Duration = FileChangeMonitor.projectRefreshQuietPeriod,
+        projectRefreshMaximumDelay: Duration = FileChangeMonitor.projectRefreshMaximumDelay
+    ) {
+        self.projectRefreshQuietPeriod = projectRefreshQuietPeriod
+        self.projectRefreshMaximumDelay = projectRefreshMaximumDelay
+    }
 
     func start(
         catalogURL: URL,
@@ -355,17 +366,28 @@ final class FileChangeMonitor {
         projectRefreshTaskID = taskID
         projectRefreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            var maximumDelayDeadline = ContinuousClock.now + self.projectRefreshMaximumDelay
             while !Task.isCancelled {
                 let generationBeforeQuietPeriod = self.projectRefreshGeneration
-                try? await Task.sleep(for: Self.projectRefreshQuietPeriod)
+                let now = ContinuousClock.now
+                if now < maximumDelayDeadline {
+                    try? await Task.sleep(
+                        for: min(
+                            self.projectRefreshQuietPeriod,
+                            now.duration(to: maximumDelayDeadline)
+                        )
+                    )
+                }
                 guard !Task.isCancelled else { break }
-                if self.projectRefreshGeneration != generationBeforeQuietPeriod {
+                if self.projectRefreshGeneration != generationBeforeQuietPeriod,
+                   ContinuousClock.now < maximumDelayDeadline {
                     continue
                 }
                 let paths = self.pendingProjectPaths
                 self.pendingProjectPaths = []
                 if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
                 guard !Task.isCancelled, !self.pendingProjectPaths.isEmpty else { break }
+                maximumDelayDeadline = ContinuousClock.now + self.projectRefreshMaximumDelay
             }
             if self.projectRefreshTaskID == taskID {
                 self.projectRefreshTask = nil

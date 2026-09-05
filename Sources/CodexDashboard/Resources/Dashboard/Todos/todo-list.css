@@ -49,7 +49,6 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-shell { width: min(760px, calc(100% - 64px)); margin: 0 auto; padding: 56px 0 72px; }
 #codex-dashboard-todo-page .todo-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 #codex-dashboard-todo-page h1 { margin: 0; color: var(--todo-text); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.025em; }
-#codex-dashboard-todo-page .todo-header p { margin: 10px 0 0; color: var(--todo-dim); font-size: 12px; }
 
 #codex-dashboard-todo-page .todo-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 28px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
 #codex-dashboard-todo-page .todo-add input { min-width: 0; height: 52px; padding: 0 16px; font-size: 14px; border: 0; background: transparent; color: var(--todo-text); }
@@ -106,8 +105,6 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page progress::-moz-progress-bar { background: var(--todo-green); border-radius: 4px; }
 #codex-dashboard-todo-page .todo-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border: 1px solid var(--todo-line); border-radius: 14px; color: var(--todo-green); background: var(--todo-surface); }
 #codex-dashboard-todo-page .todo-empty-icon svg { width: 22px; height: 22px; }
-#codex-dashboard-todo-page .todo-empty > span:last-child { max-width: 300px; line-height: 1.6; }
-#codex-dashboard-todo-page .todo-hint { margin: 18px 0 0; color: var(--todo-dim); font-size: 11px; text-align: center; line-height: 1.5; }
 @media (hover: none) { #codex-dashboard-todo-page .todo-delete { opacity: 1; } }
 
 @container todo-page (max-width: 600px) {

@@ -4,9 +4,8 @@ import Foundation
 @MainActor
 final class RefreshScheduler {
     enum Schedule {
-        static func catalog(active: Bool, fileEventsAvailable: Bool) -> Duration {
-            if fileEventsAvailable { return active ? .seconds(30) : .seconds(2 * 60) }
-            return active ? .seconds(2) : .seconds(8)
+        static func catalog(active: Bool) -> Duration {
+            active ? .seconds(2) : .seconds(8)
         }
         static func workingTree(active: Bool, fileEventsAvailable: Bool) -> Duration {
             if fileEventsAvailable { return active ? .seconds(5 * 60) : .seconds(15 * 60) }
@@ -59,11 +58,8 @@ final class RefreshScheduler {
         else { return }
 
         catalogPollingTask = recurringTask(
-            interval: { [self] in
-                Schedule.catalog(
-                    active: Self.isUserActive,
-                    fileEventsAvailable: fileChanges != nil
-                )
+            interval: {
+                Schedule.catalog(active: Self.isUserActive)
             },
             action: synchronizeDashboard
         )

@@ -126,7 +126,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(latestPolicy, .useCached)
     }
 
-    func testActivationReliesOnFileEventsWhenMonitoringIsAvailable() async {
+    func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsAvailable() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
         let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .clean)
         let coordinator = makeAppCoordinator(
@@ -142,17 +142,17 @@ extension AppCoordinatorTests {
         await coordinator.refreshAfterActivation()
 
         let requestCount = await workingTreeStatusProvider.requestCount()
-        XCTAssertEqual(requestCount, 0)
+        XCTAssertEqual(requestCount, 1)
     }
 
-    func testCatalogAndUnreadPollingUseSlowFallbacksWhenFileEventsAreAvailable() {
+    func testCatalogPollingKeepsLifecycleTrackingResponsiveWhenFileEventsAreAvailable() {
         XCTAssertEqual(
-            RefreshScheduler.Schedule.catalog(active: true, fileEventsAvailable: true),
-            .seconds(30)
+            RefreshScheduler.Schedule.catalog(active: true),
+            .seconds(2)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.catalog(active: false, fileEventsAvailable: true),
-            .seconds(2 * 60)
+            RefreshScheduler.Schedule.catalog(active: false),
+            .seconds(8)
         )
         XCTAssertEqual(
             RefreshScheduler.Schedule.unread(active: true, fileEventsAvailable: true),
@@ -164,13 +164,39 @@ extension AppCoordinatorTests {
         )
     }
 
+    func testNewlyDiscoveredProjectGetsImmediateWorkingTreeRefresh() async throws {
+        let thread = ThreadSummary.fixture(
+            id: "new-project",
+            projectPath: "/tmp/new-project",
+            workingTreeStatus: .notRepository
+        )
+        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
+        let coordinator = makeAppCoordinator(
+            catalogProvider: StubCatalogProvider(
+                catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
+            ),
+            workingTreeStatusProvider: workingTreeStatusProvider,
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            runtimeFactory: { StubDashboardRuntime() }
+        )
+
+        await coordinator.synchronizeDashboard()
+        try await waitUntil {
+            await workingTreeStatusProvider.requestCount() == 1
+                && coordinator.threads.first?.workingTreeStatus == .hasChanges
+        }
+
+        let latestPolicy = await workingTreeStatusProvider.latestPolicy()
+        XCTAssertEqual(latestPolicy, .refresh)
+    }
+
     func testCatalogAndUnreadPollingRemainResponsiveWithoutFileEvents() {
         XCTAssertEqual(
-            RefreshScheduler.Schedule.catalog(active: true, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.catalog(active: true),
             .seconds(2)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.catalog(active: false, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.catalog(active: false),
             .seconds(8)
         )
         XCTAssertEqual(

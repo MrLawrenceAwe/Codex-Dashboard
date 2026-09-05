@@ -322,6 +322,46 @@ final class FileChangeMonitorTests: XCTestCase {
         XCTAssertEqual(refreshes.first, [projectDirectory.path])
     }
 
+    func testContinuousProjectChangesCannotPostponeRefreshIndefinitely() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-bounded-project-refresh-\(UUID().uuidString)", isDirectory: true)
+        let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        let unreadURL = root.appendingPathComponent("state.json")
+        try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
+        try Data("catalog".utf8).write(to: catalogURL)
+        try Data("unread".utf8).write(to: unreadURL)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = FileChangeMonitor(
+            projectRefreshQuietPeriod: .milliseconds(200),
+            projectRefreshMaximumDelay: .milliseconds(500)
+        )
+        var refreshes: [Set<String>] = []
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: unreadURL,
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: {},
+            refreshUnread: {},
+            refreshAccounts: {},
+            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        )
+        monitor.updateProjectPaths([projectDirectory.path])
+        defer { monitor.stop() }
+
+        for index in 0..<8 {
+            try Data("\(index)".utf8).write(
+                to: projectDirectory.appendingPathComponent("change-\(index).txt")
+            )
+            try await Task.sleep(for: .milliseconds(100))
+        }
+
+        XCTAssertFalse(refreshes.isEmpty)
+        XCTAssertEqual(refreshes.first, [projectDirectory.path])
+    }
+
     func testProjectChangesWaitForInFlightRefreshBeforeStartingAnother() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-serialized-refresh-\(UUID().uuidString)", isDirectory: true)
