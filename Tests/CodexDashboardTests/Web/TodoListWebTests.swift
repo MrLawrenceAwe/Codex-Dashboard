@@ -30,6 +30,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 todoButton.nextElementSibling?.textContent.trim(),
                 document.querySelector('[data-todo-project]') === null,
                 document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
+                document.querySelector('[data-todo-progress]') === null,
               ];
             })()
             """
@@ -40,6 +41,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Scheduled")
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertEqual(values[4] as? Bool, true)
     }
 
     func testTodoCanBeEditedCompletedFilteredAndDeleted() async throws {
