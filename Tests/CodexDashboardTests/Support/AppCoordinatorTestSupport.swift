@@ -117,6 +117,10 @@ final class RecordingCodexForegrounder: CodexForegrounding {
     }
 }
 
+struct StubTypingActivityDetector: TypingActivityDetecting {
+    var isUserTyping = false
+}
+
 struct StubCompatibilityChecker: LocalCompatibilityChecking {
     let checks: [CompatibilityCheck]
 
@@ -393,6 +397,7 @@ func makeAppCoordinator(
     observeFileChanges: Bool = true,
     installedCodexVersion: @escaping () -> String? = { nil },
     codexForegrounder: any CodexForegrounding = RecordingCodexForegrounder(),
+    typingActivityDetector: any TypingActivityDetecting = StubTypingActivityDetector(),
     promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
     accountManager: CodexAccountManager = CodexAccountManager(),
     accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
@@ -408,6 +413,7 @@ func makeAppCoordinator(
         observeFileChanges: observeFileChanges,
         installedCodexVersion: installedCodexVersion,
         codexForegrounder: codexForegrounder,
+        typingActivityDetector: typingActivityDetector,
         promptLibraryStore: promptLibraryStore,
         accountManager: accountManager,
         accountUsageProvider: accountUsageProvider,

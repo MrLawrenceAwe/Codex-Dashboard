@@ -113,7 +113,7 @@ extension AppCoordinator {
         refreshThreadDataWarning()
         if let completedThreadID {
             Task { await self.refreshAccountUsage() }
-            if foregroundOnTaskCompletion {
+            if foregroundOnTaskCompletion, !typingActivityDetector.isUserTyping {
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)
             }

@@ -68,6 +68,38 @@ extension AppCoordinatorTests {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func testTaskCompletionDoesNotStealFocusWhileTheUserIsTyping() async {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            typingActivityDetector: StubTypingActivityDetector(isUserTyping: true),
+            runtimeFactory: { runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+    }
+
     func testNewestSimultaneousCompletionIsOpened() async {
         let startedAt = Date().addingTimeInterval(-3)
         let olderCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(1))

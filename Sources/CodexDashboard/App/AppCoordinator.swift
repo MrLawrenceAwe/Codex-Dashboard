@@ -32,6 +32,7 @@ final class AppCoordinator: ObservableObject {
     let accountPopoverActionListener = AccountPopoverActionListener()
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
+    let typingActivityDetector: any TypingActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
     let synchronizationGate = SynchronizationGate()
@@ -68,6 +69,7 @@ final class AppCoordinator: ObservableObject {
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
+        typingActivityDetector: any TypingActivityDetecting = SystemTypingActivityDetector(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
@@ -81,6 +83,7 @@ final class AppCoordinator: ObservableObject {
         )
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
+        self.typingActivityDetector = typingActivityDetector
         self.promptLibraryStore = promptLibraryStore
         accounts = AccountCoordinator(
             manager: accountManager,
