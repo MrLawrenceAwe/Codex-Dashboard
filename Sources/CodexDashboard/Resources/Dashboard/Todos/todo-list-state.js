@@ -6,6 +6,19 @@ const todoListState = (() => {
     return String(value || '').trim();
   }
 
+  function normalizeImage(image) {
+    if (!image || typeof image !== 'object') return null;
+    const dataURL = cleanText(image.dataURL);
+    const match = dataURL.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,[a-z0-9+/=\s]+$/i);
+    if (!match) return null;
+    return {
+      dataURL,
+      name: cleanText(image.name) || 'Attached image',
+      type: match[1].toLowerCase(),
+      size: Math.max(0, Number(image.size) || 0),
+    };
+  }
+
   function normalizeItem(item) {
     const title = cleanText(item?.title);
     const id = cleanText(item?.id);
@@ -14,6 +27,7 @@ const todoListState = (() => {
       id,
       title,
       completed: item?.completed === true,
+      image: normalizeImage(item?.image),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
     };
@@ -48,5 +62,5 @@ const todoListState = (() => {
     });
   }
 
-  return { create, load, normalizeItem, save };
+  return { create, load, normalizeImage, normalizeItem, save };
 })();
