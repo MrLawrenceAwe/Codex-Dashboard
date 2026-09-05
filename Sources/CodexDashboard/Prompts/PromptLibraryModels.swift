@@ -3,7 +3,7 @@ import Foundation
 enum PromptLibrarySchema {
     static let currentVersion = 3
     static let defaultSection = "General"
-    static let defaultModel = "gpt-5.6-sol"
+    static let defaultModel = "gpt-6-astra"
     static let defaultReasoningEffort = "medium"
     static let defaultSpeed = "standard"
     static let reasoningEfforts = ["light", "medium", "high", "xhigh", "max", "ultra"]

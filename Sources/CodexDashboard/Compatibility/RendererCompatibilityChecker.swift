@@ -79,6 +79,17 @@ struct RendererCompatibilityChecker {
             in: target
         ))
         checks.append(await inspect(
+            id: "model-picker",
+            title: "Model preset controls",
+            expression: contractExpression(
+                "codexUIContracts.probeModelPickerControls()"
+            ),
+            failureStatus: .warning,
+            compatibleDetail: "Codex exposes the model-picker and reasoning controls used by saved prompt presets.",
+            failureDetail: "The model-picker or reasoning controls used by saved prompt presets were not found.",
+            in: target
+        ))
+        checks.append(await inspect(
             id: "commit-push-handoff",
             title: "Commit or push handoff",
             expression: contractExpression(

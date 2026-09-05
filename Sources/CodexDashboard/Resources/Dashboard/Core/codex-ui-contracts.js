@@ -187,6 +187,48 @@ const codexUIContracts = (() => {
     return null;
   }
 
+  function intelligenceTrigger(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
+    const activeComposer = composer(promptDialogID);
+    let container = activeComposer?.parentElement;
+    while (container && container !== document.body) {
+      const trigger = [...container.querySelectorAll('[data-codex-intelligence-trigger]')]
+        .find(isVisible);
+      if (trigger) return trigger;
+      container = container.parentElement;
+    }
+    return [...document.querySelectorAll('[data-codex-intelligence-trigger]')].find(isVisible) || null;
+  }
+
+  function modelPicker() {
+    return [...document.querySelectorAll('[data-model-picker-view]')].find(isVisible) || null;
+  }
+
+  async function probeModelPickerControls(timeout = 1200) {
+    const trigger = intelligenceTrigger();
+    if (!trigger) return false;
+    const waitFor = (value) => domUtils.waitFor(value, { timeout, interval: 25 });
+    const wasExpanded = trigger.getAttribute('aria-expanded') === 'true';
+    try {
+      if (!wasExpanded) {
+        trigger.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, button: 0, pointerType: 'mouse',
+        }));
+        trigger.click();
+      }
+      const picker = await waitFor(modelPicker);
+      if (!picker) return false;
+      const effort = trigger.dataset.selectedReasoningEffort;
+      const hasSupportedEffort = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(effort);
+      return hasSupportedEffort
+        && Boolean(picker.querySelector('[data-model-picker-view-toggle]'))
+        && Boolean(picker.querySelector('[data-reasoning-slider]'));
+    } finally {
+      if (!wasExpanded && trigger.getAttribute('aria-expanded') === 'true') {
+        document.body.click();
+      }
+    }
+  }
+
   function sidePanelToggle() {
     return [...document.querySelectorAll('button[aria-label="Toggle side panel"]')]
       .filter(isVisible)
@@ -258,6 +300,9 @@ const codexUIContracts = (() => {
     composer,
     composerAddButton,
     composerEditorView,
+    intelligenceTrigger,
+    modelPicker,
+    probeModelPickerControls,
     sidePanelToggle,
     environmentToggle,
     commitOrPushButton,

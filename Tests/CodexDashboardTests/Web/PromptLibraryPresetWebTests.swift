@@ -260,7 +260,7 @@ extension PromptLibraryWebTests {
         }
 
         XCTAssertEqual(values["version"] as? Int, 3)
-        XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-5.6-sol")
+        XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-6-astra")
         XCTAssertEqual(presetDefaults["effortValue"] as? String, "medium")
         XCTAssertEqual(presetDefaults["speedValue"] as? String, "standard")
         XCTAssertEqual(presetDefaults["hasPresetChecked"] as? Bool, false)

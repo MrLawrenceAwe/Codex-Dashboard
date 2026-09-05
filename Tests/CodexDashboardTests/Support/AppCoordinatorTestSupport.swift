@@ -403,6 +403,7 @@ extension XCTestCase {
         accountManager: CodexAccountManager? = nil,
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
+        compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
@@ -426,6 +427,7 @@ extension XCTestCase {
             accountManager: isolatedAccountManager,
             accountUsageProvider: accountUsageProvider,
             accountUsageCacheStore: accountUsageCacheStore,
+            compatibilityIssueNotifier: compatibilityIssueNotifier,
             runtimeFactory: runtimeFactory
         )
         addTeardownBlock {
@@ -433,5 +435,14 @@ extension XCTestCase {
             try? FileManager.default.removeItem(at: accountDirectory)
         }
         return coordinator
+    }
+}
+
+@MainActor
+final class RecordingCompatibilityIssueNotifier: CompatibilityIssueNotifying {
+    private(set) var reports: [CompatibilityReport] = []
+
+    func notify(report: CompatibilityReport) async {
+        reports.append(report)
     }
 }

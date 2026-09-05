@@ -56,7 +56,7 @@ extension DashboardRendererTests {
             checks.map(\.id),
             [
                 "renderer", "sidebar-host", "thread-navigation", "sidebar-unread",
-                "composer", "composer-controls", "commit-push-handoff",
+                "composer", "composer-controls", "model-picker", "commit-push-handoff",
             ]
         )
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
@@ -65,6 +65,9 @@ extension DashboardRendererTests {
             expressions.first { $0.contains("Boolean(codexUIContracts.composerAddButton())") }
         )
         XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-launcher"))
+        XCTAssertTrue(
+            expressions.contains { $0.contains("codexUIContracts.probeModelPickerControls()") }
+        )
         XCTAssertTrue(
             expressions.contains { $0.contains("codexUIContracts.probeCommitOrPushControls()") }
         )

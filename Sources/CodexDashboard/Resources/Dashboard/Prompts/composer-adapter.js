@@ -15,15 +15,7 @@ const composerAdapter = (() => {
     .find(isAvailable);
 
   function intelligenceTrigger() {
-    const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
-    let container = composer?.parentElement;
-    while (container && container !== document.body) {
-      const trigger = [...container.querySelectorAll('[data-codex-intelligence-trigger]')]
-        .find(isVisible);
-      if (trigger) return trigger;
-      container = container.parentElement;
-    }
-    return [...document.querySelectorAll('[data-codex-intelligence-trigger]')].find(isVisible) || null;
+    return codexUIContracts.intelligenceTrigger(dashboardElements.elementIDs.promptDialog);
   }
 
   async function openIntelligenceMenu() {

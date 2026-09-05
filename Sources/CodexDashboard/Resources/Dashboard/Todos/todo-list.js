@@ -34,8 +34,13 @@ const todoList = (() => {
   function add(title, image = null) {
     const item = todoListState.create(title, image);
     if (!item) return false;
+    const previousItems = [...items];
     items.unshift(item);
-    persist();
+    if (!persist()) {
+      items = previousItems;
+      render();
+      return false;
+    }
     filterMode = 'open';
     render();
     return true;
@@ -44,12 +49,16 @@ const todoList = (() => {
   function updateItem(id, changes) {
     const index = items.findIndex((item) => item.id === id);
     if (index < 0) return;
-    items[index] = todoListState.normalizeItem({
+    const updatedItem = todoListState.normalizeItem({
       ...items[index],
       ...changes,
       updatedAt: Date.now(),
     }) || items[index];
-    persist();
+    const previousItems = items;
+    items = items.map((item, itemIndex) => itemIndex === index ? updatedItem : item);
+    if (!persist()) {
+      items = previousItems;
+    }
     render();
   }
 
@@ -213,8 +222,9 @@ const todoList = (() => {
       });
     });
     page.querySelector('[data-todo-clear-completed]').addEventListener('click', () => {
+      const previousItems = items;
       items = items.filter((item) => !item.completed);
-      persist();
+      if (!persist()) items = previousItems;
       render();
     });
     page.querySelector('[data-todo-list]').addEventListener('change', (event) => {
@@ -253,8 +263,9 @@ const todoList = (() => {
         button.title = 'Confirm delete to-do';
         return;
       }
+      const previousItems = items;
       items = items.filter((item) => item.id !== row.dataset.todoId);
-      persist();
+      if (!persist()) items = previousItems;
       render();
     });
     pageHost.append(page);

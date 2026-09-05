@@ -146,6 +146,54 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Int, 0)
     }
 
+    func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const title = form.querySelector('[data-todo-new-title]');
+              const realStorage = window.localStorage;
+              Object.defineProperty(window, 'localStorage', {
+                configurable: true,
+                value: {
+                  getItem: realStorage.getItem.bind(realStorage),
+                  setItem() { throw new Error('Storage full'); },
+                },
+              });
+              title.value = 'Keep this draft';
+              form.requestSubmit();
+              Object.defineProperty(window, 'localStorage', {
+                configurable: true,
+                value: realStorage,
+              });
+              return [
+                title.value,
+                document.querySelectorAll('[data-todo-id]').length,
+                document.querySelector('[data-todo-storage-error]').hidden,
+                localStorage.getItem('codex-dashboard.todos'),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "Keep this draft")
+        XCTAssertEqual(values[1] as? Int, 0)
+        XCTAssertEqual(values[2] as? Bool, false)
+        XCTAssertTrue(values[3] is NSNull)
+    }
+
     func testTodoImageCanBePastedDuringAdditionReplacedAndPreservedWhenCompleted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
