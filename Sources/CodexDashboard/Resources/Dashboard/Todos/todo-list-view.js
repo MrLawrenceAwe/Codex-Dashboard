@@ -100,6 +100,19 @@ const todoListView = (() => {
         </div>
         <main class="todo-list" data-todo-list></main>
       </div>`;
+    const addForm = page.querySelector('[data-todo-form]');
+    const titleInput = page.querySelector('[data-todo-new-title]');
+    const addButton = addForm.querySelector('button[type="submit"]');
+    // Codex applies high-priority form-control styles to its own renderer. Keep
+    // this small composer self-contained even when those styles change.
+    addForm.style.setProperty('display', 'grid', 'important');
+    addForm.style.setProperty('grid-template-columns', 'minmax(0, 1fr) auto', 'important');
+    addForm.style.setProperty('width', '100%', 'important');
+    addForm.style.setProperty('padding', '0', 'important');
+    titleInput.style.setProperty('width', '100%', 'important');
+    titleInput.style.setProperty('max-width', 'none', 'important');
+    titleInput.style.setProperty('min-width', '0', 'important');
+    addButton.style.setProperty('width', 'auto', 'important');
     page.insertAdjacentHTML('beforeend', `
       <dialog class="todo-image-dialog" data-todo-image-dialog aria-label="Image preview">
         <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
@@ -117,10 +130,16 @@ const todoListView = (() => {
     const preview = document.querySelector('[data-todo-new-image-preview]');
     if (!preview) return;
     const previewImage = preview.querySelector('img');
+    const form = preview.closest('[data-todo-form]');
     preview.hidden = !image;
     previewImage.src = image?.dataURL || '';
     previewImage.alt = image?.name || '';
     preview.title = image?.name || '';
+    form?.style.setProperty(
+      'grid-template-columns',
+      image ? 'auto minmax(0, 1fr) auto' : 'minmax(0, 1fr) auto',
+      'important'
+    );
   }
 
   function showImage(image) {
