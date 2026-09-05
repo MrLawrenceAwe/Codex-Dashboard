@@ -103,7 +103,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Int, 0)
     }
 
-    func testTodoImageCanBeUploadedDuringAdditionPreviewedAndPreservedWhenCompleted() async throws {
+    func testTodoImageCanBePastedDuringAdditionReplacedAndPreservedWhenCompleted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -119,21 +119,46 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
-              form.querySelector('[data-todo-new-title]').value = 'Review design';
-              const input = form.querySelector('[data-todo-new-image]');
+              const title = form.querySelector('[data-todo-new-title]');
+              title.value = 'Review design';
               const file = new File(
                 [new Uint8Array([137, 80, 78, 71])],
                 'mockup.png',
                 { type: 'image/png' }
               );
-              Object.defineProperty(input, 'files', { value: [file] });
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              form.requestSubmit();
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [file], items: [] } });
+              title.dispatchEvent(paste);
             })()
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
+            "!document.querySelector('[data-todo-new-image-status]').hidden",
+            in: webView
+        )
+        _ = try await webView.evaluateJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
+        try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-image-preview]') !== null",
+            in: webView
+        )
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const title = document.querySelector('[data-todo-title]');
+              const replacement = new File(
+                [new Uint8Array([137, 80, 78, 71])],
+                'updated-mockup.png',
+                { type: 'image/png' }
+              );
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [replacement], items: [] } });
+              title.dispatchEvent(paste);
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].image.name === 'updated-mockup.png'",
             in: webView
         )
 
@@ -156,6 +181,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 dialog.querySelector('img').alt,
                 document.querySelector('[data-todo-image-preview]') !== null,
                 document.querySelector('[data-todo-image-actions]') === null,
+                document.querySelectorAll('input[type="file"]').length === 0,
               ];
               dialog.close();
               return values;
@@ -164,16 +190,17 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? String, "mockup.png")
+        XCTAssertEqual(values[0] as? String, "updated-mockup.png")
         XCTAssertEqual(values[1] as? String, "image/png")
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
-        XCTAssertEqual(values[4] as? String, "mockup.png")
+        XCTAssertEqual(values[4] as? String, "updated-mockup.png")
         XCTAssertEqual(values[5] as? Bool, true)
         XCTAssertEqual(values[6] as? Bool, true)
+        XCTAssertEqual(values[7] as? Bool, true)
     }
 
-    func testTodoImageRejectsUnsupportedFiles() async throws {
+    func testTodoImagePasteShowsAnErrorForOversizedImages() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -190,11 +217,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Review notes';
-              const input = form.querySelector('[data-todo-new-image]');
-              Object.defineProperty(input, 'files', {
-                value: [new File(['notes'], 'notes.txt', { type: 'text/plain' })],
-              });
-              input.dispatchEvent(new Event('change', { bubbles: true }));
+              const image = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' });
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
+              form.querySelector('[data-todo-new-title]').dispatchEvent(paste);
               form.requestSubmit();
               return [
                 document.querySelector('[data-todo-image-error]').textContent,
@@ -205,7 +231,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? String, "Choose a JPEG, PNG, GIF, or WebP image.")
+        XCTAssertEqual(values[0] as? String, "Images must be 2 MB or smaller.")
         XCTAssertEqual(values[1] as? Bool, true)
     }
 
