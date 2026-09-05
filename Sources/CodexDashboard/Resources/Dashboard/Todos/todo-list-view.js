@@ -80,6 +80,10 @@ const todoListView = (() => {
           <h1>To-dos</h1>
         </header>
         <form class="todo-add" data-todo-form>
+          <div class="todo-add-image" data-todo-new-image-preview hidden>
+            <img alt="">
+            <button type="button" data-todo-new-image-remove aria-label="Remove pasted image" title="Remove pasted image">&times;</button>
+          </div>
           <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do… Paste an image to attach it" autocomplete="off">
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
@@ -109,6 +113,16 @@ const todoListView = (() => {
     return page;
   }
 
+  function updateImageDraft(image) {
+    const preview = document.querySelector('[data-todo-new-image-preview]');
+    if (!preview) return;
+    const previewImage = preview.querySelector('img');
+    preview.hidden = !image;
+    previewImage.src = image?.dataURL || '';
+    previewImage.alt = image?.name || '';
+    preview.title = image?.name || '';
+  }
+
   function showImage(image) {
     const dialog = document.querySelector('[data-todo-image-dialog]');
     if (!dialog) return;
@@ -118,5 +132,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateNavigation };
+  return { createPage, render, showImage, updateImageDraft, updateNavigation };
 })();
