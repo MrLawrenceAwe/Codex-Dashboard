@@ -19,7 +19,99 @@ private actor CachedAccountUsageProvider: AccountUsageProviding {
 }
 
 @MainActor
+private final class AccountChangingUsageProvider: AccountUsageProviding {
+    var onFetch: (() throws -> Void)?
+    private(set) var requestCount = 0
+
+    func usage() async throws -> CodexAccountUsage {
+        CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func usage(using credential: Data) async throws -> SavedAccountUsageResult {
+        requestCount += 1
+        try onFetch?()
+        return SavedAccountUsageResult(usage: try await usage(), credential: credential)
+    }
+
+    func reset() async {}
+}
+
+private struct InteractiveOnlyCredentialVault: AccountCredentialVault {
+    let storage = CoordinatorMemoryCredentialVault()
+
+    func credential(for accountID: UUID) throws -> Data? { storage.credential(for: accountID) }
+    func store(_ credential: Data, for accountID: UUID) throws { storage.store(credential, for: accountID) }
+    func deleteCredential(for accountID: UUID) throws { storage.deleteCredential(for: accountID) }
+    func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data? {
+        throw CodexAccountError.keychainAuthorizationRequired
+    }
+    func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) throws {
+        throw CodexAccountError.keychainAuthorizationRequired
+    }
+}
+
+@MainActor
 final class AccountCoordinatorTests: XCTestCase {
+    func testInteractiveBatchRefreshCanReadProtectedAccountsAndPersistsOnce() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        let manager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("accounts.json"),
+            authenticationURL: auth,
+            vault: InteractiveOnlyCredentialVault()
+        )
+        var saved: [SavedAccount] = []
+        for name in ["First", "Second", "Active"] {
+            try testAccountCredential(accountID: name, name: name).write(to: auth)
+            saved.append(try manager.saveCurrentAccount())
+        }
+        let cache = RecordingUsageCache()
+        let coordinator = AccountCoordinator(
+            manager: manager, usageProvider: StubAccountUsageProvider(), usageCacheStore: cache
+        )
+        await coordinator.refreshInactiveUsage()
+        XCTAssertTrue(coordinator.usageByAccountID.isEmpty)
+        XCTAssertNil(coordinator.statusMessage)
+        let previousWrites = cache.saveCount
+
+        await coordinator.refreshInactiveUsage(interactionAllowed: true)
+
+        XCTAssertEqual(cache.saveCount, previousWrites + 1)
+        XCTAssertEqual(Set(cache.savedSnapshots.keys), Set(saved.dropLast().map(\.id)))
+        XCTAssertEqual(coordinator.activeAccountID, saved.last?.id)
+        XCTAssertTrue(coordinator.refreshingUsageAccountIDs.isEmpty)
+    }
+
+    func testBatchStopsWhenAccountIdentityChangesDuringRefresh() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        let manager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("accounts.json"),
+            authenticationURL: auth,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        for name in ["First", "Second", "Active"] {
+            try testAccountCredential(accountID: name, name: name).write(to: auth)
+            _ = try manager.saveCurrentAccount()
+        }
+        let provider = AccountChangingUsageProvider()
+        let coordinator = AccountCoordinator(manager: manager, usageProvider: provider)
+        provider.onFetch = { [weak coordinator] in
+            try testAccountCredential(accountID: "New", name: "New").write(to: auth)
+            coordinator?.refreshState()
+        }
+
+        await coordinator.refreshInactiveUsage(interactionAllowed: true)
+
+        XCTAssertEqual(provider.requestCount, 1)
+        XCTAssertTrue(coordinator.usageByAccountID.isEmpty)
+        XCTAssertTrue(coordinator.refreshingUsageAccountIDs.isEmpty)
+    }
+
     func testExternalAccountChangeDoesNotKeepPreviousAccountsUsage() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

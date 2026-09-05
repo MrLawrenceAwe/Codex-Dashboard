@@ -118,13 +118,7 @@ const dashboardLifecycle = (() => {
       const shouldRebindHosts = pendingHostRebind;
       pendingUnreadSync = false;
       pendingHostRebind = false;
-      const restoredPage = !document.getElementById(dashboardElements.elementIDs.page)
-        || !document.getElementById(dashboardElements.elementIDs.todoPage);
-      if (restoredPage) hooks.mountPage();
-      if (!document.getElementById(dashboardElements.elementIDs.navButton)
-        || !document.getElementById(dashboardElements.elementIDs.todoNavButton)) hooks.mountNavigation();
-      attachPage();
-      hooks.restoreOpenState?.();
+      mountPagesAndNavigation();
       observeSidebarSize();
       if (shouldRebindHosts) {
         observeHosts();
@@ -179,6 +173,14 @@ const dashboardLifecycle = (() => {
     promptLauncher.scheduleSync();
   }
 
+  function mountPagesAndNavigation() {
+    // Feature mount methods are idempotent and own their element-presence checks.
+    hooks.mountPage();
+    hooks.mountNavigation();
+    attachPage();
+    hooks.restoreOpenState();
+  }
+
   function ensureMounted(nextHooks) {
     hooks = nextHooks;
     if (!document.body) return false;
@@ -188,13 +190,7 @@ const dashboardLifecycle = (() => {
       style.textContent = DASHBOARD_CSS;
       document.head.append(style);
     }
-    const pageWasMissing = !document.getElementById(dashboardElements.elementIDs.page)
-      || !document.getElementById(dashboardElements.elementIDs.todoPage);
-    if (pageWasMissing) hooks.mountPage();
-    if (!document.getElementById(dashboardElements.elementIDs.navButton)
-      || !document.getElementById(dashboardElements.elementIDs.todoNavButton)) hooks.mountNavigation();
-    attachPage();
-    hooks.restoreOpenState?.();
+    mountPagesAndNavigation();
     syncContentInset();
     sidebarProjectHighlights.start();
     promptLibrary.mount();

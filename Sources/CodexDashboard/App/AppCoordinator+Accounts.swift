@@ -16,9 +16,7 @@ extension AppCoordinator {
             guard let accountID = action.accountID else { return .unavailable }
             _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
         case .refreshInactiveUsage:
-            for account in accounts.savedAccounts where account.id != accounts.activeAccountID {
-                _ = await refreshSavedAccountUsage(account.id, interactionAllowed: true)
-            }
+            await accounts.refreshInactiveUsage(interactionAllowed: true)
         case .saveCurrentAccount:
             saveCurrentAccount()
         case .switchAccount:
