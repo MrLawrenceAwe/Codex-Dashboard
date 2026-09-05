@@ -71,8 +71,7 @@ const promptLibraryContract = (() => {
 
   function isValidLibrary(library) {
     return hasValidContents(library)
-      && library.version === PROMPT_LIBRARY_SCHEMA.version
-      && library.prompts.every((prompt) => isValidScope(prompt.scope));
+      && library.version === PROMPT_LIBRARY_SCHEMA.version;
   }
 
   function normalizePrompts(storedPrompts) {

@@ -46,14 +46,14 @@ const todoListView = (() => {
     if (!visible.length) {
       const message = !items.length ? 'No to-dos yet'
         : filterMode === 'completed' ? 'No completed to-dos' : 'All caught up';
-      list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${threadMarkup.icon('completed')}</span><strong>${message}</strong></div>`;
+      list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${dashboardIcons.render('completed')}</span><strong>${message}</strong></div>`;
       return;
     }
     list.innerHTML = visible.map((item) => `
       <article class="todo-item${item.completed ? ' is-completed' : ''}" data-todo-id="${domUtils.escapeHTML(item.id)}">
         <label class="todo-check" title="${item.completed ? 'Mark as open' : 'Mark as completed'}">
           <input type="checkbox" data-todo-completed${item.completed ? ' checked' : ''} aria-label="${item.completed ? 'Mark as open' : 'Mark as completed'}: ${domUtils.escapeHTML(item.title)}">
-          <span>${threadMarkup.icon('completed')}</span>
+          <span>${dashboardIcons.render('completed')}</span>
         </label>
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">

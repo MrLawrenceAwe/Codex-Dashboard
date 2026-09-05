@@ -1,4 +1,4 @@
-const promptLibrary = (() => {
+function createPromptLibrary({ findThread }) {
   const dialogOwner = Symbol('codex-dashboard.prompt-dialog-owner');
   const insertionGuard = Symbol.for('codex-dashboard.prompt-insertion-guard');
   let dialogState = { mode: 'list' };
@@ -69,7 +69,7 @@ function openLibrary() {
     : undefined;
   dialogState = { mode: 'list' };
   searchTerm = '';
-  composerProject = taskDashboard.resolveComposerProject();
+  composerProject = codexHost.composerProject(findThread);
   presentDialog();
 }
 
@@ -380,4 +380,4 @@ function refresh() {
 }
 
   return { mount, refresh, unmount };
-})();
+}

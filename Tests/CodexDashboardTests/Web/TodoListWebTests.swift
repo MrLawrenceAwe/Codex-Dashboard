@@ -172,14 +172,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const paste = new Event('paste', { bubbles: true, cancelable: true });
               Object.defineProperty(paste, 'clipboardData', { value: { files: [file], items: [] } });
               title.dispatchEvent(paste);
+              form.requestSubmit();
             })()
             """
         )
-        try await DashboardWebTestHarness.waitForJavaScript(
-            "!document.querySelector('[data-todo-new-image-status]').hidden",
-            in: webView
-        )
-        _ = try await webView.evaluateJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-image-preview]') !== null",
             in: webView

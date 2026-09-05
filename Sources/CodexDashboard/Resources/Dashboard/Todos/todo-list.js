@@ -1,9 +1,15 @@
 const todoList = (() => {
   let items = todoListState.load();
   let filterMode = 'open';
-  let pageIsOpen = false;
+  const pageState = createDashboardPage({
+    pageID: dashboardElements.elementIDs.todoPage,
+    navigationID: dashboardElements.elementIDs.todoNavButton,
+    rootClass: 'codex-todo-open',
+  });
   let pendingNewImage = null;
   let pendingNewImageIsInvalid = false;
+  let pendingNewImageIsLoading = false;
+  let pendingNewImageSubmissionPending = false;
   const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
   const maximumImageBytes = 2 * 1024 * 1024;
 
@@ -57,7 +63,7 @@ const todoList = (() => {
     return '';
   }
 
-  function readImage(file, onLoad) {
+  function readImage(file, onLoad, onError = () => {}) {
     showImageError();
     const validationError = imageValidationError(file);
     if (validationError) {
@@ -74,11 +80,15 @@ const todoList = (() => {
       });
       if (!image) {
         showImageError('Codex could not read that image.');
+        onError();
         return;
       }
       onLoad(image);
     });
-    reader.addEventListener('error', () => showImageError('Codex could not read that image.'));
+    reader.addEventListener('error', () => {
+      showImageError('Codex could not read that image.');
+      onError();
+    });
     reader.readAsDataURL(file);
     return true;
   }
@@ -111,14 +121,14 @@ const todoList = (() => {
     button.setAttribute('aria-label', 'To-dos');
     button.innerHTML = `
       <span class="todo-nav-copy">
-        <span class="todo-nav-icon">${threadMarkup.icon('completed')}</span>
+        <span class="todo-nav-icon">${dashboardIcons.render('completed')}</span>
         <span>To-dos</span>
       </span>
       <strong class="todo-nav-count" data-todo-navigation-count aria-label="0 open to-dos" hidden>0</strong>`;
     if (insertionPoint.insertAfter) insertionPoint.element.after(button);
     else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
     todoListView.updateNavigation(items.filter((item) => !item.completed).length);
-    if (pageIsOpen) button.setAttribute('aria-current', 'page');
+    pageState.restoreOpenState();
     return true;
   }
 
@@ -133,12 +143,21 @@ const todoList = (() => {
         pendingNewImageIsInvalid = false;
         return;
       }
+      if (pendingNewImageIsLoading) {
+        pendingNewImageSubmissionPending = true;
+        const imageStatus = page.querySelector('[data-todo-new-image-status]');
+        imageStatus.textContent = 'Preparing image…';
+        imageStatus.hidden = false;
+        return;
+      }
       showImageError();
       const title = page.querySelector('[data-todo-new-title]');
       if (!add(title.value, pendingNewImage)) return;
       title.value = '';
       pendingNewImage = null;
       pendingNewImageIsInvalid = false;
+      pendingNewImageIsLoading = false;
+      pendingNewImageSubmissionPending = false;
       const imageStatus = page.querySelector('[data-todo-new-image-status]');
       imageStatus.hidden = true;
       imageStatus.textContent = '';
@@ -159,15 +178,32 @@ const todoList = (() => {
       if (validationError) {
         pendingNewImage = null;
         pendingNewImageIsInvalid = true;
+        pendingNewImageIsLoading = false;
+        pendingNewImageSubmissionPending = false;
         showImageError(validationError);
         return;
       }
+      pendingNewImage = null;
+      pendingNewImageIsInvalid = false;
+      pendingNewImageIsLoading = true;
+      pendingNewImageSubmissionPending = false;
+      const imageStatus = page.querySelector('[data-todo-new-image-status]');
+      imageStatus.textContent = 'Preparing image…';
+      imageStatus.hidden = false;
       readImage(file, (image) => {
         pendingNewImage = image;
         pendingNewImageIsInvalid = false;
-        const imageStatus = page.querySelector('[data-todo-new-image-status]');
+        pendingNewImageIsLoading = false;
         imageStatus.textContent = 'Image ready to attach when you add this to-do.';
         imageStatus.hidden = false;
+        if (pendingNewImageSubmissionPending) {
+          pendingNewImageSubmissionPending = false;
+          page.querySelector('[data-todo-form]').requestSubmit();
+        }
+      }, () => {
+        pendingNewImageIsLoading = false;
+        pendingNewImageSubmissionPending = false;
+        imageStatus.hidden = true;
       });
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
@@ -222,48 +258,23 @@ const todoList = (() => {
       render();
     });
     pageHost.append(page);
-    if (pageIsOpen) page.classList.add('is-open');
+    pageState.restoreOpenState();
     render();
     return true;
   }
 
   function open() {
     if (!document.getElementById(dashboardElements.elementIDs.todoPage)) mountPage();
-    const page = document.getElementById(dashboardElements.elementIDs.todoPage);
-    if (!page) return;
-    pageIsOpen = true;
-    page.classList.add('is-open');
-    document.documentElement.classList.add('codex-todo-open');
-    document.getElementById(dashboardElements.elementIDs.todoNavButton)?.setAttribute('aria-current', 'page');
-    render();
-  }
-
-  function close() {
-    pageIsOpen = false;
-    document.getElementById(dashboardElements.elementIDs.todoPage)?.classList.remove('is-open');
-    document.documentElement.classList.remove('codex-todo-open');
-    document.getElementById(dashboardElements.elementIDs.todoNavButton)?.removeAttribute('aria-current');
-  }
-
-  function restoreOpenState() {
-    if (!pageIsOpen) return;
-    document.getElementById(dashboardElements.elementIDs.todoPage)?.classList.add('is-open');
-    document.documentElement.classList.add('codex-todo-open');
-    document.getElementById(dashboardElements.elementIDs.todoNavButton)?.setAttribute('aria-current', 'page');
-  }
-
-  function destroy() {
-    pageIsOpen = false;
-    document.documentElement.classList.remove('codex-todo-open');
+    if (pageState.open()) render();
   }
 
   return {
-    close,
-    destroy,
-    isOpen: () => pageIsOpen,
+    close: pageState.close,
+    destroy: pageState.close,
+    isOpen: pageState.isOpen,
     mountNavigation,
     mountPage,
     open,
-    restoreOpenState,
+    restoreOpenState: pageState.restoreOpenState,
   };
 })();

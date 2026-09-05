@@ -31,7 +31,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(threads: [], totalThreadCount: 0)),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
         coordinator.connectionState = .dashboardMounted
 
@@ -53,7 +53,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
         var publicationCount = 0
@@ -73,7 +73,7 @@ extension AppCoordinatorTests {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         XCTAssertEqual(coordinator.connectionState, .checking)
@@ -94,7 +94,7 @@ extension AppCoordinatorTests {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: unreadThreadIDProvider,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
         await unreadThreadIDProvider.setUnreadThreadIDs([thread.id])
@@ -113,7 +113,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: workingTreeStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.refreshAfterActivation()
@@ -136,7 +136,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: workingTreeStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: true,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.refreshAfterActivation()
@@ -177,7 +177,7 @@ extension AppCoordinatorTests {
             ),
             workingTreeStatusProvider: workingTreeStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
@@ -236,7 +236,7 @@ extension AppCoordinatorTests {
             ),
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: FailingViewModelUnreadIDProvider(),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
@@ -253,7 +253,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         coordinator.startMonitoring()

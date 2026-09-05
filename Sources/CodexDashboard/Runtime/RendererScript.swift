@@ -27,10 +27,7 @@ enum RendererScript {
     }
 
     static func deliverThreads(_ threads: [ThreadWireModel]) throws -> String {
-        let data = try JSONEncoder().encode(threads)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("Thread data could not be encoded for the renderer.")
-        }
+        let json = try encodeJSON(threads)
         return """
         (() => {
           const dashboard = window.__codexDashboard;
@@ -40,10 +37,7 @@ enum RendererScript {
     }
 
     static func deliverAccountPopover(_ snapshot: AccountPopoverSnapshot?) throws -> String {
-        let data = try JSONEncoder().encode(snapshot)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("Account data could not be encoded for the renderer.")
-        }
+        let json = try encodeJSON(snapshot)
         return "(() => window.__codexDashboard?.applyAccountPopoverSnapshot?.(\(json)) === true)()"
     }
 
@@ -60,20 +54,18 @@ enum RendererScript {
         "window.__codexDashboard?.discardPendingPromptLibrary?.() === true"
 
     static func deliverPromptLibrary(_ library: PromptLibraryDocument) throws -> String {
-        let data = try JSONEncoder().encode(library)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("The prompt library could not be encoded for the renderer.")
-        }
+        let json = try encodeJSON(library)
         return """
         (() => window.__codexDashboard?.applyPromptLibrary?.(\(json)) === true)()
         """
     }
 
     static func acknowledgePendingPromptLibrary(_ library: PromptLibraryDocument) throws -> String {
-        let data = try JSONEncoder().encode(library)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw DashboardError.enableFailed("The prompt library could not be encoded for the renderer.")
-        }
+        let json = try encodeJSON(library)
         return "(() => window.__codexDashboard?.acknowledgePendingPromptLibrary?.(\(json)) === true)()"
+    }
+
+    private static func encodeJSON(_ value: some Encodable) throws -> String {
+        String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
     }
 }
