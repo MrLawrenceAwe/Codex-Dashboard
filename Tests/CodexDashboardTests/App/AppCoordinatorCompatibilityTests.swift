@@ -27,7 +27,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.restartCodexAndEnableDashboard()
@@ -43,7 +43,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         coordinator.setFailure(
@@ -74,7 +74,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [incompatible]),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
         await coordinator.checkCompatibility()
 
@@ -106,7 +106,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: checker,
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
         await coordinator.checkCompatibility()
 
@@ -131,7 +131,7 @@ extension AppCoordinatorTests {
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.checkCompatibility()
@@ -160,7 +160,7 @@ extension AppCoordinatorTests {
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             userDefaults: defaults,
             installedCodexVersion: { "2.0" },
-            runtimeFactory: {
+            runtimeFactory: { _ in
                 StubDashboardRuntime(compatibilityChecks: [unavailableRenderer])
             }
         )
@@ -183,7 +183,7 @@ extension AppCoordinatorTests {
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             userDefaults: defaults,
             installedCodexVersion: { "2.0" },
-            runtimeFactory: {
+            runtimeFactory: { _ in
                 StubDashboardRuntime(compatibilityChecks: [compatibleRenderer])
             }
         )

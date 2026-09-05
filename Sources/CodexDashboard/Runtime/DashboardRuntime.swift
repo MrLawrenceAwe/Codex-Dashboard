@@ -43,7 +43,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     init(
         codex: CodexProcessController = CodexProcessController(),
         renderer: DashboardRenderer? = nil,
-        promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore()
+        promptLibraryStore: PromptLibraryFileStore
     ) throws {
         self.codex = codex
         self.renderer = try renderer ?? DashboardRenderer(promptLibraryStore: promptLibraryStore)

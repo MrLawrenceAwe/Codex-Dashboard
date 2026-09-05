@@ -26,7 +26,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.synchronizeDashboard()
@@ -57,7 +57,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: usageProvider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
 
         await coordinator.synchronizeDashboard()
@@ -90,7 +90,7 @@ extension AppCoordinatorTests {
             observeFileChanges: false,
             codexForegrounder: foregrounder,
             typingActivityDetector: StubTypingActivityDetector(isUserTyping: true),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.synchronizeDashboard()
@@ -136,7 +136,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.synchronizeDashboard()
@@ -160,7 +160,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
@@ -188,7 +188,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
@@ -222,7 +222,7 @@ extension AppCoordinatorTests {
             userDefaults: defaults,
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            runtimeFactory: { StubDashboardRuntime() }
+            runtimeFactory: { _ in StubDashboardRuntime() }
         )
         await coordinator.synchronizeDashboard()
 

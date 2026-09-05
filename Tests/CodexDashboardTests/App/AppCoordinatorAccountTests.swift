@@ -32,7 +32,7 @@ extension AppCoordinatorTests {
         let coordinator = makeAppCoordinator(
             accountManager: accountManager,
             accountUsageProvider: SequencedAccountUsageProvider(outcomes: [usage]),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.refreshAccountUsage()
@@ -64,7 +64,7 @@ extension AppCoordinatorTests {
                 vault: CoordinatorMemoryCredentialVault()
             ),
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
 
         await coordinator.refreshAccountUsage()
@@ -95,7 +95,7 @@ extension AppCoordinatorTests {
                 vault: CoordinatorMemoryCredentialVault()
             ),
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
 
         let first = Task { @MainActor in await coordinator.refreshAccountUsage() }
@@ -125,7 +125,7 @@ extension AppCoordinatorTests {
                 vault: CoordinatorMemoryCredentialVault()
             ),
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: false) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: false) }
         )
 
         await coordinator.refreshAccountUsage()
@@ -168,7 +168,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: false) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: false) }
         )
 
         XCTAssertEqual(coordinator.accounts.usageByAccountID[account.id], snapshot)
@@ -202,7 +202,7 @@ extension AppCoordinatorTests {
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.beginAddingAccount()
@@ -251,7 +251,7 @@ extension AppCoordinatorTests {
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.switchAccount(to: lawrence.id)
@@ -298,7 +298,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
         await coordinator.synchronizeDashboard()
 
@@ -343,7 +343,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: usageProvider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
         await coordinator.synchronizeDashboard()
 
@@ -397,7 +397,7 @@ extension AppCoordinatorTests {
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
-            runtimeFactory: { runtime }
+            runtimeFactory: { _ in runtime }
         )
 
         await coordinator.switchAccount(to: first.id)
@@ -461,7 +461,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: provider,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
 
         _ = await coordinator.refreshSavedAccountUsage(first.id)
@@ -511,7 +511,7 @@ extension AppCoordinatorTests {
                 refreshedCredential: credentials[0]
             ),
             accountUsageCacheStore: cache,
-            runtimeFactory: { StubDashboardRuntime(codexIsRunning: true) }
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
         )
 
         await coordinator.refreshInactiveAccountUsage()

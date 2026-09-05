@@ -403,7 +403,7 @@ extension XCTestCase {
         accountManager: CodexAccountManager? = nil,
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
-        runtimeFactory: () throws -> any DashboardRuntime = { StubDashboardRuntime() }
+        runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorAccounts-\(UUID().uuidString)")

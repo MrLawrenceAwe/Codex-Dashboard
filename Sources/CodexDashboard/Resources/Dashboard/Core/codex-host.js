@@ -19,6 +19,18 @@ const codexHost = {
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
   },
 
+  composerProject(findThread) {
+    const selectedProject = codexUIContracts.activeComposerProject();
+    if (selectedProject) return selectedProject;
+    const thread = findThread(codexUIContracts.activeComposerThreadID());
+    const projectPath = String(thread?.projectPath || '').trim();
+    if (!projectPath) return null;
+    return {
+      name: String(thread?.projectName || '').trim() || projectPath.split('/').filter(Boolean).at(-1) || projectPath,
+      path: projectPath,
+    };
+  },
+
   threadReadStates() {
     return codexUIContracts.threadReadStates();
   },

@@ -32,6 +32,23 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
+enum CodexDashboardMain {
+    @MainActor
+    static func main() throws {
+        let arguments = CommandLine.arguments.dropFirst()
+        if arguments.first == "--export-preview-injection" {
+            guard arguments.count == 2, let path = arguments.last else {
+                throw CocoaError(.fileWriteInvalidFileName)
+            }
+            try InjectionBundle.load().mountExpression.write(
+                toFile: path, atomically: true, encoding: .utf8
+            )
+            return
+        }
+        CodexDashboardApp.main()
+    }
+}
+
 struct CodexDashboardApp: App {
     @NSApplicationDelegateAdaptor(CodexDashboardAppDelegate.self) private var appDelegate
 

@@ -74,7 +74,9 @@ final class AppCoordinator: ObservableObject {
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
-        runtimeFactory: () throws -> any DashboardRuntime = { try LocalCodexDashboardRuntime() }
+        runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
+            try LocalCodexDashboardRuntime(promptLibraryStore: $0)
+        }
     ) {
         threadSnapshotService = ThreadSnapshotService(
             catalogProvider: catalogProvider,
@@ -98,7 +100,7 @@ final class AppCoordinator: ObservableObject {
             installedVersion: installedCodexVersion
         )
         do {
-            dashboardRuntime = try runtimeFactory()
+            dashboardRuntime = try runtimeFactory(promptLibraryStore)
         } catch {
             setFailure(error, lastKnownState: .codexClosed)
         }

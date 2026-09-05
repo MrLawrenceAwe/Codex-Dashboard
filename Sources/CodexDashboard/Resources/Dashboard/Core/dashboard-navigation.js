@@ -1,3 +1,5 @@
+const promptLibrary = createPromptLibrary({ findThread: taskDashboard.findThread });
+
 const dashboardNavigation = (() => {
   function openTasks() {
     todoList.close();

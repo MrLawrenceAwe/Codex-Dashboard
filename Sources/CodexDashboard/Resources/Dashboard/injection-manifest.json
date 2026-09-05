@@ -3,6 +3,8 @@
     "Core/dashboard-bootstrap",
     "Core/dashboard-elements",
     "Core/dom-utils",
+    "Core/dashboard-icons",
+    "Core/dashboard-page",
     "Core/codex-ui-contracts",
     "Core/codex-host",
     "Prompts/prompt-library-contract",

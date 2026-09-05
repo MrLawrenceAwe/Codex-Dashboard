@@ -10,7 +10,11 @@ let unreadSyncTimer;
 let renderFrame;
 let renderFallbackTimer;
 let unreadMonitoringStarted = false;
-let dashboardIsOpen = false;
+const pageState = createDashboardPage({
+  pageID: dashboardElements.elementIDs.page,
+  navigationID: dashboardElements.elementIDs.navButton,
+  rootClass: 'codex-dashboard-open',
+});
 let viewNeedsRender = true;
 let unreadThreadIDs = new Set();
 const sidebarUnreadOverrides = new Map();
@@ -97,7 +101,7 @@ function refreshUnreadFromSidebar() {
 
 function unreadSyncDelay() {
   if (document.visibilityState === 'hidden') return 30000;
-  return dashboardIsOpen ? 3000 : 10000;
+  return pageState.isOpen() ? 3000 : 10000;
 }
 
 function scheduleUnreadSync(delay = unreadSyncDelay()) {
@@ -191,7 +195,7 @@ function scheduleRender() {
 }
 
 function requestRender() {
-  if (dashboardIsOpen) {
+  if (pageState.isOpen()) {
     scheduleRender();
     return;
   }
@@ -210,18 +214,18 @@ function mountTaskNavigationButton() {
   button.setAttribute('aria-label', 'Task Dashboard');
   button.innerHTML = `
     <div class="dashboard-nav-copy">
-      <span class="dashboard-nav-icon">${threadMarkup.icon('threads')}</span>
+      <span class="dashboard-nav-icon">${dashboardIcons.render('threads')}</span>
       <span class="dashboard-nav-label">Task Dashboard</span>
     </div>
     <div class="dashboard-nav-status">
       <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running tasks" title="0 running tasks" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
-      <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${threadMarkup.icon('gitChanges')}</span>
+      <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${dashboardIcons.render('gitChanges')}</span>
       <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread tasks" hidden>0</strong>
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
   else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
   taskDashboardView.updateSidebarStatus(deriveViewState());
-  if (dashboardIsOpen) button.setAttribute('aria-current', 'page');
+  pageState.restoreOpenState();
   return true;
 }
 
@@ -268,10 +272,7 @@ function mountTaskDashboardPage() {
       openThreadFromEvent(event);
     },
   });
-  if (mounted && dashboardIsOpen) {
-    document.getElementById(dashboardElements.elementIDs.page)?.classList.add('is-open');
-    document.documentElement.classList.add('codex-dashboard-open');
-  }
+  if (mounted) pageState.restoreOpenState();
   return mounted;
 }
 
@@ -284,35 +285,15 @@ function openThreadFromEvent(event) {
 }
 
 function openDashboard() {
-  const page = document.getElementById(dashboardElements.elementIDs.page);
-  if (!page) return;
-  dashboardIsOpen = true;
-  page.classList.add('is-open');
-  document.documentElement.classList.add('codex-dashboard-open');
-  document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
+  if (!pageState.open()) return;
   if (viewNeedsRender) renderDashboard();
   else taskDashboardView.updateSidebarStatus(deriveViewState());
   scheduleUnreadSync(1500);
 }
 
 function closeDashboard() {
-  dashboardIsOpen = false;
-  document.getElementById(dashboardElements.elementIDs.page)?.classList.remove('is-open');
-  document.documentElement.classList.remove('codex-dashboard-open');
-  document.getElementById(dashboardElements.elementIDs.navButton)?.removeAttribute('aria-current');
+  pageState.close();
   scheduleUnreadSync();
-}
-
-function restoreOpenState() {
-  if (dashboardIsOpen) {
-    document.getElementById(dashboardElements.elementIDs.page)?.classList.add('is-open');
-    document.documentElement.classList.add('codex-dashboard-open');
-    document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
-  }
-}
-
-function isOpen() {
-  return dashboardIsOpen;
 }
 
 function applyThreads(nextThreads) {
@@ -343,26 +324,13 @@ function applyThreads(nextThreads) {
   // short burst. Keep the renderer responsive by applying only the latest
   // snapshot in the next frame instead of rebuilding the task list for each
   // delivery.
-  if (dashboardIsOpen) {
+  if (pageState.isOpen()) {
     viewNeedsRender = true;
     scheduleRender();
   } else {
     requestRender();
   }
   return true;
-}
-
-function resolveComposerProject() {
-  const selectedProject = codexUIContracts.activeComposerProject();
-  if (selectedProject) return selectedProject;
-  const activeThreadID = codexUIContracts.activeComposerThreadID();
-  const thread = threads.find((item) => item.id === activeThreadID);
-  const projectPath = String(thread?.projectPath || '').trim();
-  if (!projectPath) return null;
-  return {
-    name: String(thread?.projectName || '').trim() || projectPath.split('/').filter(Boolean).at(-1) || projectPath,
-    path: projectPath,
-  };
 }
 
 function startMonitoring() {
@@ -374,7 +342,7 @@ function startMonitoring() {
 }
 
 function destroy() {
-  dashboardIsOpen = false;
+  pageState.close();
   cancelScheduledRender();
   if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
   if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
@@ -390,15 +358,15 @@ function destroy() {
 return {
   mountNavigation: mountTaskNavigationButton,
   mountPage: mountTaskDashboardPage,
-  restoreOpenState,
+  restoreOpenState: pageState.restoreOpenState,
   startMonitoring,
   requestRender,
   syncUnread: syncUnreadFromSidebar,
   destroy,
   open: openDashboard,
   close: closeDashboard,
-  isOpen,
+  isOpen: pageState.isOpen,
   applyThreads,
-  resolveComposerProject,
+  findThread: (id) => threads.find((thread) => thread.id === id),
 };
 })();

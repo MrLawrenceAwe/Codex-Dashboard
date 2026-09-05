@@ -87,6 +87,18 @@ injection maintenance.
 
 Codex still uses one active account at a time. The switcher does not merge accounts, transfer subscriptions or usage, or rotate accounts automatically. Do not commit, export, or manually copy `~/.codex/auth.json`.
 
+## Development preview
+
+Run `./DashboardPreview/generate.sh`, then open `DashboardPreview/index.html` in a
+browser. Regenerate after changing renderer resources or the prompt schema. The
+ignored `injection.js` is built by the production `InjectionBundle` loader, including
+the Swift-defined prompt schema; preview fixtures use the current thread contract.
+Generation exits before starting the menu-bar application.
+
+Shared page visibility and icons live in `Core`. The prompt controller receives an
+explicit thread lookup for composer context. Native import/export and renderer
+persistence share the prompt store constructed by the application coordinator.
+
 ## Visual baselines
 
 The web test suite compares wide dark, medium light, and narrow dark screenshots against committed baselines. After an intentional visual change, regenerate them with:
