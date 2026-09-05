@@ -32,7 +32,8 @@ final class CompatibilityIssueNotifier: CompatibilityIssueNotifying {
         content.title = report.blockingCount > 0
             ? "Codex Dashboard is incompatible"
             : "Codex Dashboard needs attention"
-        content.body = "A Codex update triggered compatibility checks: \(report.summary). Review Diagnostics from the menu bar."
+        let reason = report.attentionSummary ?? report.summary
+        content.body = "A Codex update triggered compatibility checks: \(reason) Review Diagnostics from the menu bar."
         content.sound = .default
 
         let request = UNNotificationRequest(

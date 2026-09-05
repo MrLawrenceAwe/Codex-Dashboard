@@ -133,6 +133,12 @@ struct DiagnosticsWindowView: View {
 
     var body: some View {
         let codexVersion = CodexConfiguration.installedVersion ?? "not found"
+        let dashboardShortVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "development"
+        let dashboardBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        let dashboardVersion = dashboardBuild.map { "\(dashboardShortVersion) (\($0))" }
+            ?? dashboardShortVersion
         let actions = coordinator.dashboardActions
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
@@ -194,7 +200,8 @@ struct DiagnosticsWindowView: View {
             }
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
+                Text("Codex Dashboard \(dashboardVersion) · Codex \(codexVersion)")
+                Text("\(coordinator.rendererTargetCount) renderer target(s)")
                 Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total tasks")
                 if let refreshed = coordinator.lastSuccessfulRefresh {
                     Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")

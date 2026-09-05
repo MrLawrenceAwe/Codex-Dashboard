@@ -18,8 +18,8 @@ extension DashboardRendererTests {
 
         let checks = await renderer.compatibilityChecks()
 
-        XCTAssertFalse(
-            checks.contains { $0.status == .incompatible },
+        XCTAssertTrue(
+            checks.allSatisfy { $0.status == .compatible },
             checks.map { "\($0.title): \($0.detail)" }.joined(separator: "\n")
         )
     }

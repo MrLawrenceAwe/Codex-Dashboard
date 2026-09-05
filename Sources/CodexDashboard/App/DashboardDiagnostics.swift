@@ -10,13 +10,14 @@ struct DashboardDiagnostics {
     let lastRefresh: Date?
     let lastCompatibilityCheck: Date?
     let compatibilitySummary: String
+    let compatibilityDetails: [String]
     let connectionError: String?
     let connectionNotice: String?
     let threadWarning: String?
 
     var text: String {
         let formatter = ISO8601DateFormatter()
-        return [
+        var lines = [
             "Codex Dashboard \(dashboardVersion)",
             "Codex: \(codexVersion)",
             "Status: \(status)",
@@ -28,6 +29,8 @@ struct DashboardDiagnostics {
             "Connection error: \(connectionError ?? "none")",
             "Connection notice: \(connectionNotice ?? "none")",
             "Task warning: \(threadWarning ?? "none")",
-        ].joined(separator: "\n")
+        ]
+        lines.append(contentsOf: compatibilityDetails.map { "Compatibility detail: \($0)" })
+        return lines.joined(separator: "\n")
     }
 }

@@ -48,6 +48,7 @@ final class DashboardStatusItemControllerTests: XCTestCase {
             "exclamationmark.octagon.fill"
         )
         XCTAssertTrue(DashboardStatusItemController.requiresCompatibilityAttention(warning))
+        XCTAssertEqual(warning.attentionSummary, "Composer: Changed")
     }
 
     private let positionKey = "NSStatusItem Preferred Position CodexDashboardStatusItem"

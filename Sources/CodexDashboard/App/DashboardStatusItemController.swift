@@ -51,7 +51,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         if let report = coordinator.compatibilityReport,
            report.blockingCount > 0 || report.warningCount > 0 {
             let compatibilityStatus = NSMenuItem(
-                title: "Compatibility: \(report.summary)",
+                title: "Compatibility: \(report.attentionSummary ?? report.summary)",
                 action: nil,
                 keyEquivalent: ""
             )
@@ -144,7 +144,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         image?.isTemplate = true
         statusItem.button?.image = image
         statusItem.button?.toolTip = Self.requiresCompatibilityAttention(report)
-            ? "Codex Dashboard — \(report?.summary ?? "compatibility needs attention")"
+            ? "Codex Dashboard — \(report?.attentionSummary ?? "compatibility needs attention")"
             : "Codex Dashboard"
     }
 

@@ -14,6 +14,7 @@ final class DashboardDiagnosticsTests: XCTestCase {
             lastRefresh: nil,
             lastCompatibilityCheck: nil,
             compatibilitySummary: "not checked",
+            compatibilityDetails: ["Warning — Composer controls: Add button missing"],
             connectionError: nil,
             connectionNotice: nil,
             threadWarning: nil
@@ -23,5 +24,6 @@ final class DashboardDiagnosticsTests: XCTestCase {
         XCTAssertTrue(report.text.contains("Tasks: 12 loaded / 20 total"))
         XCTAssertTrue(report.text.contains("Last refresh: never"))
         XCTAssertTrue(report.text.contains("Connection error: none"))
+        XCTAssertTrue(report.text.contains("Compatibility detail: Warning — Composer controls: Add button missing"))
     }
 }
