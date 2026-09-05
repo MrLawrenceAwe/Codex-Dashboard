@@ -31,11 +31,6 @@ const todoList = (() => {
     if (!page) return;
     const openCount = items.filter((item) => !item.completed).length;
     const completedCount = items.length - openCount;
-    const progress = page.querySelector('[data-todo-progress]');
-    progress.hidden = items.length === 0;
-    progress.querySelector('progress').value = completedCount;
-    progress.querySelector('progress').max = items.length || 1;
-    progress.querySelector('span').textContent = `${completedCount}/${items.length} done`;
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       const active = button.dataset.todoFilter === filterMode;
       button.classList.toggle('is-active', active);
@@ -129,7 +124,6 @@ const todoList = (() => {
       <div class="todo-shell">
         <header class="todo-header">
           <h1>To-dos</h1>
-          <div class="todo-progress" data-todo-progress hidden><span></span><progress value="0" max="1" aria-label="To-do completion"></progress></div>
         </header>
         <form class="todo-add" data-todo-form>
           <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do…" autocomplete="off">
