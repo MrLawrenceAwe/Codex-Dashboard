@@ -114,24 +114,17 @@ const todoList = (() => {
 
   function mountNavigation() {
     if (document.getElementById(dashboardElements.elementIDs.todoNavButton)) return true;
-    const taskButton = document.getElementById(dashboardElements.elementIDs.navButton);
-    const insertionPoint = taskButton
-      ? { element: taskButton, insertAfter: true }
-      : codexHost.navigationInsertionPoint();
-    if (!insertionPoint?.element?.parentElement) return false;
-    const button = document.createElement('button');
-    button.id = dashboardElements.elementIDs.todoNavButton;
-    button.type = 'button';
-    button.className = insertionPoint.element.className;
-    button.setAttribute('aria-label', 'To-dos');
-    button.innerHTML = `
+    if (!mountDashboardNavigationButton({
+      id: dashboardElements.elementIDs.todoNavButton,
+      label: 'To-dos',
+      afterID: dashboardElements.elementIDs.navButton,
+      markup: `
       <span class="todo-nav-copy">
         <span class="todo-nav-icon">${dashboardIcons.render('completed')}</span>
         <span>To-dos</span>
       </span>
-      <strong class="todo-nav-count" data-todo-navigation-count aria-label="0 open to-dos" hidden>0</strong>`;
-    if (insertionPoint.insertAfter) insertionPoint.element.after(button);
-    else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
+      <strong class="todo-nav-count" data-todo-navigation-count aria-label="0 open to-dos" hidden>0</strong>`,
+    })) return false;
     todoListView.updateNavigation(items.filter((item) => !item.completed).length);
     pageState.restoreOpenState();
     return true;

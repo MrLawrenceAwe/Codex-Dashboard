@@ -34,18 +34,33 @@ struct InjectionBundle: Sendable {
             withExtension: "css",
             from: resourceBundle
         )
-        let digest = SHA256.hash(data: Data((script + stylesheet).utf8))
-        let version = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return try assemble(
+            script: script,
+            stylesheet: stylesheet,
+            schemaDeclaration: PromptLibrarySchema.javascriptDeclaration
+        )
+    }
+
+    static func assemble(
+        script: String,
+        stylesheet: String,
+        schemaDeclaration: String
+    ) throws -> InjectionBundle {
         let cssData = try JSONSerialization.data(withJSONObject: stylesheet, options: .fragmentsAllowed)
         guard let encodedCSS = String(data: cssData, encoding: .utf8) else {
             throw DashboardError.missingResources
         }
+        let payload = """
+          const DASHBOARD_CSS = \(encodedCSS);
+          \(schemaDeclaration)
+          \(script)
+        """
+        let digest = SHA256.hash(data: Data(payload.utf8))
+        let version = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
         let mountExpression = """
         (() => {
           const DASHBOARD_VERSION = \(String(reflecting: version));
-          const DASHBOARD_CSS = \(encodedCSS);
-          \(PromptLibrarySchema.javascriptDeclaration)
-          \(script)
+          \(payload)
         })()
         """
         return InjectionBundle(version: version, mountExpression: mountExpression)

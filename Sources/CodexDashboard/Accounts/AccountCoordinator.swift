@@ -159,17 +159,19 @@ final class AccountCoordinator: ObservableObject {
         }
     }
 
-    func refreshInactiveUsage() async {
+    func refreshInactiveUsage(interactionAllowed: Bool = false) async {
+        let generation = usageGeneration
         let inactiveAccounts = savedAccounts.filter { $0.id != activeAccountID }
         var shouldPersistUsageCache = false
         defer {
             if shouldPersistUsageCache { persistUsageCache(force: true) }
         }
         for account in inactiveAccounts {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, generation == usageGeneration else { return }
             _ = await refreshInactiveAccountUsage(
                 account.id,
-                reportsFailure: false,
+                reportsFailure: interactionAllowed,
+                interactionAllowed: interactionAllowed,
                 persistsUsageCache: false
             )
             shouldPersistUsageCache = true
