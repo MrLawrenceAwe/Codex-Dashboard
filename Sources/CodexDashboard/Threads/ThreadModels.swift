@@ -43,7 +43,7 @@ struct ThreadCatalog: Sendable {
     let totalThreadCount: Int
 }
 
-struct ThreadWireModel: Codable, Equatable, Sendable {
+struct RendererThread: Codable, Equatable, Sendable {
     let id: String
     let title: String
     let preview: String
@@ -74,11 +74,11 @@ struct ThreadWireModel: Codable, Equatable, Sendable {
 }
 
 struct DashboardSnapshot: Codable, Equatable, Sendable {
-    let threads: [ThreadWireModel]
+    let threads: [RendererThread]
     let accountPopover: AccountPopoverSnapshot?
 
     init(threads: [ThreadSummary], accountPopover: AccountPopoverSnapshot? = nil) {
-        self.threads = threads.map(ThreadWireModel.init)
+        self.threads = threads.map(RendererThread.init)
         self.accountPopover = accountPopover
     }
 }

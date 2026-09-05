@@ -1,15 +1,18 @@
 const todoList = (() => {
   let items = todoListState.load();
   let filterMode = 'open';
-  const pageState = createDashboardPage({
+  const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton,
     rootClass: 'codex-todo-open',
   });
-  let pendingNewImage = null;
-  let pendingNewImageIsInvalid = false;
-  let pendingNewImageIsLoading = false;
-  let pendingNewImageSubmissionPending = false;
+  let imageDraft;
+  resetImageDraft();
+
+  function resetImageDraft() {
+    imageDraft = { status: 'empty', image: null, submitWhenReady: false };
+  }
+
   const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
   const maximumImageBytes = 2 * 1024 * 1024;
 
@@ -31,35 +34,28 @@ const todoList = (() => {
     todoListView.render(items, filterMode);
   }
 
+  function commitItems(nextItems) {
+    const previousItems = items;
+    items = nextItems;
+    if (persist()) return true;
+    items = previousItems;
+    render();
+    return false;
+  }
+
   function add(title, image = null) {
     const item = todoListState.create(title, image);
-    if (!item) return false;
-    const previousItems = [...items];
-    items.unshift(item);
-    if (!persist()) {
-      items = previousItems;
-      render();
-      return false;
-    }
+    if (!item || !commitItems([item, ...items])) return false;
     filterMode = 'open';
     render();
     return true;
   }
 
   function updateItem(id, changes) {
-    const index = items.findIndex((item) => item.id === id);
-    if (index < 0) return;
-    const updatedItem = todoListState.normalizeItem({
-      ...items[index],
-      ...changes,
-      updatedAt: Date.now(),
-    }) || items[index];
-    const previousItems = items;
-    items = items.map((item, itemIndex) => itemIndex === index ? updatedItem : item);
-    if (!persist()) {
-      items = previousItems;
-    }
-    render();
+    const nextItems = items.map((item) => item.id === id
+      ? todoListState.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
+      : item);
+    if (commitItems(nextItems)) render();
   }
 
   function imageValidationError(file) {
@@ -148,12 +144,12 @@ const todoList = (() => {
     const page = todoListView.createPage();
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
-      if (pendingNewImageIsInvalid) {
-        pendingNewImageIsInvalid = false;
+      if (imageDraft.status === 'invalid') {
+        resetImageDraft();
         return;
       }
-      if (pendingNewImageIsLoading) {
-        pendingNewImageSubmissionPending = true;
+      if (imageDraft.status === 'loading') {
+        imageDraft.submitWhenReady = true;
         const imageStatus = page.querySelector('[data-todo-new-image-status]');
         imageStatus.textContent = 'Preparing image…';
         imageStatus.hidden = false;
@@ -161,12 +157,9 @@ const todoList = (() => {
       }
       showImageError();
       const title = page.querySelector('[data-todo-new-title]');
-      if (!add(title.value, pendingNewImage)) return;
+      if (!add(title.value, imageDraft.image)) return;
       title.value = '';
-      pendingNewImage = null;
-      pendingNewImageIsInvalid = false;
-      pendingNewImageIsLoading = false;
-      pendingNewImageSubmissionPending = false;
+      resetImageDraft();
       const imageStatus = page.querySelector('[data-todo-new-image-status]');
       imageStatus.hidden = true;
       imageStatus.textContent = '';
@@ -185,33 +178,31 @@ const todoList = (() => {
       event.preventDefault();
       const validationError = imageValidationError(file);
       if (validationError) {
-        pendingNewImage = null;
-        pendingNewImageIsInvalid = true;
-        pendingNewImageIsLoading = false;
-        pendingNewImageSubmissionPending = false;
+        resetImageDraft();
+        imageDraft.status = 'invalid';
         showImageError(validationError);
         return;
       }
-      pendingNewImage = null;
-      pendingNewImageIsInvalid = false;
-      pendingNewImageIsLoading = true;
-      pendingNewImageSubmissionPending = false;
+      resetImageDraft();
+      imageDraft.status = 'loading';
+      const readingDraft = imageDraft;
       const imageStatus = page.querySelector('[data-todo-new-image-status]');
       imageStatus.textContent = 'Preparing image…';
       imageStatus.hidden = false;
       readImage(file, (image) => {
-        pendingNewImage = image;
-        pendingNewImageIsInvalid = false;
-        pendingNewImageIsLoading = false;
+        if (imageDraft !== readingDraft) return;
+        imageDraft.image = image;
+        imageDraft.status = 'ready';
         imageStatus.textContent = 'Image ready to attach when you add this to-do.';
         imageStatus.hidden = false;
-        if (pendingNewImageSubmissionPending) {
-          pendingNewImageSubmissionPending = false;
+        if (imageDraft.submitWhenReady) {
+          imageDraft.submitWhenReady = false;
           page.querySelector('[data-todo-form]').requestSubmit();
         }
       }, () => {
-        pendingNewImageIsLoading = false;
-        pendingNewImageSubmissionPending = false;
+        if (imageDraft !== readingDraft) return;
+        resetImageDraft();
+        imageDraft.status = 'invalid';
         imageStatus.hidden = true;
       });
     });
@@ -222,10 +213,7 @@ const todoList = (() => {
       });
     });
     page.querySelector('[data-todo-clear-completed]').addEventListener('click', () => {
-      const previousItems = items;
-      items = items.filter((item) => !item.completed);
-      if (!persist()) items = previousItems;
-      render();
+      if (commitItems(items.filter((item) => !item.completed))) render();
     });
     page.querySelector('[data-todo-list]').addEventListener('change', (event) => {
       const row = event.target.closest('[data-todo-id]');
@@ -263,10 +251,7 @@ const todoList = (() => {
         button.title = 'Confirm delete to-do';
         return;
       }
-      const previousItems = items;
-      items = items.filter((item) => item.id !== row.dataset.todoId);
-      if (!persist()) items = previousItems;
-      render();
+      if (commitItems(items.filter((item) => item.id !== row.dataset.todoId))) render();
     });
     pageHost.append(page);
     pageState.restoreOpenState();

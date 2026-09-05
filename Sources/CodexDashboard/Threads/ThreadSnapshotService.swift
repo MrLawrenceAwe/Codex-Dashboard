@@ -82,7 +82,7 @@ actor ThreadSnapshotService {
         projectPaths requestedPaths: Set<String>? = nil
     ) async -> [String: WorkingTreeStatus]? {
         let allProjectPaths = Set(threads.map(\.projectPath))
-        // FileChangeMonitor already coalesces bursts. Do not discard the final event:
+        // WorkingTreeChangeMonitor already coalesces bursts. Do not discard the final event:
         // it may be the commit that clears the project's change indicator.
         let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
         guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }

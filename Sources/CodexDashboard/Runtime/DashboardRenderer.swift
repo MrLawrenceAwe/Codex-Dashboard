@@ -284,7 +284,7 @@ final class DashboardRenderer {
     }
 
     private func deliverThreads(
-        _ threads: [ThreadWireModel],
+        _ threads: [RendererThread],
         to targets: [DevToolsTarget]
     ) async throws {
         try await deliver(RendererScript.deliverThreads(threads), to: targets)

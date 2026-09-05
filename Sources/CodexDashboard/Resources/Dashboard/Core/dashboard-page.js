@@ -1,4 +1,4 @@
-function createDashboardPage({ pageID, navigationID, rootClass }) {
+function createPageVisibilityController({ pageID, navigationID, rootClass }) {
   let isOpen = false;
 
   function restoreOpenState() {

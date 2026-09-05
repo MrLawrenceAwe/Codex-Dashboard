@@ -68,7 +68,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[4] as? String, "Changed projects 1")
     }
 
-    func testIgnoredProjectIsRemovedFromChangeIndicatorsAndCanBeUnignored() async throws {
+    func testMutedProjectIsRemovedFromChangeIndicatorsAndCanBeUnmuted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -77,7 +77,7 @@ extension TaskDashboardWebTests {
             </body></html>
             """,
         )
-        let projectPath = "/tmp/ignored-project"
+        let projectPath = "/tmp/muted-project"
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(projectPath: projectPath, workingTreeStatus: .hasChanges),
         ])
@@ -91,33 +91,33 @@ extension TaskDashboardWebTests {
               const before = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-ignore]').textContent.trim(),
+                document.querySelector('[data-project-mute]').textContent.trim(),
               ];
-              document.querySelector('[data-project-ignore]').click();
-              const ignored = [
+              document.querySelector('[data-project-mute]').click();
+              const muted = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-ignore]').textContent.trim(),
-                document.querySelector('.dashboard-ignored-projects')?.open,
-                document.querySelector('.dashboard-ignored-projects summary')?.textContent.trim(),
+                document.querySelector('[data-project-mute]').textContent.trim(),
+                document.querySelector('.dashboard-muted-projects')?.open,
+                document.querySelector('.dashboard-muted-projects summary')?.textContent.trim(),
               ];
-              document.querySelector('[data-project-ignore]').click();
+              document.querySelector('[data-project-mute]').click();
               const restored = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-ignore]').textContent.trim(),
+                document.querySelector('[data-project-mute]').textContent.trim(),
               ];
-              return [before, ignored, restored];
+              return [before, muted, restored];
             })()
             """
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Mute changes"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unmute changes", false, "Muted1"])
-        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Mute changes"])
+        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Mute change alerts"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unmute change alerts", false, "Muted1"])
+        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Mute change alerts"])
     }
 
     func testUnavailableCommitActionDoesNotNavigateAwayFromDashboard() async throws {

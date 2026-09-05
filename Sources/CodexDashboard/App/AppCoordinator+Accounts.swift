@@ -177,12 +177,12 @@ extension AppCoordinator {
         _ accountID: UUID,
         reportsFailure: Bool = true,
         interactionAllowed: Bool = false
-    ) async -> SavedAccountUsageRefreshOutcome {
+    ) async -> UsageRefreshAuthorization {
         if accountID == accounts.activeAccountID {
             await refreshAccountUsage()
-            return .completed
+            return .notRequired
         }
-        guard !isPerformingAction else { return .completed }
+        guard !isPerformingAction else { return .notRequired }
         return await accounts.refreshInactiveAccountUsage(
             accountID,
             reportsFailure: reportsFailure,

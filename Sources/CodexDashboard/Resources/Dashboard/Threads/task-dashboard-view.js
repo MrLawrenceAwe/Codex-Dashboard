@@ -7,7 +7,7 @@ const taskDashboardView = (() => {
     renderedMarkup.set(element, markup);
   }
 
-  function updateSidebarStatus({ unreadCount, runningCount, visibleChangedProjectPaths }) {
+  function updateSidebarStatus({ unreadCount, runningCount, unmutedChangedProjectPaths }) {
     const unreadBadge = document.querySelector('[data-navigation-count]');
     if (unreadBadge) {
       unreadBadge.textContent = String(unreadCount);
@@ -28,8 +28,8 @@ const taskDashboardView = (() => {
     }
     const changes = document.querySelector('[data-navigation-changes]');
     if (changes) {
-      const changedProjectCount = visibleChangedProjectPaths.size;
-      const changedProjectNames = [...visibleChangedProjectPaths]
+      const changedProjectCount = unmutedChangedProjectPaths.size;
+      const changedProjectNames = [...unmutedChangedProjectPaths]
         .map((path) => path.split('/').filter(Boolean).at(-1) || path)
         .slice(0, 3);
       const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
@@ -44,7 +44,7 @@ const taskDashboardView = (() => {
     filterMode,
     visibleThreadLimit,
     collapsedProjects,
-    ignoredProjectPaths,
+    mutedProjectPaths,
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
@@ -67,7 +67,7 @@ const taskDashboardView = (() => {
       today: state.todayCount,
       running: state.runningCount,
       unread: state.unreadCount,
-      changedProjects: state.visibleChangedProjectPaths.size,
+      changedProjects: state.unmutedChangedProjectPaths.size,
     };
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
@@ -96,7 +96,7 @@ const taskDashboardView = (() => {
       threadMarkup.list(displayedThreads, {
         filterMode,
         collapsedProjects,
-        ignoredProjectPaths,
+        mutedProjectPaths,
         isUnread: isThreadUnread,
         isCompletionTickVisible,
       }),

@@ -164,7 +164,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-filter="running"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
-              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.ignoredProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
+              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.mutedProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }
@@ -182,6 +182,34 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
         XCTAssertEqual(values[5] as? Bool, true)
         XCTAssertEqual(values[6] as? Bool, true)
+    }
+
+    func testCurrentPreferencesMigrateMutedPathsWithoutKeepingOldField() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript("""
+        window.__codexDashboard.destroy();
+        localStorage.setItem('codex-dashboard.task-preferences', JSON.stringify({
+          filterMode: 'unread', ignoredProjectPaths: ['/tmp/old'], mutedProjectPaths: ['/tmp/current']
+        }));
+        """)
+        let injection = try InjectionBundle.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const stored = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
+          return [stored.filterMode, stored.mutedProjectPaths[0], Object.hasOwn(stored, 'ignoredProjectPaths')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["unread", "/tmp/current", false])
     }
 
     func testNavigationShowsUncommittedChangesIndicatorForChangedProjects() async throws {

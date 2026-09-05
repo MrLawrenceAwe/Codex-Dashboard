@@ -26,7 +26,7 @@ enum RendererScript {
         """
     }
 
-    static func deliverThreads(_ threads: [ThreadWireModel]) throws -> String {
+    static func deliverThreads(_ threads: [RendererThread]) throws -> String {
         let json = try encodeJSON(threads)
         return """
         (() => {

@@ -8,9 +8,16 @@ const taskDashboardState = (() => {
       const current = localStorage.getItem(preferencesKey);
       const legacy = current === null ? localStorage.getItem(legacyPreferencesKey) : null;
       stored = JSON.parse(current || legacy || '{}');
-      if (legacy !== null) {
-        localStorage.setItem(preferencesKey, legacy);
-        localStorage.removeItem(legacyPreferencesKey);
+      const hasLegacyMutedPaths = Object.hasOwn(stored, 'ignoredProjectPaths');
+      if (hasLegacyMutedPaths) {
+        if (!Object.hasOwn(stored, 'mutedProjectPaths')) {
+          stored.mutedProjectPaths = stored.ignoredProjectPaths;
+        }
+        delete stored.ignoredProjectPaths;
+      }
+      if (legacy !== null || hasLegacyMutedPaths) {
+        localStorage.setItem(preferencesKey, JSON.stringify(stored));
+        if (legacy !== null) localStorage.removeItem(legacyPreferencesKey);
       }
     } catch (_) {}
     return {
@@ -18,29 +25,29 @@ const taskDashboardState = (() => {
         ? stored.filterMode : 'today',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
-      ignoredProjectPaths: new Set(Array.isArray(stored.ignoredProjectPaths)
-        ? stored.ignoredProjectPaths.filter((value) => typeof value === 'string') : []),
+      mutedProjectPaths: new Set(Array.isArray(stored.mutedProjectPaths)
+        ? stored.mutedProjectPaths.filter((value) => typeof value === 'string') : []),
     };
   }
 
-  function savePreferences({ filterMode, collapsedProjects, ignoredProjectPaths }) {
+  function savePreferences({ filterMode, collapsedProjects, mutedProjectPaths }) {
     try {
       localStorage.setItem(preferencesKey, JSON.stringify({
         filterMode,
         collapsedProjects: [...collapsedProjects],
-        ignoredProjectPaths: [...ignoredProjectPaths],
+        mutedProjectPaths: [...mutedProjectPaths],
       }));
     } catch (_) {}
   }
 
-  function derive(threads, isThreadUnread, ignoredProjectPaths, now = new Date()) {
+  function derive(threads, isThreadUnread, mutedProjectPaths, now = new Date()) {
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
     const startOfTomorrow = new Date(startOfToday);
     startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
     const dayRange = { start: startOfToday.getTime(), end: startOfTomorrow.getTime() };
     let runningCount = 0;
-    const visibleChangedProjectPaths = new Set();
+    const unmutedChangedProjectPaths = new Set();
     const allChangedProjectPaths = new Set();
     let todayCount = 0;
     let unreadCount = 0;
@@ -52,10 +59,10 @@ const taskDashboardState = (() => {
       if (thread.workingTreeStatus === 'hasChanges') {
         const projectPath = String(thread.projectPath).trim();
         allChangedProjectPaths.add(projectPath);
-        if (!ignoredProjectPaths.has(projectPath)) visibleChangedProjectPaths.add(projectPath);
+        if (!mutedProjectPaths.has(projectPath)) unmutedChangedProjectPaths.add(projectPath);
       }
     });
-    return { todayCount, runningCount, unreadCount, visibleChangedProjectPaths, allChangedProjectPaths, dayRange };
+    return { todayCount, runningCount, unreadCount, unmutedChangedProjectPaths, allChangedProjectPaths, dayRange };
   }
 
   function filter({

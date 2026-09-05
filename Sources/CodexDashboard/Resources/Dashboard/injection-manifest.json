@@ -23,12 +23,12 @@
     "Threads/task-dashboard-page",
     "Todos/todo-list-state",
     "Todos/todo-list-view",
-    "Todos/todo-list",
+    "Todos/todo-list-controller",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
     "Core/dashboard-navigation",
-    "Core/dashboard-host"
+    "Core/dashboard-bridge"
   ],
   "stylesheets": [
     "Threads/task-dashboard",

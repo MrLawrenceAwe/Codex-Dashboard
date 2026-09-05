@@ -122,14 +122,14 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-project-icon svg { width: 13px; height: 13px; }
 #codex-dashboard-page .dashboard-project-summary { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
 #codex-dashboard-page .dashboard-project-count { flex: 0 0 auto; color: var(--dashboard-dim); font-size: 10px; }
-#codex-dashboard-page .dashboard-project-commit, #codex-dashboard-page .dashboard-project-ignore { display: inline-flex; min-height: 26px; flex: 0 0 auto; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: transparent; color: var(--dashboard-muted); font-size: 10px; font-weight: 550; cursor: pointer; }
-#codex-dashboard-page .dashboard-project-commit:hover, #codex-dashboard-page .dashboard-project-ignore:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
+#codex-dashboard-page .dashboard-project-commit, #codex-dashboard-page .dashboard-project-mute { display: inline-flex; min-height: 26px; flex: 0 0 auto; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: transparent; color: var(--dashboard-muted); font-size: 10px; font-weight: 550; cursor: pointer; }
+#codex-dashboard-page .dashboard-project-commit:hover, #codex-dashboard-page .dashboard-project-mute:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
 #codex-dashboard-page .dashboard-project-commit:disabled { cursor: not-allowed; opacity: .52; }
 #codex-dashboard-page .dashboard-project-commit:disabled:hover { border-color: var(--dashboard-line); background: var(--dashboard-control); color: var(--dashboard-muted); }
-#codex-dashboard-page .dashboard-project-commit svg, #codex-dashboard-page .dashboard-project-ignore svg { width: 11px; height: 11px; }
+#codex-dashboard-page .dashboard-project-commit svg, #codex-dashboard-page .dashboard-project-mute svg { width: 11px; height: 11px; }
 #codex-dashboard-page .dashboard-git-changes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 25%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--dashboard-amber) 8%, transparent); color: var(--dashboard-amber); font-size: 10px; font-weight: 550; }
 #codex-dashboard-page .dashboard-git-changes svg { width: 11px; height: 11px; }
-#codex-dashboard-page .dashboard-project-ignored { display: inline-flex; flex: 0 0 auto; padding: 2px 5px; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-dim); font-size: 10px; font-weight: 550; }
+#codex-dashboard-page .dashboard-project-muted { display: inline-flex; flex: 0 0 auto; padding: 2px 5px; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-dim); font-size: 10px; font-weight: 550; }
 #codex-dashboard-page .dashboard-project-list { display: grid; overflow: hidden; }
 #codex-dashboard-page .dashboard-project-list[hidden] { display: none; }
 #codex-dashboard-page .dashboard-git-project { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--dashboard-line); background: transparent; }
@@ -138,14 +138,14 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-git-project .dashboard-project-copy { gap: 2px; }
 #codex-dashboard-page .dashboard-git-project .dashboard-git-changes { margin-left: 5px; }
 #codex-dashboard-page .dashboard-git-project .dashboard-project-commit { margin-left: auto; }
-#codex-dashboard-page .dashboard-ignored-projects { margin-top: 4px; }
-#codex-dashboard-page .dashboard-ignored-projects > summary { display: flex; min-height: 32px; align-items: center; gap: 7px; padding: 6px 4px; color: var(--dashboard-dim); cursor: pointer; list-style: none; }
-#codex-dashboard-page .dashboard-ignored-projects > summary::-webkit-details-marker { display: none; }
-#codex-dashboard-page .dashboard-ignored-projects > summary::before { width: 6px; height: 6px; content: ""; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform 120ms ease; }
-#codex-dashboard-page .dashboard-ignored-projects[open] > summary::before { transform: rotate(45deg); }
-#codex-dashboard-page .dashboard-ignored-project-label { color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
-#codex-dashboard-page .dashboard-ignored-project-count { color: var(--dashboard-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
-#codex-dashboard-page .dashboard-ignored-project-list { display: grid; gap: 8px; padding-top: 4px; }
+#codex-dashboard-page .dashboard-muted-projects { margin-top: 4px; }
+#codex-dashboard-page .dashboard-muted-projects > summary { display: flex; min-height: 32px; align-items: center; gap: 7px; padding: 6px 4px; color: var(--dashboard-dim); cursor: pointer; list-style: none; }
+#codex-dashboard-page .dashboard-muted-projects > summary::-webkit-details-marker { display: none; }
+#codex-dashboard-page .dashboard-muted-projects > summary::before { width: 6px; height: 6px; content: ""; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform 120ms ease; }
+#codex-dashboard-page .dashboard-muted-projects[open] > summary::before { transform: rotate(45deg); }
+#codex-dashboard-page .dashboard-muted-project-label { color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
+#codex-dashboard-page .dashboard-muted-project-count { color: var(--dashboard-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+#codex-dashboard-page .dashboard-muted-project-list { display: grid; gap: 8px; padding-top: 4px; }
 #codex-dashboard-page .dashboard-list > .dashboard-thread { border: 0; border-radius: 0; }
 #codex-dashboard-page .dashboard-list.is-compact > .dashboard-thread { min-height: 48px; padding: 7px 12px; border: 0; border-radius: 0; }
 #codex-dashboard-page .dashboard-thread { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: 50px; align-items: center; padding: 6px 14px; appearance: none; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; transition: background 120ms ease, box-shadow 120ms ease; }
@@ -207,7 +207,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
   #codex-dashboard-page .dashboard-thread-preview { white-space: normal; }
   #codex-dashboard-page .dashboard-open-affordance { opacity: .72; }
   #codex-dashboard-page .dashboard-git-changes span { display: none; }
-  #codex-dashboard-page .dashboard-project-commit span, #codex-dashboard-page .dashboard-project-ignore span { display: none; }
+  #codex-dashboard-page .dashboard-project-commit span, #codex-dashboard-page .dashboard-project-mute span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

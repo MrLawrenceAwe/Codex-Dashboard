@@ -5,12 +5,12 @@ const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
 const pageSize = 60;
 let visibleLimit = pageSize;
-const { collapsedProjects, ignoredProjectPaths } = storedPreferences;
+const { collapsedProjects, mutedProjectPaths } = storedPreferences;
 let unreadSyncTimer;
 let renderFrame;
 let renderFallbackTimer;
 let unreadMonitoringStarted = false;
-const pageState = createDashboardPage({
+const pageState = createPageVisibilityController({
   pageID: dashboardElements.elementIDs.page,
   navigationID: dashboardElements.elementIDs.navButton,
   rootClass: 'codex-dashboard-open',
@@ -27,7 +27,7 @@ function savePreferences() {
   taskDashboardState.savePreferences({
     filterMode,
     collapsedProjects,
-    ignoredProjectPaths,
+    mutedProjectPaths,
   });
 }
 
@@ -122,7 +122,7 @@ function isThreadUnread(thread) {
 }
 
 function deriveViewState() {
-  return taskDashboardState.derive(threads, isThreadUnread, ignoredProjectPaths);
+  return taskDashboardState.derive(threads, isThreadUnread, mutedProjectPaths);
 }
 
 function openThread(thread) {
@@ -160,7 +160,7 @@ function renderDashboard() {
     filterMode,
     visibleThreadLimit: visibleLimit,
     collapsedProjects,
-    ignoredProjectPaths,
+    mutedProjectPaths,
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
@@ -243,12 +243,12 @@ function mountTaskDashboardPage() {
       renderDashboard();
     },
     onListClick: (event) => {
-      const projectIgnore = event.target.closest('[data-project-ignore]');
-      if (projectIgnore) {
+      const projectMute = event.target.closest('[data-project-mute]');
+      if (projectMute) {
         event.preventDefault();
-        const projectPath = projectIgnore.dataset.projectIgnore;
-        if (ignoredProjectPaths.has(projectPath)) ignoredProjectPaths.delete(projectPath);
-        else ignoredProjectPaths.add(projectPath);
+        const projectPath = projectMute.dataset.projectMute;
+        if (mutedProjectPaths.has(projectPath)) mutedProjectPaths.delete(projectPath);
+        else mutedProjectPaths.add(projectPath);
         commitOrPushError = '';
         savePreferences();
         renderDashboard();
