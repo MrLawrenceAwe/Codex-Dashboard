@@ -50,7 +50,12 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 #codex-dashboard-todo-page h1 { margin: 0; color: var(--todo-text); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.025em; }
 
-#codex-dashboard-todo-page .todo-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 28px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+#codex-dashboard-todo-page .todo-add { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 28px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+#codex-dashboard-todo-page .todo-add-image { position: relative; width: 44px; height: 38px; margin-left: 7px; overflow: visible; border: 1px solid var(--todo-line); border-radius: 7px; background: var(--todo-bg); }
+#codex-dashboard-todo-page .todo-add-image[hidden] { display: none; }
+#codex-dashboard-todo-page .todo-add-image img { display: block; width: 100%; height: 100%; border-radius: 6px; object-fit: cover; }
+#codex-dashboard-todo-page .todo-add .todo-add-image button { position: absolute; top: -6px; right: -6px; display: grid; width: 17px; min-width: 0; height: 17px; margin: 0; padding: 0; border: 1px solid var(--todo-line-strong); border-radius: 50%; background: var(--todo-bg); color: var(--todo-muted); font-size: 13px; font-weight: 500; line-height: 1; cursor: pointer; place-items: center; }
+#codex-dashboard-todo-page .todo-add .todo-add-image button:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add input { min-width: 0; height: 52px; padding: 0 16px; font-size: 14px; border: 0; background: transparent; color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add input { padding-left: 14px; }
 #codex-dashboard-todo-page .todo-add input::placeholder { color: var(--todo-dim); }

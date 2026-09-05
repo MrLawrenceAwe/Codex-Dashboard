@@ -11,6 +11,12 @@ const todoList = (() => {
 
   function resetImageDraft() {
     imageDraft = { status: 'empty', image: null, submitWhenReady: false };
+    todoListView?.updateImageDraft?.(null);
+    const imageStatus = document.querySelector('[data-todo-new-image-status]');
+    if (imageStatus) {
+      imageStatus.hidden = true;
+      imageStatus.textContent = '';
+    }
   }
 
   const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
@@ -153,9 +159,6 @@ const todoList = (() => {
       if (!add(title.value, imageDraft.image)) return;
       title.value = '';
       resetImageDraft();
-      const imageStatus = page.querySelector('[data-todo-new-image-status]');
-      imageStatus.hidden = true;
-      imageStatus.textContent = '';
       title.focus();
     });
     page.addEventListener('paste', (event) => {
@@ -186,6 +189,7 @@ const todoList = (() => {
         if (imageDraft !== readingDraft) return;
         imageDraft.image = image;
         imageDraft.status = 'ready';
+        todoListView.updateImageDraft(image);
         imageStatus.textContent = 'Image ready to attach when you add this to-do.';
         imageStatus.hidden = false;
         if (imageDraft.submitWhenReady) {
@@ -198,6 +202,11 @@ const todoList = (() => {
         imageDraft.status = 'invalid';
         imageStatus.hidden = true;
       });
+    });
+    page.querySelector('[data-todo-new-image-remove]').addEventListener('click', () => {
+      resetImageDraft();
+      showImageError();
+      page.querySelector('[data-todo-new-title]').focus();
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {

@@ -266,14 +266,26 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const paste = new Event('paste', { bubbles: true, cancelable: true });
               Object.defineProperty(paste, 'clipboardData', { value: { files: [file], items: [] } });
               title.dispatchEvent(paste);
-              form.requestSubmit();
             })()
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-todo-new-image-preview]:not([hidden]) img')?.src.startsWith('data:image/png;base64,'))",
+            in: webView
+        )
+        let draftPreview = try await webView.evaluateJavaScript(
+            "[document.querySelector('[data-todo-new-image-preview] img').alt, document.querySelector('[data-todo-new-image-status]').textContent]"
+        ) as? [String]
+        XCTAssertEqual(draftPreview, ["mockup.png", "Image ready to attach when you add this to-do."])
+        _ = try await webView.evaluateJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
+        try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-image-preview]') !== null",
             in: webView
         )
+        let draftWasCleared = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-todo-new-image-preview]').hidden"
+        ) as? Bool
+        XCTAssertEqual(draftWasCleared, true)
 
         _ = try await webView.evaluateJavaScript(
             """
@@ -366,6 +378,52 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? String, "Images must be 2 MB or smaller.")
         XCTAssertEqual(values[1] as? Bool, true)
+    }
+
+    func testPastedTodoImageCanBeRemovedFromTheAddBar() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const title = document.querySelector('[data-todo-new-title]');
+              const file = new File([new Uint8Array([137, 80, 78, 71])], 'draft.png', { type: 'image/png' });
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [], items: [
+                { kind: 'file', type: 'image/png', getAsFile: () => file },
+              ] } });
+              title.dispatchEvent(paste);
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "!document.querySelector('[data-todo-new-image-preview]').hidden",
+            in: webView
+        )
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-todo-new-image-remove]').click();
+              return [
+                document.querySelector('[data-todo-new-image-preview]').hidden,
+                document.querySelector('[data-todo-new-image-preview] img').getAttribute('src'),
+                document.querySelector('[data-todo-new-image-status]').hidden,
+                document.activeElement === document.querySelector('[data-todo-new-title]'),
+              ];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "", true, true])
     }
 
     func testOpenTodoPageIsRepairedAndClosesForCodexNavigation() async throws {
