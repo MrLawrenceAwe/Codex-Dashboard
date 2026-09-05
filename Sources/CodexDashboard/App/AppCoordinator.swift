@@ -269,10 +269,18 @@ final class AppCoordinator: ObservableObject {
         totalCount: Int? = nil,
         refreshedAt: Date? = nil
     ) {
-        refreshScheduler.updateProjectPaths(Self.liveMonitoredProjectPaths(in: updatedThreads))
+        let previousProjectPaths = Self.liveMonitoredProjectPaths(in: threads)
+        let updatedProjectPaths = Self.liveMonitoredProjectPaths(in: updatedThreads)
+        let newlyMonitoredProjectPaths = updatedProjectPaths.subtracting(previousProjectPaths)
+        refreshScheduler.updateProjectPaths(updatedProjectPaths)
         if threads != updatedThreads { threads = updatedThreads }
         if let totalCount, totalThreadCount != totalCount { totalThreadCount = totalCount }
         if let refreshedAt { lastSuccessfulRefresh = refreshedAt }
+        if !newlyMonitoredProjectPaths.isEmpty {
+            Task { @MainActor [weak self] in
+                await self?.updateWorkingTreeStatuses(projectPaths: newlyMonitoredProjectPaths)
+            }
+        }
     }
 
     static func liveMonitoredProjectPaths(in threads: [ThreadSummary]) -> Set<String> {

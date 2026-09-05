@@ -31,14 +31,11 @@ const todoList = (() => {
     if (!page) return;
     const openCount = items.filter((item) => !item.completed).length;
     const completedCount = items.length - openCount;
-    page.querySelector('[data-todo-summary]').textContent = items.length
-      ? `${openCount} open · ${completedCount} completed`
-      : 'A little space for your next steps.';
     const progress = page.querySelector('[data-todo-progress]');
     progress.hidden = items.length === 0;
     progress.querySelector('progress').value = completedCount;
     progress.querySelector('progress').max = items.length || 1;
-    progress.querySelector('span').textContent = `${completedCount} of ${items.length} done`;
+    progress.querySelector('span').textContent = `${completedCount}/${items.length} done`;
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       const active = button.dataset.todoFilter === filterMode;
       button.classList.toggle('is-active', active);
@@ -52,11 +49,9 @@ const todoList = (() => {
     const list = page.querySelector('[data-todo-list]');
     const visible = visibleItems();
     if (!visible.length) {
-      const message = !items.length ? 'Start with one small step'
-        : filterMode === 'completed' ? 'Your wins will appear here' : 'All caught up';
-      const detail = !items.length ? 'Add your first to-do above. Make room for what matters.'
-        : filterMode === 'completed' ? 'Check off a to-do to see it here.' : 'Everything is checked off. Enjoy the breathing room.';
-      list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${threadMarkup.icon('completed')}</span><strong>${message}</strong><span>${detail}</span></div>`;
+      const message = !items.length ? 'No to-dos yet'
+        : filterMode === 'completed' ? 'No completed to-dos' : 'All caught up';
+      list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${threadMarkup.icon('completed')}</span><strong>${message}</strong></div>`;
       return;
     }
     list.innerHTML = visible.map((item) => `
@@ -133,12 +128,12 @@ const todoList = (() => {
     page.innerHTML = `
       <div class="todo-shell">
         <header class="todo-header">
-          <div><h1>To-dos</h1><p data-todo-summary role="status">A little space for your next steps.</p></div>
+          <h1>To-dos</h1>
           <div class="todo-progress" data-todo-progress hidden><span></span><progress value="0" max="1" aria-label="To-do completion"></progress></div>
         </header>
         <form class="todo-add" data-todo-form>
-          <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="What needs to get done?" autocomplete="off">
-          <button type="submit"><span aria-hidden="true">+</span> Add to-do</button>
+          <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do…" autocomplete="off">
+          <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
         <div class="todo-toolbar">
@@ -150,7 +145,6 @@ const todoList = (() => {
           <button type="button" class="todo-clear" data-todo-clear-completed hidden>Clear completed</button>
         </div>
         <main class="todo-list" data-todo-list></main>
-        <p class="todo-hint">Click a title to edit it. Check it off when you’re done.</p>
       </div>`;
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
