@@ -5,7 +5,7 @@ const promptLibrary = (() => {
   let returnFocusElement;
   let searchTerm = '';
   let capturedSelectionText = '';
-  let scopeProject;
+  let composerProject;
 
   function showStorageError(message) {
     const error = document.querySelector('[data-prompt-storage-error]');
@@ -15,18 +15,12 @@ const promptLibrary = (() => {
     }
   }
 
-  function persistLibrary(nextPrompts = promptStore.prompts, nextSections = promptStore.sections) {
-    if (promptStore.commitLibrary(nextPrompts, nextSections)) return true;
+  function stageLibraryUpdate(nextPrompts = promptStore.prompts, nextSections = promptStore.sections) {
+    if (promptStore.stageLibraryUpdate(nextPrompts, nextSections)) return true;
     showStorageError();
     return false;
   }
 
-  function scopeKey(scope) {
-    const normalized = promptStore.normalizeScope(scope);
-    return normalized.type === 'project'
-      ? `project:${normalized.projectPath}`
-      : 'global';
-  }
 
   const promptInteractionEventTypes = [
   'pointerdown', 'mousedown', 'click', 'keydown', 'input', 'search', 'change', 'submit',
@@ -36,7 +30,7 @@ const promptLibrary = (() => {
   function renderDialog({ searchSelection } = {}) {
     promptLibraryView.render({
       dialogState,
-      scopeProject,
+      composerProject,
       searchTerm,
       searchSelection,
     });
@@ -75,7 +69,7 @@ function openLibrary() {
     : undefined;
   dialogState = { mode: 'list' };
   searchTerm = '';
-  scopeProject = taskDashboard.scopeProject();
+  composerProject = taskDashboard.resolveComposerProject();
   presentDialog();
 }
 
@@ -99,8 +93,8 @@ function savePrompt(form) {
   const content = String(values.get('content') || '').trim();
   if (!name || !content) return;
   const section = promptStore.resolveSection(values.get('section'));
-  const scope = values.get('scope') === 'project' && scopeProject
-    ? { type: 'project', projectPath: scopeProject.path }
+  const scope = values.get('scope') === 'project' && composerProject
+    ? { type: 'project', projectPath: composerProject.path }
     : { type: 'global' };
   const preset = values.has('hasPreset')
     ? promptStore.normalizePreset({
@@ -129,7 +123,7 @@ function savePrompt(form) {
   const nextSections = promptStore.sections.includes(section)
     ? promptStore.sections
     : [...promptStore.sections, section];
-  if (!persistLibrary(nextPrompts, nextSections)) return;
+  if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
   dialogState = { mode: 'list' };
   renderDialog();
 }
@@ -142,7 +136,7 @@ function createPromptSection(form) {
   const nextSections = promptStore.sections.includes(section)
     ? promptStore.sections
     : [...promptStore.sections, section];
-  if (!persistLibrary(promptStore.prompts, nextSections)) return;
+  if (!stageLibraryUpdate(promptStore.prompts, nextSections)) return;
   const nextCollapsedSections = new Set(promptStore.collapsedSections);
   nextCollapsedSections.delete(section);
   promptStore.saveCollapsedSections(nextCollapsedSections);
@@ -174,7 +168,7 @@ function renamePromptSection(form) {
   const nextSections = promptStore.sections.map((section) => (
     section === source ? destination : section
   ));
-  if (!persistLibrary(nextPrompts, nextSections)) return;
+  if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
   promptStore.collapsedSections.delete(source);
   promptStore.saveCollapsedSections();
   dialogState = { mode: 'list' };
@@ -182,24 +176,7 @@ function renamePromptSection(form) {
 }
 
 function movePrompt(promptID, offset) {
-  const index = promptStore.prompts.findIndex((prompt) => prompt.id === promptID);
-  const prompt = promptStore.prompts[index];
-  if (!prompt) return;
-  const section = promptStore.normalizeSection(prompt.section);
-  const promptScopeKey = scopeKey(prompt.scope);
-  const sectionIndexes = promptStore.prompts
-    .map((item, itemIndex) => ({ item, itemIndex }))
-    .filter(({ item }) => (
-      promptStore.normalizeSection(item.section) === section
-        && scopeKey(item.scope) === promptScopeKey
-    ))
-    .map(({ itemIndex }) => itemIndex);
-  const position = sectionIndexes.indexOf(index);
-  const destination = sectionIndexes[position + offset];
-  if (destination === undefined) return;
-  const nextPrompts = [...promptStore.prompts];
-  [nextPrompts[index], nextPrompts[destination]] = [nextPrompts[destination], nextPrompts[index]];
-  if (!persistLibrary(nextPrompts, promptStore.sections)) return;
+  if (!promptReordering.moveByOffset(promptID, offset, stageLibraryUpdate)) return;
   renderDialog();
   document.querySelector(`[data-prompt-row-id="${CSS.escape(promptID)}"] [data-prompt-move-${offset < 0 ? 'up' : 'down'}]`)?.focus();
 }
@@ -211,25 +188,23 @@ function handlePromptSubmit(event, form) {
   else if (form.matches('[data-prompt-section-rename-form]')) renamePromptSection(form);
 }
 
-function insertSavedPrompt(prompt) {
+async function insertSavedPrompt(prompt) {
   const insert = (clipboardText = '') => {
     if (!composerAdapter.insert(expandedPromptContent(prompt.content, clipboardText))) return false;
     closeLibrary({ restoreFocus: false });
     return true;
   };
   if ((!prompt.usePreset || !prompt.preset) && !prompt.content.includes('{{clipboard}}')) return insert();
-  return (async () => {
-    let clipboardText = '';
-    if (prompt.content.includes('{{clipboard}}')) {
-      try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
-    }
-    hideDialog();
-    if (!await composerAdapter.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
-      restoreDialog('Could not apply this prompt’s composer preset. The prompt was not inserted.');
-      return false;
-    }
-    return insert(clipboardText);
-  })();
+  let clipboardText = '';
+  if (prompt.content.includes('{{clipboard}}')) {
+    try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
+  }
+  hideDialog();
+  if (!await composerAdapter.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
+    restoreDialog('Could not apply this prompt’s composer preset. The prompt was not inserted.');
+    return false;
+  }
+  return insert(clipboardText);
 }
 
 function handlePromptClick(target) {
@@ -260,7 +235,7 @@ function handlePromptClick(target) {
         : prompt
     ));
     const nextSections = promptStore.sections.filter((item) => item !== section);
-    if (!persistLibrary(nextPrompts, nextSections)) return;
+    if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
     promptStore.collapsedSections.delete(section);
     promptStore.saveCollapsedSections();
     renderDialog();
@@ -291,7 +266,7 @@ function handlePromptClick(target) {
   } else if (target.closest('[data-prompt-delete-confirm]')) {
     const id = target.closest('[data-prompt-delete-confirm]').dataset.promptDeleteConfirm;
     const nextPrompts = promptStore.prompts.filter((prompt) => prompt.id !== id);
-    if (!persistLibrary(nextPrompts, promptStore.sections)) return;
+    if (!stageLibraryUpdate(nextPrompts, promptStore.sections)) return;
     renderDialog();
   } else if (target.closest('[data-prompt-delete]')) {
     const button = target.closest('[data-prompt-delete]');
@@ -305,7 +280,7 @@ function handlePromptClick(target) {
         ? { ...prompt, usePreset: checkbox.checked || undefined }
         : prompt
     ));
-    if (!persistLibrary(nextPrompts, promptStore.sections)) checkbox.checked = !checkbox.checked;
+    if (!stageLibraryUpdate(nextPrompts, promptStore.sections)) checkbox.checked = !checkbox.checked;
   } else if (target.closest('[data-prompt-use]')) {
     const id = target.closest('[data-prompt-use]').dataset.promptUse;
     const prompt = promptStore.prompts.find((item) => item.id === id);
@@ -320,12 +295,13 @@ function handlePromptClick(target) {
       delete window[insertionGuard];
       return;
     }
-    const insertion = insertSavedPrompt(prompt);
-    if (insertion && typeof insertion.then === 'function') {
-      void insertion.then((inserted) => {
-        if (!inserted) delete window[insertionGuard];
-      });
-    } else if (!insertion) delete window[insertionGuard];
+    void insertSavedPrompt(prompt).then((inserted) => {
+      if (!inserted) delete window[insertionGuard];
+    }).catch(() => {
+      delete window[insertionGuard];
+      if (!document.getElementById(dashboardElements.elementIDs.promptDialog)) presentDialog();
+      showStorageError('Could not insert this prompt. Please try again.');
+    });
   }
 }
 
@@ -345,7 +321,7 @@ function handlePromptInteraction(event) {
   }
   const dialog = target?.closest(`#${dashboardElements.elementIDs.promptDialog}`);
   if (!dialog || dialog[dialogOwner] !== true) return;
-  if (promptReordering.handle(event, target, dialog, persistLibrary, renderDialog)) return;
+  if (promptReordering.handle(event, target, dialog, stageLibraryUpdate, renderDialog)) return;
   if (event.type === 'keydown') {
     if (event.target.matches('[data-prompt-search]') && event.key === 'ArrowDown') {
       event.preventDefault();

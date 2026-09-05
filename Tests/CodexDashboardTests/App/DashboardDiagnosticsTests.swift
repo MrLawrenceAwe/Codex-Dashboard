@@ -20,7 +20,7 @@ final class DashboardDiagnosticsTests: XCTestCase {
         )
 
         XCTAssertTrue(report.text.contains("Codex Dashboard 1.2.3"))
-        XCTAssertTrue(report.text.contains("Threads: 12 loaded / 20 total"))
+        XCTAssertTrue(report.text.contains("Tasks: 12 loaded / 20 total"))
         XCTAssertTrue(report.text.contains("Last refresh: never"))
         XCTAssertTrue(report.text.contains("Connection error: none"))
     }

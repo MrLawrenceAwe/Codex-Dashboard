@@ -250,9 +250,10 @@ final class AccountCoordinator: ObservableObject {
                     id: account.id,
                     name: account.name,
                     isActive: isActive,
-                    usageLines: AccountPopoverUsageFormatter.titles(
+                    usageLines: AccountUsageFormatter.lines(
                         for: usageStatus,
-                        staleLabel: isActive ? "Usage may be stale" : "Cached usage"
+                        staleLabel: isActive ? "Usage may be stale" : "Cached usage",
+                        includesAbsoluteDate: false
                     ),
                     isRefreshing: refreshingUsageAccountIDs.contains(account.id),
                     errorMessage: usageErrorsByAccountID[account.id]

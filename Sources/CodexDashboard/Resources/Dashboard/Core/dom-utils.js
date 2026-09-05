@@ -1,4 +1,10 @@
 const domUtils = (() => {
+  function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+    })[character]);
+  }
+
   function isVisible(element) {
     if (!element || element.getClientRects().length === 0) return false;
     const style = getComputedStyle(element);
@@ -19,5 +25,5 @@ const domUtils = (() => {
     return null;
   }
 
-  return { delay, isVisible, waitFor };
+  return { delay, escapeHTML, isVisible, waitFor };
 })();

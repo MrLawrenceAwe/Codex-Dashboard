@@ -90,7 +90,8 @@ const promptStore = (() => {
       ) || normalizedSection;
     },
 
-    commitLibrary(nextPrompts = store.prompts, nextSections = store.sections) {
+    // Queue a renderer edit; PromptLibraryBridge persists and acknowledges it.
+    stageLibraryUpdate(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);
       const library = { version, prompts: nextPrompts, sections };
       if (!writeJSON(pendingLibraryStorageKey, library)) return false;

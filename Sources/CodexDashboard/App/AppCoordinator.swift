@@ -172,7 +172,7 @@ final class AppCoordinator: ObservableObject {
         await synchronizationGate.perform { [weak self] in await self?.synchronizeRuntime() }
     }
 
-    func restartCodexAndEnableTaskDashboard() async {
+    func restartCodexAndEnableDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
         connectionNotice = nil
         do {
@@ -301,8 +301,8 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func newestCompletedThreadID(in threads: [ThreadSummary]) -> String? {
-        taskCompletionObserver.newestCompletion(in: threads)
+    func observeAndReturnNewestCompletedThreadID(in threads: [ThreadSummary]) -> String? {
+        taskCompletionObserver.observeAndReturnNewestCompletedThreadID(in: threads)
     }
 
     static let incompatibleContractMessage =

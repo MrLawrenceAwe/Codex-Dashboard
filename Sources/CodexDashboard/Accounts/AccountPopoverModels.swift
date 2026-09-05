@@ -19,7 +19,7 @@ struct AccountPopoverItem: Codable, Equatable, Sendable {
 struct AccountPopoverAction: Codable, Equatable, Sendable {
     enum Kind: String, Codable, Sendable {
         case updateUsage
-        case updateSignedOutUsage
+        case refreshInactiveUsage
         case saveCurrentAccount
         case switchAccount
         case addAccount

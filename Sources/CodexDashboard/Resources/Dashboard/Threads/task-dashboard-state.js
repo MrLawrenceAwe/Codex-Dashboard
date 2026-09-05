@@ -39,7 +39,7 @@ const taskDashboardState = (() => {
     const startOfTomorrow = new Date(startOfToday);
     startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
     const dayRange = { start: startOfToday.getTime(), end: startOfTomorrow.getTime() };
-    const runningThreads = [];
+    let runningCount = 0;
     const visibleChangedProjectPaths = new Set();
     const allChangedProjectPaths = new Set();
     let todayCount = 0;
@@ -47,7 +47,7 @@ const taskDashboardState = (() => {
 
     threads.forEach((thread) => {
       if (isToday(thread, dayRange)) todayCount += 1;
-      if (thread.runState === 'running') runningThreads.push(thread);
+      if (thread.runState === 'running') runningCount += 1;
       if (isThreadUnread(thread)) unreadCount += 1;
       if (thread.workingTreeStatus === 'hasChanges') {
         const projectPath = String(thread.projectPath).trim();
@@ -55,7 +55,7 @@ const taskDashboardState = (() => {
         if (!ignoredProjectPaths.has(projectPath)) visibleChangedProjectPaths.add(projectPath);
       }
     });
-    return { todayCount, runningThreads, unreadCount, visibleChangedProjectPaths, allChangedProjectPaths, dayRange };
+    return { todayCount, runningCount, unreadCount, visibleChangedProjectPaths, allChangedProjectPaths, dayRange };
   }
 
   function filter({
@@ -81,7 +81,7 @@ const taskDashboardState = (() => {
     return recency >= start && recency < end;
   }
 
-  function normalizeThreads(threads) {
+  function sortThreadsByRecency(threads) {
     if (!Array.isArray(threads)) return [];
     return [...threads].sort((left, right) => {
       const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
@@ -89,5 +89,5 @@ const taskDashboardState = (() => {
     });
   }
 
-  return { derive, filter, loadPreferences, normalizeThreads, savePreferences };
+  return { derive, filter, loadPreferences, sortThreadsByRecency, savePreferences };
 })();

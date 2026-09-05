@@ -18,13 +18,31 @@ const promptReordering = (() => {
     } : null;
   }
 
+  function isInGroup(prompt, section, scopeKey) {
+    return promptStore.normalizeSection(prompt.section) === section
+      && promptLibraryContract.scopeKey(prompt.scope) === scopeKey;
+  }
+
+  function moveByOffset(promptID, offset, persist) {
+    const index = promptStore.prompts.findIndex((prompt) => prompt.id === promptID);
+    const prompt = promptStore.prompts[index];
+    if (!prompt) return false;
+    const section = promptStore.normalizeSection(prompt.section);
+    const scopeKey = promptLibraryContract.scopeKey(prompt.scope);
+    const groupIndexes = promptStore.prompts.flatMap((item, itemIndex) => (
+      isInGroup(item, section, scopeKey) ? [itemIndex] : []
+    ));
+    const destination = groupIndexes[groupIndexes.indexOf(index) + offset];
+    if (destination === undefined) return false;
+    const nextPrompts = [...promptStore.prompts];
+    [nextPrompts[index], nextPrompts[destination]] = [nextPrompts[destination], nextPrompts[index]];
+    return persist(nextPrompts, promptStore.sections);
+  }
+
   function reorder(destination, dropAfter, persist) {
     const movingPrompt = promptStore.prompts.find((prompt) => prompt.id === draggedPromptID);
     if (!movingPrompt || !destination?.section) return false;
-    const movingScope = promptStore.normalizeScope(movingPrompt.scope);
-    const movingScopeKey = movingScope.type === 'project'
-      ? `project:${movingScope.projectPath}`
-      : 'global';
+    const movingScopeKey = promptLibraryContract.scopeKey(movingPrompt.scope);
     if (movingScopeKey !== destination.scopeKey) return false;
     if (destination.row?.dataset.promptRowId === draggedPromptID) return false;
 
@@ -38,15 +56,11 @@ const promptReordering = (() => {
       else if (dropAfter) insertionIndex += 1;
     } else {
       insertionIndex = remainingPrompts.reduce((lastIndex, prompt, index) => (
-        promptStore.normalizeSection(prompt.section) === movedPrompt.section
-          && promptStore.normalizeScope(prompt.scope).type === movingScope.type
-          && promptStore.normalizeScope(prompt.scope).projectPath === movingScope.projectPath
-          ? index + 1 : lastIndex
+        isInGroup(prompt, movedPrompt.section, movingScopeKey) ? index + 1 : lastIndex
       ), remainingPrompts.length);
     }
     remainingPrompts.splice(insertionIndex, 0, movedPrompt);
-    if (!persist(remainingPrompts, promptStore.sections)) return false;
-    return true;
+    return persist(remainingPrompts, promptStore.sections);
   }
 
   function handle(event, target, dialog, persist, render) {
@@ -98,5 +112,5 @@ const promptReordering = (() => {
     return false;
   }
 
-  return { handle };
+  return { handle, moveByOffset };
 })();

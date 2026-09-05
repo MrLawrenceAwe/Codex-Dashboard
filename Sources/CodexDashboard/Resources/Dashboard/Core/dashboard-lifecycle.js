@@ -36,7 +36,13 @@ const dashboardLifecycle = (() => {
     if (target?.closest(`#${dashboardElements.elementIDs.navButton}`)) {
       event.preventDefault();
       event.stopPropagation();
-      if (event.type === 'click') hooks.open();
+      if (event.type === 'click') hooks.openTasks();
+      return;
+    }
+    if (target?.closest(`#${dashboardElements.elementIDs.todoNavButton}`)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.type === 'click') hooks.openTodos();
       return;
     }
     if (event.type === 'click' && target?.closest('aside')) {

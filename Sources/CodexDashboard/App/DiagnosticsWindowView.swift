@@ -163,7 +163,7 @@ struct DiagnosticsWindowView: View {
                 .disabled(!actions.canOpen)
 
                 Button(DashboardActionPresentation.restartTitle) {
-                    Task { await coordinator.restartCodexAndEnableTaskDashboard() }
+                    Task { await coordinator.restartCodexAndEnableDashboard() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!actions.canRestart)
@@ -195,7 +195,7 @@ struct DiagnosticsWindowView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("Codex \(codexVersion) · \(coordinator.rendererTargetCount) renderer target(s)")
-                Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total threads")
+                Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total tasks")
                 if let refreshed = coordinator.lastSuccessfulRefresh {
                     Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
                 }
@@ -230,7 +230,7 @@ struct DiagnosticsWindowView: View {
                 )
             }
 
-            Text("The app runs from the menu bar. The Task Dashboard reads local Codex thread metadata and activity logs; the signed Codex application bundle is never modified.")
+            Text("The app runs from the menu bar. The Task Dashboard reads local Codex task metadata and activity logs; the signed Codex application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -5,6 +5,49 @@ import XCTest
 
 @MainActor
 final class TodoListWebTests: SerializedDashboardWebTestCase {
+    func testPageSelectionRemainsExclusiveAcrossRemountAndReinjection() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const state = () => [
+            document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+            document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
+            document.querySelectorAll('[aria-current="page"]').length,
+          ];
+          window.__codexDashboard.open();
+          document.getElementById('codex-dashboard-todo-navigation').click();
+          const todos = state();
+          document.getElementById('codex-dashboard-todo-navigation').remove();
+          window.__codexDashboard.ensureMounted();
+          const remounted = state();
+          document.getElementById('codex-dashboard-navigation').click();
+          const tasks = state();
+          window.__codexDashboard.openTodos();
+          return [todos, remounted, tasks, state()];
+        })()
+        """) as? [[AnyHashable]]
+        XCTAssertEqual(result, [
+            [false, true, 1], [false, true, 1], [true, false, 1], [false, true, 1],
+        ])
+
+        let injection = try InjectionBundle.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let sameVersion = try await webView.evaluateJavaScript("""
+        [document.querySelectorAll('#codex-dashboard-todo-navigation').length,
+         document.getElementById('codex-dashboard-todo-page').classList.contains('is-open')]
+        """) as? [AnyHashable]
+        XCTAssertEqual(sameVersion, [1, true])
+
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.version = 'previous-version'")
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let replacedVersion = try await webView.evaluateJavaScript("""
+        [document.querySelectorAll('#codex-dashboard-todo-navigation').length,
+         window.__codexDashboard.isOpen(),
+         document.documentElement.classList.contains('codex-todo-open')]
+        """) as? [AnyHashable]
+        XCTAssertEqual(replacedVersion, [1, false, false])
+    }
+
     func testTodoDestinationSitsAfterTaskDashboard() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """

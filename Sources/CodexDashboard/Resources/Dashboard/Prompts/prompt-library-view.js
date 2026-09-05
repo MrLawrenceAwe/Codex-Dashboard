@@ -4,7 +4,7 @@ const promptLibraryView = (() => {
       ? options
       : [[selectedValue, `Saved model · ${selectedValue}`], ...options];
     return availableOptions.map(([value, label]) => (
-      `<option value="${dashboardElements.escapeHTML(value)}"${value === selectedValue ? ' selected' : ''}>${dashboardElements.escapeHTML(label)}</option>`
+      `<option value="${domUtils.escapeHTML(value)}"${value === selectedValue ? ' selected' : ''}>${domUtils.escapeHTML(label)}</option>`
     )).join('');
   }
 
@@ -18,18 +18,12 @@ const promptLibraryView = (() => {
     ].filter(Boolean);
   }
 
-  function scopeKey(scope) {
-    const normalized = promptStore.normalizeScope(scope);
-    return normalized.type === 'project'
-      ? `project:${normalized.projectPath}`
-      : 'global';
-  }
 
   function promptMatchesScope(prompt, scope) {
-    return scopeKey(prompt.scope) === scopeKey(scope);
+    return promptLibraryContract.scopeKey(prompt.scope) === promptLibraryContract.scopeKey(scope);
   }
 
-  function render({ dialogState, scopeProject, searchTerm, searchSelection } = {}) {
+  function render({ dialogState, composerProject, searchTerm, searchSelection } = {}) {
   const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
   const content = dialog?.querySelector('[data-prompt-content]');
   if (!content) return;
@@ -48,7 +42,7 @@ const promptLibraryView = (() => {
   if (dialogState.mode === 'renameSection') {
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-section-rename-form>
-        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${dashboardElements.escapeHTML(dialogState.section)}" required /></label>
+        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${domUtils.escapeHTML(dialogState.section)}" required /></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
           <button type="submit" class="dashboard-prompt-primary">Rename section</button>
@@ -66,12 +60,12 @@ const promptLibraryView = (() => {
     const promptScope = promptStore.normalizeScope(prompt?.scope);
     const selectedScope = prompt
       ? promptScope.type
-      : (scopeProject ? 'project' : 'global');
+      : (composerProject ? 'project' : 'global');
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
-        <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${dashboardElements.escapeHTML(prompt?.name || '')}" required /></label>
-        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${dashboardElements.escapeHTML(promptLibraryContract.defaultSection)}" value="${dashboardElements.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${dashboardElements.escapeHTML(section)}"></option>`).join('')}</datalist></label>
-        <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${scopeProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${dashboardElements.escapeHTML(scopeProject.name)}</option>` : ''}</select></label>
+        <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${domUtils.escapeHTML(prompt?.name || '')}" required /></label>
+        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${domUtils.escapeHTML(promptLibraryContract.defaultSection)}" value="${domUtils.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${domUtils.escapeHTML(section)}"></option>`).join('')}</datalist></label>
+        <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${composerProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${domUtils.escapeHTML(composerProject.name)}</option>` : ''}</select></label>
         <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a model preset</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
           <legend>Model preset</legend>
@@ -79,7 +73,7 @@ const promptLibraryView = (() => {
           <label>Effort<select name="presetReasoningEffort">${selectOptions(presetOptions.reasoningEfforts, prompt?.preset?.reasoningEffort || promptLibraryContract.defaults.reasoningEffort)}</select></label>
           <label>Speed<select name="presetSpeed">${selectOptions(presetOptions.speeds, prompt?.preset?.speed || promptLibraryContract.defaults.speed)}</select></label>
         </fieldset>
-        <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${dashboardElements.escapeHTML(prompt?.content || '')}</textarea></label>
+        <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${domUtils.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
           <button type="submit" class="dashboard-prompt-primary">Save prompt</button>
@@ -94,31 +88,31 @@ const promptLibraryView = (() => {
       .toLowerCase().includes(query)
   )) : promptStore.prompts;
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
-    <article class="dashboard-prompt-row" data-prompt-row-id="${dashboardElements.escapeHTML(prompt.id)}" draggable="true">
+    <article class="dashboard-prompt-row" data-prompt-row-id="${domUtils.escapeHTML(prompt.id)}" draggable="true">
       <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
       <div class="dashboard-prompt-row-main">
-        <button type="button" class="dashboard-prompt-use" data-prompt-use="${dashboardElements.escapeHTML(prompt.id)}">
-          <strong>${dashboardElements.escapeHTML(prompt.name)}</strong>
-          <span>${dashboardElements.escapeHTML(prompt.content)}</span>
-          ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${dashboardElements.escapeHTML(item)}</em>`).join('')}</span>` : ''}
+        <button type="button" class="dashboard-prompt-use" data-prompt-use="${domUtils.escapeHTML(prompt.id)}">
+          <strong>${domUtils.escapeHTML(prompt.name)}</strong>
+          <span>${domUtils.escapeHTML(prompt.content)}</span>
+          ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
         </button>
-        <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${dashboardElements.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use model preset</label>
+        <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use model preset</label>
       </div>
       <div class="dashboard-prompt-row-actions">
-        <button type="button" data-prompt-move-up="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Move ${dashboardElements.escapeHTML(prompt.name)} up">↑</button>
-        <button type="button" data-prompt-move-down="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Move ${dashboardElements.escapeHTML(prompt.name)} down">↓</button>
-        <button type="button" data-prompt-edit="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Edit ${dashboardElements.escapeHTML(prompt.name)}">Edit</button>
-        <button type="button" data-prompt-delete="${dashboardElements.escapeHTML(prompt.id)}" aria-label="Delete ${dashboardElements.escapeHTML(prompt.name)}">Delete</button>
+        <button type="button" data-prompt-move-up="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} up">↑</button>
+        <button type="button" data-prompt-move-down="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} down">↓</button>
+        <button type="button" data-prompt-edit="${domUtils.escapeHTML(prompt.id)}" aria-label="Edit ${domUtils.escapeHTML(prompt.name)}">Edit</button>
+        <button type="button" data-prompt-delete="${domUtils.escapeHTML(prompt.id)}" aria-label="Delete ${domUtils.escapeHTML(prompt.name)}">Delete</button>
       </div>
     </article>`).join('');
   const scopeGroups = [];
-  if (scopeProject) {
+  if (composerProject) {
     scopeGroups.push({
-      title: `This project · ${scopeProject.name}`,
-      scope: { type: 'project', projectPath: scopeProject.path },
+      title: `This project · ${composerProject.name}`,
+      scope: { type: 'project', projectPath: composerProject.path },
       prompts: matchingPrompts.filter((prompt) => promptMatchesScope(
         prompt,
-        { type: 'project', projectPath: scopeProject.path },
+        { type: 'project', projectPath: composerProject.path },
       )),
       includeEmptySections: false,
     });
@@ -150,27 +144,27 @@ const promptLibraryView = (() => {
       const canManageSection = group.scope.type === 'global'
         && section !== promptLibraryContract.defaultSection;
       return `
-        <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${dashboardElements.escapeHTML(section)}" data-prompt-scope-key="${dashboardElements.escapeHTML(scopeKey(group.scope))}">
-          <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${dashboardElements.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
-            <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${dashboardElements.escapeHTML(section)}</strong></span>
+        <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${domUtils.escapeHTML(section)}" data-prompt-scope-key="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
+          <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${domUtils.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
+            <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${domUtils.escapeHTML(section)}</strong></span>
             <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
           </button>
           <div class="dashboard-prompt-section-actions">
-            ${canManageSection ? `<button type="button" data-prompt-section-rename="${dashboardElements.escapeHTML(section)}" aria-label="Rename ${dashboardElements.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${dashboardElements.escapeHTML(section)}" aria-label="Delete ${dashboardElements.escapeHTML(section)} section">Delete</button>` : ''}
+            ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section">Delete</button>` : ''}
           </div>
           <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
         </section>`;
     }).join('');
     const emptyMessage = query ? 'No matching prompts' : 'No prompts saved here yet';
     return `
-      <section class="dashboard-prompt-scope" data-prompt-scope="${dashboardElements.escapeHTML(scopeKey(group.scope))}">
-        <h3>${dashboardElements.escapeHTML(group.title)}</h3>
+      <section class="dashboard-prompt-scope" data-prompt-scope="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
+        <h3>${domUtils.escapeHTML(group.title)}</h3>
         ${sections || `<div class="dashboard-prompt-scope-empty">${emptyMessage}</div>`}
       </section>`;
   }).join('');
   content.innerHTML = `
     <div class="dashboard-prompt-tools">
-      <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${dashboardElements.escapeHTML(searchTerm)}" /></label>
+      <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${domUtils.escapeHTML(searchTerm)}" /></label>
     </div>
     <div class="dashboard-prompt-list">
       ${groups}
@@ -185,7 +179,6 @@ const promptLibraryView = (() => {
     search?.setSelectionRange(searchSelection.start, searchSelection.end);
   }
 }
-
 
   return { render };
 })();

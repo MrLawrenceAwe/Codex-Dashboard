@@ -384,40 +384,54 @@ final class StubDashboardRuntime: DashboardRuntime {
 }
 
 @MainActor
-func makeAppCoordinator(
-    catalogProvider: any ThreadCatalogProviding = StubCatalogProvider(
-        catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
-    ),
-    workingTreeStatusProvider: any WorkingTreeStatusProviding = StubWorkingTreeStatusProvider(),
-    unreadThreadIDProvider: any UnreadThreadIDProviding = StubUnreadIDProvider(
-        unreadThreadIDs: []
-    ),
-    compatibilityChecker: any LocalCompatibilityChecking = StubCompatibilityChecker(checks: []),
-    userDefaults: UserDefaults = UserDefaults(suiteName: UUID().uuidString)!,
-    observeFileChanges: Bool = true,
-    installedCodexVersion: @escaping () -> String? = { nil },
-    codexForegrounder: any CodexForegrounding = RecordingCodexForegrounder(),
-    typingActivityDetector: any TypingActivityDetecting = StubTypingActivityDetector(),
-    promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
-    accountManager: CodexAccountManager = CodexAccountManager(),
-    accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
-    accountUsageCacheStore: (any UsageCaching)? = nil,
-    runtimeFactory: () throws -> any DashboardRuntime = { StubDashboardRuntime() }
-) -> AppCoordinator {
-    AppCoordinator(
-        catalogProvider: catalogProvider,
-        workingTreeStatusProvider: workingTreeStatusProvider,
-        unreadThreadIDProvider: unreadThreadIDProvider,
-        compatibilityChecker: compatibilityChecker,
-        userDefaults: userDefaults,
-        observeFileChanges: observeFileChanges,
-        installedCodexVersion: installedCodexVersion,
-        codexForegrounder: codexForegrounder,
-        typingActivityDetector: typingActivityDetector,
-        promptLibraryStore: promptLibraryStore,
-        accountManager: accountManager,
-        accountUsageProvider: accountUsageProvider,
-        accountUsageCacheStore: accountUsageCacheStore,
-        runtimeFactory: runtimeFactory
-    )
+extension XCTestCase {
+    func makeAppCoordinator(
+        catalogProvider: any ThreadCatalogProviding = StubCatalogProvider(
+            catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
+        ),
+        workingTreeStatusProvider: any WorkingTreeStatusProviding = StubWorkingTreeStatusProvider(),
+        unreadThreadIDProvider: any UnreadThreadIDProviding = StubUnreadIDProvider(
+            unreadThreadIDs: []
+        ),
+        compatibilityChecker: any LocalCompatibilityChecking = StubCompatibilityChecker(checks: []),
+        userDefaults: UserDefaults = UserDefaults(suiteName: UUID().uuidString)!,
+        observeFileChanges: Bool = true,
+        installedCodexVersion: @escaping () -> String? = { nil },
+        codexForegrounder: any CodexForegrounding = RecordingCodexForegrounder(),
+        typingActivityDetector: any TypingActivityDetecting = StubTypingActivityDetector(),
+        promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
+        accountManager: CodexAccountManager? = nil,
+        accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
+        accountUsageCacheStore: (any UsageCaching)? = nil,
+        runtimeFactory: () throws -> any DashboardRuntime = { StubDashboardRuntime() }
+    ) -> AppCoordinator {
+        let accountDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorAccounts-\(UUID().uuidString)")
+        let isolatedAccountManager = accountManager ?? CodexAccountManager(
+            metadataURL: accountDirectory.appendingPathComponent("accounts.json"),
+            authenticationURL: accountDirectory.appendingPathComponent("auth.json"),
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let coordinator = AppCoordinator(
+            catalogProvider: catalogProvider,
+            workingTreeStatusProvider: workingTreeStatusProvider,
+            unreadThreadIDProvider: unreadThreadIDProvider,
+            compatibilityChecker: compatibilityChecker,
+            userDefaults: userDefaults,
+            observeFileChanges: observeFileChanges,
+            installedCodexVersion: installedCodexVersion,
+            codexForegrounder: codexForegrounder,
+            typingActivityDetector: typingActivityDetector,
+            promptLibraryStore: promptLibraryStore,
+            accountManager: isolatedAccountManager,
+            accountUsageProvider: accountUsageProvider,
+            accountUsageCacheStore: accountUsageCacheStore,
+            runtimeFactory: runtimeFactory
+        )
+        addTeardownBlock {
+            await MainActor.run { coordinator.stopMonitoring() }
+            try? FileManager.default.removeItem(at: accountDirectory)
+        }
+        return coordinator
+    }
 }
