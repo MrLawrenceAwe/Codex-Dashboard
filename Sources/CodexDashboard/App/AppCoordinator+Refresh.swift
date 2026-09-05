@@ -102,7 +102,7 @@ extension AppCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        let completedThreadID = newestCompletedThreadID(in: snapshot.catalog.threads)
+        let completedThreadID = observeAndReturnNewestCompletedThreadID(in: snapshot.catalog.threads)
         applyThreadSnapshot(
             snapshot.catalog.threads,
             totalCount: snapshot.catalog.totalThreadCount,
@@ -144,6 +144,6 @@ extension AppCoordinator {
 
     var connectionSummary: String {
         let runningCount = threads.count { $0.runState == .running }
-        return "\(runningCount) running · \(totalThreadCount) available threads"
+        return "\(runningCount) running · \(totalThreadCount) available tasks"
     }
 }

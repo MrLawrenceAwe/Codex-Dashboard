@@ -121,7 +121,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func restartAndEnable() {
-        Task { await coordinator.restartCodexAndEnableTaskDashboard() }
+        Task { await coordinator.restartCodexAndEnableDashboard() }
     }
 
     @objc private func disableTaskDashboard() {

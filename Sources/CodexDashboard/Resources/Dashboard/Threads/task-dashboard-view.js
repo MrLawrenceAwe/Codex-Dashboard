@@ -7,20 +7,19 @@ const taskDashboardView = (() => {
     renderedMarkup.set(element, markup);
   }
 
-  function updateSidebarStatus({ unreadCount, runningThreads, visibleChangedProjectPaths }) {
+  function updateSidebarStatus({ unreadCount, runningCount, visibleChangedProjectPaths }) {
     const unreadBadge = document.querySelector('[data-navigation-count]');
     if (unreadBadge) {
       unreadBadge.textContent = String(unreadCount);
       unreadBadge.hidden = unreadCount === 0;
       unreadBadge.setAttribute(
         'aria-label',
-        `${unreadCount} unread ${unreadCount === 1 ? 'thread' : 'threads'}`,
+        `${unreadCount} unread ${unreadCount === 1 ? 'task' : 'tasks'}`,
       );
     }
     const spinner = document.querySelector('[data-navigation-running]');
     if (spinner) {
-      const runningCount = runningThreads.length;
-      const runningLabel = `${runningCount} running ${runningCount === 1 ? 'thread' : 'threads'}`;
+      const runningLabel = `${runningCount} running ${runningCount === 1 ? 'task' : 'tasks'}`;
       spinner.hidden = runningCount === 0;
       spinner.setAttribute('aria-label', runningLabel);
       spinner.setAttribute('title', runningLabel);
@@ -66,7 +65,7 @@ const taskDashboardView = (() => {
     });
     const filterCounts = {
       today: state.todayCount,
-      running: state.runningThreads.length,
+      running: state.runningCount,
       unread: state.unreadCount,
       changedProjects: state.visibleChangedProjectPaths.size,
     };
@@ -88,7 +87,7 @@ const taskDashboardView = (() => {
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
-        : 'No threads found';
+        : 'No tasks found';
       updateMarkup(list, `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`);
       return true;
     }

@@ -112,11 +112,6 @@ final class FileChangeMonitor {
     static let projectRefreshQuietPeriod: Duration = .milliseconds(500)
     static let projectRefreshMaximumDelay: Duration = .seconds(2)
 
-    private struct Watch {
-        let descriptor: Int32
-        let source: DispatchSourceFileSystemObject
-    }
-
     private struct FileSignature: Equatable {
         let size: UInt64
         let modifiedAt: Date
@@ -127,8 +122,8 @@ final class FileChangeMonitor {
         let writeAheadLog: FileSignature?
     }
 
-    private var dataWatches: [Watch] = []
-    private var projectWatches: [Watch] = []
+    private var dataWatches: [DispatchSourceFileSystemObject] = []
+    private var projectWatches: [DispatchSourceFileSystemObject] = []
     private var projectChangeMonitor: RecursiveProjectChangeMonitor?
     private var watchedProjectPaths: Set<String> = []
     private var catalogURL: URL?
@@ -415,7 +410,7 @@ final class FileChangeMonitor {
     private func makeWatch(
         for url: URL,
         action: @escaping @MainActor @Sendable () async -> Void
-    ) -> Watch? {
+    ) -> DispatchSourceFileSystemObject? {
         let descriptor = Darwin.open(url.path, O_EVTONLY)
         guard descriptor >= 0 else { return nil }
         let source = DispatchSource.makeFileSystemObjectSource(
@@ -426,7 +421,7 @@ final class FileChangeMonitor {
         source.setEventHandler(handler: Self.eventHandler(for: action))
         source.setCancelHandler(handler: Self.cancelHandler(for: descriptor))
         source.resume()
-        return Watch(descriptor: descriptor, source: source)
+        return source
     }
 
     private nonisolated static func eventHandler(
@@ -439,8 +434,8 @@ final class FileChangeMonitor {
         { Darwin.close(descriptor) }
     }
 
-    private func cancel(_ watches: inout [Watch]) {
-        watches.forEach { $0.source.cancel() }
+    private func cancel(_ watches: inout [DispatchSourceFileSystemObject]) {
+        watches.forEach { $0.cancel() }
         watches = []
     }
 }

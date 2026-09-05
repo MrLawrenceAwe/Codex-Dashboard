@@ -1,5 +1,6 @@
 {
   "scripts": [
+    "Core/dashboard-bootstrap",
     "Core/dashboard-elements",
     "Core/dom-utils",
     "Core/codex-ui-contracts",
@@ -19,10 +20,12 @@
     "Threads/task-dashboard-view",
     "Threads/task-dashboard-page",
     "Todos/todo-list-state",
+    "Todos/todo-list-view",
     "Todos/todo-list",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
+    "Core/dashboard-navigation",
     "Core/dashboard-host"
   ],
   "stylesheets": [

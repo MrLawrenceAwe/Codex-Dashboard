@@ -1,7 +1,7 @@
 import Foundation
 
-enum AccountUsageMenuFormatter {
-    static func titles(
+enum AccountUsageFormatter {
+    static func lines(
         for status: CodexAccountUsageStatus,
         now: Date = .now,
         staleLabel: String = "Usage may be stale",
@@ -9,10 +9,10 @@ enum AccountUsageMenuFormatter {
         locale: Locale = .current,
         timeZone: TimeZone = .current
     ) -> [String] {
-        var titles: [String] = []
+        var lines: [String] = []
         if let snapshot = status.snapshot {
             if let window = snapshot.usage.fiveHour {
-                titles.append(windowTitle(
+                lines.append(windowTitle(
                     "5-hour",
                     window: window,
                     now: now,
@@ -22,7 +22,7 @@ enum AccountUsageMenuFormatter {
                 ))
             }
             if let window = snapshot.usage.weekly {
-                titles.append(windowTitle(
+                lines.append(windowTitle(
                     "Weekly",
                     window: window,
                     now: now,
@@ -43,21 +43,21 @@ enum AccountUsageMenuFormatter {
                     )
                     title += " · next expires \(deadline)"
                 }
-                titles.append(title)
+                lines.append(title)
             }
         }
 
         switch status {
         case .loading(let previous):
-            titles.append(previous == nil ? "Loading usage details…" : "Updating usage details…")
+            lines.append(previous == nil ? "Loading usage details…" : "Updating usage details…")
         case .available:
-            if titles.isEmpty { titles.append("Usage details unavailable") }
+            if lines.isEmpty { lines.append("Usage details unavailable") }
         case .stale(let snapshot):
-            titles.append("\(staleLabel) · updated \(timeString(snapshot.fetchedAt))")
+            lines.append("\(staleLabel) · updated \(timeString(snapshot.fetchedAt))")
         case .unavailable:
-            titles.append("Usage details unavailable")
+            lines.append("Usage details unavailable")
         }
-        return titles
+        return lines
     }
 
     private static func windowTitle(

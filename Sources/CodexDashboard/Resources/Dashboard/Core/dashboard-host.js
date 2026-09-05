@@ -1,10 +1,10 @@
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
-  ensureMounted: taskDashboard.ensureMounted,
-  destroy: taskDashboard.destroy,
-  open: taskDashboard.open,
-  isOpen: () => taskDashboard.isOpen() || todoList.isOpen(),
-  openTodos: todoList.open,
+  ensureMounted: dashboardNavigation.ensureMounted,
+  destroy: dashboardNavigation.destroy,
+  open: dashboardNavigation.openTasks,
+  isOpen: dashboardNavigation.isOpen,
+  openTodos: dashboardNavigation.openTodos,
   applyThreads: taskDashboard.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
   waitForAccountPopoverAction: accountPopover.waitForAction,
@@ -22,4 +22,4 @@ window.__codexDashboard = {
     return applied;
   },
 };
-return taskDashboard.ensureMounted();
+return dashboardNavigation.ensureMounted();

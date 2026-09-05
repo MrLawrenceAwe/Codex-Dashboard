@@ -21,13 +21,13 @@ struct DashboardDiagnostics {
             "Codex: \(codexVersion)",
             "Status: \(status)",
             "Renderer targets: \(rendererTargetCount)",
-            "Threads: \(loadedThreadCount) loaded / \(totalThreadCount) total",
+            "Tasks: \(loadedThreadCount) loaded / \(totalThreadCount) total",
             "Last refresh: \(lastRefresh.map(formatter.string(from:)) ?? "never")",
             "Last compatibility check: \(lastCompatibilityCheck.map(formatter.string(from:)) ?? "never")",
             "Compatibility: \(compatibilitySummary)",
             "Connection error: \(connectionError ?? "none")",
             "Connection notice: \(connectionNotice ?? "none")",
-            "Thread warning: \(threadWarning ?? "none")",
+            "Task warning: \(threadWarning ?? "none")",
         ].joined(separator: "\n")
     }
 }

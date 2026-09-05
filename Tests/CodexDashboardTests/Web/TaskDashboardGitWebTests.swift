@@ -115,9 +115,9 @@ extension TaskDashboardWebTests {
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Ignore"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unignore", false, "Ignored1"])
-        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Ignore"])
+        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Mute changes"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unmute changes", false, "Muted1"])
+        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Mute changes"])
     }
 
     func testUnavailableCommitActionDoesNotNavigateAwayFromDashboard() async throws {
@@ -157,7 +157,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(
             values[1] as? String,
-            "Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead."
+            "Commit or push is not available in this Codex version. Open a project task and use its Git controls instead."
         )
     }
 
@@ -213,7 +213,7 @@ extension TaskDashboardWebTests {
 
         XCTAssertEqual(
             try XCTUnwrap(state) as? [AnyHashable],
-            [true, false, "The project thread opened, but Codex could not start Commit or push."]
+            [true, false, "The project task opened, but Codex could not start Commit or push."]
         )
     }
 

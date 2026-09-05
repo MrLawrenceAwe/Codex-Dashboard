@@ -15,7 +15,7 @@ const taskDashboardPage = (() => {
           <div class="dashboard-toolbar">
             <div class="dashboard-toolbar-group dashboard-filter-group">
               <span class="dashboard-control-label">Show</span>
-              <div class="dashboard-filters" aria-label="Filter threads">
+              <div class="dashboard-filters" aria-label="Filter tasks">
                 <button type="button" data-filter="today" class="is-active">Today <span class="dashboard-filter-count" data-filter-count="today">0</span></button>
                 <button type="button" data-filter="running">Running <span class="dashboard-filter-count" data-filter-count="running">0</span></button>
                 <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
@@ -25,7 +25,7 @@ const taskDashboardPage = (() => {
           </div>
         </div>
         <main class="dashboard-list" data-thread-list></main>
-        <button type="button" class="dashboard-load-more" data-load-more hidden>Load more threads</button>
+        <button type="button" class="dashboard-load-more" data-load-more hidden>Load more tasks</button>
       </div>`;
     page.querySelectorAll('[data-filter]').forEach((button) => {
       button.addEventListener('click', () => onFilter(button.dataset.filter));

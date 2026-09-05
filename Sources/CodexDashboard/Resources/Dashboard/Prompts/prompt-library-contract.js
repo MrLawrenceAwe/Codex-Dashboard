@@ -17,6 +17,11 @@ const promptLibraryContract = (() => {
     return { type: 'global' };
   }
 
+  function scopeKey(scope) {
+    const normalized = normalizeScope(scope);
+    return normalized.type === 'project' ? `project:${normalized.projectPath}` : 'global';
+  }
+
   function isValidScope(scope) {
     return scope?.type === 'global'
       || (
@@ -102,6 +107,7 @@ const promptLibraryContract = (() => {
     normalizePrompts,
     normalizePreset,
     normalizeScope,
+    scopeKey,
     normalizeSection,
     normalizeSections,
     version: PROMPT_LIBRARY_SCHEMA.version,

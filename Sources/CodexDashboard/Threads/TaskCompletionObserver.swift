@@ -4,7 +4,7 @@ struct TaskCompletionObserver {
     private var eventsByThreadID: [String: ThreadLifecycleEvent]?
     private var observationDate: Date?
 
-    mutating func newestCompletion(
+    mutating func observeAndReturnNewestCompletedThreadID(
         in threads: [ThreadSummary],
         observedAt currentDate: Date = .now
     ) -> String? {

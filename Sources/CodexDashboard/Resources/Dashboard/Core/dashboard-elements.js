@@ -1,9 +1,3 @@
-const existing = window.__codexDashboard;
-if (existing?.version === DASHBOARD_VERSION) {
-  return existing.ensureMounted();
-}
-existing?.destroy?.();
-
 const dashboardElements = {
   elementIDs: {
     style: 'codex-dashboard-style',
@@ -12,11 +6,5 @@ const dashboardElements = {
     todoNavButton: 'codex-dashboard-todo-navigation',
     todoPage: 'codex-dashboard-todo-page',
     promptDialog: 'codex-dashboard-prompt-library-dialog',
-  },
-
-  escapeHTML(value) {
-    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-    })[character]);
   },
 };

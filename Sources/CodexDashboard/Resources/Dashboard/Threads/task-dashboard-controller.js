@@ -1,4 +1,5 @@
 const taskDashboard = (() => {
+// Snapshots are sorted newest-first on arrival; lookups preserve that order.
 let threads = [];
 const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
@@ -127,24 +128,23 @@ function openThread(thread) {
 
 async function openCommitOrPushForProject(projectPath) {
   commitOrPushError = '';
-  const candidates = threads
-    .filter((item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath)
-    .sort((left, right) => Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0));
-  const [thread] = candidates;
+  const thread = threads.find(
+    (item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath,
+  );
   if (!thread) {
-    commitOrPushError = 'No idle thread is available for this project.';
+    commitOrPushError = 'No idle task is available for this project.';
     renderDashboard();
     return;
   }
   if (!await codexHost.canOpenCommitOrPush()) {
-    commitOrPushError = 'Commit or push is not available in this Codex version. Open a project thread and use its Git controls instead.';
+    commitOrPushError = 'Commit or push is not available in this Codex version. Open a project task and use its Git controls instead.';
     renderDashboard();
     return;
   }
   closeDashboard();
   if (await codexHost.openCommitOrPush(thread)) return;
-  commitOrPushError = 'The project thread opened, but Codex could not start Commit or push.';
-  openDashboard();
+  commitOrPushError = 'The project task opened, but Codex could not start Commit or push.';
+  dashboardNavigation.openTasks();
   renderDashboard();
 }
 
@@ -214,21 +214,15 @@ function mountTaskNavigationButton() {
       <span class="dashboard-nav-label">Task Dashboard</span>
     </div>
     <div class="dashboard-nav-status">
-      <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running threads" title="0 running threads" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
+      <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running tasks" title="0 running tasks" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
       <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${threadMarkup.icon('gitChanges')}</span>
-      <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread threads" hidden>0</strong>
+      <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread tasks" hidden>0</strong>
     </div>`;
   if (insertionPoint.insertAfter) insertionPoint.element.after(button);
   else insertionPoint.element.parentElement.insertBefore(button, insertionPoint.element);
   taskDashboardView.updateSidebarStatus(deriveViewState());
   if (dashboardIsOpen) button.setAttribute('aria-current', 'page');
   return true;
-}
-
-function mountNavigation() {
-  const taskMounted = mountTaskNavigationButton();
-  const todosMounted = todoList.mountNavigation();
-  return taskMounted && todosMounted;
 }
 
 function mountTaskDashboardPage() {
@@ -281,13 +275,6 @@ function mountTaskDashboardPage() {
   return mounted;
 }
 
-function mountPages() {
-  const taskMounted = mountTaskDashboardPage();
-  const todosMounted = todoList.mountPage();
-  todoList.restoreOpenState();
-  return taskMounted && todosMounted;
-}
-
 function openThreadFromEvent(event) {
   const eventTarget = event.target instanceof Element ? event.target : null;
   const target = eventTarget?.closest('[data-open-thread]');
@@ -299,7 +286,6 @@ function openThreadFromEvent(event) {
 function openDashboard() {
   const page = document.getElementById(dashboardElements.elementIDs.page);
   if (!page) return;
-  todoList.close();
   dashboardIsOpen = true;
   page.classList.add('is-open');
   document.documentElement.classList.add('codex-dashboard-open');
@@ -317,30 +303,20 @@ function closeDashboard() {
   scheduleUnreadSync();
 }
 
-function closeAllPages() {
-  closeDashboard();
-  todoList.close();
-}
-
 function restoreOpenState() {
   if (dashboardIsOpen) {
     document.getElementById(dashboardElements.elementIDs.page)?.classList.add('is-open');
     document.documentElement.classList.add('codex-dashboard-open');
     document.getElementById(dashboardElements.elementIDs.navButton)?.setAttribute('aria-current', 'page');
   }
-  todoList.restoreOpenState();
 }
 
 function isOpen() {
   return dashboardIsOpen;
 }
 
-function anyPageIsOpen() {
-  return dashboardIsOpen || todoList.isOpen();
-}
-
 function applyThreads(nextThreads) {
-  threads = taskDashboardState.normalizeThreads(nextThreads);
+  threads = taskDashboardState.sortThreadsByRecency(nextThreads);
   const nextUnreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
   );
@@ -376,7 +352,7 @@ function applyThreads(nextThreads) {
   return true;
 }
 
-function scopeProject() {
+function resolveComposerProject() {
   const selectedProject = codexUIContracts.activeComposerProject();
   if (selectedProject) return selectedProject;
   const activeThreadID = codexUIContracts.activeComposerThreadID();
@@ -389,23 +365,12 @@ function scopeProject() {
   };
 }
 
-function ensureMounted() {
-  const mounted = dashboardLifecycle.ensureMounted({
-    close: closeAllPages,
-    isOpen: anyPageIsOpen,
-    mountNavigation,
-    mountPage: mountPages,
-    open: openDashboard,
-    requestRender,
-    restoreOpenState,
-    syncUnread: syncUnreadFromSidebar,
-  });
+function startMonitoring() {
   if (!unreadMonitoringStarted) {
     unreadMonitoringStarted = true;
     scheduleUnreadSync();
     document.addEventListener('visibilitychange', handleVisibilityChange);
   }
-  return mounted;
 }
 
 function destroy() {
@@ -420,18 +385,20 @@ function destroy() {
   unreadMonitoringStarted = false;
   viewNeedsRender = true;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
-  todoList.destroy();
-  dashboardLifecycle.destroy();
-  delete window.__codexDashboard;
 }
 
 return {
-  ensureMounted,
+  mountNavigation: mountTaskNavigationButton,
+  mountPage: mountTaskDashboardPage,
+  restoreOpenState,
+  startMonitoring,
+  requestRender,
+  syncUnread: syncUnreadFromSidebar,
   destroy,
   open: openDashboard,
   close: closeDashboard,
   isOpen,
   applyThreads,
-  scopeProject,
+  resolveComposerProject,
 };
 })();
