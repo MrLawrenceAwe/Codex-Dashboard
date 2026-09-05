@@ -194,6 +194,52 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertTrue(values[3] is NSNull)
     }
 
+    func testFailedEditsDeletionAndClearCompletedRestoreSavedItems() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Saved item';
+          form.requestSubmit();
+          const checkbox = document.querySelector('[data-todo-completed]');
+          checkbox.checked = true;
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          document.querySelector('[data-todo-filter="completed"]').click();
+          const original = localStorage.getItem('codex-dashboard.todos');
+          const realStorage = window.localStorage;
+          Object.defineProperty(window, 'localStorage', {
+            configurable: true,
+            value: { getItem: realStorage.getItem.bind(realStorage), setItem() { throw new Error('Storage full'); } },
+          });
+          const title = document.querySelector('[data-todo-title]');
+          title.value = 'Unsaved edit';
+          title.dispatchEvent(new Event('change', { bubbles: true }));
+          const restoredTitle = document.querySelector('[data-todo-title]').value;
+          const deletion = document.querySelector('[data-todo-delete]');
+          deletion.click();
+          deletion.click();
+          const countAfterDelete = document.querySelectorAll('[data-todo-id]').length;
+          document.querySelector('[data-todo-clear-completed]').click();
+          const countAfterClear = document.querySelectorAll('[data-todo-id]').length;
+          Object.defineProperty(window, 'localStorage', { configurable: true, value: realStorage });
+          return [restoredTitle, countAfterDelete, countAfterClear,
+            realStorage.getItem('codex-dashboard.todos') === original,
+            document.querySelector('[data-todo-storage-error]').hidden];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Saved item", 1, 1, true, false])
+    }
+
     func testTodoImageCanBePastedDuringAdditionReplacedAndPreservedWhenCompleted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """

@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class FileChangeMonitorTests: XCTestCase {
+final class ChangeMonitorTests: XCTestCase {
     func testFileAndProjectChangesTriggerTargetedRefreshes() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-file-monitor-\(UUID().uuidString)", isDirectory: true)
@@ -16,27 +16,29 @@ final class FileChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let dataMonitor = CodexDataChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var accountRefreshes = 0
         var workingTreeRefreshes = 0
         var refreshedProjectPaths: Set<String> = []
-        monitor.start(
+        dataMonitor.start(
             catalogURL: catalogDirectory.appendingPathComponent("state.sqlite"),
             unreadStateURL: unreadDirectory.appendingPathComponent("state.json"),
             accountMetadataURL: root.appendingPathComponent("accounts.json"),
             authenticationURL: root.appendingPathComponent("auth.json"),
             refreshCatalog: { catalogRefreshes += 1 },
             refreshUnread: { unreadRefreshes += 1 },
-            refreshAccounts: { accountRefreshes += 1 },
-            refreshWorkingTrees: { paths in
+            refreshAccounts: { accountRefreshes += 1 }
+        )
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in
                 workingTreeRefreshes += 1
                 refreshedProjectPaths.formUnion(paths ?? [])
             }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { dataMonitor.stop(); workingTreeMonitor.stop() }
 
         try Data("catalog".utf8).write(to: catalogDirectory.appendingPathComponent("state.sqlite"))
         try Data("unread".utf8).write(to: unreadDirectory.appendingPathComponent("state.json"))
@@ -60,20 +62,19 @@ final class FileChangeMonitorTests: XCTestCase {
         try Data("initial-catalog".utf8).write(to: catalogURL)
         try Data("initial-unread".utf8).write(to: unreadURL)
 
-        let monitor = FileChangeMonitor()
+        let dataMonitor = CodexDataChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
-        monitor.start(
+        dataMonitor.start(
             catalogURL: catalogURL,
             unreadStateURL: unreadURL,
             accountMetadataURL: root.appendingPathComponent("accounts.json"),
             authenticationURL: root.appendingPathComponent("auth.json"),
             refreshCatalog: { catalogRefreshes += 1 },
             refreshUnread: { unreadRefreshes += 1 },
-            refreshAccounts: {},
-            refreshWorkingTrees: { _ in }
+            refreshAccounts: {}
         )
-        defer { monitor.stop() }
+        defer { dataMonitor.stop() }
 
         try Data("updated-catalog".utf8).write(to: catalogURL)
         try await waitUntil { catalogRefreshes == 1 }
@@ -94,12 +95,12 @@ final class FileChangeMonitorTests: XCTestCase {
         try Data("initial-catalog".utf8).write(to: catalogURL)
         try Data("initial-unread".utf8).write(to: unreadURL)
 
-        let monitor = FileChangeMonitor()
+        let dataMonitor = CodexDataChangeMonitor()
         var refreshCount = 0
         var activeRefreshCount = 0
         var maximumActiveRefreshCount = 0
         var firstRefreshContinuation: CheckedContinuation<Void, Never>?
-        monitor.start(
+        dataMonitor.start(
             catalogURL: catalogURL,
             unreadStateURL: unreadURL,
             accountMetadataURL: root.appendingPathComponent("accounts.json"),
@@ -114,10 +115,9 @@ final class FileChangeMonitorTests: XCTestCase {
                 activeRefreshCount -= 1
             },
             refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { _ in }
+            refreshAccounts: {}
         )
-        defer { monitor.stop() }
+        defer { dataMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("first-change".utf8).write(to: catalogURL)
@@ -139,34 +139,22 @@ final class FileChangeMonitorTests: XCTestCase {
             .appendingPathComponent("dashboard-nested-monitor-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
         let nestedDirectory = projectDirectory.appendingPathComponent("Sources/Feature", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
         _ = try await Subprocess.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/git"),
             arguments: ["-C", projectDirectory.path, "init", "--quiet"],
             timeout: 3
         )
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         let nestedFile = nestedDirectory.appendingPathComponent("Feature.swift")
         try Data("initial".utf8).write(to: nestedFile)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var refreshedProjectPaths: Set<String> = []
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("updated".utf8).write(to: nestedFile)
@@ -179,27 +167,15 @@ final class FileChangeMonitorTests: XCTestCase {
             .appendingPathComponent("dashboard-non-repository-monitor-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
         let nestedDirectory = projectDirectory.appendingPathComponent("Generated/Output", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var workingTreeRefreshes = 0
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { _ in workingTreeRefreshes += 1 }
+        workingTreeMonitor.start(refreshWorkingTrees: { _ in workingTreeRefreshes += 1 }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("generated".utf8).write(to: nestedDirectory.appendingPathComponent("asset.json"))
@@ -213,27 +189,15 @@ final class FileChangeMonitorTests: XCTestCase {
             .appendingPathComponent("dashboard-repository-promotion-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
         let nestedDirectory = projectDirectory.appendingPathComponent("Sources/Feature", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var refreshes: [Set<String>] = []
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         _ = try await Subprocess.run(
@@ -253,28 +217,16 @@ final class FileChangeMonitorTests: XCTestCase {
             .appendingPathComponent("dashboard-targeted-project-monitor-\(UUID().uuidString)", isDirectory: true)
         let firstProject = root.appendingPathComponent("first", isDirectory: true)
         let secondProject = root.appendingPathComponent("second", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: firstProject, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: secondProject, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var refreshes: [Set<String>] = []
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
         )
-        monitor.updateProjectPaths([firstProject.path, secondProject.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([firstProject.path, secondProject.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("change".utf8).write(to: firstProject.appendingPathComponent("changed.txt"))
@@ -287,27 +239,15 @@ final class FileChangeMonitorTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-coalesced-project-monitor-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var refreshes: [Set<String>] = []
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         for index in 0..<5 {
@@ -326,30 +266,18 @@ final class FileChangeMonitorTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-bounded-project-refresh-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor(
+        let workingTreeMonitor = WorkingTreeChangeMonitor(
             projectRefreshQuietPeriod: .milliseconds(200),
             projectRefreshMaximumDelay: .milliseconds(500)
         )
         var refreshes: [Set<String>] = []
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         for index in 0..<8 {
             try Data("\(index)".utf8).write(
@@ -366,27 +294,15 @@ final class FileChangeMonitorTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-serialized-refresh-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
-        let catalogURL = root.appendingPathComponent("state.sqlite")
-        let unreadURL = root.appendingPathComponent("state.json")
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
-        try Data("catalog".utf8).write(to: catalogURL)
-        try Data("unread".utf8).write(to: unreadURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = FileChangeMonitor()
+        let workingTreeMonitor = WorkingTreeChangeMonitor()
         var refreshCount = 0
         var activeRefreshCount = 0
         var maximumActiveRefreshCount = 0
         var firstRefreshContinuation: CheckedContinuation<Void, Never>?
-        monitor.start(
-            catalogURL: catalogURL,
-            unreadStateURL: unreadURL,
-            accountMetadataURL: root.appendingPathComponent("accounts.json"),
-            authenticationURL: root.appendingPathComponent("auth.json"),
-            refreshCatalog: {},
-            refreshUnread: {},
-            refreshAccounts: {},
-            refreshWorkingTrees: { _ in
+        workingTreeMonitor.start(refreshWorkingTrees: { _ in
                 refreshCount += 1
                 activeRefreshCount += 1
                 maximumActiveRefreshCount = max(maximumActiveRefreshCount, activeRefreshCount)
@@ -396,8 +312,8 @@ final class FileChangeMonitorTests: XCTestCase {
                 activeRefreshCount -= 1
             }
         )
-        monitor.updateProjectPaths([projectDirectory.path])
-        defer { monitor.stop() }
+        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
+        defer { workingTreeMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("first".utf8).write(to: projectDirectory.appendingPathComponent("first.txt"))

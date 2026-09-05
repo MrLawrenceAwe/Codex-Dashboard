@@ -1,7 +1,8 @@
 import Foundation
 
-enum SavedAccountUsageRefreshOutcome: Equatable {
-    case completed
+// Reports whether retrying requires Keychain authorization, not whether usage was updated.
+enum UsageRefreshAuthorization: Equatable {
+    case notRequired
     case authorizationRequired
 }
 
@@ -18,7 +19,7 @@ final class AccountCoordinator: ObservableObject {
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
     private var usageGeneration = 0
-    private var activeAccountIdentifier: String?
+    private var activeCodexAccountID: String?
 
     init(
         manager: CodexAccountManager,
@@ -41,16 +42,16 @@ final class AccountCoordinator: ObservableObject {
 
     func refreshState() {
         do {
-            let document = try manager.document()
-            let identifier = try manager.activeAccountIdentifier()
+            let document = try manager.loadDocument()
+            let identifier = try manager.activeCodexAccountID()
             let accounts = document.accounts.sorted {
                 if $0.lastUsedAt == $1.lastUsedAt { return $0.name < $1.name }
                 return $0.lastUsedAt > $1.lastUsedAt
             }
             if savedAccounts != accounts { savedAccounts = accounts }
-            let identityChanged = activeAccountIdentifier != identifier
+            let identityChanged = activeCodexAccountID != identifier
             let savedAccountChanged = activeAccountID != document.activeAccountID
-            activeAccountIdentifier = identifier
+            activeCodexAccountID = identifier
             if savedAccountChanged { activeAccountID = document.activeAccountID }
             if identityChanged || savedAccountChanged {
                 usageGeneration += 1
@@ -180,23 +181,23 @@ final class AccountCoordinator: ObservableObject {
         reportsFailure: Bool = true,
         interactionAllowed: Bool = false,
         persistsUsageCache: Bool = true
-    ) async -> SavedAccountUsageRefreshOutcome {
-        if accountID == activeAccountID { return .completed }
-        guard savedAccounts.contains(where: { $0.id == accountID }) else { return .completed }
+    ) async -> UsageRefreshAuthorization {
+        if accountID == activeAccountID { return .notRequired }
+        guard savedAccounts.contains(where: { $0.id == accountID }) else { return .notRequired }
 
         let generation = usageGeneration
         refreshingUsageAccountIDs.insert(accountID)
         defer { refreshingUsageAccountIDs.remove(accountID) }
         do {
-            let credential = try interactionAllowed
-                ? manager.savedCredentialAllowingUserInteraction(for: accountID)
-                : manager.savedCredentialWithoutUserInteraction(for: accountID)
+            let credential = try manager.savedCredential(
+                for: accountID, interactionAllowed: interactionAllowed
+            )
             let result = try await usageSession.fetchUsage(using: credential, for: accountID)
             guard !Task.isCancelled,
                   generation == usageGeneration,
                   accountID != activeAccountID,
                   savedAccounts.contains(where: { $0.id == accountID })
-            else { return .completed }
+            else { return .notRequired }
 
             try manager.updateSavedCredential(
                 result.credential,
@@ -215,14 +216,14 @@ final class AccountCoordinator: ObservableObject {
             guard !Task.isCancelled,
                   generation == usageGeneration,
                   savedAccounts.contains(where: { $0.id == accountID })
-            else { return .completed }
+            else { return .notRequired }
             usageErrorsByAccountID[accountID] = error.localizedDescription
             if reportsFailure,
                let account = savedAccounts.first(where: { $0.id == accountID }) {
                 statusMessage = "Could not update usage for \(account.name): \(error.localizedDescription)"
             }
         }
-        return .completed
+        return .notRequired
     }
 
     func persistUsageCache(force: Bool = false, now: Date = .now) {

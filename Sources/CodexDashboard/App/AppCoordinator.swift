@@ -307,8 +307,8 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func observeAndReturnNewestCompletedThreadID(in threads: [ThreadSummary]) -> String? {
-        taskCompletionObserver.observeAndReturnNewestCompletedThreadID(in: threads)
+    func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> String? {
+        taskCompletionObserver.recordSnapshotAndFindNewestCompletion(in: threads)
     }
 
     static let incompatibleContractMessage =

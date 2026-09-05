@@ -49,10 +49,28 @@ const threadMarkup = (() => {
       </button>`;
   }
 
+  function groupThreadsByProject(threads) {
+    const groups = new Map();
+    threads.forEach((thread) => {
+      const path = String(thread.projectPath).trim();
+      if (!groups.has(path)) groups.set(path, { path, name: thread.projectName, threads: [] });
+      groups.get(path).threads.push(thread);
+    });
+    return [...groups.values()];
+  }
+
+  function renderProjectActions(projectPath, projectThreads, isMuted) {
+    if (!projectThreads.some((thread) => thread.workingTreeStatus === 'hasChanges')) return '';
+    const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
+    return `
+      <button type="button" class="dashboard-project-mute" data-project-mute="${domUtils.escapeHTML(projectPath)}" title="${isMuted ? 'Unmute change notifications for this project' : 'Mute change notifications for this project'}">${dashboardIcons.render(isMuted ? 'restore' : 'mute')}<span>${isMuted ? 'Unmute change alerts' : 'Mute change alerts'}</span></button>
+      ${isMuted ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`}`;
+  }
+
   function list(visibleThreads, {
     filterMode,
     collapsedProjects,
-    ignoredProjectPaths,
+    mutedProjectPaths,
     isUnread,
     isCompletionTickVisible,
   }) {
@@ -65,57 +83,41 @@ const threadMarkup = (() => {
       })).join('');
     }
     if (filterMode === 'changedProjects') {
-      const projects = new Map();
-      visibleThreads.forEach((item) => {
-        const projectPath = String(item.projectPath).trim();
-        if (!projects.has(projectPath)) projects.set(projectPath, []);
-        projects.get(projectPath).push(item);
-      });
-      const projectCard = ([projectPath, projectThreads]) => {
-        const project = projectThreads[0];
-        const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
+      const projects = groupThreadsByProject(visibleThreads);
+      const projectCard = ({ path: projectPath, name: projectName, threads: projectThreads }) => {
         return `
         <article class="dashboard-git-project">
           <div class="dashboard-git-project-copy">
             <span class="dashboard-project-icon">${dashboardIcons.render('project')}</span>
             <span class="dashboard-project-copy">
-              <span class="dashboard-project-name">${domUtils.escapeHTML(project.projectName)}</span>
+              <span class="dashboard-project-name">${domUtils.escapeHTML(projectName)}</span>
               <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
             </span>
             <span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>
           </div>
           <span class="dashboard-project-summary">
-            <button type="button" class="dashboard-project-ignore" data-project-ignore="${domUtils.escapeHTML(projectPath)}" title="${ignoredProjectPaths.has(projectPath) ? 'Unmute change notifications for this project' : 'Mute change notifications for this project'}">${dashboardIcons.render(ignoredProjectPaths.has(projectPath) ? 'restore' : 'ignore')}<span>${ignoredProjectPaths.has(projectPath) ? 'Unmute changes' : 'Mute changes'}</span></button>
-            ${ignoredProjectPaths.has(projectPath) ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`}
+            ${renderProjectActions(projectPath, projectThreads, mutedProjectPaths.has(projectPath))}
           </span>
         </article>`;
       };
       const activeProjects = [];
-      const ignoredProjects = [];
-      projects.forEach((project, projectPath) => {
-        (ignoredProjectPaths.has(projectPath) ? ignoredProjects : activeProjects).push([projectPath, project]);
+      const mutedProjects = [];
+      projects.forEach((project) => {
+        (mutedProjectPaths.has(project.path) ? mutedProjects : activeProjects).push(project);
       });
       return `
         ${activeProjects.map(projectCard).join('')}
-        ${ignoredProjects.length ? `
-          <details class="dashboard-ignored-projects">
-            <summary><span class="dashboard-ignored-project-label">Muted</span><span class="dashboard-ignored-project-count">${ignoredProjects.length}</span></summary>
-            <div class="dashboard-ignored-project-list">${ignoredProjects.map(projectCard).join('')}</div>
+        ${mutedProjects.length ? `
+          <details class="dashboard-muted-projects">
+            <summary><span class="dashboard-muted-project-label">Muted</span><span class="dashboard-muted-project-count">${mutedProjects.length}</span></summary>
+            <div class="dashboard-muted-project-list">${mutedProjects.map(projectCard).join('')}</div>
           </details>` : ''}`;
     }
-    const groups = new Map();
-    visibleThreads.forEach((item) => {
-      const projectPath = String(item.projectPath).trim();
-      if (!groups.has(projectPath)) {
-        groups.set(projectPath, { path: projectPath, name: item.projectName, threads: [] });
-      }
-      groups.get(projectPath).threads.push(item);
-    });
-    return [...groups.values()].map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
+    return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjects.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
-      const isIgnored = ignoredProjectPaths.has(projectPath);
+      const isMuted = mutedProjectPaths.has(projectPath);
       return `
       <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${domUtils.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
@@ -127,14 +129,13 @@ const threadMarkup = (() => {
                 <span class="dashboard-project-name">${domUtils.escapeHTML(project)}</span>
                 <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
               </span>
-              ${hasChanges && !isIgnored ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>` : ''}
-              ${hasChanges && isIgnored ? '<span class="dashboard-project-ignored" title="Change notifications are muted for this project">Muted</span>' : ''}
+              ${hasChanges && !isMuted ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>` : ''}
+              ${hasChanges && isMuted ? '<span class="dashboard-project-muted" title="Change notifications are muted for this project">Muted</span>' : ''}
             </span>
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'task' : 'tasks'}</span>
-            ${hasChanges ? `<button type="button" class="dashboard-project-ignore" data-project-ignore="${domUtils.escapeHTML(projectPath)}" title="${isIgnored ? 'Unmute change notifications for this project' : 'Mute change notifications for this project'}">${dashboardIcons.render(isIgnored ? 'restore' : 'ignore')}<span>${isIgnored ? 'Unmute changes' : 'Mute changes'}</span></button>` : ''}
-            ${hasChanges && !isIgnored ? `<button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="Open Codex’s Commit or push flow for this project">${dashboardIcons.render('gitChanges')}<span>Commit or push</span></button>` : ''}
+            ${renderProjectActions(projectPath, projectThreads, isMuted)}
           </span>
         </header>
         <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>
@@ -142,5 +143,5 @@ const threadMarkup = (() => {
     }).join('');
   }
 
-  return { list, thread };
+  return { list };
 })();

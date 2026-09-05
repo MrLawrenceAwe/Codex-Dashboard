@@ -26,12 +26,14 @@ final class RefreshScheduler {
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
-    private let fileChanges: FileChangeMonitor?
+    private let dataChanges: CodexDataChangeMonitor?
+    private let workingTreeChanges: WorkingTreeChangeMonitor?
 
-    var hasFileChangeMonitoring: Bool { fileChanges != nil }
+    var hasFileChangeMonitoring: Bool { dataChanges != nil }
 
     init(observeFileChanges: Bool = true) {
-        fileChanges = observeFileChanges ? FileChangeMonitor() : nil
+        dataChanges = observeFileChanges ? CodexDataChangeMonitor() : nil
+        workingTreeChanges = observeFileChanges ? WorkingTreeChangeMonitor() : nil
     }
 
     deinit {
@@ -67,7 +69,7 @@ final class RefreshScheduler {
             interval: { [self] in
                 Schedule.workingTree(
                     active: Self.isUserActive,
-                    fileEventsAvailable: fileChanges != nil
+                    fileEventsAvailable: workingTreeChanges != nil
                 )
             },
             action: { await updateWorkingTrees(nil) }
@@ -76,7 +78,7 @@ final class RefreshScheduler {
             interval: { [self] in
                 Schedule.unread(
                     active: Self.isUserActive,
-                    fileEventsAvailable: fileChanges != nil
+                    fileEventsAvailable: dataChanges != nil
                 )
             },
             action: updateUnreadState
@@ -92,20 +94,20 @@ final class RefreshScheduler {
             interval: { Schedule.inactiveAccountUsage },
             action: refreshInactiveAccountUsage
         )
-        fileChanges?.start(
+        workingTreeChanges?.start(refreshWorkingTrees: updateWorkingTrees)
+        dataChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
             accountMetadataURL: CodexConfiguration.accountMetadataURL,
             authenticationURL: CodexConfiguration.authenticationURL,
             refreshCatalog: synchronizeDashboard,
             refreshUnread: updateUnreadState,
-            refreshAccounts: refreshAccountState,
-            refreshWorkingTrees: updateWorkingTrees
+            refreshAccounts: refreshAccountState
         )
     }
 
     func updateProjectPaths(_ paths: Set<String>) {
-        fileChanges?.updateProjectPaths(paths)
+        workingTreeChanges?.updateProjectPaths(paths)
     }
 
     static var isUserActive: Bool {
@@ -136,6 +138,7 @@ final class RefreshScheduler {
         unreadPollingTask = nil
         accountUsagePollingTask = nil
         inactiveAccountUsagePollingTask = nil
-        fileChanges?.stop()
+        dataChanges?.stop()
+        workingTreeChanges?.stop()
     }
 }

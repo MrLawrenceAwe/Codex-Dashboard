@@ -41,25 +41,17 @@ final class CodexAccountManager: @unchecked Sendable {
         self.now = now
     }
 
-    func activeAccountIdentifier() throws -> String? {
+    func activeCodexAccountID() throws -> String? {
         try lock.withLock {
             try activeCredentialFile.read().flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
         }
     }
 
-    func document() throws -> SavedAccountsDocument {
+    func loadDocument() throws -> SavedAccountsDocument {
         try lock.withLock { try documentStore.load() }
     }
 
-    func savedCredentialWithoutUserInteraction(for accountID: UUID) throws -> Data {
-        try savedCredential(for: accountID, interactionAllowed: false)
-    }
-
-    func savedCredentialAllowingUserInteraction(for accountID: UUID) throws -> Data {
-        try savedCredential(for: accountID, interactionAllowed: true)
-    }
-
-    private func savedCredential(
+    func savedCredential(
         for accountID: UUID,
         interactionAllowed: Bool
     ) throws -> Data {

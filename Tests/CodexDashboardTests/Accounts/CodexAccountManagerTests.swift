@@ -103,7 +103,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try credential.write(to: authenticationURL)
 
         let account = try manager.saveCurrentAccount()
-        let document = try manager.document()
+        let document = try manager.loadDocument()
 
         XCTAssertEqual(account.name, "Personal")
         XCTAssertEqual(document.accounts, [account])
@@ -141,11 +141,11 @@ final class CodexAccountManagerTests: XCTestCase {
 
         XCTAssertEqual(try Data(contentsOf: authenticationURL), personal)
         XCTAssertEqual(vault.credential(for: workAccount.id), rotatedWork)
-        XCTAssertEqual(try manager.document().activeAccountID, personalAccount.id)
+        XCTAssertEqual(try manager.loadDocument().activeAccountID, personalAccount.id)
 
         try manager.rollback(transaction)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), rotatedWork)
-        XCTAssertEqual(try manager.document().activeAccountID, workAccount.id)
+        XCTAssertEqual(try manager.loadDocument().activeAccountID, workAccount.id)
     }
 
     func testBeginAddingAccountSignsOutAndCanRollback() throws {
@@ -155,11 +155,11 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let transaction = try manager.beginAddingAccount()
         XCTAssertFalse(FileManager.default.fileExists(atPath: authenticationURL.path))
-        XCTAssertNil(try manager.document().activeAccountID)
+        XCTAssertNil(try manager.loadDocument().activeAccountID)
 
         try manager.rollback(transaction)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), credential)
-        XCTAssertEqual(try manager.document().activeAccountID, account.id)
+        XCTAssertEqual(try manager.loadDocument().activeAccountID, account.id)
     }
 
     func testUnsupportedMetadataVersionIsNotOverwritten() throws {
@@ -212,7 +212,7 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertThrowsError(try manager.deleteAccount(account.id)) { error in
             XCTAssertTrue(error is MemoryAccountCredentialVault.TestError)
         }
-        XCTAssertEqual(try manager.document().accounts, [account])
+        XCTAssertEqual(try manager.loadDocument().accounts, [account])
         XCTAssertEqual(vault.credential(for: account.id), credential)
     }
 
@@ -260,7 +260,7 @@ final class CodexAccountManagerTests: XCTestCase {
         metadata["activeAccountID"] = lawrence.id.uuidString
         try JSONSerialization.data(withJSONObject: metadata).write(to: metadataURL)
 
-        let document = try manager.document()
+        let document = try manager.loadDocument()
 
         XCTAssertEqual(document.activeAccountID, oluwatoyin.id)
     }
@@ -293,7 +293,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try credential.write(to: authenticationURL)
         let account = try manager.saveCurrentAccount()
 
-        let savedCredential = try manager.savedCredentialWithoutUserInteraction(for: account.id)
+        let savedCredential = try manager.savedCredential(for: account.id, interactionAllowed: false)
 
         XCTAssertEqual(savedCredential, credential)
         XCTAssertEqual(vault.interactiveReads, 0)
@@ -305,14 +305,14 @@ final class CodexAccountManagerTests: XCTestCase {
         try credential.write(to: authenticationURL)
         let account = try manager.saveCurrentAccount()
 
-        let savedCredential = try manager.savedCredentialAllowingUserInteraction(
-            for: account.id
+        let savedCredential = try manager.savedCredential(
+            for: account.id, interactionAllowed: true
         )
 
         XCTAssertEqual(savedCredential, credential)
         XCTAssertEqual(vault.interactiveReads, 1)
         XCTAssertEqual(vault.backgroundReads, 0)
-        XCTAssertEqual(try manager.document().activeAccountID, account.id)
+        XCTAssertEqual(try manager.loadDocument().activeAccountID, account.id)
     }
 
     func testUsageCredentialUpdateNeverRequestsInteractiveVaultAccess() throws {
@@ -352,7 +352,7 @@ final class CodexAccountManagerTests: XCTestCase {
         ]
         try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
 
-        let reloaded = try manager.document()
+        let reloaded = try manager.loadDocument()
 
         XCTAssertEqual(reloaded.accounts.first(where: { $0.id == account.id })?.name, "Lawrence Awe")
     }
@@ -369,7 +369,7 @@ final class CodexAccountManagerTests: XCTestCase {
         legacy["activeProfileID"] = legacy.removeValue(forKey: "activeAccountID")
         try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
 
-        XCTAssertEqual(try manager.document().activeAccountID, account.id)
+        XCTAssertEqual(try manager.loadDocument().activeAccountID, account.id)
 
         let migrated = try XCTUnwrap(
             JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any]
@@ -418,7 +418,7 @@ final class CodexAccountManagerTests: XCTestCase {
         )
         try JSONSerialization.data(withJSONObject: legacy).write(to: metadataURL)
 
-        let document = try manager.document()
+        let document = try manager.loadDocument()
 
         XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
@@ -450,7 +450,7 @@ final class CodexAccountManagerTests: XCTestCase {
         )
         try JSONSerialization.data(withJSONObject: metadata).write(to: metadataURL)
 
-        let document = try manager.document()
+        let document = try manager.loadDocument()
 
         XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)

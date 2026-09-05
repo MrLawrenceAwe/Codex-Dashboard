@@ -210,7 +210,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(runtime.synchronizeCallCount, 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: authenticationURL.path))
-        XCTAssertNil(try accountManager.document().activeAccountID)
+        XCTAssertNil(try accountManager.loadDocument().activeAccountID)
         XCTAssertEqual(coordinator.connectionState, .rendererAvailable)
         XCTAssertEqual(
             coordinator.accounts.statusMessage,
@@ -256,7 +256,7 @@ extension AppCoordinatorTests {
 
         await coordinator.switchAccount(to: lawrence.id)
 
-        XCTAssertEqual(try accountManager.document().activeAccountID, lawrence.id)
+        XCTAssertEqual(try accountManager.loadDocument().activeAccountID, lawrence.id)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), lawrenceCredential)
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(runtime.synchronizeCallCount, 1)
@@ -304,7 +304,7 @@ extension AppCoordinatorTests {
 
         await coordinator.switchAccount(to: first.id)
 
-        XCTAssertEqual(try accountManager.document().activeAccountID, second.id)
+        XCTAssertEqual(try accountManager.loadDocument().activeAccountID, second.id)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertEqual(
