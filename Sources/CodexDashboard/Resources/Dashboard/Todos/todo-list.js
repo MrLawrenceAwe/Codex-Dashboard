@@ -2,6 +2,27 @@ const todoList = (() => {
   let items = todoListState.load();
   let filterMode = 'open';
   let pageIsOpen = false;
+  const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+  const maximumImageBytes = 2 * 1024 * 1024;
+
+  function showImageError(message = '') {
+    const notice = document.querySelector('[data-todo-image-error]');
+    if (!notice) return;
+    notice.textContent = message;
+    notice.hidden = !message;
+  }
+
+  function imageMarkup(item) {
+    if (!item.image) return '';
+    const name = dashboardElements.escapeHTML(item.image.name);
+    return `
+      <div class="todo-image">
+        <button type="button" class="todo-image-preview" data-todo-image-preview aria-label="View image: ${name}" title="View image">
+          <img src="${dashboardElements.escapeHTML(item.image.dataURL)}" alt="${name}">
+        </button>
+        <span class="todo-image-name" title="${name}">${name}</span>
+      </div>`;
+  }
 
   function visibleItems() {
     if (filterMode === 'open') return items.filter((item) => !item.completed);
@@ -57,6 +78,14 @@ const todoList = (() => {
         </label>
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${dashboardElements.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
+          ${imageMarkup(item)}
+          <div class="todo-image-actions">
+            <label class="todo-image-action" title="${item.image ? 'Replace' : 'Attach'} image">
+              <input type="file" data-todo-image-input accept="image/jpeg,image/png,image/gif,image/webp">
+              ${item.image ? 'Replace image' : 'Add image'}
+            </label>
+            ${item.image ? '<button type="button" data-todo-image-remove>Remove image</button>' : ''}
+          </div>
         </div>
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${dashboardElements.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
@@ -85,6 +114,34 @@ const todoList = (() => {
     }) || items[index];
     persist();
     render();
+  }
+
+  function attachImage(id, file) {
+    showImageError();
+    if (!acceptedImageTypes.has(file?.type)) {
+      showImageError('Choose a JPEG, PNG, GIF, or WebP image.');
+      return;
+    }
+    if (file.size > maximumImageBytes) {
+      showImageError('Images must be 2 MB or smaller.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      const image = todoListState.normalizeImage({
+        dataURL: reader.result,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+      if (!image) {
+        showImageError('Codex could not read that image.');
+        return;
+      }
+      updateItem(id, { image });
+    });
+    reader.addEventListener('error', () => showImageError('Codex could not read that image.'));
+    reader.readAsDataURL(file);
   }
 
   function mountNavigation() {
@@ -130,6 +187,7 @@ const todoList = (() => {
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
+        <p class="todo-storage-error" data-todo-image-error role="alert" hidden></p>
         <div class="todo-toolbar">
           <div class="todo-filters" aria-label="Filter to-dos">
             <button type="button" data-todo-filter="open" class="is-active">Open<span class="todo-filter-count" data-todo-filter-count>0</span></button>
@@ -167,9 +225,31 @@ const todoList = (() => {
         const title = event.target.value.trim();
         if (title) updateItem(row.dataset.todoId, { title });
         else render();
+      } else if (event.target.matches('[data-todo-image-input]')) {
+        const file = event.target.files?.[0];
+        if (file) attachImage(row.dataset.todoId, file);
       }
     });
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
+      const previewButton = event.target.closest('[data-todo-image-preview]');
+      if (previewButton) {
+        const row = previewButton.closest('[data-todo-id]');
+        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
+        const dialog = page.querySelector('[data-todo-image-dialog]');
+        if (item?.image && dialog) {
+          const image = dialog.querySelector('img');
+          image.src = item.image.dataURL;
+          image.alt = item.image.name;
+          dialog.showModal();
+        }
+        return;
+      }
+      const removeImageButton = event.target.closest('[data-todo-image-remove]');
+      if (removeImageButton) {
+        const row = removeImageButton.closest('[data-todo-id]');
+        if (row) updateItem(row.dataset.todoId, { image: null });
+        return;
+      }
       const button = event.target.closest('[data-todo-delete]');
       if (!button) return;
       const row = button.closest('[data-todo-id]');
@@ -184,6 +264,16 @@ const todoList = (() => {
       items = items.filter((item) => item.id !== row.dataset.todoId);
       persist();
       render();
+    });
+    page.insertAdjacentHTML('beforeend', `
+      <dialog class="todo-image-dialog" data-todo-image-dialog aria-label="Image preview">
+        <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
+        <img alt="">
+      </dialog>`);
+    const imageDialog = page.querySelector('[data-todo-image-dialog]');
+    imageDialog.querySelector('[data-todo-image-dialog-close]').addEventListener('click', () => imageDialog.close());
+    imageDialog.addEventListener('click', (event) => {
+      if (event.target === imageDialog) imageDialog.close();
     });
     pageHost.append(page);
     if (pageIsOpen) page.classList.add('is-open');
