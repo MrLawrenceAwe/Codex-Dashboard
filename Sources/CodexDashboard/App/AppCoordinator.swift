@@ -35,6 +35,7 @@ final class AppCoordinator: ObservableObject {
     let typingActivityDetector: any TypingActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
+    let compatibilityIssueNotifier: any CompatibilityIssueNotifying
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -44,6 +45,7 @@ final class AppCoordinator: ObservableObject {
     private var codexActivationObserver: NSObjectProtocol?
     private var accountStateObserver: AnyCancellable?
     private var taskCompletionObserver = TaskCompletionObserver()
+    var didNotifyAboutDetectedUpdate = false
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
@@ -74,6 +76,7 @@ final class AppCoordinator: ObservableObject {
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
+        compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
         }
@@ -87,6 +90,7 @@ final class AppCoordinator: ObservableObject {
         self.codexForegrounder = codexForegrounder
         self.typingActivityDetector = typingActivityDetector
         self.promptLibraryStore = promptLibraryStore
+        self.compatibilityIssueNotifier = compatibilityIssueNotifier
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,

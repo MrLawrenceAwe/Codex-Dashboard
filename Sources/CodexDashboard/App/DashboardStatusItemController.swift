@@ -10,7 +10,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     private let coordinator: AppCoordinator
     private let launchAtLogin: LaunchAtLoginController
     private let statusItem: NSStatusItem
-    private var connectionStateCancellable: AnyCancellable?
+    private var statusPresentationCancellable: AnyCancellable?
 
     init(
         coordinator: AppCoordinator,
@@ -26,10 +26,13 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         statusItem.isVisible = true
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
-        updateIcon(for: coordinator.connectionState)
+        updateIcon(for: coordinator.connectionState, report: coordinator.compatibilityReport)
 
-        connectionStateCancellable = coordinator.$connectionState.sink { [weak self] state in
-            self?.updateIcon(for: state)
+        statusPresentationCancellable = Publishers.CombineLatest(
+            coordinator.$connectionState,
+            coordinator.$compatibilityReport
+        ).sink { [weak self] state, report in
+            self?.updateIcon(for: state, report: report)
         }
     }
 
@@ -45,7 +48,20 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let status = NSMenuItem(title: coordinator.statusPresentation.title, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
-        menu.addItem(actionItem("Open Diagnostics…", action: #selector(openDiagnostics)))
+        if let report = coordinator.compatibilityReport,
+           report.blockingCount > 0 || report.warningCount > 0 {
+            let compatibilityStatus = NSMenuItem(
+                title: "Compatibility: \(report.summary)",
+                action: nil,
+                keyEquivalent: ""
+            )
+            compatibilityStatus.isEnabled = false
+            menu.addItem(compatibilityStatus)
+        }
+        let diagnosticsTitle = Self.requiresCompatibilityAttention(coordinator.compatibilityReport)
+            ? "Review Compatibility…"
+            : "Open Diagnostics…"
+        menu.addItem(actionItem(diagnosticsTitle, action: #selector(openDiagnostics)))
         menu.addItem(.separator())
 
         let actions = coordinator.dashboardActions
@@ -100,15 +116,36 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         return item
     }
 
-    private func updateIcon(for state: DashboardConnectionState) {
+    static func requiresCompatibilityAttention(_ report: CompatibilityReport?) -> Bool {
+        guard let report else { return false }
+        return report.blockingCount > 0 || report.warningCount > 0
+    }
+
+    static func statusSymbolName(
+        for state: DashboardConnectionState,
+        report: CompatibilityReport?,
+        dashboardMaintenanceIsEnabled: Bool
+    ) -> String {
+        if let report, report.blockingCount > 0 { return "exclamationmark.octagon.fill" }
+        if let report, report.warningCount > 0 { return "exclamationmark.triangle.fill" }
+        return state.statusIconIsFilled(dashboardMaintenanceIsEnabled: dashboardMaintenanceIsEnabled)
+            ? "rectangle.grid.2x2.fill"
+            : "rectangle.grid.2x2"
+    }
+
+    private func updateIcon(for state: DashboardConnectionState, report: CompatibilityReport?) {
         let dashboardMaintenanceIsEnabled = coordinator.dashboardRuntime?.maintainsDashboard ?? false
-        let symbolName = state.statusIconIsFilled(
+        let symbolName = Self.statusSymbolName(
+            for: state,
+            report: report,
             dashboardMaintenanceIsEnabled: dashboardMaintenanceIsEnabled
-        ) ? "rectangle.grid.2x2.fill" : "rectangle.grid.2x2"
+        )
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Codex Dashboard")
         image?.isTemplate = true
         statusItem.button?.image = image
-        statusItem.button?.toolTip = "Codex Dashboard"
+        statusItem.button?.toolTip = Self.requiresCompatibilityAttention(report)
+            ? "Codex Dashboard — \(report?.summary ?? "compatibility needs attention")"
+            : "Codex Dashboard"
     }
 
     @objc private func openDiagnostics() {

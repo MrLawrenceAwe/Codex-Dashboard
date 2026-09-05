@@ -17,6 +17,39 @@ final class DashboardStatusItemControllerTests: XCTestCase {
         )
     }
 
+    func testCompatibilityFindingsReplaceTheNormalStatusIcon() {
+        let warning = CompatibilityReport(checks: [CompatibilityCheck(
+            id: "composer",
+            title: "Composer",
+            status: .warning,
+            detail: "Changed"
+        )])
+        let incompatible = CompatibilityReport(checks: [CompatibilityCheck(
+            id: "renderer",
+            title: "Renderer",
+            status: .incompatible,
+            detail: "Broken"
+        )])
+
+        XCTAssertEqual(
+            DashboardStatusItemController.statusSymbolName(
+                for: .dashboardMounted,
+                report: warning,
+                dashboardMaintenanceIsEnabled: true
+            ),
+            "exclamationmark.triangle.fill"
+        )
+        XCTAssertEqual(
+            DashboardStatusItemController.statusSymbolName(
+                for: .dashboardMounted,
+                report: incompatible,
+                dashboardMaintenanceIsEnabled: true
+            ),
+            "exclamationmark.octagon.fill"
+        )
+        XCTAssertTrue(DashboardStatusItemController.requiresCompatibilityAttention(warning))
+    }
+
     private let positionKey = "NSStatusItem Preferred Position CodexDashboardStatusItem"
 
     func testRegistersVisibleDefaultStatusItemPosition() throws {

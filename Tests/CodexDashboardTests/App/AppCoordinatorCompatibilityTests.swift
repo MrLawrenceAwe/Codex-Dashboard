@@ -140,6 +140,67 @@ extension AppCoordinatorTests {
         XCTAssertFalse(coordinator.isCheckingCompatibility)
     }
 
+    func testVersionTriggeredCompatibilityWarningSendsOneNotification() async throws {
+        let suiteName = "AppCoordinatorCompatibilityTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("1.0", forKey: "lastCheckedCodexVersion")
+        let warning = CompatibilityCheck(
+            id: "model-picker",
+            title: "Model picker controls",
+            status: .warning,
+            detail: "Controls changed"
+        )
+        let notifier = RecordingCompatibilityIssueNotifier()
+        let coordinator = makeAppCoordinator(
+            compatibilityChecker: StubCompatibilityChecker(checks: [warning]),
+            userDefaults: defaults,
+            installedCodexVersion: { "2.0" },
+            compatibilityIssueNotifier: notifier,
+            runtimeFactory: { _ in StubDashboardRuntime(compatibilityChecks: [
+                CompatibilityCheck(
+                    id: "renderer",
+                    title: "Renderer connection",
+                    status: .compatible,
+                    detail: "Renderer inspected."
+                ),
+            ]) }
+        )
+        coordinator.compatibilityWasTriggeredByUpdate = coordinator.compatibilityMonitor.updateWasDetected
+
+        await coordinator.checkCompatibility()
+        await coordinator.checkCompatibility()
+
+        XCTAssertEqual(notifier.reports.count, 1)
+        XCTAssertEqual(notifier.reports.first?.warningCount, 1)
+    }
+
+    func testVersionTriggeredCompatibleReportDoesNotSendNotification() async throws {
+        let suiteName = "AppCoordinatorCompatibilityTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("1.0", forKey: "lastCheckedCodexVersion")
+        let notifier = RecordingCompatibilityIssueNotifier()
+        let coordinator = makeAppCoordinator(
+            userDefaults: defaults,
+            installedCodexVersion: { "2.0" },
+            compatibilityIssueNotifier: notifier,
+            runtimeFactory: { _ in StubDashboardRuntime(compatibilityChecks: [
+                CompatibilityCheck(
+                    id: "renderer",
+                    title: "Renderer connection",
+                    status: .compatible,
+                    detail: "Renderer inspected."
+                ),
+            ]) }
+        )
+        coordinator.compatibilityWasTriggeredByUpdate = coordinator.compatibilityMonitor.updateWasDetected
+
+        await coordinator.checkCompatibility()
+
+        XCTAssertTrue(notifier.reports.isEmpty)
+    }
+
     func testCompatibilityCheckAcknowledgesVersionOnlyAfterRendererInspection() async throws {
         let suiteName = "AppCoordinatorTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
