@@ -12,6 +12,7 @@ let unreadMonitoringStarted = false;
 let dashboardIsOpen = false;
 let viewNeedsRender = true;
 let unreadThreadIDs = new Set();
+const sidebarUnreadOverrides = new Map();
 const completedTickDuration = 60_000;
 const completedTickExpiryByThreadID = new Map();
 let completedTickTimer;
@@ -25,10 +26,19 @@ function savePreferences() {
   });
 }
 
-function syncUnreadFromSidebar() {
+function unreadRevision(thread) {
+  return JSON.stringify([
+    thread.recencyEpochMillis, thread.runState, thread.latestLifecycleEventKind, thread.preview,
+  ]);
+}
+
+function syncUnreadFromSidebar(nextUnreadThreadIDs = new Set(unreadThreadIDs)) {
   const readStates = codexHost.threadReadStates();
-  const nextUnreadThreadIDs = new Set(unreadThreadIDs);
   readStates.forEach((isUnread, id) => {
+    const thread = threads.find((item) => item.id === id);
+    if (!thread) return;
+    if (isUnread === (thread.isUnread === true)) sidebarUnreadOverrides.delete(id);
+    else sidebarUnreadOverrides.set(id, { isUnread, revision: unreadRevision(thread) });
     if (isUnread) nextUnreadThreadIDs.add(id);
     else nextUnreadThreadIDs.delete(id);
   });
@@ -331,14 +341,27 @@ function anyPageIsOpen() {
 
 function applyThreads(nextThreads) {
   threads = taskDashboardState.normalizeThreads(nextThreads);
-  updateUnreadThreadIDs(new Set(
+  const nextUnreadThreadIDs = new Set(
     threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
-  ));
+  );
+  const threadsByID = new Map(threads.map((thread) => [thread.id, thread]));
+  sidebarUnreadOverrides.forEach((override, id) => {
+    const thread = threadsByID.get(id);
+    // Retain live observations through persistence lag, but release them when
+    // acknowledged, removed, or superseded by activity in a subsequent turn.
+    if (!thread || override.isUnread === (thread.isUnread === true)
+      || override.revision !== unreadRevision(thread)) {
+      sidebarUnreadOverrides.delete(id);
+      return;
+    }
+    if (override.isUnread) nextUnreadThreadIDs.add(id);
+    else nextUnreadThreadIDs.delete(id);
+  });
   const currentThreadIDs = new Set(threads.map((thread) => thread.id));
   completedTickExpiryByThreadID.forEach((_, threadID) => {
     if (!currentThreadIDs.has(threadID)) completedTickExpiryByThreadID.delete(threadID);
   });
-  syncUnreadFromSidebar();
+  syncUnreadFromSidebar(nextUnreadThreadIDs);
   scheduleUnreadSync(1500);
   // A native refresh can update the catalog, unread state, and Git state in a
   // short burst. Keep the renderer responsive by applying only the latest
@@ -393,6 +416,7 @@ function destroy() {
   unreadSyncTimer = undefined;
   completedTickTimer = undefined;
   completedTickExpiryByThreadID.clear();
+  sidebarUnreadOverrides.clear();
   unreadMonitoringStarted = false;
   viewNeedsRender = true;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
