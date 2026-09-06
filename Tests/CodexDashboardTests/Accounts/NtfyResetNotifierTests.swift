@@ -90,15 +90,29 @@ final class NtfyResetNotifierTests: XCTestCase {
         XCTAssertTrue(messages.isEmpty)
     }
 
-    func testGeneratesAShortReplacementTopic() throws {
+    func testGeneratesAFriendlyReplacementTopic() throws {
         let notifier = NtfyResetNotifier(userDefaults: try makeDefaults())
         let initialTopic = notifier.topic
 
         notifier.generateNewTopic()
 
         XCTAssertNotEqual(notifier.topic, initialTopic)
-        XCTAssertTrue(notifier.topic.hasPrefix("cd-"))
-        XCTAssertEqual(notifier.topic.count, 23)
+        XCTAssertTrue(notifier.topic.hasPrefix("codex-dashboard-"))
+        XCTAssertEqual(notifier.topic.count, 32)
+    }
+
+    func testReplacesLegacyTopicThatExceedsNtfyLimit() throws {
+        let defaults = try makeDefaults()
+        defaults.set(
+            "codex-dashboard-6a16a2d54e074acebd459180c2c8250e45892ace75b84d98980687ae00809342",
+            forKey: NtfyResetNotifier.topicKey
+        )
+
+        let notifier = NtfyResetNotifier(userDefaults: defaults)
+
+        XCTAssertTrue(notifier.topic.hasPrefix("codex-dashboard-"))
+        XCTAssertEqual(notifier.topic.count, 32)
+        XCTAssertEqual(defaults.string(forKey: NtfyResetNotifier.topicKey), notifier.topic)
     }
 
     private func makeDefaults() throws -> UserDefaults {
