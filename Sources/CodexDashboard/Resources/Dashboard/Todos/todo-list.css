@@ -96,7 +96,6 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-image-actions { display: flex; gap: 10px; min-height: 20px; padding: 0 4px; opacity: 0; }
 #codex-dashboard-todo-page .todo-item:hover .todo-image-actions,
 #codex-dashboard-todo-page .todo-item:focus-within .todo-image-actions { opacity: 1; }
-#codex-dashboard-todo-page .todo-image-paste-hint,
 #codex-dashboard-todo-page .todo-image-actions button { padding: 2px 0; border: 0; background: transparent; color: var(--todo-dim); font-size: 10px; }
 #codex-dashboard-todo-page .todo-image-actions button:hover { color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-image-dialog { width: min(900px, calc(100% - 48px)); max-height: calc(100% - 48px); padding: 40px 16px 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }

@@ -58,10 +58,9 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           ${imageMarkup(item)}
-          ${item.completed ? '' : `<div class="todo-image-actions">
-            <span class="todo-image-paste-hint">Paste an image into the title to ${item.image ? 'replace' : 'attach'} it.</span>
-            ${item.image ? '<button type="button" data-todo-image-remove>Remove image</button>' : ''}
-          </div>`}
+          ${!item.completed && item.image ? `<div class="todo-image-actions">
+            <button type="button" data-todo-image-remove>Remove image</button>
+          </div>` : ''}
         </div>
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
