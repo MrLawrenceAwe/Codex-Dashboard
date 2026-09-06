@@ -77,6 +77,8 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
     private static let deliveredResetsKey = "ntfyDeliveredAccountResets"
+    private static let knownDeadlinesKey = "ntfyKnownAccountDeadlines"
+    private static let sentDeadlineUpdatesKey = "ntfySentAccountDeadlineUpdates"
 
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
@@ -133,17 +135,26 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             return
         }
         let currentDate = now()
-        let notifications = AccountResetNotificationPlanner.deliverableNotifications(
+        let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID,
             now: currentDate
         )
-        let desired = Dictionary(uniqueKeysWithValues: notifications.map { ($0.identifier, $0) })
+        let notifications = allNotifications.filter { $0.notificationDate > currentDate }
+        let deadlineUpdates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
+            from: allNotifications,
+            previousDeadlines: deadlines(forKey: Self.knownDeadlinesKey),
+            sentUpdates: deadlines(forKey: Self.sentDeadlineUpdatesKey),
+            now: currentDate
+        )
+        saveDeadlines(allNotifications, forKey: Self.knownDeadlinesKey)
+        saveDeadlines(deadlineUpdates, forKey: Self.sentDeadlineUpdatesKey)
+        let desired = Dictionary(uniqueKeysWithValues: (notifications + deadlineUpdates).map { ($0.identifier, $0) })
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
             cancelTask(identifier)
         }
-        for notification in notifications {
+        for notification in notifications + deadlineUpdates {
             if deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
                 cancelTask(notification.identifier)
                 continue
@@ -196,6 +207,23 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         var delivered = userDefaults.dictionary(forKey: Self.deliveredResetsKey) ?? [:]
         delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
         userDefaults.set(delivered, forKey: Self.deliveredResetsKey)
+    }
+
+    private func deadlines(forKey key: String) -> [String: Date] {
+        guard let rawValues = userDefaults.dictionary(forKey: key) else { return [:] }
+        return rawValues.reduce(into: [:]) { result, item in
+            guard let timestamp = item.value as? Double else { return }
+            result[item.key] = Date(timeIntervalSinceReferenceDate: timestamp)
+        }
+    }
+
+    private func saveDeadlines(_ notifications: [AccountResetNotification], forKey key: String) {
+        guard !notifications.isEmpty else { return }
+        var values = userDefaults.dictionary(forKey: key) ?? [:]
+        for notification in notifications {
+            values[notification.sourceIdentifier] = notification.deadlineDate.timeIntervalSinceReferenceDate
+        }
+        userDefaults.set(values, forKey: key)
     }
 
     private func cancelTask(_ identifier: String) {

@@ -5,8 +5,27 @@ struct AccountResetNotification: Equatable, Sendable {
     let identifier: String
     let title: String
     let body: String
+    let deadlineDescription: String
     let notificationDate: Date
     let deadlineDate: Date
+
+    var sourceIdentifier: String {
+        guard let range = identifier.range(of: "-deadline-update-", options: .backwards) else {
+            return identifier
+        }
+        return String(identifier[..<range.lowerBound])
+    }
+
+    func deadlineUpdateNotification(at date: Date) -> AccountResetNotification {
+        AccountResetNotification(
+            identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
+            title: "\(title) time updated",
+            body: "\(deadlineDescription) at \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)).",
+            deadlineDescription: deadlineDescription,
+            notificationDate: date,
+            deadlineDate: deadlineDate
+        )
+    }
 }
 
 enum AccountResetNotificationPlanner {
@@ -49,6 +68,22 @@ enum AccountResetNotificationPlanner {
         }.sorted { $0.identifier < $1.identifier }
     }
 
+    static func deadlineUpdateNotifications(
+        from notifications: [AccountResetNotification],
+        previousDeadlines: [String: Date],
+        sentUpdates: [String: Date],
+        now: Date
+    ) -> [AccountResetNotification] {
+        notifications.compactMap { notification in
+            guard let previousDeadline = previousDeadlines[notification.identifier],
+                  previousDeadline != notification.deadlineDate,
+                  notification.notificationDate <= now,
+                  sentUpdates[notification.sourceIdentifier] != notification.deadlineDate
+            else { return nil }
+            return notification.deadlineUpdateNotification(at: now.addingTimeInterval(1))
+        }
+    }
+
     private static func limitNotifications(
         for account: SavedAccount,
         windowName: String,
@@ -64,7 +99,8 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription).",
+                body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription), at \(formattedDeadline(resetsAt)).",
+                deadlineDescription: "\(account.name)’s \(windowName) limit will reset",
                 notificationDate: resetsAt.addingTimeInterval(-leadTime),
                 deadlineDate: resetsAt
             )
@@ -85,7 +121,8 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
-                body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription).",
+                body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription), at \(formattedDeadline(expiration)).",
+                deadlineDescription: "\(account.name)’s next banked reset will expire",
                 notificationDate: expiration.addingTimeInterval(-leadTime),
                 deadlineDate: expiration
             )
@@ -102,6 +139,13 @@ enum AccountResetNotificationPlanner {
 
     private static func identifierComponent(for leadTime: TimeInterval) -> String {
         "\(Int(leadTime / 60 / 60))h"
+    }
+
+    static func formattedDeadline(_ deadline: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: deadline)
     }
 }
 
@@ -124,29 +168,46 @@ struct NoopAccountResetNotifier: AccountResetNotifying {
 @MainActor
 final class AccountResetNotifier: AccountResetNotifying {
     private static let identifierPrefix = "codex-dashboard-account-deadline-"
+    private static let knownDeadlinesKey = "accountResetNotificationKnownDeadlines"
+    private static let sentDeadlineUpdatesKey = "accountResetNotificationSentDeadlineUpdates"
 
     private let notificationCenter: UNUserNotificationCenter
+    private let userDefaults: UserDefaults
 
-    init(notificationCenter: UNUserNotificationCenter = .current()) {
+    init(
+        notificationCenter: UNUserNotificationCenter = .current(),
+        userDefaults: UserDefaults = .standard
+    ) {
         self.notificationCenter = notificationCenter
+        self.userDefaults = userDefaults
     }
 
     func updateNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
-        let notifications = AccountResetNotificationPlanner.notifications(
+        let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID
         )
+        let notifications = allNotifications.filter { $0.notificationDate > .now }
+        let deadlineUpdates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
+            from: allNotifications,
+            previousDeadlines: deadlines(forKey: Self.knownDeadlinesKey),
+            sentUpdates: deadlines(forKey: Self.sentDeadlineUpdatesKey),
+            now: .now
+        )
+        saveDeadlines(allNotifications, forKey: Self.knownDeadlinesKey)
+        saveDeadlines(deadlineUpdates, forKey: Self.sentDeadlineUpdatesKey)
         let pendingRequests = await notificationCenter.pendingNotificationRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
             request.identifier.hasPrefix(Self.identifierPrefix) ? request.identifier : nil
         }
         notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
 
-        guard !notifications.isEmpty, await notificationsAreAuthorized() else { return }
-        for notification in notifications {
+        let requests = notifications + deadlineUpdates
+        guard !requests.isEmpty, await notificationsAreAuthorized() else { return }
+        for notification in requests {
             let content = UNMutableNotificationContent()
             content.title = notification.title
             content.body = notification.body
@@ -180,5 +241,22 @@ final class AccountResetNotifier: AccountResetNotifying {
         @unknown default:
             return false
         }
+    }
+
+    private func deadlines(forKey key: String) -> [String: Date] {
+        guard let rawValues = userDefaults.dictionary(forKey: key) else { return [:] }
+        return rawValues.reduce(into: [:]) { result, item in
+            guard let timestamp = item.value as? Double else { return }
+            result[item.key] = Date(timeIntervalSinceReferenceDate: timestamp)
+        }
+    }
+
+    private func saveDeadlines(_ notifications: [AccountResetNotification], forKey key: String) {
+        guard !notifications.isEmpty else { return }
+        var values = userDefaults.dictionary(forKey: key) ?? [:]
+        for notification in notifications {
+            values[notification.sourceIdentifier] = notification.deadlineDate.timeIntervalSinceReferenceDate
+        }
+        userDefaults.set(values, forKey: key)
     }
 }
