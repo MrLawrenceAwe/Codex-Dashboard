@@ -203,7 +203,7 @@ struct DiagnosticsWindowView: View {
                         .textSelection(.enabled)
                     HStack(spacing: 8) {
                         Button("Copy Topic") { coordinator.copyPhoneNotificationTopic() }
-                        Button("New Short Topic") {
+                        Button("New Topic") {
                             coordinator.generateNewPhoneNotificationTopic()
                         }
                         Button("Send Test") { Task { await coordinator.testPhoneNotification() } }

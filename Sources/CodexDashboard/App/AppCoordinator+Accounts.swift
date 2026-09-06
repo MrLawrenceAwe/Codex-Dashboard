@@ -237,7 +237,7 @@ extension AppCoordinator {
 
     func generateNewPhoneNotificationTopic() {
         phoneResetNotifier.generateNewTopic()
-        phoneNotificationStatusMessage = "Short topic generated. Subscribe to it, then send a test."
+        phoneNotificationStatusMessage = "New topic generated. Subscribe to it, then send a test."
         objectWillChange.send()
     }
 

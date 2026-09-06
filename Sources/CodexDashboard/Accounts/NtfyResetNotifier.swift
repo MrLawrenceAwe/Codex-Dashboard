@@ -92,7 +92,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         self.userDefaults = userDefaults
         self.publisher = publisher
         self.now = now
-        if userDefaults.string(forKey: Self.topicKey) == nil {
+        if !Self.isValidTopic(userDefaults.string(forKey: Self.topicKey)) {
             userDefaults.set(Self.makeTopic(), forKey: Self.topicKey)
         }
     }
@@ -106,7 +106,13 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     }
 
     var topic: String {
-        userDefaults.string(forKey: Self.topicKey) ?? Self.makeTopic()
+        guard let savedTopic = userDefaults.string(forKey: Self.topicKey),
+              Self.isValidTopic(savedTopic) else {
+            let replacement = Self.makeTopic()
+            userDefaults.set(replacement, forKey: Self.topicKey)
+            return replacement
+        }
+        return savedTopic
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -205,9 +211,17 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     }
 
     private static func makeTopic() -> String {
-        let randomSuffix = [UUID(), UUID()].map {
-            $0.uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        }.joined().prefix(20)
-        return "cd-\(randomSuffix)"
+        let randomSuffix = UUID().uuidString
+            .replacingOccurrences(of: "-", with: "")
+            .lowercased()
+            .prefix(16)
+        return "codex-dashboard-\(randomSuffix)"
+    }
+
+    private static func isValidTopic(_ topic: String?) -> Bool {
+        guard let topic, !topic.isEmpty, topic.count <= 64 else { return false }
+        return topic.unicodeScalars.allSatisfy {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
+        }
     }
 }
