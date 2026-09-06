@@ -24,7 +24,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
         XCTAssertTrue(notifications.contains {
             $0.title == "Codex limit resets in one hour"
-                && $0.body == "Personal’s 5-hour limit has 75% remaining and will reset in one hour."
+                && $0.body.contains("Personal’s 5-hour limit has 75% remaining and will reset in one hour, at ")
         })
         XCTAssertEqual(
             Set(notifications.filter { $0.identifier.contains("weekly") }.map(\.title)),
@@ -43,8 +43,57 @@ final class AccountResetNotifierTests: XCTestCase {
             ]
         )
         XCTAssertTrue(notifications.contains {
-            $0.body == "Personal has 2 banked resets available; the next one expires in 5 hours."
+            $0.body.contains("Personal has 2 banked resets available; the next one expires in 5 hours, at ")
         })
+    }
+
+    func testPlansOneDeadlineUpdateWhenTheWarningTimeHasPassed() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let original = AccountResetNotificationPlanner.deliverableNotifications(
+            for: [savedAccount],
+            usageByAccountID: [
+                savedAccount.id: snapshot(
+                    fiveHourReset: now.addingTimeInterval(5 * 60 * 60),
+                    weeklyReset: nil,
+                    bankedResetExpiration: nil,
+                    now: now
+                ),
+            ],
+            now: now
+        )
+        let revised = AccountResetNotificationPlanner.deliverableNotifications(
+            for: [savedAccount],
+            usageByAccountID: [
+                savedAccount.id: snapshot(
+                    fiveHourReset: now.addingTimeInterval(30 * 60),
+                    weeklyReset: nil,
+                    bankedResetExpiration: nil,
+                    now: now
+                ),
+            ],
+            now: now
+        )
+        let previousDeadlines = Dictionary(uniqueKeysWithValues: original.map { ($0.sourceIdentifier, $0.deadlineDate) })
+
+        let updates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
+            from: revised,
+            previousDeadlines: previousDeadlines,
+            sentUpdates: [:],
+            now: now
+        )
+
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates.first?.title, "Codex limit resets in one hour time updated")
+        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour limit will reset at ") == true)
+        XCTAssertTrue(
+            AccountResetNotificationPlanner.deadlineUpdateNotifications(
+                from: revised,
+                previousDeadlines: previousDeadlines,
+                sentUpdates: [revised[0].sourceIdentifier: revised[0].deadlineDate],
+                now: now
+            ).isEmpty
+        )
     }
 
     func testSkipsResetNotificationsWhoseOneHourWarningHasAlreadyPassed() {

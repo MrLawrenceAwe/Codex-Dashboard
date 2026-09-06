@@ -21,7 +21,7 @@ private actor RecordingNtfyPublisher: NtfyPublishing {
 
 @MainActor
 final class NtfyResetNotifierTests: XCTestCase {
-    func testDeliversDueResetOnceWithAccountAndRemainingUsage() async throws {
+    func testDeliversImminentResetWarningOnceWithAccountAndRemainingUsage() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
@@ -42,7 +42,7 @@ final class NtfyResetNotifierTests: XCTestCase {
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(
                     usedPercent: 18,
-                    resetsAt: now.addingTimeInterval(30 * 60)
+                    resetsAt: now.addingTimeInterval(60 * 60 + 0.01)
                 ),
                 weekly: nil
             ),
