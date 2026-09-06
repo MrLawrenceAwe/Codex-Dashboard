@@ -405,6 +405,7 @@ extension XCTestCase {
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
         accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
+        phoneResetNotifier: any PhoneResetNotifying = NoopPhoneResetNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
@@ -430,6 +431,7 @@ extension XCTestCase {
             accountUsageCacheStore: accountUsageCacheStore,
             compatibilityIssueNotifier: compatibilityIssueNotifier,
             accountResetNotifier: accountResetNotifier,
+            phoneResetNotifier: phoneResetNotifier,
             runtimeFactory: runtimeFactory
         )
         addTeardownBlock {

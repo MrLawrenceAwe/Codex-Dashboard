@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 extension AppCoordinator {
@@ -205,5 +206,41 @@ extension AppCoordinator {
             for: accounts.savedAccounts,
             usageByAccountID: accounts.usageByAccountID
         )
+        await phoneResetNotifier.updateNotifications(
+            for: accounts.savedAccounts,
+            usageByAccountID: accounts.usageByAccountID
+        )
+    }
+
+    var phoneNotificationsEnabled: Bool {
+        phoneResetNotifier.isEnabled
+    }
+
+    var phoneNotificationTopic: String {
+        phoneResetNotifier.topic
+    }
+
+    func setPhoneNotificationsEnabled(_ enabled: Bool) {
+        phoneResetNotifier.setEnabled(enabled)
+        phoneNotificationStatusMessage = enabled
+            ? "Subscribe to the topic on your phone, then send a test."
+            : nil
+        objectWillChange.send()
+        Task { await updateAccountResetNotifications() }
+    }
+
+    func copyPhoneNotificationTopic() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(phoneNotificationTopic, forType: .string)
+        phoneNotificationStatusMessage = "Topic copied."
+    }
+
+    func testPhoneNotification() async {
+        do {
+            try await phoneResetNotifier.sendTestNotification()
+            phoneNotificationStatusMessage = "Test sent. Check your phone."
+        } catch {
+            phoneNotificationStatusMessage = "Test failed: \(error.localizedDescription)"
+        }
     }
 }

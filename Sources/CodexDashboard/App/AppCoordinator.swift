@@ -22,6 +22,7 @@ final class AppCoordinator: ObservableObject {
     @Published var rendererTargetCount = 0
     @Published var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
+    @Published var phoneNotificationStatusMessage: String?
     @Published var foregroundOnTaskCompletion: Bool {
         didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
     }
@@ -37,6 +38,7 @@ final class AppCoordinator: ObservableObject {
     let accounts: AccountCoordinator
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
     let accountResetNotifier: any AccountResetNotifying
+    let phoneResetNotifier: any PhoneResetNotifying
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -79,6 +81,7 @@ final class AppCoordinator: ObservableObject {
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
         accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
+        phoneResetNotifier: any PhoneResetNotifying = NoopPhoneResetNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
         }
@@ -94,6 +97,7 @@ final class AppCoordinator: ObservableObject {
         self.promptLibraryStore = promptLibraryStore
         self.compatibilityIssueNotifier = compatibilityIssueNotifier
         self.accountResetNotifier = accountResetNotifier
+        self.phoneResetNotifier = phoneResetNotifier
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,
