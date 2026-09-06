@@ -7,12 +7,25 @@ struct AccountResetNotification: Equatable, Sendable {
     let windowName: String
     let remainingPercent: Int
     let notificationDate: Date
+    let resetDate: Date
 }
 
 enum AccountResetNotificationPlanner {
     static let notificationLeadTime: TimeInterval = 60 * 60
 
     static func notifications(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        now: Date = .now
+    ) -> [AccountResetNotification] {
+        deliverableNotifications(
+            for: accounts,
+            usageByAccountID: usageByAccountID,
+            now: now
+        ).filter { $0.notificationDate > now }
+    }
+
+    static func deliverableNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
         now: Date = .now
@@ -33,14 +46,15 @@ enum AccountResetNotificationPlanner {
         now: Date
     ) -> AccountResetNotification? {
         guard let window, let resetsAt = window.resetsAt else { return nil }
+        guard resetsAt > now else { return nil }
         let notificationDate = resetsAt.addingTimeInterval(-notificationLeadTime)
-        guard notificationDate > now else { return nil }
         return AccountResetNotification(
             identifier: "codex-dashboard-account-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())",
             accountName: account.name,
             windowName: windowName,
             remainingPercent: max(0, min(100, 100 - window.usedPercent)),
-            notificationDate: notificationDate
+            notificationDate: notificationDate,
+            resetDate: resetsAt
         )
     }
 }

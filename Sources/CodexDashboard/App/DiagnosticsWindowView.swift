@@ -185,6 +185,43 @@ struct DiagnosticsWindowView: View {
             CompatibilityCard(coordinator: coordinator)
 
             VStack(alignment: .leading, spacing: 8) {
+                Toggle(
+                    "Send reset notifications to my phone",
+                    isOn: Binding(
+                        get: { coordinator.phoneNotificationsEnabled },
+                        set: { coordinator.setPhoneNotificationsEnabled($0) }
+                    )
+                )
+                .font(.system(size: 12, weight: .medium))
+
+                if coordinator.phoneNotificationsEnabled {
+                    Text("Install the ntfy app on your phone, add a subscription, and paste this private topic:")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text(coordinator.phoneNotificationTopic)
+                        .font(.system(size: 10, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                    HStack(spacing: 8) {
+                        Button("Copy Topic") { coordinator.copyPhoneNotificationTopic() }
+                        Button("Send Test") { Task { await coordinator.testPhoneNotification() } }
+                    }
+                    Text("The topic is the subscription secret. Reset details are sent through ntfy.sh.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                if let message = coordinator.phoneNotificationStatusMessage {
+                    Text(message)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(13)
+            .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Prompt library")
                     .font(.system(size: 12, weight: .medium))
                 HStack(spacing: 8) {
@@ -243,6 +280,6 @@ struct DiagnosticsWindowView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
-        .frame(width: 620, height: 620, alignment: .topLeading)
+        .frame(width: 620, height: 760, alignment: .topLeading)
     }
 }
