@@ -147,8 +147,11 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             sentUpdates: deadlines(forKey: Self.sentDeadlineUpdatesKey),
             now: currentDate
         )
-        saveDeadlines(allNotifications, forKey: Self.knownDeadlinesKey)
-        saveDeadlines(deadlineUpdates, forKey: Self.sentDeadlineUpdatesKey)
+        let updateSources = Set(deadlineUpdates.map(\.sourceIdentifier))
+        saveDeadlines(
+            allNotifications.filter { !updateSources.contains($0.sourceIdentifier) },
+            forKey: Self.knownDeadlinesKey
+        )
         let desired = Dictionary(uniqueKeysWithValues: (notifications + deadlineUpdates).map { ($0.identifier, $0) })
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
@@ -189,6 +192,10 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 title: notification.title,
                 message: notification.body
             )
+            if notification.identifier.contains("-deadline-update-") {
+                saveDeadlines([notification], forKey: Self.knownDeadlinesKey)
+                saveDeadlines([notification], forKey: Self.sentDeadlineUpdatesKey)
+            }
             recordDelivered(notification)
             cancelTask(notification.identifier)
         } catch {

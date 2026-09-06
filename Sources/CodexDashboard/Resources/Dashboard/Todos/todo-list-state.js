@@ -51,23 +51,47 @@ const todoListState = (() => {
     }
   }
 
+  function documentData(items, includesImageData) {
+    return JSON.stringify({
+      version,
+      items: items.map((item) => ({
+        ...item,
+        image: item.image
+          ? { ...item.image, dataURL: includesImageData ? item.image.dataURL : '' }
+          : null,
+      })),
+    });
+  }
+
   function save(items) {
-    try {
-      // Data URLs count against Codex's shared, small localStorage quota. Keep
-      // only compact image metadata there and put the binary payload in IndexedDB.
-      // This also compacts existing to-do documents the next time they are saved.
-      localStorage.setItem(storageKey, JSON.stringify({
-        version,
-        items: items.map((item) => ({
-          ...item,
-          image: item.image ? { ...item.image, dataURL: '' } : null,
-        })),
-      }));
-      persistImages(items);
-      return true;
-    } catch (_) {
-      return false;
+    // An image-bearing item is not durable until both stores have accepted it.
+    // Persist its binary data first: writing compact metadata first would turn an
+    // IndexedDB failure into a permanently missing image after the next reload.
+    const hasNewImageData = items.some((item) => item.image?.dataURL);
+    if (!hasNewImageData) {
+      try {
+        localStorage.setItem(storageKey, documentData(items, false));
+        // Deletions and text-only edits can update their small localStorage index
+        // immediately. Finish pruning obsolete IndexedDB blobs in the background.
+        void persistImages(items).catch(() => {});
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
+    return persistImages(items).then(() => {
+      localStorage.setItem(storageKey, documentData(items, false));
+      return true;
+    }).catch(() => {
+      // Older WebKit renderers can disable IndexedDB. Keep the image in the
+      // primary document rather than claiming success and losing it on reload.
+      try {
+        localStorage.setItem(storageKey, documentData(items, true));
+        return true;
+      } catch (_) {
+        return false;
+      }
+    });
   }
 
   function imageDatabase() {
@@ -85,15 +109,22 @@ const todoListState = (() => {
   }
 
   function persistImages(items) {
-    const images = items.filter((item) => item.image?.dataURL);
-    if (!images.length) return;
-    imageDatabase().then((database) => {
+    const imageIDs = new Set(items.filter((item) => item.image).map((item) => item.id));
+    const imagesWithData = items.filter((item) => item.image?.dataURL);
+    return imageDatabase().then((database) => new Promise((resolve, reject) => {
       const transaction = database.transaction(imageStoreName, 'readwrite');
       const store = transaction.objectStore(imageStoreName);
-      images.forEach((item) => store.put(item.image.dataURL, item.id));
-      transaction.addEventListener('complete', () => database.close());
-      transaction.addEventListener('error', () => database.close());
-    }).catch(() => {});
+      const keys = store.getAllKeys();
+      keys.addEventListener('success', () => {
+        keys.result.forEach((id) => {
+          if (!imageIDs.has(id)) store.delete(id);
+        });
+        imagesWithData.forEach((item) => store.put(item.image.dataURL, item.id));
+      });
+      transaction.addEventListener('complete', () => { database.close(); resolve(); });
+      transaction.addEventListener('abort', () => { database.close(); reject(transaction.error); });
+      transaction.addEventListener('error', () => { database.close(); reject(transaction.error); });
+    }));
   }
 
   function hydrate(items) {
