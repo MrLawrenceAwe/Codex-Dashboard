@@ -197,7 +197,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(foregrounder.callCount, 0)
     }
 
-    func testForegroundPreferencePersistsAndSuppressesCompletionActivation() async throws {
+    func testSilentPreferencePersistsAndSuppressesCompletionActivation() async throws {
         let suiteName = "AppCoordinatorForegroundTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -226,11 +226,124 @@ extension AppCoordinatorTests {
         )
         await coordinator.synchronizeDashboard()
 
-        coordinator.foregroundOnTaskCompletion = false
+        await coordinator.selectCompletionBehavior(.silent)
         await coordinator.synchronizeDashboard()
 
-        XCTAssertFalse(defaults.bool(forKey: AppCoordinator.foregroundOnTaskCompletionKey))
+        XCTAssertEqual(defaults.string(forKey: AppCoordinator.completionBehaviorKey), "silent")
         XCTAssertEqual(foregrounder.callCount, 0)
     }
 
+}
+
+@MainActor
+private final class RecordingCompletionNotifier: TaskCompletionNotifying {
+    var batches: [[TaskCompletion]] = []
+    var notice: String?
+    var prepareCount = 0
+    func prepare() async -> String? { prepareCount += 1; return notice }
+    func notify(completions: [TaskCompletion]) async -> String? {
+        batches.append(completions)
+        return notice
+    }
+}
+
+@MainActor
+extension AppCoordinatorTests {
+    func testInboxPersistsAllCompletionsAndDismissalsWithoutReplayingSnapshots() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let runtime = StubDashboardRuntime(maintainsDashboard: true)
+        let coordinator = makeAppCoordinator(userDefaults: defaults, runtimeFactory: { _ in runtime })
+        let now = Date()
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: now)
+        _ = coordinator.recordCompletions(in: [
+            .fixture(id: "one", latestLifecycleEvent: started),
+            .fixture(id: "two", latestLifecycleEvent: started),
+        ])
+        let completed: [ThreadSummary] = [
+            .fixture(id: "one", latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(1))),
+            .fixture(id: "two", latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(2))),
+        ]
+        XCTAssertEqual(coordinator.recordCompletions(in: completed).count, 2)
+        XCTAssertEqual(coordinator.completionInbox.map(\.id), ["two", "one"])
+
+        await coordinator.openCompletedTask("one")
+        XCTAssertEqual(runtime.openedThreadIDs, ["one"])
+        XCTAssertEqual(runtime.keptDashboardOpen, [false])
+        XCTAssertEqual(coordinator.completionInbox.count, 2, "Opening does not dismiss a completion")
+
+        coordinator.dismissCompletion("one")
+        XCTAssertTrue(coordinator.recordCompletions(in: completed).isEmpty)
+        let restored = makeAppCoordinator(userDefaults: defaults)
+        XCTAssertEqual(restored.completionInbox.map(\.id), ["two"])
+        XCTAssertTrue(restored.recordCompletions(in: completed).isEmpty)
+        restored.dismissAllCompletions()
+        XCTAssertTrue(makeAppCoordinator(userDefaults: defaults).completionInbox.isEmpty)
+    }
+
+    func testLaterCompletionUpdatesExistingInboxRowAndReturnsAfterDismissal() {
+        let coordinator = makeAppCoordinator()
+        let now = Date()
+        _ = coordinator.recordCompletions(in: [.fixture(latestLifecycleEvent: .init(kind: .started, timestamp: now))])
+        for seconds in [1.0, 2.0] {
+            _ = coordinator.recordCompletions(in: [.fixture(latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(seconds)))])
+        }
+        XCTAssertEqual(coordinator.completionInbox.count, 1)
+        XCTAssertEqual(coordinator.completionInbox.first?.completedAt, now.addingTimeInterval(2))
+        coordinator.dismissAllCompletions()
+        _ = coordinator.recordCompletions(in: [.fixture(latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(3)))])
+        XCTAssertEqual(coordinator.completionInbox.count, 1)
+    }
+
+    func testNotificationModeBatchesCompletionsWithoutStealingFocus() async {
+        let now = Date()
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(threads: [
+                .fixture(id: "one", latestLifecycleEvent: .init(kind: .started, timestamp: now)),
+                .fixture(id: "two", latestLifecycleEvent: .init(kind: .started, timestamp: now)),
+            ], totalThreadCount: 2),
+            ThreadCatalog(threads: [
+                .fixture(id: "one", latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(1))),
+                .fixture(id: "two", latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(2))),
+            ], totalThreadCount: 2),
+        ])
+        let notifier = RecordingCompletionNotifier()
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider, codexForegrounder: foregrounder,
+            completionNotifier: notifier, runtimeFactory: { _ in runtime }
+        )
+        await coordinator.selectCompletionBehavior(.notification)
+        XCTAssertEqual(notifier.prepareCount, 1)
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+        XCTAssertEqual(notifier.batches.count, 1)
+        XCTAssertEqual(notifier.batches.first?.map(\.id), ["two", "one"])
+        XCTAssertEqual(coordinator.completionInbox.count, 2)
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+    }
+
+    func testNotificationDenialIsVisibleAndSilentModeClearsTheNotice() async {
+        let notifier = RecordingCompletionNotifier()
+        notifier.notice = "Notifications are off"
+        let coordinator = makeAppCoordinator(completionNotifier: notifier)
+        await coordinator.selectCompletionBehavior(.notification)
+        XCTAssertEqual(coordinator.completionNotificationNotice, "Notifications are off")
+        await coordinator.selectCompletionBehavior(.silent)
+        XCTAssertNil(coordinator.completionNotificationNotice)
+        XCTAssertEqual(coordinator.completionBehavior, .silent)
+    }
+}
+
+@MainActor
+extension AppCoordinatorTests {
+    func testOpeningCompletionWhileDisconnectedShowsNotice() async {
+        let foregrounder = RecordingCodexForegrounder()
+        let coordinator = makeAppCoordinator(codexForegrounder: foregrounder)
+        await coordinator.openCompletedTask("one")
+        XCTAssertNotNil(coordinator.completionInboxNotice)
+        XCTAssertEqual(foregrounder.callCount, 0)
+    }
 }

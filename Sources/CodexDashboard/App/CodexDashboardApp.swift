@@ -3,7 +3,10 @@ import SwiftUI
 
 @MainActor
 final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
-    let coordinator = AppCoordinator(compatibilityIssueNotifier: CompatibilityIssueNotifier())
+    private let completionNotifier = TaskCompletionNotifier()
+    lazy var coordinator = AppCoordinator(
+        compatibilityIssueNotifier: CompatibilityIssueNotifier(), completionNotifier: completionNotifier
+    )
     let launchAtLogin = LaunchAtLoginController()
     private var statusItemController: DashboardStatusItemController?
 
@@ -23,6 +26,7 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
             coordinator: coordinator,
             launchAtLogin: launchAtLogin
         )
+        completionNotifier.openInbox = { [weak self] in self?.statusItemController?.openCompletionInbox() }
         coordinator.startMonitoring()
     }
 

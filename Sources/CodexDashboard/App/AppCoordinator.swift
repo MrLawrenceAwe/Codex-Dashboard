@@ -4,7 +4,8 @@ import Foundation
 
 @MainActor
 final class AppCoordinator: ObservableObject {
-    static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
+    static let completionBehaviorKey = "taskCompletionBehavior"
+    static let completionInboxKey = "taskCompletionInbox"
     private static let maximumLiveMonitoredProjectCount = 60
 
     @Published var connectionState: DashboardConnectionState = .checking
@@ -22,9 +23,13 @@ final class AppCoordinator: ObservableObject {
     @Published var rendererTargetCount = 0
     @Published var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
-    @Published var foregroundOnTaskCompletion: Bool {
-        didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
+    @Published var completionBehavior: TaskCompletionBehavior {
+        didSet { userDefaults.set(completionBehavior.rawValue, forKey: Self.completionBehaviorKey) }
     }
+    @Published private(set) var completionInbox: [TaskCompletion]
+    @Published var completionNotificationNotice: String?
+    @Published var completionInboxNotice: String?
+    let completionNotifier: any TaskCompletionNotifying
 
     let threadSnapshotService: ThreadSnapshotService
     let compatibilityMonitor: CompatibilityMonitor
@@ -77,6 +82,7 @@ final class AppCoordinator: ObservableObject {
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
+        completionNotifier: any TaskCompletionNotifying = NoopTaskCompletionNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
         }
@@ -96,7 +102,11 @@ final class AppCoordinator: ObservableObject {
             usageProvider: accountUsageProvider,
             usageCacheStore: accountUsageCacheStore
         )
-        foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
+        self.completionNotifier = completionNotifier
+        completionBehavior = userDefaults.string(forKey: Self.completionBehaviorKey)
+            .flatMap(TaskCompletionBehavior.init(rawValue:)) ?? .foreground
+        completionInbox = userDefaults.data(forKey: Self.completionInboxKey)
+            .flatMap { try? JSONDecoder().decode([TaskCompletion].self, from: $0) } ?? []
         refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
         compatibilityMonitor = CompatibilityMonitor(
             localChecker: compatibilityChecker,
@@ -307,8 +317,53 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> String? {
-        taskCompletionObserver.recordSnapshotAndFindNewestCompletion(in: threads)
+    func recordCompletions(in threads: [ThreadSummary]) -> [TaskCompletion] {
+        let completions = taskCompletionObserver.recordSnapshotAndFindCompletions(in: threads)
+        guard !completions.isEmpty else { return [] }
+        let completedIDs = Set(completions.map(\.id))
+        completionInbox = (completions + completionInbox.filter { !completedIDs.contains($0.id) })
+            .sorted {
+                if $0.completedAt == $1.completedAt { return $0.id > $1.id }
+                return $0.completedAt > $1.completedAt
+            }
+        persistCompletionInbox()
+        return completions
+    }
+
+    func dismissCompletion(_ id: String) {
+        completionInbox.removeAll { $0.id == id }
+        persistCompletionInbox()
+    }
+
+    func dismissAllCompletions() {
+        completionInbox.removeAll()
+        persistCompletionInbox()
+    }
+
+    func openCompletedTask(_ id: String) async {
+        guard !isPerformingAction else { return }
+        completionInboxNotice = nil
+        guard let dashboardRuntime, !(await dashboardRuntime.rendererTargets()).isEmpty else {
+            completionInboxNotice = "Codex is not connected. Use Restart & Enable from the menu bar, then try opening this task again."
+            return
+        }
+        guard !isPerformingAction else { return }
+        codexForegrounder.foregroundCodex()
+        await dashboardRuntime.openThread(id, keepingDashboardOpen: false)
+    }
+
+    func selectCompletionBehavior(_ behavior: TaskCompletionBehavior) async {
+        completionBehavior = behavior
+        completionNotificationNotice = nil
+        if behavior == .notification {
+            let notice = await completionNotifier.prepare()
+            if completionBehavior == .notification { completionNotificationNotice = notice }
+        }
+    }
+
+    private func persistCompletionInbox() {
+        guard let data = try? JSONEncoder().encode(completionInbox) else { return }
+        userDefaults.set(data, forKey: Self.completionInboxKey)
     }
 
     static let incompatibleContractMessage =

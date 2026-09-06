@@ -1,32 +1,54 @@
 import Foundation
 
+struct TaskCompletion: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    let projectName: String
+    let completedAt: Date
+}
+
+enum TaskCompletionBehavior: String, CaseIterable, Identifiable {
+    case silent, notification, foreground
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .silent: "Silent badge"
+        case .notification: "Notification"
+        case .foreground: "Bring Codex to front"
+        }
+    }
+}
+
 struct TaskCompletionObserver {
-    private var eventsByThreadID: [String: ThreadLifecycleEvent]?
+    private var eventsByThreadID: [String: ThreadLifecycleEvent] = [:]
     private var observationDate: Date?
 
-    mutating func recordSnapshotAndFindNewestCompletion(
+    mutating func recordSnapshotAndFindCompletions(
         in threads: [ThreadSummary],
         observedAt currentDate: Date = .now
-    ) -> String? {
-        let latestEvents = Dictionary(uniqueKeysWithValues: threads.compactMap { thread in
-            thread.latestLifecycleEvent.map { (thread.id, $0) }
-        })
-        let previousEvents = eventsByThreadID
+    ) -> [TaskCompletion] {
         let previousDate = observationDate
-        eventsByThreadID = latestEvents
         observationDate = currentDate
-        guard let previousEvents, let previousDate else { return nil }
-
-        return latestEvents.compactMap { threadID, event -> (String, ThreadLifecycleEvent)? in
-            guard
-                event.kind == .completed,
-                previousEvents[threadID] != event,
-                previousEvents[threadID] != nil || event.timestamp > previousDate
-            else { return nil }
-            return (threadID, event)
-        }.max { left, right in
-            if left.1.timestamp == right.1.timestamp { return left.0 < right.0 }
-            return left.1.timestamp < right.1.timestamp
-        }?.0
+        var completions: [TaskCompletion] = []
+        for thread in threads {
+            guard let event = thread.latestLifecycleEvent else { continue }
+            let previousEvent = eventsByThreadID[thread.id]
+            // Keep the watermark when a task falls outside the current catalog.
+            if let previousEvent, event.timestamp < previousEvent.timestamp { continue }
+            eventsByThreadID[thread.id] = event
+            guard let previousDate,
+                  event.kind == .completed,
+                  previousEvent != event,
+                  previousEvent != nil || event.timestamp > previousDate else { continue }
+            completions.append(TaskCompletion(
+                id: thread.id, title: thread.title, projectName: thread.projectName,
+                completedAt: event.timestamp
+            ))
+        }
+        return completions.sorted {
+            if $0.completedAt == $1.completedAt { return $0.id > $1.id }
+            return $0.completedAt > $1.completedAt
+        }
     }
 }
