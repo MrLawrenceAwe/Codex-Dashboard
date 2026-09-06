@@ -102,7 +102,7 @@ extension AppCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        let completedThreadID = recordSnapshotAndFindNewestCompletion(in: snapshot.catalog.threads)
+        let completions = recordCompletions(in: snapshot.catalog.threads)
         applyThreadSnapshot(
             snapshot.catalog.threads,
             totalCount: snapshot.catalog.totalThreadCount,
@@ -111,11 +111,19 @@ extension AppCoordinator {
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
-        if let completedThreadID {
+        if let newestCompletion = completions.first {
             Task { await self.refreshAccountUsage() }
-            if foregroundOnTaskCompletion, !typingActivityDetector.isUserTyping {
-                codexForegrounder.foregroundCodex()
-                await dashboardRuntime?.openThread(completedThreadID)
+            switch completionBehavior {
+            case .silent:
+                break
+            case .notification:
+                let notice = await completionNotifier.notify(completions: completions)
+                if completionBehavior == .notification { completionNotificationNotice = notice }
+            case .foreground:
+                if !typingActivityDetector.isUserTyping {
+                    codexForegrounder.foregroundCodex()
+                    await dashboardRuntime?.openThread(newestCompletion.id, keepingDashboardOpen: true)
+                }
             }
         }
     }

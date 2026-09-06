@@ -9,14 +9,15 @@ enum RendererScript {
     (() => { window.__codexDashboard?.open?.(); return true; })()
     """
 
-    static func openThread(_ threadID: String) -> String? {
+    static func openThread(_ threadID: String, keepingDashboardOpen: Bool) -> String? {
         guard
             let data = try? JSONSerialization.data(withJSONObject: threadID, options: .fragmentsAllowed),
             let encodedThreadID = String(data: data, encoding: .utf8)
         else { return nil }
         return """
         (() => {
-          if (window.__codexDashboard?.isOpen?.()) return true;
+          if (\(keepingDashboardOpen) && window.__codexDashboard?.isOpen?.()) return true;
+          window.__codexDashboard?.close?.();
           window.dispatchEvent(new MessageEvent('message', {
             data: { type: 'navigate-to-route', path: `/local/${encodeURIComponent(\(encodedThreadID))}` },
             source: null,
