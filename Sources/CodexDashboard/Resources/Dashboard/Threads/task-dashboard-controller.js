@@ -186,6 +186,7 @@ function openThreadFromEvent(event) {
 
 function openDashboard() {
   if (!pageState.open()) return;
+  if (unreadState.syncUnread()) viewNeedsRender = true;
   if (viewNeedsRender) renderDashboard();
   else taskDashboardView.updateSidebarStatus(deriveViewState());
   unreadState.scheduleUnreadSync(1500);

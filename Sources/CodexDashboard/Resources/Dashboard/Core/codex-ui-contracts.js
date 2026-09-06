@@ -130,11 +130,15 @@ const codexUIContracts = (() => {
     const readStates = new Map();
     const fiberCache = new Map();
     threadRows().forEach((row) => {
+      const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
+      if (!sidebarID.startsWith('local:')) return;
+      const threadID = sidebarID.slice('local:'.length);
+      if (!threadID) return;
       const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
       let fiber = committedFiber(fiberKey ? row[fiberKey] : null, fiberCache);
       while (fiber) {
         const props = fiber.memoizedProps;
-        if (typeof props?.conversationId === 'string' && typeof props?.isUnread === 'boolean') {
+        if (props?.conversationId === threadID && typeof props?.isUnread === 'boolean') {
           readStates.set(props.conversationId, props.isUnread);
           break;
         }

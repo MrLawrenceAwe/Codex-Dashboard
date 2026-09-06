@@ -11,7 +11,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     private let launchAtLogin: LaunchAtLoginController
     private let statusItem: NSStatusItem
     private var statusPresentationCancellable: AnyCancellable?
-    private var inboxWindowController: CompletionInboxWindowController?
 
     init(
         coordinator: AppCoordinator,
@@ -20,7 +19,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         Self.registerDefaultPosition()
         self.coordinator = coordinator
         self.launchAtLogin = launchAtLogin
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         statusItem.autosaveName = Self.autosaveName
@@ -29,12 +28,11 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         statusItem.menu?.delegate = self
         updateIcon(for: coordinator.connectionState, report: coordinator.compatibilityReport)
 
-        statusPresentationCancellable = Publishers.CombineLatest3(
+        statusPresentationCancellable = Publishers.CombineLatest(
             coordinator.$connectionState,
-            coordinator.$compatibilityReport,
-            coordinator.$completionInbox
-        ).sink { [weak self] state, report, completions in
-            self?.updateIcon(for: state, report: report, completionCount: completions.count)
+            coordinator.$compatibilityReport
+        ).sink { [weak self] state, report in
+            self?.updateIcon(for: state, report: report)
         }
     }
 
@@ -64,11 +62,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             ? "Review Compatibility…"
             : "Open Diagnostics…"
         menu.addItem(actionItem(diagnosticsTitle, action: #selector(openDiagnostics)))
-        menu.addItem(.separator())
-
-        menu.addItem(actionItem(
-            "Completion Inbox (\(coordinator.completionInbox.count))…", action: #selector(openCompletionInbox)
-        ))
         menu.addItem(.separator())
 
         let actions = coordinator.dashboardActions
@@ -105,16 +98,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let launchItem = actionItem("Launch at Login", action: #selector(toggleLaunchAtLogin))
         launchItem.state = launchAtLogin.isEnabled ? .on : .off
         menu.addItem(launchItem)
-        let behaviorItem = NSMenuItem(title: "On Task Completion", action: nil, keyEquivalent: "")
-        let behaviorMenu = NSMenu()
-        for behavior in TaskCompletionBehavior.allCases {
-            let item = actionItem(behavior.title, action: #selector(selectCompletionBehavior(_:)))
-            item.representedObject = behavior.rawValue
-            item.state = coordinator.completionBehavior == behavior ? .on : .off
-            behaviorMenu.addItem(item)
-        }
-        behaviorItem.submenu = behaviorMenu
-        menu.addItem(behaviorItem)
+        let foregroundItem = actionItem(
+            "Bring Codex to Front on Task Completion",
+            action: #selector(toggleForegroundOnTaskCompletion)
+        )
+        foregroundItem.state = coordinator.foregroundOnTaskCompletion ? .on : .off
+        menu.addItem(foregroundItem)
         menu.addItem(actionItem("Copy Diagnostics", action: #selector(copyDiagnostics)))
         menu.addItem(actionItem("Export Prompt Library…", action: #selector(exportPromptLibrary)))
         menu.addItem(.separator())
@@ -144,11 +133,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
             : "rectangle.grid.2x2"
     }
 
-    private func updateIcon(for state: DashboardConnectionState, report: CompatibilityReport?, completionCount: Int? = nil) {
-        let count = completionCount ?? coordinator.completionInbox.count
-        statusItem.button?.title = count > 0 ? " \(count)" : ""
-        statusItem.button?.imagePosition = .imageLeading
-        statusItem.button?.setAccessibilityLabel("Codex Dashboard, \(count) undismissed completions")
+    private func updateIcon(for state: DashboardConnectionState, report: CompatibilityReport?) {
         let dashboardMaintenanceIsEnabled = coordinator.dashboardRuntime?.maintainsDashboard ?? false
         let symbolName = Self.statusSymbolName(
             for: state,
@@ -160,7 +145,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         statusItem.button?.image = image
         statusItem.button?.toolTip = Self.requiresCompatibilityAttention(report)
             ? "Codex Dashboard — \(report?.attentionSummary ?? "compatibility needs attention")"
-            : "Codex Dashboard — \(count) undismissed completions"
+            : "Codex Dashboard"
     }
 
     @objc private func openDiagnostics() {
@@ -189,20 +174,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         launchAtLogin.setEnabled(!launchAtLogin.isEnabled)
     }
 
-    @objc func openCompletionInbox() {
-        if inboxWindowController == nil {
-            inboxWindowController = CompletionInboxWindowController(coordinator: coordinator)
-        }
-        inboxWindowController?.show()
-    }
-
-    @objc private func selectCompletionBehavior(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let behavior = TaskCompletionBehavior(rawValue: rawValue) else { return }
-        Task {
-            await coordinator.selectCompletionBehavior(behavior)
-            if coordinator.completionNotificationNotice != nil { openCompletionInbox() }
-        }
+    @objc private func toggleForegroundOnTaskCompletion() {
+        coordinator.foregroundOnTaskCompletion.toggle()
     }
 
     @objc private func copyDiagnostics() {

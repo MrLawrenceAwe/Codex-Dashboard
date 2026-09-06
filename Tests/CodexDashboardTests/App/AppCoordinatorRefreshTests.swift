@@ -277,3 +277,46 @@ extension AppCoordinatorTests {
     }
 
 }
+
+private actor RequiredUnreadCatalogProvider: ThreadCatalogProviding {
+    func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) -> ThreadCatalog {
+        ThreadCatalog(
+            threads: [.fixture(id: "recent")] + requiredThreadIDs.sorted()
+                .filter { $0 != "recent" }.map { .fixture(id: $0) },
+            totalThreadCount: 501
+        )
+    }
+}
+
+@MainActor
+extension AppCoordinatorTests {
+    func testActivationRefreshesUnreadBeforeLoadingCatalog() async {
+        let unread = MutableUnreadIDProvider()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: RequiredUnreadCatalogProvider(),
+            unreadThreadIDProvider: unread,
+            observeFileChanges: false
+        )
+        await coordinator.synchronizeDashboard()
+        await unread.setUnreadThreadIDs(["old-unread"])
+
+        await coordinator.refreshAfterActivation()
+
+        XCTAssertEqual(coordinator.threads.filter(\.isUnread).map(\.id), ["old-unread"])
+    }
+
+    func testUnreadRefreshLoadsNewlyUnreadTaskOutsideCurrentCatalogImmediately() async {
+        let unread = MutableUnreadIDProvider()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: RequiredUnreadCatalogProvider(),
+            unreadThreadIDProvider: unread,
+            observeFileChanges: false
+        )
+        await coordinator.synchronizeDashboard()
+        await unread.setUnreadThreadIDs(["old-unread"])
+
+        await coordinator.refreshUnreadState()
+
+        XCTAssertEqual(coordinator.threads.filter(\.isUnread).map(\.id), ["old-unread"])
+    }
+}

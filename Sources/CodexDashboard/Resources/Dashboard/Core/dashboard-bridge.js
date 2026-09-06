@@ -4,7 +4,6 @@ window.__codexDashboard = {
   destroy: dashboardNavigation.destroy,
   open: dashboardNavigation.openTasks,
   isOpen: dashboardNavigation.isOpen,
-  close: dashboardNavigation.close,
   openTodos: dashboardNavigation.openTodos,
   applyThreads: taskDashboard.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,

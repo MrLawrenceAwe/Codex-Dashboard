@@ -242,8 +242,8 @@ final class DashboardRenderer {
         }
     }
 
-    func openThread(_ threadID: String, keepingDashboardOpen: Bool) async {
-        guard let expression = RendererScript.openThread(threadID, keepingDashboardOpen: keepingDashboardOpen) else { return }
+    func openThread(_ threadID: String) async {
+        guard let expression = RendererScript.openThread(threadID) else { return }
         for target in await targets(forceRefresh: true) {
             _ = try? await devTools.evaluateBoolean(expression, in: target)
         }

@@ -403,7 +403,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
 
     func testCompletionRouteDoesNotReplaceOpenDashboard() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
-        let expression = try XCTUnwrap(RendererScript.openThread("completed-thread", keepingDashboardOpen: true))
+        let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))
 
         let result = try await webView.evaluateJavaScript(
             """
@@ -427,25 +427,6 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
 
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["0", true])
-    }
-
-    func testExplicitCompletionOpenClosesDashboardAndNavigates() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
-        let expression = try XCTUnwrap(RendererScript.openThread("completed-thread", keepingDashboardOpen: false))
-        let result = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              let route = '';
-              window.addEventListener('message', (event) => {
-                if (event.data?.type === 'navigate-to-route') route = event.data.path;
-              });
-              window.__codexDashboard.open();
-              \(expression);
-              return [route, window.__codexDashboard.isOpen()];
-            })()
-            """
-        ) as? [AnyHashable]
-        XCTAssertEqual(result, ["/local/completed-thread", false])
     }
 
 }

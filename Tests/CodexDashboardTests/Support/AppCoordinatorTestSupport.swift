@@ -331,7 +331,6 @@ final class StubDashboardRuntime: DashboardRuntime {
     private(set) var accountPopoverSynchronizationCount = 0
     private(set) var lastAccountPopoverSnapshot: AccountPopoverSnapshot?
     private(set) var openedThreadIDs: [String] = []
-    private(set) var keptDashboardOpen: [Bool] = []
 
     init(
         codexIsRunning: Bool = false,
@@ -376,10 +375,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     }
     func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome { .codexClosed }
     func openTaskDashboard() async {}
-    func openThread(_ threadID: String, keepingDashboardOpen: Bool) async {
-        openedThreadIDs.append(threadID)
-        keptDashboardOpen.append(keepingDashboardOpen)
-    }
+    func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
         accountPopoverSynchronizationCount += 1
         lastAccountPopoverSnapshot = snapshot
@@ -408,7 +404,6 @@ extension XCTestCase {
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
-        completionNotifier: any TaskCompletionNotifying = NoopTaskCompletionNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
@@ -433,7 +428,6 @@ extension XCTestCase {
             accountUsageProvider: accountUsageProvider,
             accountUsageCacheStore: accountUsageCacheStore,
             compatibilityIssueNotifier: compatibilityIssueNotifier,
-            completionNotifier: completionNotifier,
             runtimeFactory: runtimeFactory
         )
         addTeardownBlock {

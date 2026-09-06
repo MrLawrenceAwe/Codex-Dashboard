@@ -2,6 +2,7 @@ function createThreadUnreadState({ isOpen, onChange }) {
   let threadsByID = new Map();
   let unreadThreadIDs = new Set();
   const sidebarUnreadOverrides = new Map();
+  const observedSidebarReadStates = new Map();
   const completedTickDuration = 60_000;
   const completedTickExpiryByThreadID = new Map();
   let completedTickTimer;
@@ -16,12 +17,22 @@ function createThreadUnreadState({ isOpen, onChange }) {
 
   function syncUnreadFromSidebar(nextUnreadThreadIDs = new Set(unreadThreadIDs)) {
     const readStates = codexHost.threadReadStates();
+    observedSidebarReadStates.forEach((_, id) => {
+      if (!readStates.has(id) || !threadsByID.has(id)) observedSidebarReadStates.delete(id);
+    });
     readStates.forEach((isUnread, id) => {
       const thread = threadsByID.get(id);
       if (!thread) return;
+      const isNewObservation = observedSidebarReadStates.get(id) !== isUnread;
+      observedSidebarReadStates.set(id, isUnread);
       if (isUnread === (thread.isUnread === true)) sidebarUnreadOverrides.delete(id);
-      else sidebarUnreadOverrides.set(id, { isUnread, revision: unreadRevision(thread) });
-      if (isUnread) nextUnreadThreadIDs.add(id);
+      else if (isNewObservation) {
+        sidebarUnreadOverrides.set(id, { isUnread, revision: unreadRevision(thread) });
+      }
+      // An unchanged mounted row is not a new observation. Once its override
+      // expires or is acknowledged, it must not mask a later persisted change.
+      const effectiveUnread = sidebarUnreadOverrides.get(id)?.isUnread ?? (thread.isUnread === true);
+      if (effectiveUnread) nextUnreadThreadIDs.add(id);
       else nextUnreadThreadIDs.delete(id);
     });
     return updateUnreadThreadIDs(nextUnreadThreadIDs);
@@ -137,6 +148,7 @@ function createThreadUnreadState({ isOpen, onChange }) {
     completedTickTimer = undefined;
     completedTickExpiryByThreadID.clear();
     sidebarUnreadOverrides.clear();
+    observedSidebarReadStates.clear();
     unreadThreadIDs.clear();
     threadsByID.clear();
     unreadMonitoringStarted = false;

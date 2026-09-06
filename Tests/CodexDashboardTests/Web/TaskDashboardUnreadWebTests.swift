@@ -220,4 +220,97 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(counts, ["0", "0", "0", "1", "0", "1", "1", "1", "1", "0", "1"])
     }
 
+    func testUnchangedSidebarCannotOverrideNewerPersistedUnreadTransitions() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button>
+                <button data-app-action-sidebar-thread-id="local:one">Thread</button>
+              </aside><main>Conversation</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "one")])
+        let counts = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+              row.__reactFiber$test = { memoizedProps: { conversationId: 'one', isUnread: false }, return: null };
+              const thread = (\(payload)).threads[0];
+              const sample = (value) => {
+                window.__codexDashboard.applyThreads([value]);
+                window.__codexDashboard.open();
+                return document.querySelector('[data-filter-count="unread"]').textContent;
+              };
+              const results = [sample(thread)];
+              const newTurn = { ...thread, isUnread: true, recencyEpochMillis: thread.recencyEpochMillis + 1 };
+              results.push(sample(newTurn)); // Sidebar still shows the previous turn's read state.
+              results.push(sample(newTurn)); // Repeated polls cannot renew that stale observation.
+              row.__reactFiber$test.memoizedProps.isUnread = true;
+              results.push(sample(newTurn));
+              results.push(sample({ ...newTurn, isUnread: false })); // Read in another window, sidebar lags.
+              row.__reactFiber$test.memoizedProps.isUnread = false;
+              results.push(sample({ ...newTurn, isUnread: false }));
+              row.__reactFiber$test.memoizedProps.isUnread = true; // A genuinely new live transition wins.
+              results.push(sample({ ...newTurn, isUnread: false }));
+              return results;
+            })()
+            """
+        ) as? [String]
+        XCTAssertEqual(counts, ["0", "1", "1", "1", "0", "0", "1"])
+    }
+
+    func testOpeningDashboardImmediatelyReconcilesSilentSidebarReadChange() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button>
+                <button data-app-action-sidebar-thread-id="local:one">Thread</button>
+              </aside><main>Conversation</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "one", isUnread: true)])
+        let count = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+              row.__reactFiber$test = { memoizedProps: { conversationId: 'one', isUnread: true }, return: null };
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              row.click();
+              row.__reactFiber$test.memoizedProps.isUnread = false;
+              window.__codexDashboard.open();
+              return document.querySelector('[data-filter-count="unread"]').textContent;
+            })()
+            """
+        ) as? String
+        XCTAssertEqual(count, "0")
+    }
+
+    func testRemoteSidebarRowCannotOverrideLocalUnreadState() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button>
+                <button data-app-action-sidebar-thread-id="remote:one">Remote thread</button>
+              </aside><main>Conversation</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "one", isUnread: true)])
+        let count = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.querySelector('[data-app-action-sidebar-thread-id]');
+              row.__reactFiber$test = { memoizedProps: { conversationId: 'one', isUnread: false }, return: null };
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              return document.querySelector('[data-filter-count="unread"]').textContent;
+            })()
+            """
+        ) as? String
+        XCTAssertEqual(count, "1")
+    }
+
 }

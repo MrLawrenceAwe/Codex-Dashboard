@@ -66,10 +66,18 @@ extension AppCoordinator {
             updatedThread.isUnread = unreadThreadIDs.contains(updatedThread.id)
             return updatedThread
         })
-        await publishSnapshotIfMaintained()
+        // A newly unread task may be outside the loaded history. Include it now
+        // rather than waiting for the next catalog poll.
+        let loadedIDs = Set(threads.map(\.id))
+        if !unreadThreadIDs.isSubset(of: loadedIDs) {
+            await synchronizeDashboard()
+        } else {
+            await publishSnapshotIfMaintained()
+        }
     }
 
     func refreshAfterActivation() async {
+        await refreshUnreadState()
         await synchronizeDashboard()
         await refreshAccountUsage()
         if !refreshScheduler.hasFileChangeMonitoring {
@@ -102,7 +110,7 @@ extension AppCoordinator {
     func loadThreadSnapshot() async throws {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return }
-        let completions = recordCompletions(in: snapshot.catalog.threads)
+        let completedThreadID = recordSnapshotAndFindNewestCompletion(in: snapshot.catalog.threads)
         applyThreadSnapshot(
             snapshot.catalog.threads,
             totalCount: snapshot.catalog.totalThreadCount,
@@ -111,19 +119,11 @@ extension AppCoordinator {
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
-        if let newestCompletion = completions.first {
+        if let completedThreadID {
             Task { await self.refreshAccountUsage() }
-            switch completionBehavior {
-            case .silent:
-                break
-            case .notification:
-                let notice = await completionNotifier.notify(completions: completions)
-                if completionBehavior == .notification { completionNotificationNotice = notice }
-            case .foreground:
-                if !typingActivityDetector.isUserTyping {
-                    codexForegrounder.foregroundCodex()
-                    await dashboardRuntime?.openThread(newestCompletion.id, keepingDashboardOpen: true)
-                }
+            if foregroundOnTaskCompletion, !typingActivityDetector.isUserTyping {
+                codexForegrounder.foregroundCodex()
+                await dashboardRuntime?.openThread(completedThreadID)
             }
         }
     }
