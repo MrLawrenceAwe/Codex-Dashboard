@@ -1,6 +1,6 @@
 const todoListView = (() => {
   function imageMarkup(item) {
-    if (!item.image) return '';
+    if (!item.image?.dataURL) return '';
     const name = domUtils.escapeHTML(item.image.name);
     return `
       <div class="todo-image">

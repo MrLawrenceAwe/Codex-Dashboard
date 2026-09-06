@@ -40,6 +40,20 @@ const todoList = (() => {
     todoListView.render(items, filterMode);
   }
 
+  function hydrateImages() {
+    todoListState.hydrate(items).then((hydratedItems) => {
+      const hydratedImages = new Map(hydratedItems.map((item) => [item.id, item.image?.dataURL]));
+      let changed = false;
+      items = items.map((item) => {
+        const dataURL = hydratedImages.get(item.id);
+        if (!item.image || item.image.dataURL || !dataURL) return item;
+        changed = true;
+        return { ...item, image: { ...item.image, dataURL } };
+      });
+      if (changed) render();
+    });
+  }
+
   function commitItems(nextItems) {
     const previousItems = items;
     items = nextItems;
@@ -258,6 +272,7 @@ const todoList = (() => {
     pageHost.append(page);
     pageState.restoreOpenState();
     render();
+    hydrateImages();
     return true;
   }
 

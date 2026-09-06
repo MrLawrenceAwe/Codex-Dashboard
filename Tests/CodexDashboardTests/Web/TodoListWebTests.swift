@@ -321,7 +321,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const values = [
                 stored.image.name,
                 stored.image.type,
-                stored.image.dataURL.startsWith('data:image/png;base64,'),
+                !Object.hasOwn(stored.image, 'dataURL') || stored.image.dataURL === '',
                 dialog.open,
                 dialog.querySelector('img').alt,
                 document.querySelector('[data-todo-image-preview]') !== null,
@@ -378,6 +378,62 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? String, "Images must be 2 MB or smaller.")
         XCTAssertEqual(values[1] as? Bool, true)
+    }
+
+    func testTodoImageDoesNotStoreItsDataURLInLocalStorage() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const title = document.querySelector('[data-todo-new-title]');
+              title.value = 'Keep screenshot';
+              const image = new File([new Uint8Array(24 * 1024)], 'screenshot.png', { type: 'image/png' });
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
+              title.dispatchEvent(paste);
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const realStorage = window.localStorage;
+              Object.defineProperty(window, 'localStorage', {
+                configurable: true,
+                value: {
+                  getItem: realStorage.getItem.bind(realStorage),
+                  setItem(key, value) {
+                    if (value.length > 1024) throw new Error('Storage full');
+                    return realStorage.setItem(key, value);
+                  },
+                },
+              });
+              document.querySelector('[data-todo-form]').requestSubmit();
+              Object.defineProperty(window, 'localStorage', { configurable: true, value: realStorage });
+              const stored = JSON.parse(realStorage.getItem('codex-dashboard.todos')).items[0];
+              return [document.querySelectorAll('[data-todo-id]').length, stored.image.dataURL, document.querySelector('[data-todo-storage-error]').hidden];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 1)
+        XCTAssertEqual(values[1] as? String, "")
+        XCTAssertEqual(values[2] as? Bool, true)
     }
 
     func testPastedTodoImageCanBeRemovedFromTheAddBar() async throws {
