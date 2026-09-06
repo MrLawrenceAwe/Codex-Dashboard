@@ -21,6 +21,15 @@ enum AccountDocumentMigration {
                 requiresIdentitySynchronization: false,
                 requiresRewrite: false
             )
+        case 5:
+            var document = try JSONDecoder().decode(SavedAccountsDocument.self, from: data)
+            document.version = SavedAccountsDocument.currentVersion
+            return Result(
+                document: document,
+                requiresNameFallback: false,
+                requiresIdentitySynchronization: true,
+                requiresRewrite: true
+            )
         case 4:
             return Result(
                 document: try currentDocument(from: data),

@@ -10,7 +10,7 @@ struct SavedAccount: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct SavedAccountsDocument: Codable, Equatable, Sendable {
-    static let currentVersion = 5
+    static let currentVersion = 6
 
     var version = Self.currentVersion
     var accounts: [SavedAccount] = []

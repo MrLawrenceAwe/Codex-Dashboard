@@ -12,8 +12,11 @@ struct AccountIdentity {
     }
 
     private static func nonempty(_ value: String?) -> String? {
-        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? nil : trimmed
+        let words = (value ?? "")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        let normalized = words.joined(separator: " ")
+        return normalized.isEmpty ? nil : normalized
     }
 }
 
