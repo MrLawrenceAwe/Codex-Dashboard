@@ -276,6 +276,14 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertNil(identity.displayName)
     }
 
+    func testNormalizesProfileDisplayNameWhitespace() throws {
+        let credential = credential(accountID: "account-lawrence", name: "  Lawrence   Awe\n")
+
+        let identity = try XCTUnwrap(AccountIdentityDecoder.identity(in: credential))
+
+        XCTAssertEqual(identity.accountName, "Lawrence Awe")
+    }
+
     func testUsesAccountEmailWhenDisplayNameIsUnavailable() throws {
         let credential = credential(
             accountID: "account-personal",
@@ -354,6 +362,22 @@ final class CodexAccountManagerTests: XCTestCase {
 
         let reloaded = try manager.loadDocument()
 
+        XCTAssertEqual(reloaded.accounts.first(where: { $0.id == account.id })?.name, "Lawrence Awe")
+    }
+
+    func testMigratesV5AccountNamesUsingNormalizedAuthenticatedProfileName() throws {
+        let credential = credential(accountID: "account-personal", name: "Lawrence  Awe")
+        try credential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        var document = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: metadataURL)
+        ) as! [String: Any]
+        document["version"] = 5
+        try JSONSerialization.data(withJSONObject: document).write(to: metadataURL)
+
+        let reloaded = try manager.loadDocument()
+
+        XCTAssertEqual(reloaded.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(reloaded.accounts.first(where: { $0.id == account.id })?.name, "Lawrence Awe")
     }
 
