@@ -31,7 +31,20 @@ struct AccountResetNotification: Equatable, Sendable {
 enum AccountResetNotificationPlanner {
     private static let oneHour: TimeInterval = 60 * 60
     private static let fiveHours: TimeInterval = 5 * 60 * 60
+    private static let twelveHours: TimeInterval = 12 * 60 * 60
     private static let twentyFourHours: TimeInterval = 24 * 60 * 60
+    private static let thirtySixHours: TimeInterval = 36 * 60 * 60
+    private static let fortyEightHours: TimeInterval = 48 * 60 * 60
+    private static let seventyTwoHours: TimeInterval = 72 * 60 * 60
+    private static let extendedLeadTimes = [
+        seventyTwoHours,
+        fortyEightHours,
+        thirtySixHours,
+        twentyFourHours,
+        twelveHours,
+        fiveHours,
+        oneHour,
+    ]
 
     static func notifications(
         for accounts: [SavedAccount],
@@ -62,7 +75,7 @@ enum AccountResetNotificationPlanner {
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,
-                leadTimes: [twentyFourHours, fiveHours, oneHour],
+                leadTimes: extendedLeadTimes,
                 now: now
             ) + bankedResetExpiryNotifications(for: account, resets: usage.bankedResets, now: now)
         }.sorted { $0.identifier < $1.identifier }
@@ -115,7 +128,7 @@ enum AccountResetNotificationPlanner {
         guard let resets, resets.availableCount > 0, let expiration = resets.nextExpiration, expiration > now else {
             return []
         }
-        return [twentyFourHours, fiveHours, oneHour].map { leadTime in
+        return extendedLeadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
             let countDescription = resets.availableCount == 1 ? "1 banked reset" : "\(resets.availableCount) banked resets"
             return AccountResetNotification(
@@ -131,7 +144,11 @@ enum AccountResetNotificationPlanner {
 
     private static func description(for leadTime: TimeInterval) -> String {
         switch leadTime {
+        case seventyTwoHours: "72 hours"
+        case fortyEightHours: "48 hours"
+        case thirtySixHours: "36 hours"
         case twentyFourHours: "24 hours"
+        case twelveHours: "12 hours"
         case fiveHours: "5 hours"
         default: "one hour"
         }

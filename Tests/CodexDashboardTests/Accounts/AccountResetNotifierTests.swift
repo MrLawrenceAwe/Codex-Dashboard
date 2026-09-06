@@ -12,15 +12,15 @@ final class AccountResetNotifierTests: XCTestCase {
             usageByAccountID: [
                 account.id: snapshot(
                     fiveHourReset: now.addingTimeInterval(2 * 60 * 60),
-                    weeklyReset: now.addingTimeInterval(48 * 60 * 60),
-                    bankedResetExpiration: now.addingTimeInterval(30 * 60 * 60),
+                    weeklyReset: now.addingTimeInterval(96 * 60 * 60),
+                    bankedResetExpiration: now.addingTimeInterval(96 * 60 * 60),
                     now: now
                 ),
             ],
             now: now
         )
 
-        XCTAssertEqual(notifications.count, 7)
+        XCTAssertEqual(notifications.count, 15)
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
         XCTAssertTrue(notifications.contains {
             $0.title == "Codex limit resets in one hour"
@@ -30,6 +30,10 @@ final class AccountResetNotifierTests: XCTestCase {
             Set(notifications.filter { $0.identifier.contains("weekly") }.map(\.title)),
             [
                 "Codex limit resets in 24 hours",
+                "Codex limit resets in 36 hours",
+                "Codex limit resets in 48 hours",
+                "Codex limit resets in 72 hours",
+                "Codex limit resets in 12 hours",
                 "Codex limit resets in 5 hours",
                 "Codex limit resets in one hour",
             ]
@@ -38,6 +42,10 @@ final class AccountResetNotifierTests: XCTestCase {
             Set(notifications.filter { $0.identifier.contains("banked-reset-expiry") }.map(\.title)),
             [
                 "Banked Codex reset expires in 24 hours",
+                "Banked Codex reset expires in 36 hours",
+                "Banked Codex reset expires in 48 hours",
+                "Banked Codex reset expires in 72 hours",
+                "Banked Codex reset expires in 12 hours",
                 "Banked Codex reset expires in 5 hours",
                 "Banked Codex reset expires in one hour",
             ]
