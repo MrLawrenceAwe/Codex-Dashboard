@@ -359,7 +359,7 @@ final class DashboardRendererTests: XCTestCase {
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        await renderer.openThread("thread/with spaces", keepingDashboardOpen: true)
+        await renderer.openThread("thread/with spaces")
 
         let expressions = await devTools.expressions()
         let expression = try XCTUnwrap(expressions.last)

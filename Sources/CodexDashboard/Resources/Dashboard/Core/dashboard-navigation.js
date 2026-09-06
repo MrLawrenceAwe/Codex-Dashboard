@@ -60,5 +60,5 @@ const dashboardNavigation = (() => {
     delete window.__codexDashboard;
   }
 
-  return { ensureMounted, destroy, openTasks, openTodos, close, isOpen };
+  return { ensureMounted, destroy, openTasks, openTodos, isOpen };
 })();

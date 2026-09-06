@@ -21,7 +21,7 @@ protocol DashboardRuntime: AnyObject {
     ) async throws
     func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome
     func openTaskDashboard() async
-    func openThread(_ threadID: String, keepingDashboardOpen: Bool) async
+    func openThread(_ threadID: String) async
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
     func preferNativePromptLibraryOnNextSynchronization()
@@ -94,8 +94,8 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         await renderer.open()
     }
 
-    func openThread(_ threadID: String, keepingDashboardOpen: Bool) async {
-        await renderer.openThread(threadID, keepingDashboardOpen: keepingDashboardOpen)
+    func openThread(_ threadID: String) async {
+        await renderer.openThread(threadID)
     }
 
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
