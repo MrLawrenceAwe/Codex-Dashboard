@@ -9,16 +9,19 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     private let coordinator: AppCoordinator
     private let launchAtLogin: LaunchAtLoginController
+    private let showDiagnostics: @MainActor () -> Void
     private let statusItem: NSStatusItem
     private var statusPresentationCancellable: AnyCancellable?
 
     init(
         coordinator: AppCoordinator,
-        launchAtLogin: LaunchAtLoginController
+        launchAtLogin: LaunchAtLoginController,
+        showDiagnostics: @escaping @MainActor () -> Void
     ) {
         Self.registerDefaultPosition()
         self.coordinator = coordinator
         self.launchAtLogin = launchAtLogin
+        self.showDiagnostics = showDiagnostics
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
@@ -149,8 +152,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func openDiagnostics() {
-        NSApp.activate(ignoringOtherApps: true)
-        _ = NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        showDiagnostics()
     }
 
     @objc private func openTaskDashboard() {

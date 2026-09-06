@@ -50,6 +50,7 @@ protocol PhoneResetNotifying: AnyObject {
     var topic: String { get }
 
     func setEnabled(_ enabled: Bool)
+    func generateNewTopic()
     func updateNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
@@ -63,6 +64,7 @@ final class NoopPhoneResetNotifier: PhoneResetNotifying {
     var topic: String { "" }
 
     func setEnabled(_ enabled: Bool) {}
+    func generateNewTopic() {}
     func updateNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
@@ -110,6 +112,10 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     func setEnabled(_ enabled: Bool) {
         userDefaults.set(enabled, forKey: Self.enabledKey)
         if !enabled { cancelAllTasks() }
+    }
+
+    func generateNewTopic() {
+        userDefaults.set(Self.makeTopic(), forKey: Self.topicKey)
     }
 
     func updateNotifications(
@@ -199,8 +205,9 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     }
 
     private static func makeTopic() -> String {
-        "codex-dashboard-" + [UUID(), UUID()].map {
+        let randomSuffix = [UUID(), UUID()].map {
             $0.uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        }.joined()
+        }.joined().prefix(20)
+        return "cd-\(randomSuffix)"
     }
 }

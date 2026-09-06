@@ -235,6 +235,12 @@ extension AppCoordinator {
         phoneNotificationStatusMessage = "Topic copied."
     }
 
+    func generateNewPhoneNotificationTopic() {
+        phoneResetNotifier.generateNewTopic()
+        phoneNotificationStatusMessage = "Short topic generated. Subscribe to it, then send a test."
+        objectWillChange.send()
+    }
+
     func testPhoneNotification() async {
         do {
             try await phoneResetNotifier.sendTestNotification()
