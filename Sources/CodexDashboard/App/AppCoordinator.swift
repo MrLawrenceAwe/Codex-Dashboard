@@ -36,6 +36,7 @@ final class AppCoordinator: ObservableObject {
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
+    let accountResetNotifier: any AccountResetNotifying
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -77,6 +78,7 @@ final class AppCoordinator: ObservableObject {
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
+        accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
         }
@@ -91,6 +93,7 @@ final class AppCoordinator: ObservableObject {
         self.typingActivityDetector = typingActivityDetector
         self.promptLibraryStore = promptLibraryStore
         self.compatibilityIssueNotifier = compatibilityIssueNotifier
+        self.accountResetNotifier = accountResetNotifier
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,
@@ -132,6 +135,7 @@ final class AppCoordinator: ObservableObject {
         accountPopoverActionListener.start { [weak self] in
             await self?.handleAccountPopoverAction() ?? .unavailable
         }
+        Task { await updateAccountResetNotifications() }
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,

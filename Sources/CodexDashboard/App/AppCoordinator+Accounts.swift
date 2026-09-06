@@ -28,12 +28,14 @@ extension AppCoordinator {
             guard let accountID = action.accountID else { return .unavailable }
             accounts.deleteAccount(accountID)
         }
+        await updateAccountResetNotifications()
         await publishAccountPopoverSnapshot()
         return .handled
     }
 
     func refreshAccountStateAfterFileChange() async {
         accounts.refreshState()
+        await updateAccountResetNotifications()
         await publishAccountPopoverSnapshot()
     }
 
@@ -162,12 +164,14 @@ extension AppCoordinator {
         await accounts.refreshActiveUsage(
             codexIsRunning: dashboardRuntime?.codexIsRunning == true
         )
+        await updateAccountResetNotifications()
         await publishAccountPopoverSnapshot()
     }
 
     func refreshInactiveAccountUsage() async {
         guard !isPerformingAction else { return }
         await accounts.refreshInactiveUsage()
+        await updateAccountResetNotifications()
         await publishAccountPopoverSnapshot()
     }
 
@@ -181,16 +185,25 @@ extension AppCoordinator {
             return .notRequired
         }
         guard !isPerformingAction else { return .notRequired }
-        return await accounts.refreshInactiveAccountUsage(
+        let authorization = await accounts.refreshInactiveAccountUsage(
             accountID,
             reportsFailure: reportsFailure,
             interactionAllowed: interactionAllowed
         )
+        await updateAccountResetNotifications()
+        return authorization
     }
 
     private func publishAccountPopoverSnapshot() async {
         await dashboardRuntime?.synchronizeAccountPopover(
             accounts.popoverSnapshot(isBusy: isPerformingAction)
+        )
+    }
+
+    func updateAccountResetNotifications() async {
+        await accountResetNotifier.updateNotifications(
+            for: accounts.savedAccounts,
+            usageByAccountID: accounts.usageByAccountID
         )
     }
 }

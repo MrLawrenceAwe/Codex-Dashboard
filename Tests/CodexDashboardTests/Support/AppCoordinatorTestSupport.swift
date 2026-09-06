@@ -404,6 +404,7 @@ extension XCTestCase {
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
+        accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
@@ -428,6 +429,7 @@ extension XCTestCase {
             accountUsageProvider: accountUsageProvider,
             accountUsageCacheStore: accountUsageCacheStore,
             compatibilityIssueNotifier: compatibilityIssueNotifier,
+            accountResetNotifier: accountResetNotifier,
             runtimeFactory: runtimeFactory
         )
         addTeardownBlock {
