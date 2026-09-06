@@ -197,8 +197,11 @@ final class AccountResetNotifier: AccountResetNotifying {
             sentUpdates: deadlines(forKey: Self.sentDeadlineUpdatesKey),
             now: .now
         )
-        saveDeadlines(allNotifications, forKey: Self.knownDeadlinesKey)
-        saveDeadlines(deadlineUpdates, forKey: Self.sentDeadlineUpdatesKey)
+        let updateSources = Set(deadlineUpdates.map(\.sourceIdentifier))
+        saveDeadlines(
+            allNotifications.filter { !updateSources.contains($0.sourceIdentifier) },
+            forKey: Self.knownDeadlinesKey
+        )
         let pendingRequests = await notificationCenter.pendingNotificationRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
             request.identifier.hasPrefix(Self.identifierPrefix) ? request.identifier : nil
@@ -219,13 +222,22 @@ final class AccountResetNotifier: AccountResetNotifying {
                 ),
                 repeats: false
             )
-            try? await notificationCenter.add(
-                UNNotificationRequest(
-                    identifier: notification.identifier,
-                    content: content,
-                    trigger: trigger
+            do {
+                try await notificationCenter.add(
+                    UNNotificationRequest(
+                        identifier: notification.identifier,
+                        content: content,
+                        trigger: trigger
+                    )
                 )
-            )
+                if notification.identifier.contains("-deadline-update-") {
+                    saveDeadlines([notification], forKey: Self.knownDeadlinesKey)
+                    saveDeadlines([notification], forKey: Self.sentDeadlineUpdatesKey)
+                }
+            } catch {
+                // Keep the previous deadline so a later refresh can retry an
+                // immediate revised-deadline alert that macOS rejected.
+            }
         }
     }
 

@@ -32,8 +32,11 @@ const todoList = (() => {
   function persist() {
     const saved = todoListState.save(items);
     const notice = document.querySelector('[data-todo-storage-error]');
-    if (notice) notice.hidden = saved;
-    return saved;
+    const updateNotice = (result) => {
+      if (notice) notice.hidden = result;
+      return result;
+    };
+    return saved instanceof Promise ? saved.then(updateNotice) : updateNotice(saved);
   }
 
   function render() {
@@ -57,25 +60,39 @@ const todoList = (() => {
   function commitItems(nextItems) {
     const previousItems = items;
     items = nextItems;
-    if (persist()) return true;
-    items = previousItems;
-    render();
-    return false;
+    const finish = (saved) => {
+      if (saved) {
+        render();
+        return true;
+      }
+      if (items === nextItems) {
+        items = previousItems;
+        render();
+      }
+      return false;
+    };
+    const saved = persist();
+    return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
   function add(title, image = null) {
     const item = todoListState.create(title, image);
-    if (!item || !commitItems([item, ...items])) return false;
-    filterMode = 'open';
-    render();
-    return true;
+    if (!item) return false;
+    const finish = (saved) => {
+      if (!saved) return false;
+      filterMode = 'open';
+      render();
+      return true;
+    };
+    const saved = commitItems([item, ...items]);
+    return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
   function updateItem(id, changes) {
     const nextItems = items.map((item) => item.id === id
       ? todoListState.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
       : item);
-    if (commitItems(nextItems)) render();
+    return commitItems(nextItems);
   }
 
   function imageValidationError(file) {
@@ -170,10 +187,15 @@ const todoList = (() => {
       }
       showImageError();
       const title = page.querySelector('[data-todo-new-title]');
-      if (!add(title.value, imageDraft.image)) return;
-      title.value = '';
-      resetImageDraft();
-      title.focus();
+      const finish = (saved) => {
+        if (!saved) return;
+        title.value = '';
+        resetImageDraft();
+        title.focus();
+      };
+      const saved = add(title.value, imageDraft.image);
+      if (saved instanceof Promise) void saved.then(finish);
+      else finish(saved);
     });
     page.addEventListener('paste', (event) => {
       const file = pastedImage(event);
@@ -229,16 +251,16 @@ const todoList = (() => {
       });
     });
     page.querySelector('[data-todo-clear-completed]').addEventListener('click', () => {
-      if (commitItems(items.filter((item) => !item.completed))) render();
+      void commitItems(items.filter((item) => !item.completed));
     });
     page.querySelector('[data-todo-list]').addEventListener('change', (event) => {
       const row = event.target.closest('[data-todo-id]');
       if (!row) return;
       if (event.target.matches('[data-todo-completed]')) {
-        updateItem(row.dataset.todoId, { completed: event.target.checked });
+        void updateItem(row.dataset.todoId, { completed: event.target.checked });
       } else if (event.target.matches('[data-todo-title]')) {
         const title = event.target.value.trim();
-        if (title) updateItem(row.dataset.todoId, { title });
+        if (title) void updateItem(row.dataset.todoId, { title });
         else render();
       }
     });
@@ -253,7 +275,7 @@ const todoList = (() => {
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
       if (removeImageButton) {
         const row = removeImageButton.closest('[data-todo-id]');
-        if (row) updateItem(row.dataset.todoId, { image: null });
+        if (row) void updateItem(row.dataset.todoId, { image: null });
         return;
       }
       const button = event.target.closest('[data-todo-delete]');
@@ -267,7 +289,7 @@ const todoList = (() => {
         button.title = 'Confirm delete to-do';
         return;
       }
-      if (commitItems(items.filter((item) => item.id !== row.dataset.todoId))) render();
+      void commitItems(items.filter((item) => item.id !== row.dataset.todoId));
     });
     pageHost.append(page);
     pageState.restoreOpenState();

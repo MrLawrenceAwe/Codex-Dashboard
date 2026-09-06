@@ -19,6 +19,21 @@ private actor RecordingNtfyPublisher: NtfyPublishing {
     func recordedMessages() -> [Message] { messages }
 }
 
+private actor FailOnceNtfyPublisher: NtfyPublishing {
+    private var failuresRemaining = 1
+    private var messages: [String] = []
+
+    func publish(topic: String, title: String, message: String) throws {
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw URLError(.cannotConnectToHost)
+        }
+        messages.append(message)
+    }
+
+    func messageCount() -> Int { messages.count }
+}
+
 @MainActor
 final class NtfyResetNotifierTests: XCTestCase {
     func testDeliversImminentResetWarningOnceWithAccountAndRemainingUsage() async throws {
@@ -88,6 +103,48 @@ final class NtfyResetNotifierTests: XCTestCase {
 
         let messages = await publisher.recordedMessages()
         XCTAssertTrue(messages.isEmpty)
+    }
+
+    func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        let publisher = FailOnceNtfyPublisher()
+        let notifier = NtfyResetNotifier(
+            userDefaults: defaults,
+            publisher: publisher,
+            now: { now }
+        )
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        let initialUsage = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(2 * 60 * 60)),
+                weekly: nil
+            ),
+            fetchedAt: now
+        )
+        let revisedUsage = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(30 * 60)),
+                weekly: nil
+            ),
+            fetchedAt: now
+        )
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: initialUsage])
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: revisedUsage])
+        try? await Task.sleep(for: .seconds(1.1))
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: revisedUsage])
+        try? await Task.sleep(for: .seconds(1.1))
+        for _ in 0..<50 {
+            if await publisher.messageCount() == 1 { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        let messageCount = await publisher.messageCount()
+        XCTAssertEqual(messageCount, 1)
     }
 
     func testGeneratesAFriendlyReplacementTopic() throws {

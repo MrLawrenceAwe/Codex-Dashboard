@@ -164,6 +164,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               const title = form.querySelector('[data-todo-new-title]');
               const realStorage = window.localStorage;
+              window.__todoTestStorage = realStorage;
               Object.defineProperty(window, 'localStorage', {
                 configurable: true,
                 value: {
@@ -282,10 +283,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('[data-todo-image-preview]') !== null",
             in: webView
         )
-        let draftWasCleared = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-todo-new-image-preview]').hidden"
-        ) as? Bool
-        XCTAssertEqual(draftWasCleared, true)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-new-image-preview]').hidden",
+            in: webView
+        )
 
         _ = try await webView.evaluateJavaScript(
             """
@@ -408,10 +409,11 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
             in: webView
         )
-        let result = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateJavaScript(
             """
             (() => {
               const realStorage = window.localStorage;
+              window.__todoTestStorage = realStorage;
               Object.defineProperty(window, 'localStorage', {
                 configurable: true,
                 value: {
@@ -423,9 +425,24 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 },
               });
               document.querySelector('[data-todo-form]').requestSubmit();
-              Object.defineProperty(window, 'localStorage', { configurable: true, value: realStorage });
-              const stored = JSON.parse(realStorage.getItem('codex-dashboard.todos')).items[0];
-              return [document.querySelectorAll('[data-todo-id]').length, stored.image.dataURL, document.querySelector('[data-todo-storage-error]').hidden];
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelectorAll('[data-todo-id]').length === 1",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              Object.defineProperty(window, 'localStorage', {
+                configurable: true,
+                value: window.__todoTestStorage,
+              });
+              delete window.__todoTestStorage;
+              const stored = JSON.parse(window.localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [document.querySelectorAll('[data-todo-id]').length, stored.image.dataURL,
+                document.querySelector('[data-todo-storage-error]').hidden];
             })()
             """
         ) as? [Any]

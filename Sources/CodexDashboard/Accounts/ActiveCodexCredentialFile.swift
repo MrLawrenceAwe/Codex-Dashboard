@@ -19,11 +19,34 @@ final class ActiveCodexCredentialFile: @unchecked Sendable {
 
     func write(_ credential: Data) throws {
         try validate(credential)
+        let directory = url.deletingLastPathComponent()
         try fileManager.createDirectory(
-            at: url.deletingLastPathComponent(),
+            at: directory,
             withIntermediateDirectories: true
         )
-        try credential.write(to: url, options: [.atomic])
+        let temporaryURL = directory.appendingPathComponent(".auth-\(UUID().uuidString).tmp")
+        guard fileManager.createFile(
+            atPath: temporaryURL.path,
+            contents: nil,
+            attributes: [.posixPermissions: 0o600]
+        ) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        defer { try? fileManager.removeItem(at: temporaryURL) }
+        let handle = try FileHandle(forWritingTo: temporaryURL)
+        do {
+            try handle.write(contentsOf: credential)
+            try handle.synchronize()
+            try handle.close()
+        } catch {
+            try? handle.close()
+            throw error
+        }
+        if fileManager.fileExists(atPath: url.path) {
+            _ = try fileManager.replaceItemAt(url, withItemAt: temporaryURL)
+        } else {
+            try fileManager.moveItem(at: temporaryURL, to: url)
+        }
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
