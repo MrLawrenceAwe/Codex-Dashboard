@@ -144,7 +144,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             cancelTask(identifier)
         }
         for notification in notifications {
-            if deliveredReset(for: notification.identifier) == notification.resetDate {
+            if deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
                 cancelTask(notification.identifier)
                 continue
             }
@@ -175,8 +175,8 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         do {
             try await publisher.publish(
                 topic: topic,
-                title: "Codex limit resets in one hour",
-                message: "\(notification.accountName)’s \(notification.windowName) limit has \(notification.remainingPercent)% remaining and will reset in one hour."
+                title: notification.title,
+                message: notification.body
             )
             recordDelivered(notification)
             cancelTask(notification.identifier)
@@ -186,7 +186,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         }
     }
 
-    private func deliveredReset(for identifier: String) -> Date? {
+    private func deliveredDeadline(for identifier: String) -> Date? {
         guard let timestamp = userDefaults.dictionary(forKey: Self.deliveredResetsKey)?[identifier]
             as? Double else { return nil }
         return Date(timeIntervalSince1970: timestamp)
@@ -194,7 +194,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
 
     private func recordDelivered(_ notification: AccountResetNotification) {
         var delivered = userDefaults.dictionary(forKey: Self.deliveredResetsKey) ?? [:]
-        delivered[notification.identifier] = notification.resetDate.timeIntervalSince1970
+        delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
         userDefaults.set(delivered, forKey: Self.deliveredResetsKey)
     }
 
