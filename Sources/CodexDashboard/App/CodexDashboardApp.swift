@@ -10,6 +10,7 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
     )
     let launchAtLogin = LaunchAtLoginController()
     private var statusItemController: DashboardStatusItemController?
+    private var diagnosticsWindowController: DiagnosticsWindowController?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         let currentProcessID = ProcessInfo.processInfo.processIdentifier
@@ -23,9 +24,12 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let diagnosticsWindowController = DiagnosticsWindowController(coordinator: coordinator)
+        self.diagnosticsWindowController = diagnosticsWindowController
         statusItemController = DashboardStatusItemController(
             coordinator: coordinator,
-            launchAtLogin: launchAtLogin
+            launchAtLogin: launchAtLogin,
+            showDiagnostics: { diagnosticsWindowController.showDiagnostics() }
         )
         coordinator.startMonitoring()
     }
@@ -58,7 +62,7 @@ struct CodexDashboardApp: App {
 
     var body: some Scene {
         Settings {
-            DiagnosticsWindowView(coordinator: appDelegate.coordinator)
+            EmptyView()
         }
     }
 }

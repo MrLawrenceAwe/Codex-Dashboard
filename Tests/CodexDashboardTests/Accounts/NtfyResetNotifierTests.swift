@@ -90,6 +90,17 @@ final class NtfyResetNotifierTests: XCTestCase {
         XCTAssertTrue(messages.isEmpty)
     }
 
+    func testGeneratesAShortReplacementTopic() throws {
+        let notifier = NtfyResetNotifier(userDefaults: try makeDefaults())
+        let initialTopic = notifier.topic
+
+        notifier.generateNewTopic()
+
+        XCTAssertNotEqual(notifier.topic, initialTopic)
+        XCTAssertTrue(notifier.topic.hasPrefix("cd-"))
+        XCTAssertEqual(notifier.topic.count, 23)
+    }
+
     private func makeDefaults() throws -> UserDefaults {
         let suiteName = "NtfyResetNotifierTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

@@ -195,16 +195,17 @@ struct DiagnosticsWindowView: View {
                 .font(.system(size: 12, weight: .medium))
 
                 if coordinator.phoneNotificationsEnabled {
-                    Text("Install the ntfy app on your phone, add a subscription, and paste this private topic:")
+                    Text("In ntfy, choose Add Subscription and enter this private topic:")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Text(coordinator.phoneNotificationTopic)
                         .font(.system(size: 10, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
                         .textSelection(.enabled)
                     HStack(spacing: 8) {
                         Button("Copy Topic") { coordinator.copyPhoneNotificationTopic() }
+                        Button("New Short Topic") {
+                            coordinator.generateNewPhoneNotificationTopic()
+                        }
                         Button("Send Test") { Task { await coordinator.testPhoneNotification() } }
                     }
                     Text("The topic is the subscription secret. Reset details are sent through ntfy.sh.")
