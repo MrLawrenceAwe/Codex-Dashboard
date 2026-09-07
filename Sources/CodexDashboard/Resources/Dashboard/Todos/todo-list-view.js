@@ -57,6 +57,7 @@ const todoListView = (() => {
         </label>
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
+          <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
@@ -83,7 +84,10 @@ const todoListView = (() => {
             <img alt="">
             <button type="button" data-todo-new-image-remove aria-label="Remove pasted image" title="Remove pasted image">&times;</button>
           </div>
-          <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do… Paste an image to attach it" autocomplete="off">
+          <div class="todo-add-fields">
+            <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do" autocomplete="off">
+            <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
+          </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
         <p class="todo-image-paste-status" data-todo-new-image-status hidden></p>

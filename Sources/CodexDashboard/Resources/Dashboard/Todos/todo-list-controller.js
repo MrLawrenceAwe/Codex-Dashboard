@@ -75,8 +75,8 @@ const todoList = (() => {
     return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
-  function add(title, image = null) {
-    const item = todoListState.create(title, image);
+  function add(title, body = '', image = null) {
+    const item = todoListState.create(title, body, image);
     if (!item) return false;
     const finish = (saved) => {
       if (!saved) return false;
@@ -187,13 +187,15 @@ const todoList = (() => {
       }
       showImageError();
       const title = page.querySelector('[data-todo-new-title]');
+      const body = page.querySelector('[data-todo-new-body]');
       const finish = (saved) => {
         if (!saved) return;
         title.value = '';
+        body.value = '';
         resetImageDraft();
         title.focus();
       };
-      const saved = add(title.value, imageDraft.image);
+      const saved = add(title.value, body.value, imageDraft.image);
       if (saved instanceof Promise) void saved.then(finish);
       else finish(saved);
     });
@@ -262,6 +264,8 @@ const todoList = (() => {
         const title = event.target.value.trim();
         if (title) void updateItem(row.dataset.todoId, { title });
         else render();
+      } else if (event.target.matches('[data-todo-body]')) {
+        void updateItem(row.dataset.todoId, { body: event.target.value });
       }
     });
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {

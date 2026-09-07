@@ -29,11 +29,13 @@ const todoListState = (() => {
 
   function normalizeItem(item) {
     const title = cleanText(item?.title);
+    const body = cleanText(item?.body);
     const id = cleanText(item?.id);
     if (!id || !title) return null;
     return {
       id,
       title,
+      body,
       completed: item?.completed === true,
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
@@ -148,11 +150,12 @@ const todoListState = (() => {
     })).catch(() => items);
   }
 
-  function create(title, image = null) {
+  function create(title, body = '', image = null) {
     const now = Date.now();
     return normalizeItem({
       id: crypto.randomUUID(),
       title,
+      body,
       image,
       createdAt: now,
       updatedAt: now,
