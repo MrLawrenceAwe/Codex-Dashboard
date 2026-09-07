@@ -32,6 +32,27 @@ struct AccountResetNotification: Equatable, Sendable {
     }
 }
 
+struct AccountUsageResetObservation: Codable, Equatable, Sendable {
+    struct Window: Codable, Equatable, Sendable {
+        let usedPercent: Int
+        let resetsAt: Date?
+    }
+
+    let fiveHour: Window?
+    let weekly: Window?
+
+    init(usage: CodexAccountUsage) {
+        fiveHour = usage.fiveHour.map { Window(usedPercent: $0.usedPercent, resetsAt: $0.resetsAt) }
+        weekly = usage.weekly.map { Window(usedPercent: $0.usedPercent, resetsAt: $0.resetsAt) }
+    }
+}
+
+struct AccountUnexpectedResetNotification: Equatable, Sendable {
+    let identifier: String
+    let title: String
+    let body: String
+}
+
 enum AccountResetNotificationPlanner {
     private static let oneHour: TimeInterval = 60 * 60
     private static let fiveHours: TimeInterval = 5 * 60 * 60
@@ -109,6 +130,44 @@ enum AccountResetNotificationPlanner {
         }
     }
 
+    static func unexpectedResetNotifications(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        previousObservations: [UUID: AccountUsageResetObservation],
+        now: Date = .now
+    ) -> [AccountUnexpectedResetNotification] {
+        accounts.flatMap { account -> [AccountUnexpectedResetNotification] in
+            guard let usage = usageByAccountID[account.id]?.usage,
+                  let previous = previousObservations[account.id]
+            else { return [] }
+            return [
+                unexpectedResetNotification(
+                    for: account,
+                    windowName: "5-hour",
+                    current: usage.fiveHour,
+                    previous: previous.fiveHour,
+                    now: now
+                ),
+                unexpectedResetNotification(
+                    for: account,
+                    windowName: "Weekly",
+                    current: usage.weekly,
+                    previous: previous.weekly,
+                    now: now
+                ),
+            ].compactMap { $0 }
+        }.sorted { $0.identifier < $1.identifier }
+    }
+
+    static func observations(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot]
+    ) -> [UUID: AccountUsageResetObservation] {
+        Dictionary(uniqueKeysWithValues: accounts.compactMap { account in
+            usageByAccountID[account.id].map { (account.id, AccountUsageResetObservation(usage: $0.usage)) }
+        })
+    }
+
     private static func limitNotifications(
         for account: SavedAccount,
         windowName: String,
@@ -133,6 +192,27 @@ enum AccountResetNotificationPlanner {
                 deadlineDate: resetsAt
             )
         }
+    }
+
+    private static func unexpectedResetNotification(
+        for account: SavedAccount,
+        windowName: String,
+        current: CodexUsageWindow?,
+        previous: AccountUsageResetObservation.Window?,
+        now: Date
+    ) -> AccountUnexpectedResetNotification? {
+        guard let current, let previous,
+              previous.usedPercent > current.usedPercent,
+              let previousReset = previous.resetsAt, previousReset > now
+        else { return nil }
+
+        let remainingPercent = max(0, min(100, 100 - current.usedPercent))
+        let nextReset = current.resetsAt.map { " Next reset: \(formattedDeadline($0))." } ?? ""
+        return AccountUnexpectedResetNotification(
+            identifier: "codex-dashboard-account-unexpected-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(now.timeIntervalSinceReferenceDate))",
+            title: "Codex limit reset early",
+            body: "\(account.name)’s \(windowName) usage dropped from \(previous.usedPercent)% used to \(current.usedPercent)% used before its scheduled reset at \(formattedDeadline(previousReset)). It now has \(remainingPercent)% remaining.\(nextReset)"
+        )
     }
 
     private static func bankedResetExpiryNotifications(
@@ -217,6 +297,7 @@ final class AccountResetNotifier: AccountResetNotifying {
     private static let identifierPrefix = "codex-dashboard-account-deadline-"
     private static let knownDeadlinesKey = "accountResetNotificationKnownDeadlines"
     private static let sentDeadlineUpdatesKey = "accountResetNotificationSentDeadlineUpdates"
+    private static let usageObservationsKey = "accountResetNotificationUsageObservations"
 
     private let notificationCenter: UNUserNotificationCenter
     private let userDefaults: UserDefaults
@@ -233,6 +314,12 @@ final class AccountResetNotifier: AccountResetNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
+        let unexpectedResets = AccountResetNotificationPlanner.unexpectedResetNotifications(
+            for: accounts,
+            usageByAccountID: usageByAccountID,
+            previousObservations: observations(),
+            now: .now
+        )
         let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID
@@ -256,7 +343,10 @@ final class AccountResetNotifier: AccountResetNotifying {
         notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
 
         let requests = notifications + deadlineUpdates
-        guard !requests.isEmpty, await notificationsAreAuthorized() else { return }
+        guard !requests.isEmpty || !unexpectedResets.isEmpty, await notificationsAreAuthorized() else {
+            saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+            return
+        }
         for notification in requests {
             let content = UNMutableNotificationContent()
             content.title = notification.title
@@ -286,6 +376,20 @@ final class AccountResetNotifier: AccountResetNotifying {
                 // immediate revised-deadline alert that macOS rejected.
             }
         }
+        for notification in unexpectedResets {
+            let content = UNMutableNotificationContent()
+            content.title = notification.title
+            content.body = notification.body
+            content.sound = .default
+            try? await notificationCenter.add(
+                UNNotificationRequest(
+                    identifier: notification.identifier,
+                    content: content,
+                    trigger: nil
+                )
+            )
+        }
+        saveObservations(for: accounts, usageByAccountID: usageByAccountID)
     }
 
     private func notificationsAreAuthorized() async -> Bool {
@@ -317,5 +421,24 @@ final class AccountResetNotifier: AccountResetNotifying {
             values[notification.sourceIdentifier] = notification.deadlineDate.timeIntervalSinceReferenceDate
         }
         userDefaults.set(values, forKey: key)
+    }
+
+    private func observations() -> [UUID: AccountUsageResetObservation] {
+        guard let data = userDefaults.data(forKey: Self.usageObservationsKey) else { return [:] }
+        return (try? JSONDecoder().decode([UUID: AccountUsageResetObservation].self, from: data)) ?? [:]
+    }
+
+    private func saveObservations(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot]
+    ) {
+        let updatedObservations = AccountResetNotificationPlanner.observations(
+            for: accounts,
+            usageByAccountID: usageByAccountID
+        )
+        var allObservations = observations()
+        allObservations.merge(updatedObservations) { _, updated in updated }
+        guard let data = try? JSONEncoder().encode(allObservations) else { return }
+        userDefaults.set(data, forKey: Self.usageObservationsKey)
     }
 }

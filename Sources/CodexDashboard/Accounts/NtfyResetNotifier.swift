@@ -79,6 +79,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     private static let deliveredResetsKey = "ntfyDeliveredAccountResets"
     private static let knownDeadlinesKey = "ntfyKnownAccountDeadlines"
     private static let sentDeadlineUpdatesKey = "ntfySentAccountDeadlineUpdates"
+    private static let usageObservationsKey = "ntfyAccountUsageObservations"
 
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
@@ -135,6 +136,12 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             return
         }
         let currentDate = now()
+        let unexpectedResets = AccountResetNotificationPlanner.unexpectedResetNotifications(
+            for: accounts,
+            usageByAccountID: usageByAccountID,
+            previousObservations: observations(),
+            now: currentDate
+        )
         let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID,
@@ -174,6 +181,15 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 await self?.deliver(notification)
             }
         }
+        for notification in unexpectedResets {
+            do {
+                try await publisher.publish(topic: topic, title: notification.title, message: notification.body)
+            } catch {
+                // Leave the previous observation in place so a later refresh can retry.
+                return
+            }
+        }
+        saveObservations(for: accounts, usageByAccountID: usageByAccountID)
     }
 
     func sendTestNotification() async throws {
@@ -231,6 +247,25 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             values[notification.sourceIdentifier] = notification.deadlineDate.timeIntervalSinceReferenceDate
         }
         userDefaults.set(values, forKey: key)
+    }
+
+    private func observations() -> [UUID: AccountUsageResetObservation] {
+        guard let data = userDefaults.data(forKey: Self.usageObservationsKey) else { return [:] }
+        return (try? JSONDecoder().decode([UUID: AccountUsageResetObservation].self, from: data)) ?? [:]
+    }
+
+    private func saveObservations(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot]
+    ) {
+        let updatedObservations = AccountResetNotificationPlanner.observations(
+            for: accounts,
+            usageByAccountID: usageByAccountID
+        )
+        var allObservations = observations()
+        allObservations.merge(updatedObservations) { _, updated in updated }
+        guard let data = try? JSONEncoder().encode(allObservations) else { return }
+        userDefaults.set(data, forKey: Self.usageObservationsKey)
     }
 
     private func cancelTask(_ identifier: String) {
