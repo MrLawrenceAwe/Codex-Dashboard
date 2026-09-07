@@ -6,6 +6,7 @@ struct AccountResetNotification: Equatable, Sendable {
     let title: String
     let body: String
     let deadlineDescription: String
+    let usageSummary: String
     let notificationDate: Date
     let deadlineDate: Date
 
@@ -20,8 +21,9 @@ struct AccountResetNotification: Equatable, Sendable {
         AccountResetNotification(
             identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
             title: "\(title) time updated",
-            body: "\(deadlineDescription) at \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)).",
+            body: "\(deadlineDescription) at \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)). \(usageSummary)",
             deadlineDescription: deadlineDescription,
+            usageSummary: usageSummary,
             notificationDate: date,
             deadlineDate: deadlineDate
         )
@@ -70,14 +72,21 @@ enum AccountResetNotificationPlanner {
                 windowName: "5-hour",
                 window: usage.fiveHour,
                 leadTimes: [oneHour],
+                usageSummary: usageSummary(for: usage),
                 now: now
             ) + limitNotifications(
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,
                 leadTimes: extendedLeadTimes,
+                usageSummary: usageSummary(for: usage),
                 now: now
-            ) + bankedResetExpiryNotifications(for: account, resets: usage.bankedResets, now: now)
+            ) + bankedResetExpiryNotifications(
+                for: account,
+                resets: usage.bankedResets,
+                usageSummary: usageSummary(for: usage),
+                now: now
+            )
         }.sorted { $0.identifier < $1.identifier }
     }
 
@@ -102,6 +111,7 @@ enum AccountResetNotificationPlanner {
         windowName: String,
         window: CodexUsageWindow?,
         leadTimes: [TimeInterval],
+        usageSummary: String,
         now: Date
     ) -> [AccountResetNotification] {
         guard let window, let resetsAt = window.resetsAt else { return [] }
@@ -112,8 +122,9 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription), at \(formattedDeadline(resetsAt)).",
+                body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription), at \(formattedDeadline(resetsAt)). \(usageSummary)",
                 deadlineDescription: "\(account.name)’s \(windowName) limit will reset",
+                usageSummary: usageSummary,
                 notificationDate: resetsAt.addingTimeInterval(-leadTime),
                 deadlineDate: resetsAt
             )
@@ -123,6 +134,7 @@ enum AccountResetNotificationPlanner {
     private static func bankedResetExpiryNotifications(
         for account: SavedAccount,
         resets: CodexBankedResetSummary?,
+        usageSummary: String,
         now: Date
     ) -> [AccountResetNotification] {
         guard let resets, resets.availableCount > 0, let expiration = resets.nextExpiration, expiration > now else {
@@ -134,8 +146,9 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
-                body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription), at \(formattedDeadline(expiration)).",
+                body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription), at \(formattedDeadline(expiration)). \(usageSummary)",
                 deadlineDescription: "\(account.name)’s next banked reset will expire",
+                usageSummary: usageSummary,
                 notificationDate: expiration.addingTimeInterval(-leadTime),
                 deadlineDate: expiration
             )
@@ -156,6 +169,18 @@ enum AccountResetNotificationPlanner {
 
     private static func identifierComponent(for leadTime: TimeInterval) -> String {
         "\(Int(leadTime / 60 / 60))h"
+    }
+
+    private static func usageSummary(for usage: CodexAccountUsage) -> String {
+        let fiveHour = remainingUsage(for: usage.fiveHour)
+        let weekly = remainingUsage(for: usage.weekly)
+        let bankedResets = usage.bankedResets.map { String(max(0, $0.availableCount)) } ?? "unavailable"
+        return "Usage remaining: 5-hour \(fiveHour) · weekly \(weekly) · banked resets \(bankedResets)."
+    }
+
+    private static func remainingUsage(for window: CodexUsageWindow?) -> String {
+        guard let window else { return "unavailable" }
+        return "\(max(0, min(100, 100 - window.usedPercent)))%"
     }
 
     static func formattedDeadline(_ deadline: Date) -> String {
