@@ -74,7 +74,7 @@ const threadMarkup = (() => {
     isUnread,
     isCompletionTickVisible,
   }) {
-    if (filterMode === 'today') {
+    if (filterMode === 'recent') {
       return visibleThreads.map((item) => thread(item, {
         compact: true,
         showProject: true,

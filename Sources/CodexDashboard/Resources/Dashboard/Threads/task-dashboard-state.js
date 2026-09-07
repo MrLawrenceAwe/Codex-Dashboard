@@ -21,8 +21,8 @@ const taskDashboardState = (() => {
       }
     } catch (_) {}
     return {
-      filterMode: ['today', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'today',
+      filterMode: ['recent', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'recent',
       collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
         ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
       mutedProjectPaths: new Set(Array.isArray(stored.mutedProjectPaths)
@@ -40,20 +40,13 @@ const taskDashboardState = (() => {
     } catch (_) {}
   }
 
-  function derive(threads, isThreadUnread, mutedProjectPaths, now = new Date()) {
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-    const dayRange = { start: startOfToday.getTime(), end: startOfTomorrow.getTime() };
+  function derive(threads, isThreadUnread, mutedProjectPaths) {
     let runningCount = 0;
     const unmutedChangedProjectPaths = new Set();
     const allChangedProjectPaths = new Set();
-    let todayCount = 0;
     let unreadCount = 0;
 
     threads.forEach((thread) => {
-      if (isToday(thread, dayRange)) todayCount += 1;
       if (thread.runState === 'running') runningCount += 1;
       if (isThreadUnread(thread)) unreadCount += 1;
       if (thread.workingTreeStatus === 'hasChanges') {
@@ -62,30 +55,23 @@ const taskDashboardState = (() => {
         if (!mutedProjectPaths.has(projectPath)) unmutedChangedProjectPaths.add(projectPath);
       }
     });
-    return { todayCount, runningCount, unreadCount, unmutedChangedProjectPaths, allChangedProjectPaths, dayRange };
+    return { runningCount, unreadCount, unmutedChangedProjectPaths, allChangedProjectPaths };
   }
 
   function filter({
     threads,
     allChangedProjectPaths,
-    dayRange,
     filterMode,
     isThreadUnread,
   }) {
     return threads.filter((thread) => {
-      const matchesFilter = (filterMode === 'today' && isToday(thread, dayRange))
+      const matchesFilter = filterMode === 'recent'
         || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));
       return matchesFilter;
     });
-  }
-
-  function isToday(thread, { start, end }) {
-    const recency = Number(thread.recencyEpochMillis || 0);
-    if (!Number.isFinite(recency)) return false;
-    return recency >= start && recency < end;
   }
 
   function sortThreadsByRecency(threads) {

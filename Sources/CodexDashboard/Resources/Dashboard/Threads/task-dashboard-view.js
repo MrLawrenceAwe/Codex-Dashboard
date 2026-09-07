@@ -64,7 +64,6 @@ const taskDashboardView = (() => {
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
-      today: state.todayCount,
       running: state.runningCount,
       unread: state.unreadCount,
       changedProjects: state.unmutedChangedProjectPaths.size,
@@ -75,7 +74,6 @@ const taskDashboardView = (() => {
     const visibleThreads = taskDashboardState.filter({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
-      dayRange: state.dayRange,
       filterMode,
       isThreadUnread,
     });
@@ -83,7 +81,7 @@ const taskDashboardView = (() => {
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
-    list.classList.toggle('is-compact', filterMode === 'today');
+    list.classList.toggle('is-compact', filterMode === 'recent');
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
