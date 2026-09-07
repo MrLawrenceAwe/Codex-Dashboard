@@ -18,6 +18,12 @@ const todoListView = (() => {
     `).join('')}</div>`;
   }
 
+  function badgeOptions(badges, selectedBadge = '') {
+    return `<option value="">Choose a badge</option>${badges.map((badge) => (
+      `<option value="${domUtils.escapeHTML(badge)}"${badge === selectedBadge ? ' selected' : ''}>${domUtils.escapeHTML(badge)}</option>`
+    )).join('')}`;
+  }
+
   function visibleItems(items, filterMode) {
     if (filterMode === 'open') return items.filter((item) => !item.completed);
     if (filterMode === 'completed') return items.filter((item) => item.completed);
@@ -86,6 +92,7 @@ const todoListView = (() => {
       <div class="todo-shell">
         <header class="todo-header">
           <h1>To-dos</h1>
+          <button type="button" class="todo-manage-badges" data-todo-manage-badges>Badges</button>
         </header>
         <form class="todo-add" data-todo-form>
           <div class="todo-add-image" data-todo-new-image-preview hidden>
@@ -97,8 +104,8 @@ const todoListView = (() => {
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
             <div class="todo-badge-composer">
               <div class="todo-badges" data-todo-new-badges aria-label="New to-do badges"></div>
-              <input data-todo-new-badge aria-label="New to-do badge" maxlength="40" placeholder="Add a badge" autocomplete="off">
-              <button type="button" data-todo-new-badge-add>Add badge</button>
+              <select data-todo-new-badge aria-label="Badge to attach">${badgeOptions([])}</select>
+              <button type="button" data-todo-new-badge-add>Attach badge</button>
             </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
@@ -133,6 +140,14 @@ const todoListView = (() => {
       <dialog class="todo-image-dialog" data-todo-image-dialog aria-label="Image preview">
         <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
         <img alt="">
+      </dialog>
+      <dialog class="todo-badge-dialog" data-todo-badge-dialog aria-label="Manage badges">
+        <form method="dialog" class="todo-badge-dialog-header"><strong>Badges</strong><button type="submit" aria-label="Close badges">&times;</button></form>
+        <form data-todo-badge-form class="todo-badge-form">
+          <input data-todo-badge-name aria-label="Badge name" maxlength="40" placeholder="New badge name" autocomplete="off">
+          <button type="submit">Create badge</button>
+        </form>
+        <div class="todo-badges" data-todo-managed-badges aria-label="Available badges"></div>
       </dialog>`);
     const imageDialog = page.querySelector('[data-todo-image-dialog]');
     imageDialog.querySelector('[data-todo-image-dialog-close]').addEventListener('click', () => imageDialog.close());
@@ -164,6 +179,17 @@ const todoListView = (() => {
     container.innerHTML = badgeMarkup(badges, true);
   }
 
+  function updateBadgeOptions(badges) {
+    const select = document.querySelector('[data-todo-new-badge]');
+    if (!select) return;
+    select.innerHTML = badgeOptions(badges, select.value);
+  }
+
+  function updateManagedBadges(badges) {
+    const container = document.querySelector('[data-todo-managed-badges]');
+    if (container) container.innerHTML = badgeMarkup(badges);
+  }
+
   function showImage(image) {
     const dialog = document.querySelector('[data-todo-image-dialog]');
     if (!dialog) return;
@@ -173,5 +199,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateBadgeDraft, updateImageDraft, updateNavigation };
+  return { createPage, render, showImage, updateBadgeDraft, updateBadgeOptions, updateImageDraft, updateManagedBadges, updateNavigation };
 })();

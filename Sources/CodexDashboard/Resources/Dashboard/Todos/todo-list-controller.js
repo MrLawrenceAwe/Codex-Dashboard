@@ -1,5 +1,6 @@
 const todoList = (() => {
   let items = todoListState.load();
+  let availableBadges = todoListState.loadBadges(items);
   let filterMode = 'open';
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
@@ -27,6 +28,7 @@ const todoList = (() => {
   }
 
   function addBadgeDraft(value) {
+    if (!availableBadges.includes(value)) return false;
     const badges = todoListState.normalizeBadges([...badgeDraft, value]);
     if (badges.length === badgeDraft.length) return false;
     badgeDraft = badges;
@@ -52,6 +54,18 @@ const todoList = (() => {
       return result;
     };
     return saved instanceof Promise ? saved.then(updateNotice) : updateNotice(saved);
+  }
+
+  function persistBadges() {
+    const saved = todoListState.saveBadges(availableBadges);
+    const notice = document.querySelector('[data-todo-storage-error]');
+    if (notice) notice.hidden = saved;
+    return saved;
+  }
+
+  function renderBadges() {
+    todoListView.updateBadgeOptions(availableBadges);
+    todoListView.updateManagedBadges(availableBadges);
   }
 
   function render() {
@@ -187,6 +201,7 @@ const todoList = (() => {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
+    renderBadges();
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       if (imageDraft.status === 'invalid') {
@@ -269,17 +284,29 @@ const todoList = (() => {
       badgeInput.focus();
     };
     page.querySelector('[data-todo-new-badge-add]').addEventListener('click', addBadge);
-    badgeInput.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      addBadge();
-    });
     page.querySelector('[data-todo-new-badges]').addEventListener('click', (event) => {
       const button = event.target.closest('[data-todo-badge-remove]');
       if (!button) return;
       badgeDraft = badgeDraft.filter((badge) => badge !== button.dataset.todoBadgeRemove);
       todoListView.updateBadgeDraft(badgeDraft);
       badgeInput.focus();
+    });
+    const badgeDialog = page.querySelector('[data-todo-badge-dialog]');
+    page.querySelector('[data-todo-manage-badges]').addEventListener('click', () => badgeDialog.showModal());
+    page.querySelector('[data-todo-badge-form]').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const name = page.querySelector('[data-todo-badge-name]');
+      const previousBadges = availableBadges;
+      const nextBadges = todoListState.normalizeBadges([...availableBadges, name.value]);
+      if (nextBadges.length === availableBadges.length) return;
+      availableBadges = nextBadges;
+      if (!persistBadges()) {
+        availableBadges = previousBadges;
+        return;
+      }
+      name.value = '';
+      renderBadges();
+      name.focus();
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {

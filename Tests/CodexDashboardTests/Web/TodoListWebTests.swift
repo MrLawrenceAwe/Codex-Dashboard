@@ -162,25 +162,30 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
-              const badge = form.querySelector('[data-todo-new-badge]');
-              badge.value = 'Work';
+              const badgePicker = form.querySelector('[data-todo-new-badge]');
+              const unavailableBeforeCreation = badgePicker.options.length === 1;
+              document.querySelector('[data-todo-manage-badges]').click();
+              const badgeDialog = document.querySelector('[data-todo-badge-dialog]');
+              badgeDialog.querySelector('[data-todo-badge-name]').value = 'Work';
+              badgeDialog.querySelector('[data-todo-badge-form]').requestSubmit();
+              badgePicker.value = 'Work';
               form.querySelector('[data-todo-new-badge-add]').click();
-              badge.value = 'work';
-              badge.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const renderedBadge = document.querySelector('[data-todo-id] .todo-badge').textContent.trim();
               document.querySelector('[data-todo-badge-remove]').click();
-              return [stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
+              return [unavailableBeforeCreation, JSON.parse(localStorage.getItem('codex-dashboard.todo-badges')), stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
             })()
             """
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [String], ["Work"])
-        XCTAssertEqual(values[1] as? String, "Work×")
-        XCTAssertEqual(values[2] as? [String], [])
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? [String], ["Work"])
+        XCTAssertEqual(values[2] as? [String], ["Work"])
+        XCTAssertEqual(values[3] as? String, "Work×")
+        XCTAssertEqual(values[4] as? [String], [])
     }
 
     func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
