@@ -146,6 +146,43 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Int, 0)
     }
 
+    func testTodoBadgesCanBeCreatedPersistedAndRemoved() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const badge = form.querySelector('[data-todo-new-badge]');
+              badge.value = 'Work';
+              form.querySelector('[data-todo-new-badge-add]').click();
+              badge.value = 'work';
+              badge.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Send update';
+              form.requestSubmit();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              const renderedBadge = document.querySelector('[data-todo-id] .todo-badge').textContent.trim();
+              document.querySelector('[data-todo-badge-remove]').click();
+              return [stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["Work"])
+        XCTAssertEqual(values[1] as? String, "Work×")
+        XCTAssertEqual(values[2] as? [String], [])
+    }
+
     func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """

@@ -11,6 +11,13 @@ const todoListView = (() => {
       </div>`;
   }
 
+  function badgeMarkup(badges, editable = false) {
+    if (!badges.length) return '';
+    return `<div class="todo-badges" aria-label="To-do badges">${badges.map((badge) => `
+      <span class="todo-badge">${domUtils.escapeHTML(badge)}${editable ? `<button type="button" data-todo-badge-remove="${domUtils.escapeHTML(badge)}" aria-label="Remove badge ${domUtils.escapeHTML(badge)}" title="Remove badge ${domUtils.escapeHTML(badge)}">&times;</button>` : ''}</span>
+    `).join('')}</div>`;
+  }
+
   function visibleItems(items, filterMode) {
     if (filterMode === 'open') return items.filter((item) => !item.completed);
     if (filterMode === 'completed') return items.filter((item) => item.completed);
@@ -58,6 +65,7 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
+          ${badgeMarkup(item.badges, !item.completed)}
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
@@ -87,6 +95,11 @@ const todoListView = (() => {
           <div class="todo-add-fields">
             <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do" autocomplete="off">
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
+            <div class="todo-badge-composer">
+              <div class="todo-badges" data-todo-new-badges aria-label="New to-do badges"></div>
+              <input data-todo-new-badge aria-label="New to-do badge" maxlength="40" placeholder="Add a badge" autocomplete="off">
+              <button type="button" data-todo-new-badge-add>Add badge</button>
+            </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
@@ -145,6 +158,12 @@ const todoListView = (() => {
     );
   }
 
+  function updateBadgeDraft(badges) {
+    const container = document.querySelector('[data-todo-new-badges]');
+    if (!container) return;
+    container.innerHTML = badgeMarkup(badges, true);
+  }
+
   function showImage(image) {
     const dialog = document.querySelector('[data-todo-image-dialog]');
     if (!dialog) return;
@@ -154,5 +173,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateImageDraft, updateNavigation };
+  return { createPage, render, showImage, updateBadgeDraft, updateImageDraft, updateNavigation };
 })();

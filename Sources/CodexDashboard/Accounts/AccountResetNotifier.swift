@@ -69,14 +69,15 @@ enum AccountResetNotificationPlanner {
     ) -> [AccountResetNotification] {
         accounts.flatMap { account -> [AccountResetNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            return limitNotifications(
+            let fiveHourNotifications = usage.weekly?.usedPercent == 0 ? [] : limitNotifications(
                 for: account,
                 windowName: "5-hour",
                 window: usage.fiveHour,
                 leadTimes: [oneHour],
                 usageSummary: usageSummary(for: usage),
                 now: now
-            ) + limitNotifications(
+            )
+            return fiveHourNotifications + limitNotifications(
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,

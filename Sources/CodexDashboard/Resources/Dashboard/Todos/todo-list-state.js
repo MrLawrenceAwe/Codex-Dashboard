@@ -2,10 +2,26 @@ const todoListState = (() => {
   const storageKey = 'codex-dashboard.todos';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 1;
+  const version = 2;
+  const supportedVersions = new Set([1, version]);
+  const maximumBadges = 8;
+  const maximumBadgeLength = 40;
 
   function cleanText(value) {
     return String(value || '').trim();
+  }
+
+  function normalizeBadges(badges) {
+    if (!Array.isArray(badges)) return [];
+    const seen = new Set();
+    return badges.reduce((normalized, badge) => {
+      const name = cleanText(badge).slice(0, maximumBadgeLength);
+      const key = name.toLocaleLowerCase();
+      if (!name || seen.has(key) || normalized.length === maximumBadges) return normalized;
+      seen.add(key);
+      normalized.push(name);
+      return normalized;
+    }, []);
   }
 
   function normalizeImage(image, allowDeferredData = false) {
@@ -37,6 +53,7 @@ const todoListState = (() => {
       title,
       body,
       completed: item?.completed === true,
+      badges: normalizeBadges(item?.badges),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -46,7 +63,7 @@ const todoListState = (() => {
   function load() {
     try {
       const document = JSON.parse(localStorage.getItem(storageKey));
-      if (document?.version !== version || !Array.isArray(document.items)) return [];
+      if (!supportedVersions.has(document?.version) || !Array.isArray(document.items)) return [];
       return document.items.map(normalizeItem).filter(Boolean);
     } catch (_) {
       return [];
@@ -150,17 +167,18 @@ const todoListState = (() => {
     })).catch(() => items);
   }
 
-  function create(title, body = '', image = null) {
+  function create(title, body = '', image = null, badges = []) {
     const now = Date.now();
     return normalizeItem({
       id: crypto.randomUUID(),
       title,
       body,
       image,
+      badges,
       createdAt: now,
       updatedAt: now,
     });
   }
 
-  return { create, hydrate, load, normalizeImage, normalizeItem, save };
+  return { create, hydrate, load, normalizeBadges, normalizeImage, normalizeItem, save };
 })();
