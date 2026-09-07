@@ -5,6 +5,7 @@ struct AccountResetNotification: Equatable, Sendable {
     let identifier: String
     let title: String
     let body: String
+    let deadlineUpdateTitle: String
     let deadlineDescription: String
     let usageSummary: String
     let notificationDate: Date
@@ -20,8 +21,9 @@ struct AccountResetNotification: Equatable, Sendable {
     func deadlineUpdateNotification(at date: Date) -> AccountResetNotification {
         AccountResetNotification(
             identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
-            title: "\(title) time updated",
+            title: deadlineUpdateTitle,
             body: "\(deadlineDescription) at \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)). \(usageSummary)",
+            deadlineUpdateTitle: deadlineUpdateTitle,
             deadlineDescription: deadlineDescription,
             usageSummary: usageSummary,
             notificationDate: date,
@@ -123,7 +125,8 @@ enum AccountResetNotificationPlanner {
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 title: "Codex limit resets in \(leadTimeDescription)",
                 body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription), at \(formattedDeadline(resetsAt)). \(usageSummary)",
-                deadlineDescription: "\(account.name)’s \(windowName) limit will reset",
+                deadlineUpdateTitle: "\(windowName) reset time changed",
+                deadlineDescription: "\(account.name)’s \(windowName) limit will now reset",
                 usageSummary: usageSummary,
                 notificationDate: resetsAt.addingTimeInterval(-leadTime),
                 deadlineDate: resetsAt
@@ -147,7 +150,8 @@ enum AccountResetNotificationPlanner {
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
                 body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription), at \(formattedDeadline(expiration)). \(usageSummary)",
-                deadlineDescription: "\(account.name)’s next banked reset will expire",
+                deadlineUpdateTitle: "Banked reset expiry changed",
+                deadlineDescription: "\(account.name)’s next banked reset will now expire",
                 usageSummary: usageSummary,
                 notificationDate: expiration.addingTimeInterval(-leadTime),
                 deadlineDate: expiration

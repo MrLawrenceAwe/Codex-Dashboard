@@ -93,8 +93,8 @@ final class AccountResetNotifierTests: XCTestCase {
         )
 
         XCTAssertEqual(updates.count, 1)
-        XCTAssertEqual(updates.first?.title, "Codex limit resets in one hour time updated")
-        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour limit will reset at ") == true)
+        XCTAssertEqual(updates.first?.title, "5-hour reset time changed")
+        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour limit will now reset at ") == true)
         XCTAssertTrue(updates.first?.body.contains("Usage remaining: 5-hour 75% · weekly 50% · banked resets 0.") == true)
         XCTAssertTrue(
             AccountResetNotificationPlanner.deadlineUpdateNotifications(
