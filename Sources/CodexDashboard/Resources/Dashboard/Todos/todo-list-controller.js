@@ -7,7 +7,9 @@ const todoList = (() => {
     rootClass: 'codex-todo-open',
   });
   let imageDraft;
+  let badgeDraft;
   resetImageDraft();
+  resetBadgeDraft();
 
   function resetImageDraft() {
     imageDraft = { status: 'empty', image: null, submitWhenReady: false };
@@ -17,6 +19,19 @@ const todoList = (() => {
       imageStatus.hidden = true;
       imageStatus.textContent = '';
     }
+  }
+
+  function resetBadgeDraft() {
+    badgeDraft = [];
+    todoListView?.updateBadgeDraft?.(badgeDraft);
+  }
+
+  function addBadgeDraft(value) {
+    const badges = todoListState.normalizeBadges([...badgeDraft, value]);
+    if (badges.length === badgeDraft.length) return false;
+    badgeDraft = badges;
+    todoListView.updateBadgeDraft(badgeDraft);
+    return true;
   }
 
   const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
@@ -75,8 +90,8 @@ const todoList = (() => {
     return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
-  function add(title, body = '', image = null) {
-    const item = todoListState.create(title, body, image);
+  function add(title, body = '', image = null, badges = []) {
+    const item = todoListState.create(title, body, image, badges);
     if (!item) return false;
     const finish = (saved) => {
       if (!saved) return false;
@@ -193,9 +208,10 @@ const todoList = (() => {
         title.value = '';
         body.value = '';
         resetImageDraft();
+        resetBadgeDraft();
         title.focus();
       };
-      const saved = add(title.value, body.value, imageDraft.image);
+      const saved = add(title.value, body.value, imageDraft.image, badgeDraft);
       if (saved instanceof Promise) void saved.then(finish);
       else finish(saved);
     });
@@ -246,6 +262,25 @@ const todoList = (() => {
       showImageError();
       page.querySelector('[data-todo-new-title]').focus();
     });
+    const badgeInput = page.querySelector('[data-todo-new-badge]');
+    const addBadge = () => {
+      if (!addBadgeDraft(badgeInput.value)) return;
+      badgeInput.value = '';
+      badgeInput.focus();
+    };
+    page.querySelector('[data-todo-new-badge-add]').addEventListener('click', addBadge);
+    badgeInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      addBadge();
+    });
+    page.querySelector('[data-todo-new-badges]').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-todo-badge-remove]');
+      if (!button) return;
+      badgeDraft = badgeDraft.filter((badge) => badge !== button.dataset.todoBadgeRemove);
+      todoListView.updateBadgeDraft(badgeDraft);
+      badgeInput.focus();
+    });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {
         filterMode = button.dataset.todoFilter;
@@ -280,6 +315,15 @@ const todoList = (() => {
       if (removeImageButton) {
         const row = removeImageButton.closest('[data-todo-id]');
         if (row) void updateItem(row.dataset.todoId, { image: null });
+        return;
+      }
+      const removeBadgeButton = event.target.closest('[data-todo-badge-remove]');
+      if (removeBadgeButton) {
+        const row = removeBadgeButton.closest('[data-todo-id]');
+        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
+        if (item) void updateItem(item.id, {
+          badges: item.badges.filter((badge) => badge !== removeBadgeButton.dataset.todoBadgeRemove),
+        });
         return;
       }
       const button = event.target.closest('[data-todo-delete]');
