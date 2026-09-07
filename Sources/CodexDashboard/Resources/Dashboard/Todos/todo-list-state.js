@@ -1,5 +1,6 @@
 const todoListState = (() => {
   const storageKey = 'codex-dashboard.todos';
+  const badgesStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
   const version = 2;
@@ -67,6 +68,27 @@ const todoListState = (() => {
       return document.items.map(normalizeItem).filter(Boolean);
     } catch (_) {
       return [];
+    }
+  }
+
+  function loadBadges(items = []) {
+    try {
+      const savedBadges = JSON.parse(localStorage.getItem(badgesStorageKey));
+      return normalizeBadges([
+        ...(Array.isArray(savedBadges) ? savedBadges : []),
+        ...items.flatMap((item) => item.badges || []),
+      ]);
+    } catch (_) {
+      return normalizeBadges(items.flatMap((item) => item.badges || []));
+    }
+  }
+
+  function saveBadges(badges) {
+    try {
+      localStorage.setItem(badgesStorageKey, JSON.stringify(normalizeBadges(badges)));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -180,5 +202,5 @@ const todoListState = (() => {
     });
   }
 
-  return { create, hydrate, load, normalizeBadges, normalizeImage, normalizeItem, save };
+  return { create, hydrate, load, loadBadges, normalizeBadges, normalizeImage, normalizeItem, save, saveBadges };
 })();

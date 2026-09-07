@@ -51,6 +51,8 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-shell { width: min(760px, calc(100% - 64px)); margin: 0 auto; padding: 56px 0 72px; }
 #codex-dashboard-todo-page .todo-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 #codex-dashboard-todo-page h1 { margin: 0; color: var(--todo-text); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.025em; }
+#codex-dashboard-todo-page .todo-manage-badges { padding: 6px 9px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; }
+#codex-dashboard-todo-page .todo-manage-badges:hover { background: var(--todo-active); color: var(--todo-text); }
 
 #codex-dashboard-todo-page .todo-add { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto !important; width: 100% !important; align-items: center; gap: 8px; min-height: 46px; margin-top: 28px; padding: 0 !important; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
 #codex-dashboard-todo-page .todo-add-image { position: relative; width: 44px; height: 38px; margin-left: 7px; overflow: visible; border: 1px solid var(--todo-line); border-radius: 7px; background: var(--todo-bg); }
@@ -67,7 +69,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-add textarea::placeholder { color: var(--todo-dim); }
 #codex-dashboard-todo-page .todo-badge-composer { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 1px 14px 0; }
 #codex-dashboard-todo-page .todo-badge-composer .todo-badges { flex: 0 1 auto; }
-#codex-dashboard-todo-page .todo-badge-composer input { height: 20px !important; min-width: 76px; padding: 0 3px; color: var(--todo-muted); font-size: 11px; }
+#codex-dashboard-todo-page .todo-badge-composer select { height: 20px; min-width: 110px; padding: 0 3px; border: 0; background: transparent; color: var(--todo-muted); font-size: 11px; }
 #codex-dashboard-todo-page .todo-badge-composer button { flex: 0 0 auto; padding: 2px 4px; border: 0; border-radius: 4px; background: transparent; color: var(--todo-dim); font-size: 10px; cursor: pointer; }
 #codex-dashboard-todo-page .todo-badge-composer button:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add > button[type="submit"] { width: auto !important; min-width: 66px; height: 32px !important; margin: 0 6px 0 0; padding: 0 12px; border: 0; border-radius: 7px; background: var(--todo-text); color: var(--todo-bg); font-size: 12px; font-weight: 600; cursor: pointer; justify-self: end; }
@@ -123,6 +125,15 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-image-dialog::backdrop { background: rgba(0, 0, 0, .72); }
 #codex-dashboard-todo-page .todo-image-dialog img { display: block; max-width: 100%; max-height: calc(100vh - 96px); margin: auto; object-fit: contain; }
 #codex-dashboard-todo-page .todo-image-dialog button { position: absolute; top: 7px; right: 9px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 20px; cursor: pointer; }
+#codex-dashboard-todo-page .todo-badge-dialog { width: min(420px, calc(100% - 48px)); padding: 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-badge-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+#codex-dashboard-todo-page .todo-badge-dialog-header { display: flex; align-items: center; justify-content: space-between; }
+#codex-dashboard-todo-page .todo-badge-dialog-header strong { font-size: 16px; }
+#codex-dashboard-todo-page .todo-badge-dialog-header button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 19px; cursor: pointer; }
+#codex-dashboard-todo-page .todo-badge-form { display: flex; gap: 8px; margin-top: 16px; }
+#codex-dashboard-todo-page .todo-badge-form input { min-width: 0; flex: 1; padding: 7px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-text); font-size: 12px; }
+#codex-dashboard-todo-page .todo-badge-form button { padding: 0 9px; border: 0; border-radius: 6px; background: var(--todo-text); color: var(--todo-bg); font-size: 11px; font-weight: 600; cursor: pointer; }
+#codex-dashboard-todo-page .todo-badge-dialog [data-todo-managed-badges] { min-height: 30px; margin-top: 12px; padding: 0; }
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 32px; height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
 #codex-dashboard-todo-page .todo-item:hover .todo-delete,
 #codex-dashboard-todo-page .todo-item:focus-within .todo-delete,
