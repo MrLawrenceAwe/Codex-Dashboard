@@ -36,10 +36,10 @@ extension TaskDashboardWebTests {
             """
         ) as? [Any]
         let values = try XCTUnwrap(initial)
-        XCTAssertEqual(values[0] as? Int, 60)
+        XCTAssertEqual(values[0] as? Int, 10)
         XCTAssertEqual(values[1] as? Bool, true)
-        XCTAssertEqual(values[2] as? Int, 65)
-        XCTAssertEqual(values[3] as? String, "thread-64")
+        XCTAssertEqual(values[2] as? Int, 20)
+        XCTAssertEqual(values[3] as? String, "thread-19")
     }
 
     func testRunningFilterShowsOnlyRunningThreads() async throws {
@@ -124,7 +124,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[5] as? String, "3")
     }
 
-    func testTodayFilterIsDefaultAndKeepsOnlyTodaysTasksInStrictRecencyOrder() async throws {
+    func testRecentFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -142,10 +142,10 @@ extension TaskDashboardWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="today"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="all"]') === null,
                 initialIDs,
-                document.querySelector('[data-filter-count="today"]').textContent,
+                document.querySelector('[data-filter-count="recent"]') === null,
                 document.querySelector('[data-thread-list] .dashboard-project-group') === null,
               ];
             })()
@@ -155,8 +155,8 @@ extension TaskDashboardWebTests {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
-        XCTAssertEqual(values[2] as? [String], ["newest", "middle", "oldest"])
-        XCTAssertEqual(values[3] as? String, "3")
+        XCTAssertEqual(values[2] as? [String], ["newest", "middle", "oldest", "yesterday"])
+        XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertEqual(values[4] as? Bool, true)
     }
 

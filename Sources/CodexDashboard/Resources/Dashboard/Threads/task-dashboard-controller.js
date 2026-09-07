@@ -3,7 +3,7 @@ const taskDashboard = (() => {
 let threads = [];
 const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
-const pageSize = 60;
+const pageSize = 10;
 let visibleLimit = pageSize;
 const { collapsedProjects, mutedProjectPaths } = storedPreferences;
 let renderFrame;
@@ -134,7 +134,9 @@ function mountTaskDashboardPage() {
   viewNeedsRender = true;
   const mounted = taskDashboardPage.mount({
     onFilter: (nextFilterMode) => {
+      if (filterMode === nextFilterMode) return;
       filterMode = nextFilterMode;
+      visibleLimit = pageSize;
       savePreferences();
       renderDashboard();
     },
