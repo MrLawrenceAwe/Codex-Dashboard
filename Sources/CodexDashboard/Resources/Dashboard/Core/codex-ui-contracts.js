@@ -255,43 +255,6 @@ const codexUIContracts = (() => {
       )) || null;
   }
 
-  async function probeCommitOrPushControls(timeout = 3000) {
-    const waitFor = (value) => domUtils.waitFor(value, { timeout });
-
-    if (commitOrPushButton()) return true;
-
-    let openedSidePanel = false;
-    let expandedEnvironment = false;
-    try {
-      let environment = environmentToggle();
-      if (!environment) {
-        const panelToggle = sidePanelToggle();
-        if (!panelToggle) return false;
-        panelToggle.click();
-        openedSidePanel = true;
-        await waitFor(() => commitOrPushButton() || environmentToggle());
-      }
-
-      if (commitOrPushButton()) return true;
-      environment = environmentToggle();
-      if (!environment) return false;
-      if (environment.getAttribute('aria-expanded') !== 'true') {
-        environment.click();
-        expandedEnvironment = true;
-      }
-      return Boolean(await waitFor(() => commitOrPushButton()));
-    } finally {
-      if (expandedEnvironment) {
-        const environment = environmentToggle();
-        if (environment?.getAttribute('aria-expanded') === 'true') environment.click();
-      }
-      if (openedSidePanel) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        sidePanelToggle()?.click();
-      }
-    }
-  }
-
   return {
     sidebar,
     navigation,
@@ -310,6 +273,5 @@ const codexUIContracts = (() => {
     sidePanelToggle,
     environmentToggle,
     commitOrPushButton,
-    probeCommitOrPushControls,
   };
 })();

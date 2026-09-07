@@ -89,17 +89,6 @@ struct RendererCompatibilityChecker {
             failureDetail: "The model-picker or reasoning controls used by saved prompt presets were not found.",
             in: target
         ))
-        checks.append(await inspect(
-            id: "commit-push-handoff",
-            title: "Commit or push handoff",
-            expression: contractExpression(
-                "codexUIContracts.probeCommitOrPushControls()"
-            ),
-            failureStatus: .warning,
-            compatibleDetail: "Codex exposes the complete native Git control path for Commit or push handoff.",
-            failureDetail: "The complete native Codex Git control path was not found.",
-            in: target
-        ))
         return checks
     }
 
