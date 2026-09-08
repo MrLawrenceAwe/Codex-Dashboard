@@ -41,6 +41,7 @@
   ],
   "contracts": {
     "renderer": [
+      "Core/dashboard-elements",
       "Core/dom-utils",
       "Core/codex-ui-contracts"
     ],

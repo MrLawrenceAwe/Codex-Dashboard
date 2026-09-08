@@ -1,7 +1,5 @@
 const dashboardLifecycle = (() => {
-  const navigationEvents = [
-    'pointerdown', 'mousedown', 'click', 'keydown', 'pointerover', 'mouseover',
-  ];
+  const navigationEvents = ['pointerdown', 'mousedown', 'click', 'keydown'];
   const routeEvents = ['message', 'popstate', 'hashchange'];
   let hooks;
   let structureObserver;
@@ -36,23 +34,12 @@ const dashboardLifecycle = (() => {
     }
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(`#${dashboardElements.elementIDs.navButton}`)) {
-      // Codex delegates sidebar hover state from its navigation container. Letting
-      // that handler see our injected row makes it reuse the New chat shortcut
-      // affordance. These rows own their hover state, so keep hover events local.
-      if (event.type === 'pointerover' || event.type === 'mouseover') {
-        event.stopPropagation();
-        return;
-      }
       event.preventDefault();
       event.stopPropagation();
       if (event.type === 'click') hooks.openTasks();
       return;
     }
     if (target?.closest(`#${dashboardElements.elementIDs.todoNavButton}`)) {
-      if (event.type === 'pointerover' || event.type === 'mouseover') {
-        event.stopPropagation();
-        return;
-      }
       event.preventDefault();
       event.stopPropagation();
       if (event.type === 'click') hooks.openTodos();

@@ -5,10 +5,14 @@ import XCTest
 
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
-    func testInjectedNavigationHoverDoesNotReachNativeSidebar() async throws {
+    func testInjectedNavigationIsOutsideNewChatTooltipTrigger() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
-          <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+          <aside role="navigation">
+            <div class="sidebar-list">
+              <span data-state="closed" class="contents"><button class="sidebar-item">New chat</button></span>
+            </div>
+          </aside>
           <main>Conversation surface</main>
         </body></html>
         """)
@@ -16,19 +20,16 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              let nativeHoverCount = 0;
-              document.querySelector('aside').addEventListener('mouseover', () => {
-                nativeHoverCount += 1;
+              const tooltipTrigger = document.querySelector('span[data-state].contents');
+              return ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation'].map((id) => {
+                const button = document.getElementById(id);
+                return [button.parentElement === tooltipTrigger, tooltipTrigger.contains(button)];
               });
-              for (const id of ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation']) {
-                document.getElementById(id).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-              }
-              return nativeHoverCount;
             })()
             """
-        ) as? Int
+        ) as? [[Bool]]
 
-        XCTAssertEqual(result, 0)
+        XCTAssertEqual(result, [[false, false], [false, false]])
     }
 
     func testSidebarObserverIgnoresDashboardMutationsAndTracksThreadRowChanges() async throws {

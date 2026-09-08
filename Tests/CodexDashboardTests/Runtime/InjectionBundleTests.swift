@@ -33,6 +33,7 @@ final class InjectionBundleTests: XCTestCase {
     func testManifestDefinesRendererContractResources() throws {
         let contract = try InjectionBundle.loadRendererContractSource()
 
+        XCTAssertTrue(contract.contains("const dashboardElements"))
         XCTAssertTrue(contract.contains("const domUtils"))
         XCTAssertTrue(contract.contains("const codexUIContracts"))
     }

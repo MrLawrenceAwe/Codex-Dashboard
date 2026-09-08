@@ -13,7 +13,14 @@ const codexHost = {
     const buttons = [...navigation.querySelectorAll('button')];
     const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
     const newChatRow = newChat?.closest('.sidebar-item');
-    if (newChatRow?.parentElement) return { element: newChatRow, insertAfter: true };
+    // New chat is wrapped in Codex's tooltip trigger. Inserting our rows after
+    // its button would make them children of that trigger, causing the New chat
+    // ⌘N tooltip to appear when either injected row is hovered.
+    const newChatTooltip = newChatRow?.parentElement?.matches('span[data-state].contents')
+      ? newChatRow.parentElement
+      : null;
+    const newChatInsertionRow = newChatTooltip || newChatRow;
+    if (newChatInsertionRow?.parentElement) return { element: newChatInsertionRow, insertAfter: true };
     const fallbackButton = buttons.find((button) => button.textContent.trim() === 'Pull requests')
       || buttons.find((button) => button.classList.contains('sidebar-item'));
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
