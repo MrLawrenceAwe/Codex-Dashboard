@@ -136,7 +136,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.title, "Codex limit reset early")
-        XCTAssertTrue(messages.first?.body.contains("usage dropped from 80% used to 10% used") == true)
+        XCTAssertTrue(messages.first?.body.contains("allowance remaining increased from 20% to 90%") == true)
     }
 
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
