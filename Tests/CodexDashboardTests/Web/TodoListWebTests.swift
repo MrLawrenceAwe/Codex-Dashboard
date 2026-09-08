@@ -349,6 +349,18 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "[document.querySelector('[data-todo-new-image-preview] img').alt, document.querySelector('[data-todo-new-image-status]').textContent]"
         ) as? [String]
         XCTAssertEqual(draftPreview, ["mockup.png", "Image ready to attach when you add this to-do."])
+        let draftDialog = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.querySelector('[data-todo-new-image-open]').click();
+              const dialog = document.querySelector('[data-todo-image-dialog]');
+              const result = [dialog.open, dialog.querySelector('img').alt];
+              dialog.close();
+              return result;
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(draftDialog, [true, "mockup.png"])
         _ = try await webView.evaluateJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-image-preview]') !== null",
