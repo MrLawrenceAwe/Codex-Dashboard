@@ -151,7 +151,9 @@ const todoListView = (() => {
     titleInput.style.setProperty('max-width', 'none', 'important');
     titleInput.style.setProperty('min-width', '0', 'important');
     addButton.style.setProperty('width', 'auto', 'important');
-    page.insertAdjacentHTML('beforeend', `
+    const dialogHost = document.createElement('div');
+    dialogHost.id = 'codex-dashboard-todo-dialogs';
+    dialogHost.innerHTML = `
       <dialog class="todo-image-dialog" data-todo-image-dialog aria-label="Image preview">
         <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
         <img alt="">
@@ -163,8 +165,9 @@ const todoListView = (() => {
           <button type="submit">Create badge</button>
         </form>
         <div class="todo-badges" data-todo-managed-badges aria-label="Available badges"></div>
-      </dialog>`);
-    const imageDialog = page.querySelector('[data-todo-image-dialog]');
+      </dialog>`;
+    document.body.append(dialogHost);
+    const imageDialog = dialogHost.querySelector('[data-todo-image-dialog]');
     imageDialog.querySelector('[data-todo-image-dialog-close]').addEventListener('click', () => imageDialog.close());
     imageDialog.addEventListener('click', (event) => {
       if (event.target === imageDialog) imageDialog.close();
