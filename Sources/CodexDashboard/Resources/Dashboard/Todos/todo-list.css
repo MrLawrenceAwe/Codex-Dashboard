@@ -128,19 +128,22 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-item:focus-within .todo-image-actions { opacity: 1; }
 #codex-dashboard-todo-page .todo-image-actions button { padding: 2px 0; border: 0; background: transparent; color: var(--todo-dim); font-size: 10px; }
 #codex-dashboard-todo-page .todo-image-actions button:hover { color: var(--todo-text); }
-#codex-dashboard-todo-page .todo-image-dialog { width: min(900px, calc(100% - 48px)); max-height: calc(100% - 48px); padding: 40px 16px 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
-#codex-dashboard-todo-page .todo-image-dialog::backdrop { background: rgba(0, 0, 0, .72); }
-#codex-dashboard-todo-page .todo-image-dialog img { display: block; max-width: 100%; max-height: calc(100vh - 96px); margin: auto; object-fit: contain; }
-#codex-dashboard-todo-page .todo-image-dialog button { position: absolute; top: 7px; right: 9px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 20px; cursor: pointer; }
-#codex-dashboard-todo-page .todo-badge-dialog { width: min(420px, calc(100% - 48px)); padding: 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
-#codex-dashboard-todo-page .todo-badge-dialog::backdrop { background: rgba(0, 0, 0, .72); }
-#codex-dashboard-todo-page .todo-badge-dialog-header { display: flex; align-items: center; justify-content: space-between; }
-#codex-dashboard-todo-page .todo-badge-dialog-header strong { font-size: 16px; }
-#codex-dashboard-todo-page .todo-badge-dialog-header button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 19px; cursor: pointer; }
-#codex-dashboard-todo-page .todo-badge-form { display: flex; gap: 8px; margin-top: 16px; }
-#codex-dashboard-todo-page .todo-badge-form input { min-width: 0; flex: 1; padding: 7px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-text); font-size: 12px; }
-#codex-dashboard-todo-page .todo-badge-form button { padding: 0 9px; border: 0; border-radius: 6px; background: var(--todo-text); color: var(--todo-bg); font-size: 11px; font-weight: 600; cursor: pointer; }
-#codex-dashboard-todo-page .todo-badge-dialog [data-todo-managed-badges] { min-height: 30px; margin-top: 12px; padding: 0; }
+#codex-dashboard-todo-dialogs { --todo-bg: var(--color-background-surface, #212121); --todo-surface: var(--color-background-elevated-secondary, rgba(255, 255, 255, .022)); --todo-active: var(--color-background-button-secondary-active, rgba(255, 255, 255, .07)); --todo-line: var(--color-border, rgba(255, 255, 255, .075)); --todo-line-strong: var(--color-border-heavy, rgba(255, 255, 255, .13)); --todo-text: var(--color-text-foreground, #ececec); --todo-muted: var(--color-text-foreground-secondary, #a2a2a2); font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+#codex-dashboard-todo-dialogs .todo-image-dialog,
+#codex-dashboard-todo-dialogs .todo-badge-dialog { position: fixed; top: 50%; left: 50%; margin: 0; box-sizing: border-box; transform: translate(-50%, -50%); }
+#codex-dashboard-todo-dialogs .todo-image-dialog { width: min(900px, calc(100vw - 48px)); max-height: calc(100vh - 48px); padding: 40px 16px 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-dialogs .todo-image-dialog::backdrop,
+#codex-dashboard-todo-dialogs .todo-badge-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+#codex-dashboard-todo-dialogs .todo-image-dialog img { display: block; max-width: 100%; max-height: calc(100vh - 96px); margin: auto; object-fit: contain; }
+#codex-dashboard-todo-dialogs .todo-image-dialog button { position: absolute; top: 7px; right: 9px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 20px; cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-badge-dialog { width: min(420px, calc(100vw - 48px)); padding: 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-dialogs .todo-badge-dialog-header { display: flex; align-items: center; justify-content: space-between; }
+#codex-dashboard-todo-dialogs .todo-badge-dialog-header strong { font-size: 16px; }
+#codex-dashboard-todo-dialogs .todo-badge-dialog-header button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 19px; cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-badge-form { display: flex; gap: 8px; margin-top: 16px; }
+#codex-dashboard-todo-dialogs .todo-badge-form input { min-width: 0; flex: 1; padding: 7px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-text); font-size: 12px; }
+#codex-dashboard-todo-dialogs .todo-badge-form button { padding: 0 9px; border: 0; border-radius: 6px; background: var(--todo-text); color: var(--todo-bg); font-size: 11px; font-weight: 600; cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-badge-dialog [data-todo-managed-badges] { min-height: 30px; margin-top: 12px; padding: 0; }
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 32px; height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
 #codex-dashboard-todo-page .todo-new-chat { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-item:hover .todo-new-chat, #codex-dashboard-todo-page .todo-item:focus-within .todo-new-chat, #codex-dashboard-todo-page .todo-new-chat:focus-visible { opacity: 1; }

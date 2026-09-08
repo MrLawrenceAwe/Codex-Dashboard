@@ -323,15 +323,20 @@ const todoList = (() => {
       todoListView.updateBadgeDraft(badgeDraft);
       badgeInput.focus();
     });
-    const badgeDialog = page.querySelector('[data-todo-badge-dialog]');
-    page.querySelector('[data-todo-manage-badges]').addEventListener('click', () => badgeDialog.showModal());
-    page.querySelector('[data-todo-badge-dialog-close]').addEventListener('click', () => badgeDialog.close());
-    badgeDialog.addEventListener('click', (event) => {
-      if (event.target === badgeDialog) badgeDialog.close();
+    const badgeDialog = document.querySelector('[data-todo-badge-dialog]');
+    const closeBadgeDialog = () => {
+      if (badgeDialog.open) badgeDialog.close();
+    };
+    page.querySelector('[data-todo-manage-badges]').addEventListener('click', () => {
+      if (!badgeDialog.open) badgeDialog.showModal();
     });
-    page.querySelector('[data-todo-badge-form]').addEventListener('submit', (event) => {
+    badgeDialog.querySelector('[data-todo-badge-dialog-close]').addEventListener('click', closeBadgeDialog);
+    badgeDialog.addEventListener('click', (event) => {
+      if (event.target === badgeDialog) closeBadgeDialog();
+    });
+    badgeDialog.querySelector('[data-todo-badge-form]').addEventListener('submit', (event) => {
       event.preventDefault();
-      const name = page.querySelector('[data-todo-badge-name]');
+      const name = badgeDialog.querySelector('[data-todo-badge-name]');
       const previousBadges = availableBadges;
       const nextBadges = todoListState.normalizeBadges([...availableBadges, name.value]);
       if (nextBadges.length === availableBadges.length) return;

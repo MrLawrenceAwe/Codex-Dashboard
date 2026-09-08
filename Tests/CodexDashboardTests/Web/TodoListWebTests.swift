@@ -192,6 +192,38 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], [])
     }
 
+    func testBadgeDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              document.querySelector('[data-todo-manage-badges]').click();
+              const dialog = document.querySelector('[data-todo-badge-dialog]');
+              const rect = dialog.getBoundingClientRect();
+              const centered = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < 1
+                && Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2) < 1;
+              dialog.querySelector('[data-todo-badge-dialog-close]').click();
+              return [dialog.parentElement.id, centered, !dialog.open];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "codex-dashboard-todo-dialogs")
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+    }
+
     func testProjectBadgesComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
