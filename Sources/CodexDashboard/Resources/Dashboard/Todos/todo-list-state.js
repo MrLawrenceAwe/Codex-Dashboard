@@ -1,10 +1,11 @@
 const todoListState = (() => {
   const storageKey = 'codex-dashboard.todos';
   const tagsStorageKey = 'codex-dashboard.todo-tags';
+  const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
   const version = 4;
-  const supportedVersions = new Set([version]);
+  const supportedVersions = new Set([1, 2, 3, version]);
   const maximumTags = 8;
   const maximumTagLength = 40;
 
@@ -50,7 +51,7 @@ const todoListState = (() => {
     return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type);
   }
 
-  function normalizeItem(item) {
+  function normalizeItem(item, isLegacy = false) {
     const title = cleanText(item?.title);
     const body = cleanText(item?.body);
     const id = cleanText(item?.id);
@@ -60,8 +61,8 @@ const todoListState = (() => {
       title,
       body,
       completed: item?.completed === true,
-      tags: normalizeTags(item?.tags),
-      projectTag: normalizeProjectTag(item?.projectTag),
+      tags: normalizeTags(isLegacy ? item?.badges : item?.tags),
+      projectTag: normalizeProjectTag(isLegacy ? item?.projectBadge : item?.projectTag),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -72,7 +73,7 @@ const todoListState = (() => {
     try {
       const document = JSON.parse(localStorage.getItem(storageKey));
       if (!supportedVersions.has(document?.version) || !Array.isArray(document.items)) return [];
-      return document.items.map(normalizeItem).filter(Boolean);
+      return document.items.map((item) => normalizeItem(item, document.version < version)).filter(Boolean);
     } catch (_) {
       return [];
     }
@@ -80,7 +81,8 @@ const todoListState = (() => {
 
   function loadTags(items = []) {
     try {
-      const savedTags = JSON.parse(localStorage.getItem(tagsStorageKey));
+      const savedTags = JSON.parse(localStorage.getItem(tagsStorageKey)
+        ?? localStorage.getItem(legacyTagsStorageKey));
       return normalizeTags([
         ...(Array.isArray(savedTags) ? savedTags : []),
         ...items.flatMap((item) => item.tags || []),
