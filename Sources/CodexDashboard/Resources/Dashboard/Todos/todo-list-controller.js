@@ -336,7 +336,6 @@ const todoList = (() => {
       tagInput.focus();
     };
     tagInput.addEventListener('change', addTag);
-    page.querySelector('[data-todo-new-tag-add]').addEventListener('click', addTag);
     page.querySelector('[data-todo-new-tags]').addEventListener('click', (event) => {
       const button = event.target.closest('[data-todo-tag-remove]');
       if (!button) return;
@@ -394,6 +393,11 @@ const todoList = (() => {
         const project = codexUIContracts.projects()
           .find((candidate) => candidate.id === event.target.value) || null;
         void updateItem(row.dataset.todoId, { projectTag: project });
+      } else if (event.target.matches('[data-todo-tag]')) {
+        const item = items.find((candidate) => candidate.id === row.dataset.todoId);
+        if (item && event.target.value) void updateItem(item.id, {
+          tags: todoListState.normalizeTags([...item.tags, event.target.value]),
+        });
       }
     });
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
@@ -441,16 +445,6 @@ const todoList = (() => {
       if (removeImageButton) {
         const row = removeImageButton.closest('[data-todo-id]');
         if (row) void updateItem(row.dataset.todoId, { image: null });
-        return;
-      }
-      const addTagButton = event.target.closest('[data-todo-tag-add]');
-      if (addTagButton) {
-        const row = addTagButton.closest('[data-todo-id]');
-        const tag = row?.querySelector('[data-todo-tag]')?.value;
-        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        if (item && tag) void updateItem(item.id, {
-          tags: todoListState.normalizeTags([...item.tags, tag]),
-        });
         return;
       }
       const removeTagButton = event.target.closest('[data-todo-tag-remove]');

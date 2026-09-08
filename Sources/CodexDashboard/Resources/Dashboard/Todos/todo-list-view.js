@@ -31,7 +31,6 @@ const todoListView = (() => {
   function tagPickerMarkup(tags) {
     return `<div class="todo-tag-picker">
       <select data-todo-tag aria-label="Tag to attach">${tagOptions(tags)}</select>
-      <button type="button" data-todo-tag-add>Add tag</button>
     </div>`;
   }
 
@@ -128,7 +127,6 @@ const todoListView = (() => {
               <select data-todo-new-project aria-label="Project">${projectOptions([])}</select>
               <div class="todo-tags" data-todo-new-tags aria-label="New to-do tags"></div>
               <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
-              <button type="button" data-todo-new-tag-add>Add tag</button>
             </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
