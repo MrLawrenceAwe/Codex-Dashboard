@@ -217,12 +217,12 @@ const composerAdapter = (() => {
     const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
     if (!composer) return false;
     try {
-      const response = await fetch(image.dataURL);
-      if (!response.ok) return false;
-      const blob = await response.blob();
-      const file = new File([blob], image.name || 'Attached image', {
-        type: image.type || blob.type,
-      });
+      const separator = image.dataURL.indexOf(',');
+      if (separator < 0) return false;
+      const encoded = image.dataURL.slice(separator + 1);
+      const decoded = atob(encoded);
+      const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+      const file = new File([bytes], image.name || 'Attached image', { type: image.type });
       const clipboard = new DataTransfer();
       clipboard.items.add(file);
       const paste = new Event('paste', { bubbles: true, cancelable: true });
