@@ -247,6 +247,76 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? String, "Ship project badges\n\nInclude the new chat action.")
     }
 
+    func testNewChatTransfersTheTodoImageToTheComposer() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item" id="new-chat">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="dashboard"
+                  data-app-action-sidebar-project-label="Codex Dashboard"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const project = form.querySelector('[data-todo-new-project]');
+              project.value = 'dashboard';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const title = form.querySelector('[data-todo-new-title]');
+              title.value = 'Review the image';
+              const image = new File([new Uint8Array([137, 80, 78, 71])], 'handoff.png', { type: 'image/png' });
+              const paste = new Event('paste', { bubbles: true, cancelable: true });
+              Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
+              title.dispatchEvent(paste);
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
+            in: webView
+        )
+        _ = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-todo-form]').requestSubmit()"
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-new-chat]') !== null",
+            in: webView
+        )
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              document.getElementById('new-chat').addEventListener('click', () => {
+                const composer = document.createElement('textarea');
+                composer.placeholder = 'Do anything';
+                composer.addEventListener('paste', (event) => {
+                  const file = event.clipboardData?.files?.[0];
+                  window.__todoHandoffImage = file ? [file.name, file.type, file.size] : null;
+                  event.preventDefault();
+                });
+                document.body.append(composer);
+              });
+              document.querySelector('[data-todo-new-chat]').click();
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Array.isArray(window.__todoHandoffImage)",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            "[document.querySelector('textarea[placeholder=\"Do anything\"]').value, ...window.__todoHandoffImage]"
+        ) as? [AnyHashable]
+        XCTAssertEqual(result, ["Review the image", "handoff.png", "image/png", 4])
+    }
+
     func testExistingTodoCanBeAssignedAndUnassignedFromAProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
@@ -292,6 +362,45 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertTrue(values[4] is NSNull)
         XCTAssertEqual(values[5] as? Bool, false)
+    }
+
+    func testExistingTodoAssignmentUsesProjectsAvailableAfterTheTodoPageMounts() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Assign after refresh';
+              form.requestSubmit();
+              const row = document.querySelector('[data-todo-id]');
+              const project = row.querySelector('[data-todo-project]');
+              const sidebarProject = document.createElement('div');
+              sidebarProject.dataset.appActionSidebarProjectRow = '';
+              sidebarProject.dataset.appActionSidebarProjectId = 'late-project';
+              sidebarProject.dataset.appActionSidebarProjectLabel = 'Late Project';
+              document.querySelector('aside').append(sidebarProject);
+              project.innerHTML = '<option value="">No project</option><option value="late-project">Late Project</option>';
+              project.value = 'late-project';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [stored.projectBadge.id, stored.projectBadge.name];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "late-project")
+        XCTAssertEqual(values[1] as? String, "Late Project")
     }
 
     func testBadgePickerOptionsRemainReadableInTheNativeMenu() async throws {

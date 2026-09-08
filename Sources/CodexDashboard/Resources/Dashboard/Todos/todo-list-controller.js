@@ -365,7 +365,8 @@ const todoList = (() => {
       } else if (event.target.matches('[data-todo-body]')) {
         void updateItem(row.dataset.todoId, { body: event.target.value });
       } else if (event.target.matches('[data-todo-project]')) {
-        const project = projects.find((candidate) => candidate.id === event.target.value) || null;
+        const project = codexUIContracts.projects()
+          .find((candidate) => candidate.id === event.target.value) || null;
         void updateItem(row.dataset.todoId, { projectBadge: project });
       }
     });
@@ -384,13 +385,26 @@ const todoList = (() => {
         if (!item?.projectBadge || !codexHost.newChat()) return;
         pageState.close();
         const content = [item.title, item.body].filter(Boolean).join('\n\n');
-        const insert = () => composerAdapter.insert(content);
-        if (insert()) return;
-        void domUtils.waitFor(
-          () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
-          { timeout: 3000, interval: 25 },
-        ).then((composer) => {
-          if (composer) insert();
+        let inserted = false;
+        const transfer = async () => {
+          let image = item.image;
+          if (image && !image.dataURL) {
+            const [hydratedItem] = await todoListState.hydrate([item]);
+            image = hydratedItem?.image;
+          }
+          if (!inserted) inserted = composerAdapter.insert(content);
+          if (!inserted) return false;
+          return !image || composerAdapter.attachImage(image);
+        };
+        void transfer().then((transferred) => {
+          if (transferred) return;
+          return domUtils.waitFor(
+            () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+            { timeout: 3000, interval: 25 },
+          ).then((composer) => {
+            if (composer) return transfer();
+            return false;
+          });
         });
         return;
       }
