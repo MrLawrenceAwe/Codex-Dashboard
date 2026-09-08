@@ -206,12 +206,13 @@ enum AccountResetNotificationPlanner {
               let previousReset = previous.resetsAt, previousReset > now
         else { return nil }
 
-        let remainingPercent = max(0, min(100, 100 - current.usedPercent))
+        let previousAllowance = max(0, min(100, 100 - previous.usedPercent))
+        let currentAllowance = max(0, min(100, 100 - current.usedPercent))
         let nextReset = current.resetsAt.map { " Next reset: \(formattedDeadline($0))." } ?? ""
         return AccountUnexpectedResetNotification(
             identifier: "codex-dashboard-account-unexpected-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(now.timeIntervalSinceReferenceDate))",
             title: "Codex limit reset early",
-            body: "\(account.name)’s \(windowName) usage dropped from \(previous.usedPercent)% used to \(current.usedPercent)% used before its scheduled reset at \(formattedDeadline(previousReset)). It now has \(remainingPercent)% remaining.\(nextReset)"
+            body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)).\(nextReset)"
         )
     }
 

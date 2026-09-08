@@ -181,8 +181,7 @@ final class AccountResetNotifierTests: XCTestCase {
 
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex limit reset early")
-        XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour usage dropped from 80% used to 10% used") == true)
-        XCTAssertTrue(alerts.first?.body.contains("It now has 90% remaining.") == true)
+        XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour allowance remaining increased from 20% to 90%") == true)
     }
 
     func testDoesNotAlertForAUsageDropAfterTheScheduledReset() {
