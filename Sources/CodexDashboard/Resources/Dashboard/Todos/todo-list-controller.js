@@ -293,6 +293,10 @@ const todoList = (() => {
     });
     const badgeDialog = page.querySelector('[data-todo-badge-dialog]');
     page.querySelector('[data-todo-manage-badges]').addEventListener('click', () => badgeDialog.showModal());
+    page.querySelector('[data-todo-badge-dialog-close]').addEventListener('click', () => badgeDialog.close());
+    badgeDialog.addEventListener('click', (event) => {
+      if (event.target === badgeDialog) badgeDialog.close();
+    });
     page.querySelector('[data-todo-badge-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       const name = page.querySelector('[data-todo-badge-name]');

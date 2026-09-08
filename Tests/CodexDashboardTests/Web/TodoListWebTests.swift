@@ -166,6 +166,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const unavailableBeforeCreation = badgePicker.options.length === 1;
               document.querySelector('[data-todo-manage-badges]').click();
               const badgeDialog = document.querySelector('[data-todo-badge-dialog]');
+              badgeDialog.querySelector('[data-todo-badge-dialog-close]').click();
+              const closesFromControl = !badgeDialog.open;
+              document.querySelector('[data-todo-manage-badges]').click();
               badgeDialog.querySelector('[data-todo-badge-name]').value = 'Work';
               badgeDialog.querySelector('[data-todo-badge-form]').requestSubmit();
               badgePicker.value = 'Work';
@@ -175,17 +178,18 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const renderedBadge = document.querySelector('[data-todo-id] .todo-badge').textContent.trim();
               document.querySelector('[data-todo-badge-remove]').click();
-              return [unavailableBeforeCreation, JSON.parse(localStorage.getItem('codex-dashboard.todo-badges')), stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
+              return [unavailableBeforeCreation, closesFromControl, JSON.parse(localStorage.getItem('codex-dashboard.todo-badges')), stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
             })()
             """
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? [String], ["Work"])
+        XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? [String], ["Work"])
-        XCTAssertEqual(values[3] as? String, "Work×")
-        XCTAssertEqual(values[4] as? [String], [])
+        XCTAssertEqual(values[3] as? [String], ["Work"])
+        XCTAssertEqual(values[4] as? String, "Work×")
+        XCTAssertEqual(values[5] as? [String], [])
     }
 
     func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
