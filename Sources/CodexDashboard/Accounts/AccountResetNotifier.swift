@@ -47,7 +47,7 @@ struct AccountUsageResetObservation: Codable, Equatable, Sendable {
     }
 }
 
-struct AccountUnexpectedResetNotification: Equatable, Sendable {
+struct AccountLimitResetNotification: Equatable, Sendable {
     let identifier: String
     let title: String
     let body: String
@@ -130,25 +130,25 @@ enum AccountResetNotificationPlanner {
         }
     }
 
-    static func unexpectedResetNotifications(
+    static func resetNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
         previousObservations: [UUID: AccountUsageResetObservation],
         now: Date = .now
-    ) -> [AccountUnexpectedResetNotification] {
-        accounts.flatMap { account -> [AccountUnexpectedResetNotification] in
+    ) -> [AccountLimitResetNotification] {
+        accounts.flatMap { account -> [AccountLimitResetNotification] in
             guard let usage = usageByAccountID[account.id]?.usage,
                   let previous = previousObservations[account.id]
             else { return [] }
             return [
-                unexpectedResetNotification(
+                resetNotification(
                     for: account,
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     now: now
                 ),
-                unexpectedResetNotification(
+                resetNotification(
                     for: account,
                     windowName: "Weekly",
                     current: usage.weekly,
@@ -194,25 +194,34 @@ enum AccountResetNotificationPlanner {
         }
     }
 
-    private static func unexpectedResetNotification(
+    private static func resetNotification(
         for account: SavedAccount,
         windowName: String,
         current: CodexUsageWindow?,
         previous: AccountUsageResetObservation.Window?,
         now: Date
-    ) -> AccountUnexpectedResetNotification? {
+    ) -> AccountLimitResetNotification? {
         guard let current, let previous,
-              previous.usedPercent > current.usedPercent,
-              let previousReset = previous.resetsAt, previousReset > now
+              let previousReset = previous.resetsAt,
+              let nextReset = current.resetsAt,
+              nextReset > previousReset
         else { return nil }
 
         let previousAllowance = max(0, min(100, 100 - previous.usedPercent))
         let currentAllowance = max(0, min(100, 100 - current.usedPercent))
-        let nextReset = current.resetsAt.map { " Next reset: \(formattedDeadline($0))." } ?? ""
-        return AccountUnexpectedResetNotification(
-            identifier: "codex-dashboard-account-unexpected-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(now.timeIntervalSinceReferenceDate))",
-            title: "Codex limit reset early",
-            body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)).\(nextReset)"
+        let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(previousReset.timeIntervalSinceReferenceDate))"
+        if previousReset > now {
+            guard previous.usedPercent > current.usedPercent else { return nil }
+            return AccountLimitResetNotification(
+                identifier: identifier,
+                title: "Codex limit reset early",
+                body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)). Next reset: \(formattedDeadline(nextReset))."
+            )
+        }
+        return AccountLimitResetNotification(
+            identifier: identifier,
+            title: "Codex limit reset",
+            body: "\(account.name)’s \(windowName) limit has reset and now has \(currentAllowance)% remaining. Next reset: \(formattedDeadline(nextReset))."
         )
     }
 
@@ -315,7 +324,7 @@ final class AccountResetNotifier: AccountResetNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
-        let unexpectedResets = AccountResetNotificationPlanner.unexpectedResetNotifications(
+        let resetNotifications = AccountResetNotificationPlanner.resetNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID,
             previousObservations: observations(),
@@ -344,7 +353,7 @@ final class AccountResetNotifier: AccountResetNotifying {
         notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
 
         let requests = notifications + deadlineUpdates
-        guard !requests.isEmpty || !unexpectedResets.isEmpty, await notificationsAreAuthorized() else {
+        guard !requests.isEmpty || !resetNotifications.isEmpty, await notificationsAreAuthorized() else {
             saveObservations(for: accounts, usageByAccountID: usageByAccountID)
             return
         }
@@ -377,7 +386,7 @@ final class AccountResetNotifier: AccountResetNotifying {
                 // immediate revised-deadline alert that macOS rejected.
             }
         }
-        for notification in unexpectedResets {
+        for notification in resetNotifications {
             let content = UNMutableNotificationContent()
             content.title = notification.title
             content.body = notification.body
