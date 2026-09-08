@@ -142,7 +142,7 @@ const todoListView = (() => {
         <img alt="">
       </dialog>
       <dialog class="todo-badge-dialog" data-todo-badge-dialog aria-label="Manage badges">
-        <form method="dialog" class="todo-badge-dialog-header"><strong>Badges</strong><button type="submit" aria-label="Close badges">&times;</button></form>
+        <header class="todo-badge-dialog-header"><strong>Badges</strong><button type="button" data-todo-badge-dialog-close aria-label="Close badges">&times;</button></header>
         <form data-todo-badge-form class="todo-badge-form">
           <input data-todo-badge-name aria-label="Badge name" maxlength="40" placeholder="New badge name" autocomplete="off">
           <button type="submit">Create badge</button>
