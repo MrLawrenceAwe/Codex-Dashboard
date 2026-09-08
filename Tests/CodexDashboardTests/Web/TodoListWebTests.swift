@@ -293,6 +293,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
+              window.fetch = () => Promise.reject(new TypeError('Codex renderer rejects data URLs'));
               document.getElementById('new-chat').addEventListener('click', () => {
                 const composer = document.createElement('textarea');
                 composer.placeholder = 'Do anything';
