@@ -68,6 +68,37 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[4] as? String, "Changed projects 1")
     }
 
+    func testChangedProjectsDoesNotOfferLoadMoreForAdditionalTasksInOneProject() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let threads = (0..<11).map { index in
+            ThreadSummary.fixture(
+                id: "changed-project-thread-\(index)",
+                projectName: "Changed Project",
+                projectPath: "/tmp/changed-project",
+                recencyEpochMillis: Int64(11 - index),
+                workingTreeStatus: index == 0 ? .hasChanges : .clean
+            )
+        }
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              return [
+                document.querySelectorAll('[data-thread-list] .dashboard-git-project').length,
+                document.querySelector('[data-load-more]').hidden,
+              ];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 1)
+        XCTAssertEqual(values[1] as? Bool, true)
+    }
+
     func testMutedProjectIsRemovedFromChangeIndicatorsAndCanBeUnmuted() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

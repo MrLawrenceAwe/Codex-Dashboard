@@ -364,6 +364,9 @@ const todoList = (() => {
         else render();
       } else if (event.target.matches('[data-todo-body]')) {
         void updateItem(row.dataset.todoId, { body: event.target.value });
+      } else if (event.target.matches('[data-todo-project]')) {
+        const project = projects.find((candidate) => candidate.id === event.target.value) || null;
+        void updateItem(row.dataset.todoId, { projectBadge: project });
       }
     });
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
