@@ -277,6 +277,11 @@ const todoList = (() => {
       showImageError();
       page.querySelector('[data-todo-new-title]').focus();
     });
+    page.querySelector('[data-todo-new-image-open]').addEventListener('click', () => {
+      if (imageDraft.status === 'ready' && imageDraft.image) {
+        todoListView.showImage(imageDraft.image);
+      }
+    });
     const badgeInput = page.querySelector('[data-todo-new-badge]');
     const addBadge = () => {
       if (!addBadgeDraft(badgeInput.value)) return;

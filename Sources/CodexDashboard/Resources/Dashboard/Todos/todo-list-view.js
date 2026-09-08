@@ -96,7 +96,9 @@ const todoListView = (() => {
         </header>
         <form class="todo-add" data-todo-form>
           <div class="todo-add-image" data-todo-new-image-preview hidden>
-            <img alt="">
+            <button type="button" class="todo-add-image-preview" data-todo-new-image-open aria-label="Preview pasted image" title="Preview pasted image">
+              <img alt="">
+            </button>
             <button type="button" data-todo-new-image-remove aria-label="Remove pasted image" title="Remove pasted image">&times;</button>
           </div>
           <div class="todo-add-fields">
@@ -166,6 +168,9 @@ const todoListView = (() => {
     previewImage.src = image?.dataURL || '';
     previewImage.alt = image?.name || '';
     preview.title = image?.name || '';
+    const previewButton = preview.querySelector('[data-todo-new-image-open]');
+    previewButton?.setAttribute('aria-label', image ? `Preview pasted image: ${image.name}` : 'Preview pasted image');
+    previewButton?.setAttribute('title', image ? `Preview ${image.name}` : 'Preview pasted image');
     form?.style.setProperty(
       'grid-template-columns',
       image ? 'auto minmax(0, 1fr) auto' : 'minmax(0, 1fr) auto',
