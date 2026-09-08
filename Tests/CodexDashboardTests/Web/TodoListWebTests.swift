@@ -275,7 +275,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateJavaScript(
             """
             (() => {
               window.__codexDashboard.openTodos();
@@ -288,22 +288,36 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               form.querySelector('[data-todo-new-body]').value = 'Include the new chat action.';
               form.requestSubmit();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              let opened = 0;
+              window.__todoProjectNames = projectNames;
+              window.__todoProjectID = stored.projectTag.id;
+              window.__todoSelectedProjects = [];
+              document.querySelector('[data-app-action-sidebar-project-id="dashboard"]').addEventListener('click', () => {
+                window.__todoSelectedProjects.push('dashboard');
+              });
               document.getElementById('new-chat').addEventListener('click', () => {
-                opened += 1;
+                window.__todoNewChatOpened = (window.__todoNewChatOpened || 0) + 1;
                 const composer = document.createElement('textarea');
                 composer.placeholder = 'Do anything';
                 document.body.append(composer);
               });
               document.querySelector('[data-todo-new-chat]').click();
-              return [
-                projectNames,
-                stored.projectTag.id,
-                document.querySelector('[data-todo-project]').selectedOptions[0].textContent,
-                opened,
-                document.querySelector('textarea[placeholder="Do anything"]').value,
-              ];
             })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('textarea[placeholder=\"Do anything\"]') !== null",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            [
+              window.__todoProjectNames,
+              window.__todoProjectID,
+              document.querySelector('[data-todo-project]').selectedOptions[0].textContent,
+              window.__todoNewChatOpened,
+              document.querySelector('textarea[placeholder="Do anything"]').value,
+              window.__todoSelectedProjects,
+            ]
             """
         ) as? [Any]
 
@@ -313,6 +327,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? String, "Codex Dashboard")
         XCTAssertEqual(values[3] as? Int, 1)
         XCTAssertEqual(values[4] as? String, "Ship project tags\n\nInclude the new chat action.")
+        XCTAssertEqual(values[5] as? [String], ["dashboard"])
     }
 
     func testNewChatTransfersTheTodoImageToTheComposer() async throws {
@@ -793,6 +808,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         )
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelectorAll('[data-todo-id]').length === 1",
+            in: webView
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.localStorage.getItem('codex-dashboard.todos') !== null",
             in: webView
         )
         let result = try await webView.evaluateJavaScript(

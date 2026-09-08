@@ -5,6 +5,11 @@ const todoList = (() => {
   let projectDraft = null;
   let projectObserver;
   let filterMode = 'open';
+  // Image saves use IndexedDB and therefore complete asynchronously. Keep every
+  // snapshot in order so a slower, older save cannot overwrite a newer edit in
+  // localStorage after it finishes.
+  let persistenceTail = Promise.resolve();
+  let persistencePending = false;
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton,
@@ -66,14 +71,32 @@ const todoList = (() => {
     notice.hidden = !message;
   }
 
-  function persist() {
-    const saved = todoListState.save(items);
+  function persist(snapshot) {
     const notice = document.querySelector('[data-todo-storage-error]');
     const updateNotice = (result) => {
       if (notice) notice.hidden = result;
       return result;
     };
-    return saved instanceof Promise ? saved.then(updateNotice) : updateNotice(saved);
+    const write = () => {
+      const saved = todoListState.save(snapshot);
+      return saved instanceof Promise ? saved : Promise.resolve(saved);
+    };
+    if (!persistencePending) {
+      const saved = todoListState.save(snapshot);
+      if (!(saved instanceof Promise)) return updateNotice(saved);
+      persistencePending = true;
+      persistenceTail = saved.then(updateNotice).finally(() => {
+        persistencePending = false;
+      });
+      return persistenceTail;
+    }
+    // Recover the chain after a failed write: later changes must still have an
+    // opportunity to become durable.
+    persistenceTail = persistenceTail.catch(() => false).then(write).then(updateNotice)
+      .finally(() => {
+        persistencePending = false;
+      });
+    return persistenceTail;
   }
 
   function persistTags() {
@@ -109,18 +132,16 @@ const todoList = (() => {
   function commitItems(nextItems) {
     const previousItems = items;
     items = nextItems;
+    render();
     const finish = (saved) => {
-      if (saved) {
-        render();
-        return true;
-      }
+      if (saved) return true;
       if (items === nextItems) {
         items = previousItems;
         render();
       }
       return false;
     };
-    const saved = persist();
+    const saved = persist(nextItems);
     return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
@@ -387,30 +408,33 @@ const todoList = (() => {
       if (newChatButton) {
         const row = newChatButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        if (!item?.projectTag || !codexHost.newChat()) return;
-        pageState.close();
-        const content = [item.title, item.body].filter(Boolean).join('\n\n');
-        let inserted = false;
-        const transfer = async () => {
-          let image = item.image;
-          if (image && !image.dataURL) {
-            const [hydratedItem] = await todoListState.hydrate([item]);
-            image = hydratedItem?.image;
-          }
-          if (!inserted) inserted = composerAdapter.insert(content);
-          if (!inserted) return false;
-          return !image || composerAdapter.attachImage(image);
-        };
-        void transfer().then((transferred) => {
-          if (transferred) return;
-          return domUtils.waitFor(
-            () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
-            { timeout: 3000, interval: 25 },
-          ).then((composer) => {
-            if (composer) return transfer();
-            return false;
+        const openNewChat = async () => {
+          if (!item?.projectTag || !await codexHost.newChat(item.projectTag.id)) return;
+          pageState.close();
+          const content = [item.title, item.body].filter(Boolean).join('\n\n');
+          let inserted = false;
+          const transfer = async () => {
+            let image = item.image;
+            if (image && !image.dataURL) {
+              const [hydratedItem] = await todoListState.hydrate([item]);
+              image = hydratedItem?.image;
+            }
+            if (!inserted) inserted = composerAdapter.insert(content);
+            if (!inserted) return false;
+            return !image || composerAdapter.attachImage(image);
+          };
+          void transfer().then((transferred) => {
+            if (transferred) return;
+            return domUtils.waitFor(
+              () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+              { timeout: 3000, interval: 25 },
+            ).then((composer) => {
+              if (composer) return transfer();
+              return false;
+            });
           });
-        });
+        };
+        void openNewChat();
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');

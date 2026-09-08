@@ -42,6 +42,26 @@ const codexUIContracts = (() => {
     }, []);
   }
 
+  function selectProject(projectID) {
+    const row = document.querySelector(
+      `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
+    );
+    if (!row) return false;
+    const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? row[fiberKey] : null;
+    while (fiber) {
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      const select = props?.projectId === projectID ? props.selectAction?.onSelect : null;
+      if (typeof select === 'function') {
+        select();
+        return true;
+      }
+      fiber = fiber.return;
+    }
+    row.click();
+    return true;
+  }
+
   function threadRow(threadID) {
     return document.querySelector(
       `[data-app-action-sidebar-thread-id="${CSS.escape(`local:${threadID}`)}"]`,
@@ -275,6 +295,7 @@ const codexUIContracts = (() => {
     navigation,
     threadRows,
     projects,
+    selectProject,
     threadRow,
     isThreadSelected,
     activeComposerThreadID,
