@@ -70,6 +70,8 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-badge-composer { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 1px 14px 0; }
 #codex-dashboard-todo-page .todo-badge-composer .todo-badges { flex: 0 1 auto; }
 #codex-dashboard-todo-page .todo-badge-composer select { height: 20px; min-width: 110px; padding: 0 3px; border: 0; background: transparent; color: var(--todo-muted); font-size: 11px; }
+/* Native macOS select menus use a light surface even in the dashboard's dark theme. */
+#codex-dashboard-todo-page .todo-badge-composer select option { background: #fff; color: #1f1f1f; }
 #codex-dashboard-todo-page .todo-badge-composer button { flex: 0 0 auto; padding: 2px 4px; border: 0; border-radius: 4px; background: transparent; color: var(--todo-dim); font-size: 10px; cursor: pointer; }
 #codex-dashboard-todo-page .todo-badge-composer button:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add > button[type="submit"] { width: auto !important; min-width: 66px; height: 32px !important; margin: 0 6px 0 0; padding: 0 12px; border: 0; border-radius: 7px; background: var(--todo-text); color: var(--todo-bg); font-size: 12px; font-weight: 600; cursor: pointer; justify-self: end; }

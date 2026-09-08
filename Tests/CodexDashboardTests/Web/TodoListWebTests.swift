@@ -192,6 +192,31 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], [])
     }
 
+    func testBadgePickerOptionsRemainReadableInTheNativeMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const option = document.querySelector('[data-todo-new-badge] option');
+              const style = getComputedStyle(option);
+              return [style.backgroundColor, style.color];
+            })()
+            """
+        ) as? [String]
+
+        XCTAssertEqual(result, ["rgb(255, 255, 255)", "rgb(31, 31, 31)"])
+    }
+
     func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
