@@ -222,9 +222,6 @@ const todoList = (() => {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
-    refreshProjects();
-    startProjectObserver();
-    renderBadges();
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       if (imageDraft.status === 'invalid') {
@@ -423,6 +420,9 @@ const todoList = (() => {
       void commitItems(items.filter((item) => item.id !== row.dataset.todoId));
     });
     pageHost.append(page);
+    renderBadges();
+    refreshProjects();
+    startProjectObserver();
     pageState.restoreOpenState();
     render();
     hydrateImages();
