@@ -231,7 +231,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               return [
                 projectNames,
                 stored.projectBadge.id,
-                document.querySelector('[data-todo-project-badge]').textContent,
+                document.querySelector('[data-todo-project]').selectedOptions[0].textContent,
                 opened,
                 document.querySelector('textarea[placeholder="Do anything"]').value,
               ];
@@ -245,6 +245,53 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? String, "Codex Dashboard")
         XCTAssertEqual(values[3] as? Int, 1)
         XCTAssertEqual(values[4] as? String, "Ship project badges\n\nInclude the new chat action.")
+    }
+
+    func testExistingTodoCanBeAssignedAndUnassignedFromAProject() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-a"
+                  data-app-action-sidebar-project-label="Project A"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-b"
+                  data-app-action-sidebar-project-label="Project B"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Assign me later';
+              form.requestSubmit();
+              const project = document.querySelector('[data-todo-project]');
+              const options = [...project.options].map((option) => option.textContent);
+              project.value = 'project-b';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectBadge;
+              const newChatVisible = Boolean(document.querySelector('[data-todo-new-chat]'));
+              document.querySelector('[data-todo-project]').value = '';
+              document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
+              const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectBadge;
+              return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-chat]'))];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["No project", "Project A", "Project B"])
+        XCTAssertEqual(values[1] as? String, "project-b")
+        XCTAssertEqual(values[2] as? String, "Project B")
+        XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertTrue(values[4] is NSNull)
+        XCTAssertEqual(values[5] as? Bool, false)
     }
 
     func testBadgePickerOptionsRemainReadableInTheNativeMenu() async throws {

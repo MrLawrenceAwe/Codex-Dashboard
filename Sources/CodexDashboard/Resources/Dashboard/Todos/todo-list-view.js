@@ -18,9 +18,8 @@ const todoListView = (() => {
     `).join('')}</div>`;
   }
 
-  function projectBadgeMarkup(project) {
-    if (!project) return '';
-    return `<div class="todo-badges" aria-label="Project"><span class="todo-badge todo-project-badge" data-todo-project-badge="${domUtils.escapeHTML(project.id)}">${domUtils.escapeHTML(project.name)}</span></div>`;
+  function projectPickerMarkup(project) {
+    return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(codexUIContracts.projects(), project?.id)}</select>`;
   }
 
   function badgeOptions(badges, selectedBadge = '') {
@@ -82,7 +81,7 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
-          ${projectBadgeMarkup(item.projectBadge)}
+          ${projectPickerMarkup(item.projectBadge)}
           ${badgeMarkup(item.badges, !item.completed)}
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
@@ -205,9 +204,13 @@ const todoListView = (() => {
   }
 
   function updateProjectOptions(projects, selectedID = '') {
-    const select = document.querySelector('[data-todo-new-project]');
-    if (!select) return;
-    select.innerHTML = projectOptions(projects, selectedID || select.value);
+    document.querySelectorAll('[data-todo-new-project], [data-todo-project]').forEach((select) => {
+      const itemID = select.closest('[data-todo-id]')?.dataset.todoId;
+      const selectedProjectID = itemID
+        ? select.value
+        : selectedID || select.value;
+      select.innerHTML = projectOptions(projects, selectedProjectID);
+    });
   }
 
   function updateManagedBadges(badges) {
