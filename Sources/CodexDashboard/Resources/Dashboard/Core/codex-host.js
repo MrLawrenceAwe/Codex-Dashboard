@@ -26,7 +26,9 @@ const codexHost = {
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
   },
 
-  newChat() {
+  async newChat(projectID = '') {
+    if (projectID && !codexUIContracts.selectProject(projectID)) return false;
+    if (projectID) await new Promise((resolve) => setTimeout(resolve, 0));
     const button = [...(this.sidebar()?.querySelectorAll('button') || [])]
       .find((candidate) => candidate.textContent.trim() === 'New chat');
     if (!button || button.disabled) return false;

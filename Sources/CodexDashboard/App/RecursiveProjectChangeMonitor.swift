@@ -2,6 +2,14 @@ import CoreServices
 import Foundation
 
 final class RecursiveProjectChangeMonitor: @unchecked Sendable {
+    private final class StreamContext {
+        weak var monitor: RecursiveProjectChangeMonitor?
+
+        init(monitor: RecursiveProjectChangeMonitor) {
+            self.monitor = monitor
+        }
+    }
+
     private let projectPaths: Set<String>
     private let projectPathsByObservedRoot: [String: Set<String>]
     private let action: @MainActor @Sendable (Set<String>) async -> Void
@@ -23,18 +31,27 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 
     func start() {
         guard !projectPaths.isEmpty else { return }
+        let streamContext = StreamContext(monitor: self)
         var context = FSEventStreamContext(
             version: 0,
-            info: Unmanaged.passUnretained(self).toOpaque(),
+            // The stream can still invoke a callback already queued on its
+            // dispatch queue after its owner starts tearing it down. Keep a
+            // context alive for the stream lifetime, but only a weak reference
+            // to the monitor so the stream does not form an ownership cycle.
+            info: Unmanaged.passRetained(streamContext).toOpaque(),
             retain: nil,
-            release: nil,
+            release: { pointer in
+                guard let pointer else { return }
+                Unmanaged<StreamContext>.fromOpaque(pointer).release()
+            },
             copyDescription: nil
         )
         let callback: FSEventStreamCallback = { _, context, _, eventPaths, _, _ in
             guard let context else { return }
-            let monitor = Unmanaged<RecursiveProjectChangeMonitor>
+            let streamContext = Unmanaged<StreamContext>
                 .fromOpaque(context)
                 .takeUnretainedValue()
+            guard let monitor = streamContext.monitor else { return }
             let pathArray = Unmanaged<CFArray>
                 .fromOpaque(eventPaths)
                 .takeUnretainedValue()
@@ -105,4 +122,3 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         }
     }
 }
-
