@@ -11,10 +11,10 @@ const todoListView = (() => {
       </div>`;
   }
 
-  function badgeMarkup(badges, editable = false) {
-    if (!badges.length) return '';
-    return `<div class="todo-badges" aria-label="To-do badges">${badges.map((badge) => `
-      <span class="todo-badge">${domUtils.escapeHTML(badge)}${editable ? `<button type="button" data-todo-badge-remove="${domUtils.escapeHTML(badge)}" aria-label="Remove badge ${domUtils.escapeHTML(badge)}" title="Remove badge ${domUtils.escapeHTML(badge)}">&times;</button>` : ''}</span>
+  function tagMarkup(tags, editable = false) {
+    if (!tags.length) return '';
+    return `<div class="todo-tags" aria-label="To-do tags">${tags.map((tag) => `
+      <span class="todo-tag">${domUtils.escapeHTML(tag)}${editable ? `<button type="button" data-todo-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Remove tag ${domUtils.escapeHTML(tag)}" title="Remove tag ${domUtils.escapeHTML(tag)}">&times;</button>` : ''}</span>
     `).join('')}</div>`;
   }
 
@@ -22,16 +22,16 @@ const todoListView = (() => {
     return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(codexUIContracts.projects(), project?.id)}</select>`;
   }
 
-  function badgeOptions(badges, selectedBadge = '') {
-    return `<option value="">Choose a badge</option>${badges.map((badge) => (
-      `<option value="${domUtils.escapeHTML(badge)}"${badge === selectedBadge ? ' selected' : ''}>${domUtils.escapeHTML(badge)}</option>`
+  function tagOptions(tags, selectedTag = '') {
+    return `<option value="">Choose a tag</option>${tags.map((tag) => (
+      `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)}</option>`
     )).join('')}`;
   }
 
-  function badgePickerMarkup(badges) {
-    return `<div class="todo-badge-picker">
-      <select data-todo-badge aria-label="Badge to attach">${badgeOptions(badges)}</select>
-      <button type="button" data-todo-badge-add>Add badge</button>
+  function tagPickerMarkup(tags) {
+    return `<div class="todo-tag-picker">
+      <select data-todo-tag aria-label="Tag to attach">${tagOptions(tags)}</select>
+      <button type="button" data-todo-tag-add>Add tag</button>
     </div>`;
   }
 
@@ -55,7 +55,7 @@ const todoListView = (() => {
     count.setAttribute('aria-label', `${openCount} open ${openCount === 1 ? 'to-do' : 'to-dos'}`);
   }
 
-  function render(items, filterMode, availableBadges = []) {
+  function render(items, filterMode, availableTags = []) {
     const openCount = items.filter((item) => !item.completed).length;
     updateNavigation(openCount);
     const page = document.getElementById(dashboardElements.elementIDs.todoPage);
@@ -88,15 +88,15 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
-          ${projectPickerMarkup(item.projectBadge)}
-          ${badgeMarkup(item.badges, !item.completed)}
-          ${!item.completed ? badgePickerMarkup(availableBadges) : ''}
+          ${projectPickerMarkup(item.projectTag)}
+          ${tagMarkup(item.tags, !item.completed)}
+          ${!item.completed ? tagPickerMarkup(availableTags) : ''}
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
         </div>
-        ${!item.completed && item.projectBadge ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.projectBadge.name)}" title="Start a new chat">New chat</button>` : ''}
+        ${!item.completed && item.projectTag ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.projectTag.name)}" title="Start a new chat">New chat</button>` : ''}
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>
@@ -112,7 +112,7 @@ const todoListView = (() => {
       <div class="todo-shell">
         <header class="todo-header">
           <h1>To-dos</h1>
-          <button type="button" class="todo-manage-badges" data-todo-manage-badges>Badges</button>
+          <button type="button" class="todo-manage-tags" data-todo-manage-tags>Tags</button>
         </header>
         <form class="todo-add" data-todo-form>
           <div class="todo-add-image" data-todo-new-image-preview hidden>
@@ -124,11 +124,11 @@ const todoListView = (() => {
           <div class="todo-add-fields">
             <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do" autocomplete="off">
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
-            <div class="todo-badge-composer">
+            <div class="todo-tag-composer">
               <select data-todo-new-project aria-label="Project">${projectOptions([])}</select>
-              <div class="todo-badges" data-todo-new-badges aria-label="New to-do badges"></div>
-              <select data-todo-new-badge aria-label="Badge to attach">${badgeOptions([])}</select>
-              <button type="button" data-todo-new-badge-add>Add badge</button>
+              <div class="todo-tags" data-todo-new-tags aria-label="New to-do tags"></div>
+              <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
+              <button type="button" data-todo-new-tag-add>Add tag</button>
             </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
@@ -166,13 +166,13 @@ const todoListView = (() => {
         <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
         <img alt="">
       </dialog>
-      <dialog class="todo-badge-dialog" data-todo-badge-dialog aria-label="Manage badges">
-        <header class="todo-badge-dialog-header"><strong>Badges</strong><button type="button" data-todo-badge-dialog-close aria-label="Close badges">&times;</button></header>
-        <form data-todo-badge-form class="todo-badge-form">
-          <input data-todo-badge-name aria-label="Badge name" maxlength="40" placeholder="New badge name" autocomplete="off">
-          <button type="submit">Create badge</button>
+      <dialog class="todo-tag-dialog" data-todo-tag-dialog aria-label="Manage tags">
+        <header class="todo-tag-dialog-header"><strong>Tags</strong><button type="button" data-todo-tag-dialog-close aria-label="Close tags">&times;</button></header>
+        <form data-todo-tag-form class="todo-tag-form">
+          <input data-todo-tag-name aria-label="Tag name" maxlength="40" placeholder="New tag name" autocomplete="off">
+          <button type="submit">Create tag</button>
         </form>
-        <div class="todo-badges" data-todo-managed-badges aria-label="Available badges"></div>
+        <div class="todo-tags" data-todo-managed-tags aria-label="Available tags"></div>
       </dialog>`;
     document.body.append(dialogHost);
     const imageDialog = dialogHost.querySelector('[data-todo-image-dialog]');
@@ -202,15 +202,15 @@ const todoListView = (() => {
     );
   }
 
-  function updateBadgeDraft(badges) {
-    const container = document.querySelector('[data-todo-new-badges]');
+  function updateTagDraft(tags) {
+    const container = document.querySelector('[data-todo-new-tags]');
     if (!container) return;
-    container.innerHTML = badgeMarkup(badges, true);
+    container.innerHTML = tagMarkup(tags, true);
   }
 
-  function updateBadgeOptions(badges) {
-    document.querySelectorAll('[data-todo-new-badge], [data-todo-badge]').forEach((select) => {
-      select.innerHTML = badgeOptions(badges, select.value);
+  function updateTagOptions(tags) {
+    document.querySelectorAll('[data-todo-new-tag], [data-todo-tag]').forEach((select) => {
+      select.innerHTML = tagOptions(tags, select.value);
     });
   }
 
@@ -224,9 +224,9 @@ const todoListView = (() => {
     });
   }
 
-  function updateManagedBadges(badges) {
-    const container = document.querySelector('[data-todo-managed-badges]');
-    if (container) container.innerHTML = badgeMarkup(badges);
+  function updateManagedTags(tags) {
+    const container = document.querySelector('[data-todo-managed-tags]');
+    if (container) container.innerHTML = tagMarkup(tags);
   }
 
   function showImage(image) {
@@ -238,5 +238,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateBadgeDraft, updateBadgeOptions, updateImageDraft, updateManagedBadges, updateNavigation, updateProjectOptions };
+  return { createPage, render, showImage, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions };
 })();

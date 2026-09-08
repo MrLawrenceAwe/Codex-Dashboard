@@ -146,7 +146,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Int, 0)
     }
 
-    func testTodoBadgesCanBeCreatedPersistedAndRemoved() async throws {
+    func testTodoTagsCanBeCreatedPersistedAndRemoved() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -162,23 +162,23 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
-              const badgePicker = form.querySelector('[data-todo-new-badge]');
-              const unavailableBeforeCreation = badgePicker.options.length === 1;
-              document.querySelector('[data-todo-manage-badges]').click();
-              const badgeDialog = document.querySelector('[data-todo-badge-dialog]');
-              badgeDialog.querySelector('[data-todo-badge-dialog-close]').click();
-              const closesFromControl = !badgeDialog.open;
-              document.querySelector('[data-todo-manage-badges]').click();
-              badgeDialog.querySelector('[data-todo-badge-name]').value = 'Work';
-              badgeDialog.querySelector('[data-todo-badge-form]').requestSubmit();
-              badgePicker.value = 'Work';
-              form.querySelector('[data-todo-new-badge-add]').click();
+              const tagPicker = form.querySelector('[data-todo-new-tag]');
+              const unavailableBeforeCreation = tagPicker.options.length === 1;
+              document.querySelector('[data-todo-manage-tags]').click();
+              const tagDialog = document.querySelector('[data-todo-tag-dialog]');
+              tagDialog.querySelector('[data-todo-tag-dialog-close]').click();
+              const closesFromControl = !tagDialog.open;
+              document.querySelector('[data-todo-manage-tags]').click();
+              tagDialog.querySelector('[data-todo-tag-name]').value = 'Work';
+              tagDialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              tagPicker.value = 'Work';
+              form.querySelector('[data-todo-new-tag-add]').click();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              const renderedBadge = document.querySelector('[data-todo-id] .todo-badge').textContent.trim();
-              document.querySelector('[data-todo-badge-remove]').click();
-              return [unavailableBeforeCreation, closesFromControl, JSON.parse(localStorage.getItem('codex-dashboard.todo-badges')), stored.badges, renderedBadge, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].badges];
+              const renderedTag = document.querySelector('[data-todo-id] .todo-tag').textContent.trim();
+              document.querySelector('[data-todo-tag-remove]').click();
+              return [unavailableBeforeCreation, closesFromControl, JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')), stored.tags, renderedTag, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].tags];
             })()
             """
         ) as? [Any]
@@ -192,7 +192,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], [])
     }
 
-    func testBadgeCanBeAddedToAnExistingTodo() async throws {
+    func testTagCanBeAddedToAnExistingTodo() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -210,15 +210,15 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Follow up';
               form.requestSubmit();
-              document.querySelector('[data-todo-manage-badges]').click();
-              const dialog = document.querySelector('[data-todo-badge-dialog]');
-              dialog.querySelector('[data-todo-badge-name]').value = 'Important';
-              dialog.querySelector('[data-todo-badge-form]').requestSubmit();
-              const picker = document.querySelector('[data-todo-id] [data-todo-badge]');
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
+              dialog.querySelector('[data-todo-tag-name]').value = 'Important';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              const picker = document.querySelector('[data-todo-id] [data-todo-tag]');
               picker.value = 'Important';
-              document.querySelector('[data-todo-id] [data-todo-badge-add]').click();
+              document.querySelector('[data-todo-id] [data-todo-tag-add]').click();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              return [stored.badges, document.querySelector('[data-todo-id] .todo-badge').textContent.trim()];
+              return [stored.tags, document.querySelector('[data-todo-id] .todo-tag').textContent.trim()];
             })()
             """
         ) as? [Any]
@@ -228,7 +228,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Important×")
     }
 
-    func testBadgeDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
+    func testTagDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -243,12 +243,12 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.openTodos();
-              document.querySelector('[data-todo-manage-badges]').click();
-              const dialog = document.querySelector('[data-todo-badge-dialog]');
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
               const rect = dialog.getBoundingClientRect();
               const centered = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < 1
                 && Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2) < 1;
-              dialog.querySelector('[data-todo-badge-dialog-close]').click();
+              dialog.querySelector('[data-todo-tag-dialog-close]').click();
               return [dialog.parentElement.id, centered, !dialog.open];
             })()
             """
@@ -260,7 +260,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? Bool, true)
     }
 
-    func testProjectBadgesComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
+    func testProjectTagsComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -284,7 +284,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const projectNames = [...project.options].map((option) => option.textContent);
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              form.querySelector('[data-todo-new-title]').value = 'Ship project badges';
+              form.querySelector('[data-todo-new-title]').value = 'Ship project tags';
               form.querySelector('[data-todo-new-body]').value = 'Include the new chat action.';
               form.requestSubmit();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
@@ -298,7 +298,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-todo-new-chat]').click();
               return [
                 projectNames,
-                stored.projectBadge.id,
+                stored.projectTag.id,
                 document.querySelector('[data-todo-project]').selectedOptions[0].textContent,
                 opened,
                 document.querySelector('textarea[placeholder="Do anything"]').value,
@@ -312,7 +312,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "dashboard")
         XCTAssertEqual(values[2] as? String, "Codex Dashboard")
         XCTAssertEqual(values[3] as? Int, 1)
-        XCTAssertEqual(values[4] as? String, "Ship project badges\n\nInclude the new chat action.")
+        XCTAssertEqual(values[4] as? String, "Ship project tags\n\nInclude the new chat action.")
     }
 
     func testNewChatTransfersTheTodoImageToTheComposer() async throws {
@@ -414,11 +414,11 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const options = [...project.options].map((option) => option.textContent);
               project.value = 'project-b';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectBadge;
+              const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectTag;
               const newChatVisible = Boolean(document.querySelector('[data-todo-new-chat]'));
               document.querySelector('[data-todo-project]').value = '';
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
-              const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectBadge;
+              const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectTag;
               return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-chat]'))];
             })()
             """
@@ -462,7 +462,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               project.value = 'late-project';
               project.dispatchEvent(new Event('change', { bubbles: true }));
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              return [stored.projectBadge.id, stored.projectBadge.name];
+              return [stored.projectTag.id, stored.projectTag.name];
             })()
             """
         ) as? [Any]
@@ -472,7 +472,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Late Project")
     }
 
-    func testBadgePickerOptionsRemainReadableInTheNativeMenu() async throws {
+    func testTagPickerOptionsRemainReadableInTheNativeMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -487,7 +487,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.openTodos();
-              const option = document.querySelector('[data-todo-new-badge] option');
+              const option = document.querySelector('[data-todo-new-tag] option');
               const style = getComputedStyle(option);
               return [style.backgroundColor, style.color];
             })()

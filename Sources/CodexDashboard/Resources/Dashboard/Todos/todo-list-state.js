@@ -1,24 +1,24 @@
 const todoListState = (() => {
   const storageKey = 'codex-dashboard.todos';
-  const badgesStorageKey = 'codex-dashboard.todo-badges';
+  const tagsStorageKey = 'codex-dashboard.todo-tags';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 3;
-  const supportedVersions = new Set([1, 2, version]);
-  const maximumBadges = 8;
-  const maximumBadgeLength = 40;
+  const version = 4;
+  const supportedVersions = new Set([version]);
+  const maximumTags = 8;
+  const maximumTagLength = 40;
 
   function cleanText(value) {
     return String(value || '').trim();
   }
 
-  function normalizeBadges(badges) {
-    if (!Array.isArray(badges)) return [];
+  function normalizeTags(tags) {
+    if (!Array.isArray(tags)) return [];
     const seen = new Set();
-    return badges.reduce((normalized, badge) => {
-      const name = cleanText(badge).slice(0, maximumBadgeLength);
+    return tags.reduce((normalized, tag) => {
+      const name = cleanText(tag).slice(0, maximumTagLength);
       const key = name.toLocaleLowerCase();
-      if (!name || seen.has(key) || normalized.length === maximumBadges) return normalized;
+      if (!name || seen.has(key) || normalized.length === maximumTags) return normalized;
       seen.add(key);
       normalized.push(name);
       return normalized;
@@ -40,9 +40,9 @@ const todoListState = (() => {
     };
   }
 
-  function normalizeProjectBadge(project) {
+  function normalizeProjectTag(project) {
     const id = cleanText(project?.id);
-    const name = cleanText(project?.name).slice(0, maximumBadgeLength);
+    const name = cleanText(project?.name).slice(0, maximumTagLength);
     return id && name ? { id, name } : null;
   }
 
@@ -60,8 +60,8 @@ const todoListState = (() => {
       title,
       body,
       completed: item?.completed === true,
-      badges: normalizeBadges(item?.badges),
-      projectBadge: normalizeProjectBadge(item?.projectBadge),
+      tags: normalizeTags(item?.tags),
+      projectTag: normalizeProjectTag(item?.projectTag),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -78,21 +78,21 @@ const todoListState = (() => {
     }
   }
 
-  function loadBadges(items = []) {
+  function loadTags(items = []) {
     try {
-      const savedBadges = JSON.parse(localStorage.getItem(badgesStorageKey));
-      return normalizeBadges([
-        ...(Array.isArray(savedBadges) ? savedBadges : []),
-        ...items.flatMap((item) => item.badges || []),
+      const savedTags = JSON.parse(localStorage.getItem(tagsStorageKey));
+      return normalizeTags([
+        ...(Array.isArray(savedTags) ? savedTags : []),
+        ...items.flatMap((item) => item.tags || []),
       ]);
     } catch (_) {
-      return normalizeBadges(items.flatMap((item) => item.badges || []));
+      return normalizeTags(items.flatMap((item) => item.tags || []));
     }
   }
 
-  function saveBadges(badges) {
+  function saveTags(tags) {
     try {
-      localStorage.setItem(badgesStorageKey, JSON.stringify(normalizeBadges(badges)));
+      localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
       return true;
     } catch (_) {
       return false;
@@ -196,18 +196,18 @@ const todoListState = (() => {
     })).catch(() => items);
   }
 
-  function create(title, body = '', image = null, badges = []) {
+  function create(title, body = '', image = null, tags = []) {
     const now = Date.now();
     return normalizeItem({
       id: crypto.randomUUID(),
       title,
       body,
       image,
-      badges,
+      tags,
       createdAt: now,
       updatedAt: now,
     });
   }
 
-  return { create, hydrate, load, loadBadges, normalizeBadges, normalizeImage, normalizeItem, normalizeProjectBadge, save, saveBadges };
+  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProjectTag, save, saveTags };
 })();
