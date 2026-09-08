@@ -3,8 +3,8 @@ const todoListState = (() => {
   const badgesStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 2;
-  const supportedVersions = new Set([1, version]);
+  const version = 3;
+  const supportedVersions = new Set([1, 2, version]);
   const maximumBadges = 8;
   const maximumBadgeLength = 40;
 
@@ -40,6 +40,12 @@ const todoListState = (() => {
     };
   }
 
+  function normalizeProjectBadge(project) {
+    const id = cleanText(project?.id);
+    const name = cleanText(project?.name).slice(0, maximumBadgeLength);
+    return id && name ? { id, name } : null;
+  }
+
   function acceptedImageType(type) {
     return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type);
   }
@@ -55,6 +61,7 @@ const todoListState = (() => {
       body,
       completed: item?.completed === true,
       badges: normalizeBadges(item?.badges),
+      projectBadge: normalizeProjectBadge(item?.projectBadge),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -202,5 +209,5 @@ const todoListState = (() => {
     });
   }
 
-  return { create, hydrate, load, loadBadges, normalizeBadges, normalizeImage, normalizeItem, save, saveBadges };
+  return { create, hydrate, load, loadBadges, normalizeBadges, normalizeImage, normalizeItem, normalizeProjectBadge, save, saveBadges };
 })();
