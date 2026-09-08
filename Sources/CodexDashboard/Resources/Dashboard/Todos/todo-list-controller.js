@@ -1,6 +1,6 @@
 const todoList = (() => {
   let items = todoListState.load();
-  let availableBadges = todoListState.loadBadges(items);
+  let availableTags = todoListState.loadTags(items);
   let projects = [];
   let projectDraft = null;
   let projectObserver;
@@ -11,9 +11,9 @@ const todoList = (() => {
     rootClass: 'codex-todo-open',
   });
   let imageDraft;
-  let badgeDraft;
+  let tagDraft;
   resetImageDraft();
-  resetBadgeDraft();
+  resetTagDraft();
 
   function resetImageDraft() {
     imageDraft = { status: 'empty', image: null, submitWhenReady: false };
@@ -25,9 +25,9 @@ const todoList = (() => {
     }
   }
 
-  function resetBadgeDraft() {
-    badgeDraft = [];
-    todoListView?.updateBadgeDraft?.(badgeDraft);
+  function resetTagDraft() {
+    tagDraft = [];
+    todoListView?.updateTagDraft?.(tagDraft);
   }
 
   function refreshProjects() {
@@ -47,12 +47,12 @@ const todoList = (() => {
       attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
   }
 
-  function addBadgeDraft(value) {
-    if (!availableBadges.includes(value)) return false;
-    const badges = todoListState.normalizeBadges([...badgeDraft, value]);
-    if (badges.length === badgeDraft.length) return false;
-    badgeDraft = badges;
-    todoListView.updateBadgeDraft(badgeDraft);
+  function addTagDraft(value) {
+    if (!availableTags.includes(value)) return false;
+    const tags = todoListState.normalizeTags([...tagDraft, value]);
+    if (tags.length === tagDraft.length) return false;
+    tagDraft = tags;
+    todoListView.updateTagDraft(tagDraft);
     return true;
   }
 
@@ -76,20 +76,20 @@ const todoList = (() => {
     return saved instanceof Promise ? saved.then(updateNotice) : updateNotice(saved);
   }
 
-  function persistBadges() {
-    const saved = todoListState.saveBadges(availableBadges);
+  function persistTags() {
+    const saved = todoListState.saveTags(availableTags);
     const notice = document.querySelector('[data-todo-storage-error]');
     if (notice) notice.hidden = saved;
     return saved;
   }
 
-  function renderBadges() {
-    todoListView.updateBadgeOptions(availableBadges);
-    todoListView.updateManagedBadges(availableBadges);
+  function renderTags() {
+    todoListView.updateTagOptions(availableTags);
+    todoListView.updateManagedTags(availableTags);
   }
 
   function render() {
-    todoListView.render(items, filterMode, availableBadges);
+    todoListView.render(items, filterMode, availableTags);
   }
 
   function hydrateImages() {
@@ -124,9 +124,9 @@ const todoList = (() => {
     return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
-  function add(title, body = '', image = null, badges = [], projectBadge = null) {
-    const item = todoListState.create(title, body, image, badges);
-    if (item) item.projectBadge = todoListState.normalizeProjectBadge(projectBadge);
+  function add(title, body = '', image = null, tags = [], projectTag = null) {
+    const item = todoListState.create(title, body, image, tags);
+    if (item) item.projectTag = todoListState.normalizeProjectTag(projectTag);
     if (!item) return false;
     const finish = (saved) => {
       if (!saved) return false;
@@ -243,12 +243,12 @@ const todoList = (() => {
         title.value = '';
         body.value = '';
         resetImageDraft();
-        resetBadgeDraft();
+        resetTagDraft();
         projectDraft = null;
         todoListView.updateProjectOptions(projects);
         title.focus();
       };
-      const saved = add(title.value, body.value, imageDraft.image, badgeDraft, projectDraft);
+      const saved = add(title.value, body.value, imageDraft.image, tagDraft, projectDraft);
       if (saved instanceof Promise) void saved.then(finish);
       else finish(saved);
     });
@@ -304,49 +304,49 @@ const todoList = (() => {
         todoListView.showImage(imageDraft.image);
       }
     });
-    const badgeInput = page.querySelector('[data-todo-new-badge]');
+    const tagInput = page.querySelector('[data-todo-new-tag]');
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
       projectDraft = projects.find((project) => project.id === projectInput.value) || null;
     });
-    const addBadge = () => {
-      if (!addBadgeDraft(badgeInput.value)) return;
-      badgeInput.value = '';
-      badgeInput.focus();
+    const addTag = () => {
+      if (!addTagDraft(tagInput.value)) return;
+      tagInput.value = '';
+      tagInput.focus();
     };
-    badgeInput.addEventListener('change', addBadge);
-    page.querySelector('[data-todo-new-badge-add]').addEventListener('click', addBadge);
-    page.querySelector('[data-todo-new-badges]').addEventListener('click', (event) => {
-      const button = event.target.closest('[data-todo-badge-remove]');
+    tagInput.addEventListener('change', addTag);
+    page.querySelector('[data-todo-new-tag-add]').addEventListener('click', addTag);
+    page.querySelector('[data-todo-new-tags]').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-todo-tag-remove]');
       if (!button) return;
-      badgeDraft = badgeDraft.filter((badge) => badge !== button.dataset.todoBadgeRemove);
-      todoListView.updateBadgeDraft(badgeDraft);
-      badgeInput.focus();
+      tagDraft = tagDraft.filter((tag) => tag !== button.dataset.todoTagRemove);
+      todoListView.updateTagDraft(tagDraft);
+      tagInput.focus();
     });
-    const badgeDialog = document.querySelector('[data-todo-badge-dialog]');
-    const closeBadgeDialog = () => {
-      if (badgeDialog.open) badgeDialog.close();
+    const tagDialog = document.querySelector('[data-todo-tag-dialog]');
+    const closeTagDialog = () => {
+      if (tagDialog.open) tagDialog.close();
     };
-    page.querySelector('[data-todo-manage-badges]').addEventListener('click', () => {
-      if (!badgeDialog.open) badgeDialog.showModal();
+    page.querySelector('[data-todo-manage-tags]').addEventListener('click', () => {
+      if (!tagDialog.open) tagDialog.showModal();
     });
-    badgeDialog.querySelector('[data-todo-badge-dialog-close]').addEventListener('click', closeBadgeDialog);
-    badgeDialog.addEventListener('click', (event) => {
-      if (event.target === badgeDialog) closeBadgeDialog();
+    tagDialog.querySelector('[data-todo-tag-dialog-close]').addEventListener('click', closeTagDialog);
+    tagDialog.addEventListener('click', (event) => {
+      if (event.target === tagDialog) closeTagDialog();
     });
-    badgeDialog.querySelector('[data-todo-badge-form]').addEventListener('submit', (event) => {
+    tagDialog.querySelector('[data-todo-tag-form]').addEventListener('submit', (event) => {
       event.preventDefault();
-      const name = badgeDialog.querySelector('[data-todo-badge-name]');
-      const previousBadges = availableBadges;
-      const nextBadges = todoListState.normalizeBadges([...availableBadges, name.value]);
-      if (nextBadges.length === availableBadges.length) return;
-      availableBadges = nextBadges;
-      if (!persistBadges()) {
-        availableBadges = previousBadges;
+      const name = tagDialog.querySelector('[data-todo-tag-name]');
+      const previousTags = availableTags;
+      const nextTags = todoListState.normalizeTags([...availableTags, name.value]);
+      if (nextTags.length === availableTags.length) return;
+      availableTags = nextTags;
+      if (!persistTags()) {
+        availableTags = previousTags;
         return;
       }
       name.value = '';
-      renderBadges();
+      renderTags();
       name.focus();
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
@@ -372,7 +372,7 @@ const todoList = (() => {
       } else if (event.target.matches('[data-todo-project]')) {
         const project = codexUIContracts.projects()
           .find((candidate) => candidate.id === event.target.value) || null;
-        void updateItem(row.dataset.todoId, { projectBadge: project });
+        void updateItem(row.dataset.todoId, { projectTag: project });
       }
     });
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
@@ -387,7 +387,7 @@ const todoList = (() => {
       if (newChatButton) {
         const row = newChatButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        if (!item?.projectBadge || !codexHost.newChat()) return;
+        if (!item?.projectTag || !codexHost.newChat()) return;
         pageState.close();
         const content = [item.title, item.body].filter(Boolean).join('\n\n');
         let inserted = false;
@@ -419,22 +419,22 @@ const todoList = (() => {
         if (row) void updateItem(row.dataset.todoId, { image: null });
         return;
       }
-      const addBadgeButton = event.target.closest('[data-todo-badge-add]');
-      if (addBadgeButton) {
-        const row = addBadgeButton.closest('[data-todo-id]');
-        const badge = row?.querySelector('[data-todo-badge]')?.value;
+      const addTagButton = event.target.closest('[data-todo-tag-add]');
+      if (addTagButton) {
+        const row = addTagButton.closest('[data-todo-id]');
+        const tag = row?.querySelector('[data-todo-tag]')?.value;
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        if (item && badge) void updateItem(item.id, {
-          badges: todoListState.normalizeBadges([...item.badges, badge]),
+        if (item && tag) void updateItem(item.id, {
+          tags: todoListState.normalizeTags([...item.tags, tag]),
         });
         return;
       }
-      const removeBadgeButton = event.target.closest('[data-todo-badge-remove]');
-      if (removeBadgeButton) {
-        const row = removeBadgeButton.closest('[data-todo-id]');
+      const removeTagButton = event.target.closest('[data-todo-tag-remove]');
+      if (removeTagButton) {
+        const row = removeTagButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
         if (item) void updateItem(item.id, {
-          badges: item.badges.filter((badge) => badge !== removeBadgeButton.dataset.todoBadgeRemove),
+          tags: item.tags.filter((tag) => tag !== removeTagButton.dataset.todoTagRemove),
         });
         return;
       }
@@ -452,7 +452,7 @@ const todoList = (() => {
       void commitItems(items.filter((item) => item.id !== row.dataset.todoId));
     });
     pageHost.append(page);
-    renderBadges();
+    renderTags();
     refreshProjects();
     startProjectObserver();
     pageState.restoreOpenState();
