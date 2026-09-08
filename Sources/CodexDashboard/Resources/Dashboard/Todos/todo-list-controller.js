@@ -89,7 +89,7 @@ const todoList = (() => {
   }
 
   function render() {
-    todoListView.render(items, filterMode);
+    todoListView.render(items, filterMode, availableBadges);
   }
 
   function hydrateImages() {
@@ -417,6 +417,16 @@ const todoList = (() => {
       if (removeImageButton) {
         const row = removeImageButton.closest('[data-todo-id]');
         if (row) void updateItem(row.dataset.todoId, { image: null });
+        return;
+      }
+      const addBadgeButton = event.target.closest('[data-todo-badge-add]');
+      if (addBadgeButton) {
+        const row = addBadgeButton.closest('[data-todo-id]');
+        const badge = row?.querySelector('[data-todo-badge]')?.value;
+        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
+        if (item && badge) void updateItem(item.id, {
+          badges: todoListState.normalizeBadges([...item.badges, badge]),
+        });
         return;
       }
       const removeBadgeButton = event.target.closest('[data-todo-badge-remove]');

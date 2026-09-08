@@ -192,6 +192,42 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], [])
     }
 
+    func testBadgeCanBeAddedToAnExistingTodo() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Follow up';
+              form.requestSubmit();
+              document.querySelector('[data-todo-manage-badges]').click();
+              const dialog = document.querySelector('[data-todo-badge-dialog]');
+              dialog.querySelector('[data-todo-badge-name]').value = 'Important';
+              dialog.querySelector('[data-todo-badge-form]').requestSubmit();
+              const picker = document.querySelector('[data-todo-id] [data-todo-badge]');
+              picker.value = 'Important';
+              document.querySelector('[data-todo-id] [data-todo-badge-add]').click();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [stored.badges, document.querySelector('[data-todo-id] .todo-badge').textContent.trim()];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["Important"])
+        XCTAssertEqual(values[1] as? String, "Important×")
+    }
+
     func testBadgeDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """

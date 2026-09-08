@@ -28,6 +28,13 @@ const todoListView = (() => {
     )).join('')}`;
   }
 
+  function badgePickerMarkup(badges) {
+    return `<div class="todo-badge-picker">
+      <select data-todo-badge aria-label="Badge to attach">${badgeOptions(badges)}</select>
+      <button type="button" data-todo-badge-add>Add badge</button>
+    </div>`;
+  }
+
   function projectOptions(projects, selectedID = '') {
     return `<option value="">No project</option>${projects.map((project) => (
       `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
@@ -48,7 +55,7 @@ const todoListView = (() => {
     count.setAttribute('aria-label', `${openCount} open ${openCount === 1 ? 'to-do' : 'to-dos'}`);
   }
 
-  function render(items, filterMode) {
+  function render(items, filterMode, availableBadges = []) {
     const openCount = items.filter((item) => !item.completed).length;
     updateNavigation(openCount);
     const page = document.getElementById(dashboardElements.elementIDs.todoPage);
@@ -83,6 +90,7 @@ const todoListView = (() => {
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
           ${projectPickerMarkup(item.projectBadge)}
           ${badgeMarkup(item.badges, !item.completed)}
+          ${!item.completed ? badgePickerMarkup(availableBadges) : ''}
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
@@ -201,9 +209,9 @@ const todoListView = (() => {
   }
 
   function updateBadgeOptions(badges) {
-    const select = document.querySelector('[data-todo-new-badge]');
-    if (!select) return;
-    select.innerHTML = badgeOptions(badges, select.value);
+    document.querySelectorAll('[data-todo-new-badge], [data-todo-badge]').forEach((select) => {
+      select.innerHTML = badgeOptions(badges, select.value);
+    });
   }
 
   function updateProjectOptions(projects, selectedID = '') {
