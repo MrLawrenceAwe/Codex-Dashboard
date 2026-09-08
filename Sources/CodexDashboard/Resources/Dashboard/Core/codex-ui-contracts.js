@@ -28,6 +28,20 @@ const codexUIContracts = (() => {
     return [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')];
   }
 
+  function projects() {
+    const seen = new Set();
+    return [...document.querySelectorAll(
+      '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]',
+    )].reduce((result, row) => {
+      const id = String(row.getAttribute('data-app-action-sidebar-project-id') || '').trim();
+      const name = String(row.getAttribute('data-app-action-sidebar-project-label') || '').trim();
+      if (!id || !name || seen.has(id)) return result;
+      seen.add(id);
+      result.push({ id, name });
+      return result;
+    }, []);
+  }
+
   function threadRow(threadID) {
     return document.querySelector(
       `[data-app-action-sidebar-thread-id="${CSS.escape(`local:${threadID}`)}"]`,
@@ -151,7 +165,8 @@ const codexUIContracts = (() => {
   function composer(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     return composerSelectors.flatMap((selector) => [...document.querySelectorAll(selector)])
       .find((element) => (
-        !element.closest(`#${promptDialogID}`) && element.getClientRects().length > 0
+        !element.closest(`#${promptDialogID}, #${dashboardElements.elementIDs.todoPage}`)
+          && element.getClientRects().length > 0
       ));
   }
 
@@ -259,6 +274,7 @@ const codexUIContracts = (() => {
     sidebar,
     navigation,
     threadRows,
+    projects,
     threadRow,
     isThreadSelected,
     activeComposerThreadID,

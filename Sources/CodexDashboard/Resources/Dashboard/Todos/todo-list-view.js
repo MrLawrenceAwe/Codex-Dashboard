@@ -18,9 +18,20 @@ const todoListView = (() => {
     `).join('')}</div>`;
   }
 
+  function projectBadgeMarkup(project) {
+    if (!project) return '';
+    return `<div class="todo-badges" aria-label="Project"><span class="todo-badge todo-project-badge" data-todo-project-badge="${domUtils.escapeHTML(project.id)}">${domUtils.escapeHTML(project.name)}</span></div>`;
+  }
+
   function badgeOptions(badges, selectedBadge = '') {
     return `<option value="">Choose a badge</option>${badges.map((badge) => (
       `<option value="${domUtils.escapeHTML(badge)}"${badge === selectedBadge ? ' selected' : ''}>${domUtils.escapeHTML(badge)}</option>`
+    )).join('')}`;
+  }
+
+  function projectOptions(projects, selectedID = '') {
+    return `<option value="">No project</option>${projects.map((project) => (
+      `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
     )).join('')}`;
   }
 
@@ -71,12 +82,14 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
+          ${projectBadgeMarkup(item.projectBadge)}
           ${badgeMarkup(item.badges, !item.completed)}
           ${imageMarkup(item)}
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
         </div>
+        ${!item.completed && item.projectBadge ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.projectBadge.name)}" title="Start a new chat">New chat</button>` : ''}
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>
@@ -105,8 +118,10 @@ const todoListView = (() => {
             <input data-todo-new-title aria-label="New to-do" maxlength="240" placeholder="Add a to-do" autocomplete="off">
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
             <div class="todo-badge-composer">
+              <select data-todo-new-project aria-label="Project">${projectOptions([])}</select>
               <div class="todo-badges" data-todo-new-badges aria-label="New to-do badges"></div>
               <select data-todo-new-badge aria-label="Badge to attach">${badgeOptions([])}</select>
+              <button type="button" data-todo-new-badge-add>Add badge</button>
             </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
@@ -189,6 +204,12 @@ const todoListView = (() => {
     select.innerHTML = badgeOptions(badges, select.value);
   }
 
+  function updateProjectOptions(projects, selectedID = '') {
+    const select = document.querySelector('[data-todo-new-project]');
+    if (!select) return;
+    select.innerHTML = projectOptions(projects, selectedID || select.value);
+  }
+
   function updateManagedBadges(badges) {
     const container = document.querySelector('[data-todo-managed-badges]');
     if (container) container.innerHTML = badgeMarkup(badges);
@@ -203,5 +224,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateBadgeDraft, updateBadgeOptions, updateImageDraft, updateManagedBadges, updateNavigation };
+  return { createPage, render, showImage, updateBadgeDraft, updateBadgeOptions, updateImageDraft, updateManagedBadges, updateNavigation, updateProjectOptions };
 })();

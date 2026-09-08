@@ -19,6 +19,14 @@ const codexHost = {
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
   },
 
+  newChat() {
+    const button = [...(this.sidebar()?.querySelectorAll('button') || [])]
+      .find((candidate) => candidate.textContent.trim() === 'New chat');
+    if (!button || button.disabled) return false;
+    button.click();
+    return true;
+  },
+
   composerProject(findThread) {
     const selectedProject = codexUIContracts.activeComposerProject();
     if (selectedProject) return selectedProject;

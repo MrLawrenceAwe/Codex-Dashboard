@@ -192,6 +192,61 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], [])
     }
 
+    func testProjectBadgesComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item" id="new-chat">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="dashboard"
+                  data-app-action-sidebar-project-label="Codex Dashboard"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const project = form.querySelector('[data-todo-new-project]');
+              const projectNames = [...project.options].map((option) => option.textContent);
+              project.value = 'dashboard';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Ship project badges';
+              form.querySelector('[data-todo-new-body]').value = 'Include the new chat action.';
+              form.requestSubmit();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              let opened = 0;
+              document.getElementById('new-chat').addEventListener('click', () => {
+                opened += 1;
+                const composer = document.createElement('textarea');
+                composer.placeholder = 'Do anything';
+                document.body.append(composer);
+              });
+              document.querySelector('[data-todo-new-chat]').click();
+              return [
+                projectNames,
+                stored.projectBadge.id,
+                document.querySelector('[data-todo-project-badge]').textContent,
+                opened,
+                document.querySelector('textarea[placeholder="Do anything"]').value,
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [String], ["No project", "Codex Dashboard"])
+        XCTAssertEqual(values[1] as? String, "dashboard")
+        XCTAssertEqual(values[2] as? String, "Codex Dashboard")
+        XCTAssertEqual(values[3] as? Int, 1)
+        XCTAssertEqual(values[4] as? String, "Ship project badges\n\nInclude the new chat action.")
+    }
+
     func testBadgePickerOptionsRemainReadableInTheNativeMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """

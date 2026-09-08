@@ -1,6 +1,9 @@
 const todoList = (() => {
   let items = todoListState.load();
   let availableBadges = todoListState.loadBadges(items);
+  let projects = [];
+  let projectDraft = null;
+  let projectObserver;
   let filterMode = 'open';
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
@@ -25,6 +28,23 @@ const todoList = (() => {
   function resetBadgeDraft() {
     badgeDraft = [];
     todoListView?.updateBadgeDraft?.(badgeDraft);
+  }
+
+  function refreshProjects() {
+    projects = codexUIContracts.projects();
+    const selected = projectDraft && projects.some((project) => project.id === projectDraft.id)
+      ? projectDraft.id : '';
+    if (!selected) projectDraft = null;
+    todoListView?.updateProjectOptions?.(projects, selected);
+  }
+
+  function startProjectObserver() {
+    if (projectObserver) return;
+    const sidebar = codexHost.sidebar();
+    if (!sidebar) return;
+    projectObserver = new MutationObserver(refreshProjects);
+    projectObserver.observe(sidebar, { childList: true, subtree: true, attributes: true,
+      attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
   }
 
   function addBadgeDraft(value) {
@@ -104,8 +124,9 @@ const todoList = (() => {
     return saved instanceof Promise ? saved.then(finish) : finish(saved);
   }
 
-  function add(title, body = '', image = null, badges = []) {
+  function add(title, body = '', image = null, badges = [], projectBadge = null) {
     const item = todoListState.create(title, body, image, badges);
+    if (item) item.projectBadge = todoListState.normalizeProjectBadge(projectBadge);
     if (!item) return false;
     const finish = (saved) => {
       if (!saved) return false;
@@ -201,6 +222,8 @@ const todoList = (() => {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
+    refreshProjects();
+    startProjectObserver();
     renderBadges();
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
@@ -224,9 +247,11 @@ const todoList = (() => {
         body.value = '';
         resetImageDraft();
         resetBadgeDraft();
+        projectDraft = null;
+        todoListView.updateProjectOptions(projects);
         title.focus();
       };
-      const saved = add(title.value, body.value, imageDraft.image, badgeDraft);
+      const saved = add(title.value, body.value, imageDraft.image, badgeDraft, projectDraft);
       if (saved instanceof Promise) void saved.then(finish);
       else finish(saved);
     });
@@ -283,12 +308,17 @@ const todoList = (() => {
       }
     });
     const badgeInput = page.querySelector('[data-todo-new-badge]');
+    const projectInput = page.querySelector('[data-todo-new-project]');
+    projectInput.addEventListener('change', () => {
+      projectDraft = projects.find((project) => project.id === projectInput.value) || null;
+    });
     const addBadge = () => {
       if (!addBadgeDraft(badgeInput.value)) return;
       badgeInput.value = '';
       badgeInput.focus();
     };
     badgeInput.addEventListener('change', addBadge);
+    page.querySelector('[data-todo-new-badge-add]').addEventListener('click', addBadge);
     page.querySelector('[data-todo-new-badges]').addEventListener('click', (event) => {
       const button = event.target.closest('[data-todo-badge-remove]');
       if (!button) return;
@@ -345,6 +375,23 @@ const todoList = (() => {
         const row = previewButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
         if (item?.image) todoListView.showImage(item.image);
+        return;
+      }
+      const newChatButton = event.target.closest('[data-todo-new-chat]');
+      if (newChatButton) {
+        const row = newChatButton.closest('[data-todo-id]');
+        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
+        if (!item?.projectBadge || !codexHost.newChat()) return;
+        pageState.close();
+        const content = [item.title, item.body].filter(Boolean).join('\n\n');
+        const insert = () => composerAdapter.insert(content);
+        if (insert()) return;
+        void domUtils.waitFor(
+          () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+          { timeout: 3000, interval: 25 },
+        ).then((composer) => {
+          if (composer) insert();
+        });
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
