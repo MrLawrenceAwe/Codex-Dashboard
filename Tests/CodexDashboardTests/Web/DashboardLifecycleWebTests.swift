@@ -5,6 +5,32 @@ import XCTest
 
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
+    func testInjectedNavigationHoverDoesNotReachNativeSidebar() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+          <main>Conversation surface</main>
+        </body></html>
+        """)
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              let nativeHoverCount = 0;
+              document.querySelector('aside').addEventListener('mouseover', () => {
+                nativeHoverCount += 1;
+              });
+              for (const id of ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation']) {
+                document.getElementById(id).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+              }
+              return nativeHoverCount;
+            })()
+            """
+        ) as? Int
+
+        XCTAssertEqual(result, 0)
+    }
+
     func testSidebarObserverIgnoresDashboardMutationsAndTracksThreadRowChanges() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
