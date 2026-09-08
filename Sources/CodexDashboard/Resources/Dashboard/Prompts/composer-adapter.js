@@ -212,5 +212,27 @@ const composerAdapter = (() => {
     return true;
   }
 
-  return { applyPreset, insert };
+  async function attachImage(image) {
+    if (!image?.dataURL) return false;
+    const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
+    if (!composer) return false;
+    try {
+      const response = await fetch(image.dataURL);
+      if (!response.ok) return false;
+      const blob = await response.blob();
+      const file = new File([blob], image.name || 'Attached image', {
+        type: image.type || blob.type,
+      });
+      const clipboard = new DataTransfer();
+      clipboard.items.add(file);
+      const paste = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, 'clipboardData', { value: clipboard });
+      composer.dispatchEvent(paste);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  return { applyPreset, attachImage, insert };
 })();
