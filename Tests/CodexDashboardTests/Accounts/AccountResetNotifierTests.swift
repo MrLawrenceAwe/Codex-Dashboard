@@ -172,7 +172,7 @@ final class AccountResetNotifierTests: XCTestCase {
             fetchedAt: now
         )
 
-        let alerts = AccountResetNotificationPlanner.unexpectedResetNotifications(
+        let alerts = AccountResetNotificationPlanner.resetNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
             previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous.usage)],
@@ -184,7 +184,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour allowance remaining increased from 20% to 90%") == true)
     }
 
-    func testDoesNotAlertForAUsageDropAfterTheScheduledReset() {
+    func testPlansAnImmediateAlertWhenUsageDropsAfterTheScheduledReset() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let current = CodexAccountUsageSnapshot(
@@ -201,14 +201,45 @@ final class AccountResetNotifierTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(
-            AccountResetNotificationPlanner.unexpectedResetNotifications(
-                for: [savedAccount],
-                usageByAccountID: [savedAccount.id: current],
-                previousObservations: [savedAccount.id: previous],
-                now: now
-            ).isEmpty
+        let alerts = AccountResetNotificationPlanner.resetNotifications(
+            for: [savedAccount],
+            usageByAccountID: [savedAccount.id: current],
+            previousObservations: [savedAccount.id: previous],
+            now: now
         )
+
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.title, "Codex limit reset")
+        XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour limit has reset and now has 100% remaining") == true)
+    }
+
+    func testPlansAWeeklyResetAlertWhenTheNewCycleIsObserved() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 99, resetsAt: now.addingTimeInterval(7 * 24 * 60 * 60))
+            ),
+            fetchedAt: now
+        )
+        let previous = AccountUsageResetObservation(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(-30))
+            )
+        )
+
+        let alerts = AccountResetNotificationPlanner.resetNotifications(
+            for: [savedAccount],
+            usageByAccountID: [savedAccount.id: current],
+            previousObservations: [savedAccount.id: previous],
+            now: now
+        )
+
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.title, "Codex limit reset")
+        XCTAssertTrue(alerts.first?.body.contains("Personal’s Weekly limit has reset and now has 1% remaining") == true)
     }
 
     private func account(named name: String) -> SavedAccount {

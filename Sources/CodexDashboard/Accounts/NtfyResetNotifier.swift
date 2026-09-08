@@ -136,7 +136,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             return
         }
         let currentDate = now()
-        let unexpectedResets = AccountResetNotificationPlanner.unexpectedResetNotifications(
+        let resetNotifications = AccountResetNotificationPlanner.resetNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID,
             previousObservations: observations(),
@@ -181,7 +181,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 await self?.deliver(notification)
             }
         }
-        for notification in unexpectedResets {
+        for notification in resetNotifications {
             do {
                 try await publisher.publish(topic: topic, title: notification.title, message: notification.body)
             } catch {

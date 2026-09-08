@@ -139,6 +139,40 @@ final class NtfyResetNotifierTests: XCTestCase {
         XCTAssertTrue(messages.first?.body.contains("allowance remaining increased from 20% to 90%") == true)
     }
 
+    func testDeliversACompletedResetOnlyOnce() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        let publisher = RecordingNtfyPublisher()
+        let notifier = NtfyResetNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        let beforeReset = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 80, resetsAt: now.addingTimeInterval(-30)),
+                weekly: nil
+            ),
+            fetchedAt: now.addingTimeInterval(-60)
+        )
+        let afterReset = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
+                weekly: nil
+            ),
+            fetchedAt: now
+        )
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: beforeReset])
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: afterReset])
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: afterReset])
+
+        let messages = await publisher.recordedMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages.first?.title, "Codex limit reset")
+        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour limit has reset and now has 90% remaining") == true)
+    }
+
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
