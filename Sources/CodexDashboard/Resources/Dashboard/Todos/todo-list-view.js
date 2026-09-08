@@ -107,7 +107,6 @@ const todoListView = (() => {
             <div class="todo-badge-composer">
               <div class="todo-badges" data-todo-new-badges aria-label="New to-do badges"></div>
               <select data-todo-new-badge aria-label="Badge to attach">${badgeOptions([])}</select>
-              <button type="button" data-todo-new-badge-add>Attach badge</button>
             </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>

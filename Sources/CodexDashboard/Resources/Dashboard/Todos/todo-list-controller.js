@@ -288,7 +288,7 @@ const todoList = (() => {
       badgeInput.value = '';
       badgeInput.focus();
     };
-    page.querySelector('[data-todo-new-badge-add]').addEventListener('click', addBadge);
+    badgeInput.addEventListener('change', addBadge);
     page.querySelector('[data-todo-new-badges]').addEventListener('click', (event) => {
       const button = event.target.closest('[data-todo-badge-remove]');
       if (!button) return;
