@@ -88,7 +88,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.topic, notifier.topic)
-        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour limit has 82% remaining") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour: 82% left · resets ") == true)
     }
 
     func testDisabledNotifierDoesNotPublishDueReset() async throws {
@@ -149,7 +149,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.title, "Codex limit reset early")
-        XCTAssertTrue(messages.first?.body.contains("allowance remaining increased from 20% to 90%") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour: 20% → 90% early") == true)
     }
 
     func testDeliversACompletedResetOnlyOnce() async throws {
@@ -187,8 +187,8 @@ final class NtfyResetNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.title, "Codex limit reset")
-        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour limit has reset and now has 90% remaining") == true)
-        XCTAssertTrue(messages.first?.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 90%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 2") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour reset: 90% left") == true)
+        XCTAssertTrue(messages.first?.body.contains("\n5-hour 90% · Weekly 50% · Banked resets 2") == true)
     }
 
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {

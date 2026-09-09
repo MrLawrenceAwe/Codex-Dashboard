@@ -22,7 +22,7 @@ struct AccountResetNotification: Equatable, Sendable {
         AccountResetNotification(
             identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
             title: deadlineUpdateTitle,
-            body: "\(deadlineDescription) at \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)). \(usageSummary)",
+            body: "\(deadlineDescription): \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)).\n\(usageSummary)",
             deadlineUpdateTitle: deadlineUpdateTitle,
             deadlineDescription: deadlineDescription,
             usageSummary: usageSummary,
@@ -218,9 +218,9 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName) limit has \(remainingPercent)% remaining and will reset in \(leadTimeDescription), at \(formattedDeadline(resetsAt)). \(usageSummary)",
+                body: "\(account.name)’s \(windowName): \(remainingPercent)% left · resets \(formattedDeadline(resetsAt)).\n\(usageSummary)",
                 deadlineUpdateTitle: "\(windowName) reset time changed",
-                deadlineDescription: "\(account.name)’s \(windowName) limit will now reset",
+                deadlineDescription: "\(account.name)’s \(windowName) reset moved",
                 usageSummary: usageSummary,
                 notificationDate: resetsAt.addingTimeInterval(-leadTime),
                 deadlineDate: resetsAt
@@ -250,13 +250,13 @@ enum AccountResetNotificationPlanner {
             return AccountLimitResetNotification(
                 identifier: identifier,
                 title: "Codex limit reset early",
-                body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)). Next reset: \(formattedDeadline(nextReset)). \(usageSummary)"
+                body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(formattedDeadline(nextReset)).\n\(usageSummary)"
             )
         }
         return AccountLimitResetNotification(
             identifier: identifier,
             title: "Codex limit reset",
-            body: "\(account.name)’s \(windowName) limit has reset and now has \(currentAllowance)% remaining. Next reset: \(formattedDeadline(nextReset)). \(usageSummary)"
+            body: "\(account.name)’s \(windowName) reset: \(currentAllowance)% left · next \(formattedDeadline(nextReset)).\n\(usageSummary)"
         )
     }
 
@@ -280,7 +280,7 @@ enum AccountResetNotificationPlanner {
             return AccountLimitResetNotification(
                 identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
                 title: "Codex \(windowName) usage below \(threshold)%",
-                body: "\(account.name)’s \(windowName) limit has fallen below \(threshold)% remaining (now \(currentRemaining)%). It resets at \(formattedDeadline(reset)). \(usageSummary)"
+                body: "\(account.name)’s \(windowName): \(currentRemaining)% left · resets \(formattedDeadline(reset)).\n\(usageSummary)"
             )
         }
     }
@@ -300,7 +300,7 @@ enum AccountResetNotificationPlanner {
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
-                body: "\(account.name) has \(countDescription) available; the next one expires in \(leadTimeDescription), at \(formattedDeadline(expiration)). \(usageSummary)",
+                body: "\(account.name): \(countDescription) · next expires \(formattedDeadline(expiration)).\n\(usageSummary)",
                 deadlineUpdateTitle: "Banked reset expiry changed",
                 deadlineDescription: "\(account.name)’s next banked reset will now expire",
                 usageSummary: usageSummary,
@@ -330,7 +330,7 @@ enum AccountResetNotificationPlanner {
         let fiveHour = remainingUsage(for: usage.fiveHour)
         let weekly = remainingUsage(for: usage.weekly)
         let bankedResets = usage.bankedResets.map { String(max(0, $0.availableCount)) } ?? "unavailable"
-        return "📊 Usage remaining:\n• ⏱️ 5-hour: \(fiveHour)\n• 📅 Weekly: \(weekly)\n• 🎟️ Banked resets: \(bankedResets)"
+        return "5-hour \(fiveHour) · Weekly \(weekly) · Banked resets \(bankedResets)"
     }
 
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {
