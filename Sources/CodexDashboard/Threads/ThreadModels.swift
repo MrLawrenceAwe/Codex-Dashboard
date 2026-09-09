@@ -36,6 +36,10 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let runState: ThreadRunState
     let latestLifecycleEvent: ThreadLifecycleEvent?
     var workingTreeStatus: WorkingTreeStatus
+
+    var originatesFromChromeExtension: Bool {
+        preview.contains("# Chrome tabs:\n- The user has the Chrome extension side panel open.")
+    }
 }
 
 struct ThreadCatalog: Sendable {

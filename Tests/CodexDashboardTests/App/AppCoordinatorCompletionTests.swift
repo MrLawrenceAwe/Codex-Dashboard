@@ -233,4 +233,56 @@ extension AppCoordinatorTests {
         XCTAssertEqual(foregrounder.callCount, 0)
     }
 
+    func testChromeExtensionTaskCompletionDoesNotForegroundOrOpenCodex() async {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let chromeExtensionPreview = """
+        # Chrome tabs:
+        - The user has the Chrome extension side panel open.
+        - Current URL: https://example.com
+
+        ## My request:
+        Summarize this page.
+        """
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [
+                    .fixture(
+                        id: "thread-1",
+                        preview: chromeExtensionPreview,
+                        runState: .running,
+                        latestLifecycleEvent: started
+                    ),
+                ],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [
+                    .fixture(
+                        id: "thread-1",
+                        preview: chromeExtensionPreview,
+                        latestLifecycleEvent: completed
+                    ),
+                ],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { _ in runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+    }
+
 }

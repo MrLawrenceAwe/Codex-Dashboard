@@ -121,7 +121,10 @@ extension AppCoordinator {
         refreshThreadDataWarning()
         if let completedThreadID {
             Task { await self.refreshAccountUsage() }
-            if foregroundOnTaskCompletion, !typingActivityDetector.isUserTyping {
+            let completedThread = snapshot.catalog.threads.first { $0.id == completedThreadID }
+            if foregroundOnTaskCompletion,
+               completedThread?.originatesFromChromeExtension != true,
+               !typingActivityDetector.isUserTyping {
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)
             }
