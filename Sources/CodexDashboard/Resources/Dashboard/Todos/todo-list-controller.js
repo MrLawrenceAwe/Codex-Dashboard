@@ -354,20 +354,98 @@ const todoList = (() => {
     tagDialog.addEventListener('click', (event) => {
       if (event.target === tagDialog) closeTagDialog();
     });
+    const tagNameInput = tagDialog.querySelector('[data-todo-tag-name]');
+    const tagFormButton = tagDialog.querySelector('[data-todo-tag-form] button[type="submit"]');
+    const resetTagForm = () => {
+      tagNameInput.value = '';
+      delete tagNameInput.dataset.todoTagRename;
+      tagNameInput.setAttribute('aria-label', 'Tag name');
+      tagFormButton.textContent = 'Create tag';
+    };
     tagDialog.querySelector('[data-todo-tag-form]').addEventListener('submit', (event) => {
       event.preventDefault();
-      const name = tagDialog.querySelector('[data-todo-tag-name]');
+      const name = tagNameInput;
       const previousTags = availableTags;
-      const nextTags = todoListState.normalizeTags([...availableTags, name.value]);
-      if (nextTags.length === availableTags.length) return;
+      const oldTag = name.dataset.todoTagRename;
+      const replacement = todoListState.normalizeTags([name.value])[0];
+      if (oldTag && availableTags.some((tag) => tag !== oldTag
+        && tag.toLocaleLowerCase() === replacement?.toLocaleLowerCase())) return;
+      const nextTags = oldTag
+        ? todoListState.normalizeTags(availableTags.map((tag) => tag === oldTag ? name.value : tag))
+        : todoListState.normalizeTags([...availableTags, name.value]);
+      if (!replacement || (!oldTag && nextTags.length === availableTags.length)
+        || (oldTag && nextTags.every((tag, index) => tag === availableTags[index]))) return;
       availableTags = nextTags;
       if (!persistTags()) {
         availableTags = previousTags;
         return;
       }
-      name.value = '';
+      if (oldTag) {
+        const previousTagDraft = tagDraft;
+        const nextItems = items.map((item) => ({
+          ...item,
+          tags: item.tags.map((tag) => tag === oldTag ? replacement : tag),
+        }));
+        tagDraft = tagDraft.map((tag) => tag === oldTag ? replacement : tag);
+        const saved = commitItems(nextItems);
+        const restoreTagsAfterFailedItemSave = (success) => {
+          if (success) return;
+          availableTags = previousTags;
+          tagDraft = previousTagDraft;
+          persistTags();
+          renderTags();
+          todoListView.updateTagDraft(tagDraft);
+        };
+        if (saved instanceof Promise) void saved.then(restoreTagsAfterFailedItemSave);
+        else restoreTagsAfterFailedItemSave(saved);
+      }
+      resetTagForm();
       renderTags();
+      todoListView.updateTagDraft(tagDraft);
       name.focus();
+    });
+    tagDialog.querySelector('[data-todo-managed-tags]').addEventListener('click', (event) => {
+      const editButton = event.target.closest('[data-todo-managed-tag-edit]');
+      if (editButton) {
+        tagNameInput.value = editButton.dataset.todoManagedTagEdit;
+        tagNameInput.dataset.todoTagRename = editButton.dataset.todoManagedTagEdit;
+        tagNameInput.setAttribute('aria-label', `Rename tag ${editButton.dataset.todoManagedTagEdit}`);
+        tagFormButton.textContent = 'Save tag';
+        tagNameInput.focus();
+        tagNameInput.select();
+        return;
+      }
+      const button = event.target.closest('[data-todo-managed-tag-remove]');
+      if (!button) return;
+      const tag = button.dataset.todoManagedTagRemove;
+      const previousTags = availableTags;
+      const previousTagDraft = tagDraft;
+      const nextTags = availableTags.filter((candidate) => candidate !== tag);
+      if (nextTags.length === previousTags.length) return;
+      const nextItems = items.map((item) => ({
+        ...item,
+        tags: item.tags.filter((candidate) => candidate !== tag),
+      }));
+      availableTags = nextTags;
+      tagDraft = tagDraft.filter((candidate) => candidate !== tag);
+      if (tagNameInput.dataset.todoTagRename === tag) resetTagForm();
+      if (!persistTags()) {
+        availableTags = previousTags;
+        return;
+      }
+      renderTags();
+      todoListView.updateTagDraft(tagDraft);
+      const saved = commitItems(nextItems);
+      const restoreTagsAfterFailedItemSave = (success) => {
+          if (success) return;
+          availableTags = previousTags;
+          tagDraft = previousTagDraft;
+          persistTags();
+          renderTags();
+          todoListView.updateTagDraft(tagDraft);
+      };
+      if (saved instanceof Promise) void saved.then(restoreTagsAfterFailedItemSave);
+      else restoreTagsAfterFailedItemSave(saved);
     });
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {

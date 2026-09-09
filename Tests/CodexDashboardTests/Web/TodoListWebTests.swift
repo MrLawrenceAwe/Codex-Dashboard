@@ -228,6 +228,100 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Important×")
     }
 
+    func testManagedTagDeletionUnassignsItFromTodosAndPersists() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
+              dialog.querySelector('[data-todo-tag-name]').value = 'Work';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              form.querySelector('[data-todo-new-tag]').value = 'Work';
+              form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Send update';
+              form.requestSubmit();
+              const deleteButton = dialog.querySelector('[data-todo-managed-tag-remove="Work"]');
+              const accessible = deleteButton.getAttribute('aria-label');
+              deleteButton.click();
+              return [
+                accessible,
+                JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
+                JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].tags,
+                document.querySelector('[data-todo-managed-tag-remove]') === null,
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "Delete tag Work from all to-dos")
+        XCTAssertEqual(values[1] as? [String], [])
+        XCTAssertEqual(values[2] as? [String], [])
+        XCTAssertEqual(values[3] as? Bool, true)
+    }
+
+    func testManagedTagCanBeRenamedAcrossTodos() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
+              dialog.querySelector('[data-todo-tag-name]').value = 'Work';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              form.querySelector('[data-todo-new-tag]').value = 'Work';
+              form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Send update';
+              form.requestSubmit();
+              const renameButton = dialog.querySelector('[data-todo-managed-tag-edit="Work"]');
+              const accessible = renameButton.getAttribute('aria-label');
+              renameButton.click();
+              const name = dialog.querySelector('[data-todo-tag-name]');
+              const savesRename = dialog.querySelector('[data-todo-tag-form] button').textContent === 'Save tag';
+              name.value = 'Client';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              return [
+                accessible,
+                savesRename,
+                JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
+                JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].tags,
+                document.querySelector('[data-todo-id] .todo-tag').textContent.trim(),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "Rename tag Work")
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? [String], ["Client"])
+        XCTAssertEqual(values[3] as? [String], ["Client"])
+        XCTAssertEqual(values[4] as? String, "Client×")
+    }
+
     func testTagDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
