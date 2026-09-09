@@ -146,6 +146,7 @@ enum AccountResetNotificationPlanner {
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
+                    usageSummary: usageSummary(for: usage),
                     now: now
                 ),
                 resetNotification(
@@ -153,6 +154,7 @@ enum AccountResetNotificationPlanner {
                     windowName: "Weekly",
                     current: usage.weekly,
                     previous: previous.weekly,
+                    usageSummary: usageSummary(for: usage),
                     now: now
                 ),
             ].compactMap { $0 }
@@ -199,6 +201,7 @@ enum AccountResetNotificationPlanner {
         windowName: String,
         current: CodexUsageWindow?,
         previous: AccountUsageResetObservation.Window?,
+        usageSummary: String,
         now: Date
     ) -> AccountLimitResetNotification? {
         guard let current, let previous,
@@ -215,13 +218,13 @@ enum AccountResetNotificationPlanner {
             return AccountLimitResetNotification(
                 identifier: identifier,
                 title: "Codex limit reset early",
-                body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)). Next reset: \(formattedDeadline(nextReset))."
+                body: "\(account.name)’s \(windowName) allowance remaining increased from \(previousAllowance)% to \(currentAllowance)% before its scheduled reset at \(formattedDeadline(previousReset)). Next reset: \(formattedDeadline(nextReset)). \(usageSummary)"
             )
         }
         return AccountLimitResetNotification(
             identifier: identifier,
             title: "Codex limit reset",
-            body: "\(account.name)’s \(windowName) limit has reset and now has \(currentAllowance)% remaining. Next reset: \(formattedDeadline(nextReset))."
+            body: "\(account.name)’s \(windowName) limit has reset and now has \(currentAllowance)% remaining. Next reset: \(formattedDeadline(nextReset)). \(usageSummary)"
         )
     }
 
@@ -270,7 +273,7 @@ enum AccountResetNotificationPlanner {
         let fiveHour = remainingUsage(for: usage.fiveHour)
         let weekly = remainingUsage(for: usage.weekly)
         let bankedResets = usage.bankedResets.map { String(max(0, $0.availableCount)) } ?? "unavailable"
-        return "Usage remaining: 5-hour \(fiveHour) · weekly \(weekly) · banked resets \(bankedResets)."
+        return "📊 Usage remaining:\n• ⏱️ 5-hour: \(fiveHour)\n• 📅 Weekly: \(weekly)\n• 🎟️ Banked resets: \(bankedResets)"
     }
 
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {
