@@ -4,6 +4,7 @@ const todoList = (() => {
   let projects = [];
   let projectDraft = null;
   let projectObserver;
+  let observedProjectSidebar;
   let filterMode = 'open';
   // Image saves use IndexedDB and therefore complete asynchronously. Keep every
   // snapshot in order so a slower, older save cannot overwrite a newer edit in
@@ -44,10 +45,12 @@ const todoList = (() => {
   }
 
   function startProjectObserver() {
-    if (projectObserver) return;
     const sidebar = codexHost.sidebar();
+    if (sidebar === observedProjectSidebar) return;
+    if (!projectObserver) projectObserver = new MutationObserver(refreshProjects);
+    projectObserver.disconnect();
+    observedProjectSidebar = sidebar;
     if (!sidebar) return;
-    projectObserver = new MutationObserver(refreshProjects);
     projectObserver.observe(sidebar, { childList: true, subtree: true, attributes: true,
       attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
   }
@@ -559,6 +562,8 @@ const todoList = (() => {
 
   function open() {
     if (!document.getElementById(dashboardElements.elementIDs.todoPage)) mountPage();
+    refreshProjects();
+    startProjectObserver();
     if (pageState.open()) render();
   }
 
