@@ -80,6 +80,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
     private static let knownDeadlinesKey = "ntfyKnownAccountDeadlines"
     private static let sentDeadlineUpdatesKey = "ntfySentAccountDeadlineUpdates"
     private static let usageObservationsKey = "ntfyAccountUsageObservations"
+    private static let deliveredImmediateNotificationsKey = "ntfyDeliveredImmediateAccountNotifications"
 
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
@@ -142,6 +143,11 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             previousObservations: observations(),
             now: currentDate
         )
+        let thresholdNotifications = AccountResetNotificationPlanner.usageThresholdNotifications(
+            for: accounts,
+            usageByAccountID: usageByAccountID,
+            previousObservations: observations()
+        )
         let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID,
@@ -181,9 +187,13 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 await self?.deliver(notification)
             }
         }
-        for notification in resetNotifications {
+        let immediateNotifications = (resetNotifications + thresholdNotifications).filter {
+            !deliveredImmediateNotificationIdentifiers().contains($0.identifier)
+        }
+        for notification in immediateNotifications {
             do {
                 try await publisher.publish(topic: topic, title: notification.title, message: notification.body)
+                recordDeliveredImmediateNotification(notification.identifier)
             } catch {
                 // Leave the previous observation in place so a later refresh can retry.
                 return
@@ -230,6 +240,16 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         var delivered = userDefaults.dictionary(forKey: Self.deliveredResetsKey) ?? [:]
         delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
         userDefaults.set(delivered, forKey: Self.deliveredResetsKey)
+    }
+
+    private func deliveredImmediateNotificationIdentifiers() -> Set<String> {
+        Set(userDefaults.stringArray(forKey: Self.deliveredImmediateNotificationsKey) ?? [])
+    }
+
+    private func recordDeliveredImmediateNotification(_ identifier: String) {
+        var identifiers = deliveredImmediateNotificationIdentifiers()
+        identifiers.insert(identifier)
+        userDefaults.set(Array(identifiers), forKey: Self.deliveredImmediateNotificationsKey)
     }
 
     private func deadlines(forKey key: String) -> [String: Date] {
