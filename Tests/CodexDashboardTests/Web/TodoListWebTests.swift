@@ -581,6 +581,38 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Late Project")
     }
 
+    func testOpeningTodosRefreshesProjectsAfterTheSidebarIsReplaced() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const replacement = document.createElement('aside');
+              replacement.setAttribute('role', 'navigation');
+              replacement.innerHTML = `
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row
+                  data-app-action-sidebar-project-id="replacement-project"
+                  data-app-action-sidebar-project-label="Replacement Project"></div>`;
+              document.querySelector('aside').replaceWith(replacement);
+              window.__codexDashboard.openTodos();
+              return [...document.querySelector('[data-todo-new-project]').options]
+                .map((option) => [option.value, option.textContent]);
+            })()
+            """
+        ) as? [[String]]
+
+        XCTAssertEqual(result, [["", "No project"], ["replacement-project", "Replacement Project"]])
+    }
+
     func testTagPickerOptionsRemainReadableInTheNativeMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
