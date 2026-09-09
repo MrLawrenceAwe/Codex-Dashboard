@@ -11,10 +11,10 @@ const todoListView = (() => {
       </div>`;
   }
 
-  function tagMarkup(tags, editable = false) {
+  function tagMarkup(tags, editable = false, deletable = false) {
     if (!tags.length) return '';
     return `<div class="todo-tags" aria-label="To-do tags">${tags.map((tag) => `
-      <span class="todo-tag">${domUtils.escapeHTML(tag)}${editable ? `<button type="button" data-todo-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Remove tag ${domUtils.escapeHTML(tag)}" title="Remove tag ${domUtils.escapeHTML(tag)}">&times;</button>` : ''}</span>
+      <span class="todo-tag">${domUtils.escapeHTML(tag)}${editable ? `<button type="button" data-todo-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Remove tag ${domUtils.escapeHTML(tag)}" title="Remove tag ${domUtils.escapeHTML(tag)}">&times;</button>` : ''}${deletable ? `<button type="button" data-todo-managed-tag-edit="${domUtils.escapeHTML(tag)}" aria-label="Rename tag ${domUtils.escapeHTML(tag)}" title="Rename tag">&#9998;</button><button type="button" data-todo-managed-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Delete tag ${domUtils.escapeHTML(tag)} from all to-dos" title="Delete tag from all to-dos">&times;</button>` : ''}</span>
     `).join('')}</div>`;
   }
 
@@ -224,7 +224,7 @@ const todoListView = (() => {
 
   function updateManagedTags(tags) {
     const container = document.querySelector('[data-todo-managed-tags]');
-    if (container) container.innerHTML = tagMarkup(tags);
+    if (container) container.innerHTML = tagMarkup(tags, false, true);
   }
 
   function showImage(image) {
