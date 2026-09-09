@@ -25,18 +25,18 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     }
 
     private struct GlobalState: Decodable {
-        let persistedAtoms: PersistedAtoms
+        let threadReadState: ThreadReadState
 
         private enum CodingKeys: String, CodingKey {
-            case persistedAtoms = "electron-persisted-atom-state"
+            case threadReadState = "electron-thread-read-state-v1"
         }
     }
 
-    private struct PersistedAtoms: Decodable {
-        let unreadThreadIDsByHost: [String: [String]]
+    private struct ThreadReadState: Decodable {
+        let unreadByIdentity: [String: [String: [String]]]
 
         private enum CodingKeys: String, CodingKey {
-            case unreadThreadIDsByHost = "unread-thread-ids-by-host-v1"
+            case unreadByIdentity = "unreadByIdentity"
         }
     }
 
@@ -85,6 +85,11 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
 
     static func decodeUnreadThreadIDs(from data: Data) throws -> Set<String> {
         let state = try JSONDecoder().decode(GlobalState.self, from: data)
-        return Set(state.persistedAtoms.unreadThreadIDsByHost["local"] ?? [])
+        return Set(
+            state.threadReadState.unreadByIdentity.values
+                .flatMap(\.self)
+                .filter { hostID, _ in hostID == "local" || hostID.hasPrefix("local:") }
+                .flatMap(\.value)
+        )
     }
 }
