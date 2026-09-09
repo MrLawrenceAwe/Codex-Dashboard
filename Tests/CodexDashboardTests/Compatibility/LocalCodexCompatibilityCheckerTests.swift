@@ -23,7 +23,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
             testCase: self
         )
         let globalStateURL = try makeGlobalState(
-            #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["thread-1"]}}}"#
+            #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["thread-1"]}}}}"#
         )
         let checker = LocalCodexCompatibilityChecker(
             applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
@@ -43,7 +43,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
             schema: "CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, recency_at_ms INTEGER NOT NULL);",
             testCase: self
         )
-        let globalStateURL = try makeGlobalState(#"{"electron-persisted-atom-state":{}}"#)
+        let globalStateURL = try makeGlobalState(#"{"electron-thread-read-state-v1":{}}"#)
         let checker = LocalCodexCompatibilityChecker(
             applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
             stateDatabaseURL: databaseURL,
@@ -75,7 +75,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
 
     func testRejectsUnreadArraysThatProductionDecoderCannotRead() async throws {
         let globalStateURL = try makeGlobalState(
-            #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":[42]}}}"#
+            #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":[42]}}}}"#
         )
         let checker = LocalCodexCompatibilityChecker(
             applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),

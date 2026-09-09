@@ -25,10 +25,12 @@ final class UnreadThreadIDProviderTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-global-state-\(UUID().uuidString).json")
         let state = """
         {
-          "electron-persisted-atom-state": {
-            "unread-thread-ids-by-host-v1": {
-              "local": ["thread-one", "thread-two"],
-              "cloud": ["cloud-thread"]
+          "electron-thread-read-state-v1": {
+            "unreadByIdentity": {
+              "identity-one": {
+                "local:one": ["thread-one", "thread-two"],
+                "remote:one": ["cloud-thread"]
+              }
             }
           }
         }
@@ -59,7 +61,7 @@ final class UnreadThreadIDProviderTests: XCTestCase {
     func testReusesDecodedStateWhileFileSignatureIsUnchanged() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-cached-global-state-\(UUID().uuidString).json")
-        let state = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["thread-one"]}}}"#
+        let state = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["thread-one"]}}}}"#
         try Data(state.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
         let loader = CountingStateLoader()
@@ -75,8 +77,8 @@ final class UnreadThreadIDProviderTests: XCTestCase {
     func testReloadsDecodedStateWhenFileSignatureChanges() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-updated-global-state-\(UUID().uuidString).json")
-        let firstState = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["one"]}}}"#
-        let secondState = #"{"electron-persisted-atom-state":{"unread-thread-ids-by-host-v1":{"local":["two"]}}}"#
+        let firstState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["one"]}}}}"#
+        let secondState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["two"]}}}}"#
         try Data(firstState.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
         let provider = CodexUnreadThreadIDProvider(stateURL: stateURL)
