@@ -172,7 +172,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               tagDialog.querySelector('[data-todo-tag-name]').value = 'Work';
               tagDialog.querySelector('[data-todo-tag-form]').requestSubmit();
               tagPicker.value = 'Work';
-              form.querySelector('[data-todo-new-tag-add]').click();
+              tagPicker.dispatchEvent(new Event('change', { bubbles: true }));
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
@@ -216,7 +216,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
               const picker = document.querySelector('[data-todo-id] [data-todo-tag]');
               picker.value = 'Important';
-              document.querySelector('[data-todo-id] [data-todo-tag-add]').click();
+              picker.dispatchEvent(new Event('change', { bubbles: true }));
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [stored.tags, document.querySelector('[data-todo-id] .todo-tag').textContent.trim()];
             })()

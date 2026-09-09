@@ -77,8 +77,15 @@ final class CodexAccountManager: @unchecked Sendable {
     ) throws {
         try lock.withLock {
             let document = try documentStore.load()
-            guard document.accounts.contains(where: { $0.id == accountID }) else {
+            guard let account = document.accounts.first(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
+            }
+            guard
+                let expectedIdentifier = account.accountIdentifier,
+                let returnedIdentifier = AccountIdentityDecoder.identity(in: credential)?.identifier,
+                returnedIdentifier == expectedIdentifier
+            else {
+                throw CodexAccountError.credentialAccountMismatch
             }
             if interactionAllowed {
                 try vault.store(credential, for: accountID)

@@ -344,6 +344,26 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(vault.credential(for: account.id), refreshedCredential)
     }
 
+    func testUsageCredentialUpdateRejectsACredentialForAnotherAccount() throws {
+        let personalCredential = credential(accountID: "account-personal", name: "Personal")
+        try personalCredential.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        let otherCredential = credential(accountID: "account-work", name: "Work")
+
+        XCTAssertThrowsError(
+            try manager.updateSavedCredential(
+                otherCredential,
+                for: account.id,
+                interactionAllowed: false
+            )
+        ) { error in
+            guard case CodexAccountError.credentialAccountMismatch = error else {
+                return XCTFail("Expected credential-account mismatch, got \(error)")
+            }
+        }
+        XCTAssertEqual(vault.credential(for: account.id), personalCredential)
+    }
+
     func testLoadReplacesStoredCustomNameWithAuthenticatedAccountName() throws {
         let credential = credential(accountID: "account-personal", name: "Lawrence Awe")
         try credential.write(to: authenticationURL)

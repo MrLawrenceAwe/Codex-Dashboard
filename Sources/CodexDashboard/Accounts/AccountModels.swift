@@ -70,6 +70,7 @@ enum CodexAccountError: LocalizedError {
     case accountNotFound
     case activeTasks
     case accountIdentityUnavailable
+    case credentialAccountMismatch
     case invalidCredential
     case keychainAuthorizationRequired
     case keychain(OSStatus)
@@ -88,6 +89,8 @@ enum CodexAccountError: LocalizedError {
             return "Wait for active Codex tasks to finish before switching accounts."
         case .accountIdentityUnavailable:
             return "Codex could not read the signed-in account identity. Sign in again, then save the account."
+        case .credentialAccountMismatch:
+            return "Codex returned credentials for a different account. The saved credential was left unchanged."
         case .invalidCredential:
             return "Codex authentication data is invalid and was not saved or activated."
         case .keychainAuthorizationRequired:
