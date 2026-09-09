@@ -54,6 +54,7 @@ struct AccountLimitResetNotification: Equatable, Sendable {
 }
 
 enum AccountResetNotificationPlanner {
+    private static let resetTimeCorrectionTolerance: TimeInterval = 5 * 60
     private static let oneHour: TimeInterval = 60 * 60
     private static let fiveHours: TimeInterval = 5 * 60 * 60
     private static let twelveHours: TimeInterval = 12 * 60 * 60
@@ -161,6 +162,37 @@ enum AccountResetNotificationPlanner {
         }.sorted { $0.identifier < $1.identifier }
     }
 
+    /// Produces one immediate alert as each usage window passes a remaining-usage threshold.
+    /// Comparing observations from the same reset window makes the alert naturally fire only
+    /// once, including after the dashboard is relaunched.
+    static func usageThresholdNotifications(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        previousObservations: [UUID: AccountUsageResetObservation]
+    ) -> [AccountLimitResetNotification] {
+        accounts.flatMap { account -> [AccountLimitResetNotification] in
+            guard let usage = usageByAccountID[account.id]?.usage,
+                  let previous = previousObservations[account.id]
+            else { return [] }
+            return [
+                thresholdNotifications(
+                    for: account,
+                    windowName: "5-hour",
+                    current: usage.fiveHour,
+                    previous: previous.fiveHour,
+                    usageSummary: usageSummary(for: usage)
+                ),
+                thresholdNotifications(
+                    for: account,
+                    windowName: "Weekly",
+                    current: usage.weekly,
+                    previous: previous.weekly,
+                    usageSummary: usageSummary(for: usage)
+                ),
+            ].flatMap { $0 }
+        }.sorted { $0.identifier < $1.identifier }
+    }
+
     static func observations(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
@@ -226,6 +258,31 @@ enum AccountResetNotificationPlanner {
             title: "Codex limit reset",
             body: "\(account.name)’s \(windowName) limit has reset and now has \(currentAllowance)% remaining. Next reset: \(formattedDeadline(nextReset)). \(usageSummary)"
         )
+    }
+
+    private static func thresholdNotifications(
+        for account: SavedAccount,
+        windowName: String,
+        current: CodexUsageWindow?,
+        previous: AccountUsageResetObservation.Window?,
+        usageSummary: String
+    ) -> [AccountLimitResetNotification] {
+        guard let current, let previous,
+              let reset = current.resetsAt,
+              let previousReset = previous.resetsAt,
+              abs(previousReset.timeIntervalSince(reset)) <= resetTimeCorrectionTolerance
+        else { return [] }
+
+        let currentRemaining = max(0, min(100, 100 - current.usedPercent))
+        let previousRemaining = max(0, min(100, 100 - previous.usedPercent))
+        return [80, 50, 20].compactMap { threshold in
+            guard previousRemaining >= threshold, currentRemaining < threshold else { return nil }
+            return AccountLimitResetNotification(
+                identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
+                title: "Codex \(windowName) usage below \(threshold)%",
+                body: "\(account.name)’s \(windowName) limit has fallen below \(threshold)% remaining (now \(currentRemaining)%). It resets at \(formattedDeadline(reset)). \(usageSummary)"
+            )
+        }
     }
 
     private static func bankedResetExpiryNotifications(
@@ -333,6 +390,11 @@ final class AccountResetNotifier: AccountResetNotifying {
             previousObservations: observations(),
             now: .now
         )
+        let thresholdNotifications = AccountResetNotificationPlanner.usageThresholdNotifications(
+            for: accounts,
+            usageByAccountID: usageByAccountID,
+            previousObservations: observations()
+        )
         let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
             for: accounts,
             usageByAccountID: usageByAccountID
@@ -356,7 +418,8 @@ final class AccountResetNotifier: AccountResetNotifying {
         notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
 
         let requests = notifications + deadlineUpdates
-        guard !requests.isEmpty || !resetNotifications.isEmpty, await notificationsAreAuthorized() else {
+        let immediateNotifications = resetNotifications + thresholdNotifications
+        guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationsAreAuthorized() else {
             saveObservations(for: accounts, usageByAccountID: usageByAccountID)
             return
         }
@@ -389,7 +452,7 @@ final class AccountResetNotifier: AccountResetNotifying {
                 // immediate revised-deadline alert that macOS rejected.
             }
         }
-        for notification in resetNotifications {
+        for notification in immediateNotifications {
             let content = UNMutableNotificationContent()
             content.title = notification.title
             content.body = notification.body
