@@ -25,7 +25,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.contains {
             $0.title == "Codex limit resets in one hour"
                 && $0.body.contains("Personal’s 5-hour limit has 75% remaining and will reset in one hour, at ")
-                && $0.body.contains("Usage remaining: 5-hour 75% · weekly 50% · banked resets 2.")
+                && $0.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 75%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 2")
         })
         XCTAssertEqual(
             Set(notifications.filter { $0.identifier.contains("weekly") }.map(\.title)),
@@ -95,7 +95,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(updates.count, 1)
         XCTAssertEqual(updates.first?.title, "5-hour reset time changed")
         XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour limit will now reset at ") == true)
-        XCTAssertTrue(updates.first?.body.contains("Usage remaining: 5-hour 75% · weekly 50% · banked resets 0.") == true)
+        XCTAssertTrue(updates.first?.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 75%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 0") == true)
         XCTAssertTrue(
             AccountResetNotificationPlanner.deadlineUpdateNotifications(
                 from: revised,
@@ -167,7 +167,11 @@ final class AccountResetNotifierTests: XCTestCase {
         let current = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
-                weekly: CodexUsageWindow(usedPercent: 50, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60))
+                weekly: CodexUsageWindow(usedPercent: 50, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60)),
+                bankedResets: CodexBankedResetSummary(
+                    availableCount: 2,
+                    nextExpiration: now.addingTimeInterval(24 * 60 * 60)
+                )
             ),
             fetchedAt: now
         )
@@ -182,6 +186,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex limit reset early")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour allowance remaining increased from 20% to 90%") == true)
+        XCTAssertTrue(alerts.first?.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 90%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 2") == true)
     }
 
     func testPlansAnImmediateAlertWhenUsageDropsAfterTheScheduledReset() {
@@ -190,7 +195,11 @@ final class AccountResetNotifierTests: XCTestCase {
         let current = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(usedPercent: 0, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
-                weekly: nil
+                weekly: CodexUsageWindow(usedPercent: 50, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60)),
+                bankedResets: CodexBankedResetSummary(
+                    availableCount: 2,
+                    nextExpiration: now.addingTimeInterval(24 * 60 * 60)
+                )
             ),
             fetchedAt: now
         )
@@ -211,6 +220,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex limit reset")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour limit has reset and now has 100% remaining") == true)
+        XCTAssertTrue(alerts.first?.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 100%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 2") == true)
     }
 
     func testPlansAWeeklyResetAlertWhenTheNewCycleIsObserved() {

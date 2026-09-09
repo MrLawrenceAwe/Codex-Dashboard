@@ -158,7 +158,11 @@ final class NtfyResetNotifierTests: XCTestCase {
         let afterReset = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
-                weekly: nil
+                weekly: CodexUsageWindow(usedPercent: 50, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60)),
+                bankedResets: CodexBankedResetSummary(
+                    availableCount: 2,
+                    nextExpiration: now.addingTimeInterval(24 * 60 * 60)
+                )
             ),
             fetchedAt: now
         )
@@ -171,6 +175,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.title, "Codex limit reset")
         XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour limit has reset and now has 90% remaining") == true)
+        XCTAssertTrue(messages.first?.body.contains("📊 Usage remaining:\n• ⏱️ 5-hour: 90%\n• 📅 Weekly: 50%\n• 🎟️ Banked resets: 2") == true)
     }
 
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
