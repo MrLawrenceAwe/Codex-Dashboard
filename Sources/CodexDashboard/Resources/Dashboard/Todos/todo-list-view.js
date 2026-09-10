@@ -40,10 +40,29 @@ const todoListView = (() => {
     )).join('')}`;
   }
 
-  function visibleItems(items, filterMode) {
-    if (filterMode === 'open') return items.filter((item) => !item.completed);
-    if (filterMode === 'completed') return items.filter((item) => item.completed);
-    return items;
+  function filterProjectOptions(projects, selectedID = '') {
+    return `<option value="">All projects</option><option value="__none__"${selectedID === '__none__' ? ' selected' : ''}>No project</option>${projects.map((project) => (
+      `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
+    )).join('')}`;
+  }
+
+  function filterTagOptions(tags, selectedTag = '') {
+    return `<option value="">All tags</option>${tags.map((tag) => (
+      `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)}</option>`
+    )).join('')}`;
+  }
+
+  function visibleItems(items, filterMode, projectFilter, tagFilter) {
+    return items.filter((item) => {
+      const matchesStatus = filterMode === 'all'
+        || (filterMode === 'open' && !item.completed)
+        || (filterMode === 'completed' && item.completed);
+      const matchesProject = !projectFilter
+        || (projectFilter === '__none__' && !item.projectTag)
+        || item.projectTag?.id === projectFilter;
+      const matchesTag = !tagFilter || item.tags.includes(tagFilter);
+      return matchesStatus && matchesProject && matchesTag;
+    });
   }
 
   function updateNavigation(openCount) {
@@ -54,7 +73,7 @@ const todoListView = (() => {
     count.setAttribute('aria-label', `${openCount} open ${openCount === 1 ? 'to-do' : 'to-dos'}`);
   }
 
-  function render(items, filterMode, availableTags = []) {
+  function render(items, filterMode, availableTags = [], projects = [], filters = {}) {
     const openCount = items.filter((item) => !item.completed).length;
     updateNavigation(openCount);
     const page = document.getElementById(dashboardElements.elementIDs.todoPage);
@@ -70,10 +89,15 @@ const todoListView = (() => {
       );
     });
     page.querySelector('[data-todo-clear-completed]').hidden = completedCount === 0;
+    const projectFilter = page.querySelector('[data-todo-project-filter]');
+    const tagFilter = page.querySelector('[data-todo-tag-filter]');
+    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, filters.project || '');
+    if (tagFilter) tagFilter.innerHTML = filterTagOptions(availableTags, filters.tag || '');
     const list = page.querySelector('[data-todo-list]');
-    const visible = visibleItems(items, filterMode);
+    const visible = visibleItems(items, filterMode, filters.project, filters.tag);
     if (!visible.length) {
       const message = !items.length ? 'No to-dos yet'
+        : filters.project || filters.tag ? 'No matching to-dos'
         : filterMode === 'completed' ? 'No completed to-dos' : 'All caught up';
       list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${dashboardIcons.render('completed')}</span><strong>${message}</strong></div>`;
       return;
@@ -139,6 +163,10 @@ const todoListView = (() => {
             <button type="button" data-todo-filter="open" class="is-active">Open<span class="todo-filter-count" data-todo-filter-count>0</span></button>
             <button type="button" data-todo-filter="all">All<span class="todo-filter-count" data-todo-filter-count>0</span></button>
             <button type="button" data-todo-filter="completed">Completed<span class="todo-filter-count" data-todo-filter-count>0</span></button>
+          </div>
+          <div class="todo-attribute-filters" aria-label="Filter to-dos by project or tag">
+            <select data-todo-project-filter aria-label="Filter by project"><option value="">All projects</option></select>
+            <select data-todo-tag-filter aria-label="Filter by tag"><option value="">All tags</option></select>
           </div>
           <button type="button" class="todo-clear" data-todo-clear-completed hidden>Clear completed</button>
         </div>
@@ -222,6 +250,13 @@ const todoListView = (() => {
     });
   }
 
+  function updateFilterOptions(projects, tags, filters = {}) {
+    const projectFilter = document.querySelector('[data-todo-project-filter]');
+    const tagFilter = document.querySelector('[data-todo-tag-filter]');
+    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, filters.project || '');
+    if (tagFilter) tagFilter.innerHTML = filterTagOptions(tags, filters.tag || '');
+  }
+
   function updateManagedTags(tags) {
     const container = document.querySelector('[data-todo-managed-tags]');
     if (container) container.innerHTML = tagMarkup(tags, false, true);
@@ -236,5 +271,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions };
+  return { createPage, render, showImage, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateFilterOptions };
 })();

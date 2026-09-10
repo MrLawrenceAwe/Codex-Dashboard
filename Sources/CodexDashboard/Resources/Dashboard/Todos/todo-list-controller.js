@@ -6,6 +6,8 @@ const todoList = (() => {
   let projectObserver;
   let observedProjectSidebar;
   let filterMode = 'open';
+  let projectFilter = '';
+  let tagFilter = '';
   // Image saves use IndexedDB and therefore complete asynchronously. Keep every
   // snapshot in order so a slower, older save cannot overwrite a newer edit in
   // localStorage after it finishes.
@@ -42,6 +44,7 @@ const todoList = (() => {
       ? projectDraft.id : '';
     if (!selected) projectDraft = null;
     todoListView?.updateProjectOptions?.(projects, selected);
+    updateFilterOptions();
   }
 
   function startProjectObserver() {
@@ -112,10 +115,38 @@ const todoList = (() => {
   function renderTags() {
     todoListView.updateTagOptions(availableTags);
     todoListView.updateManagedTags(availableTags);
+    updateFilterOptions();
+  }
+
+  function filterProjects() {
+    const projectMap = new Map(projects.map((project) => [project.id, project]));
+    items.forEach((item) => {
+      if (item.projectTag && !projectMap.has(item.projectTag.id)) {
+        projectMap.set(item.projectTag.id, item.projectTag);
+      }
+    });
+    return [...projectMap.values()];
+  }
+
+  function updateFilterOptions() {
+    todoListView?.updateFilterOptions?.(filterProjects(), availableTags, {
+      project: projectFilter,
+      tag: tagFilter,
+    });
   }
 
   function render() {
-    todoListView.render(items, filterMode, availableTags);
+    const selectableProjects = filterProjects();
+    if (projectFilter !== '__none__'
+      && projectFilter
+      && !selectableProjects.some((project) => project.id === projectFilter)) {
+      projectFilter = '';
+    }
+    if (tagFilter && !availableTags.includes(tagFilter)) tagFilter = '';
+    todoListView.render(items, filterMode, availableTags, filterProjects(), {
+      project: projectFilter,
+      tag: tagFilter,
+    });
   }
 
   function hydrateImages() {
@@ -455,6 +486,14 @@ const todoList = (() => {
         filterMode = button.dataset.todoFilter;
         render();
       });
+    });
+    page.querySelector('[data-todo-project-filter]').addEventListener('change', (event) => {
+      projectFilter = event.target.value;
+      render();
+    });
+    page.querySelector('[data-todo-tag-filter]').addEventListener('change', (event) => {
+      tagFilter = event.target.value;
+      render();
     });
     page.querySelector('[data-todo-clear-completed]').addEventListener('click', () => {
       void commitItems(items.filter((item) => !item.completed));
