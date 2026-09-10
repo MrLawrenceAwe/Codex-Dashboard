@@ -24,8 +24,8 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
         XCTAssertTrue(notifications.contains {
             $0.title == "Codex limit resets in one hour"
-                && $0.body.contains("Personal’s 5-hour: 75% left · resets ")
-                && $0.body.contains("\n5-hour 75% · Weekly 50% · Banked resets 2")
+                && $0.body.contains("Personal’s 5-hour: 75% left · resets today at ")
+                && $0.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 2")
         })
         XCTAssertTrue(notifications.allSatisfy { $0.body.filter { $0 == "\n" }.count == 1 })
         XCTAssertEqual(
@@ -55,6 +55,33 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.contains {
             $0.body.contains("Personal: 2 banked resets · next expires ")
         })
+        XCTAssertTrue(notifications.filter { $0.identifier.contains("weekly") }.allSatisfy {
+            !$0.body.contains("resets today at ") && !$0.body.contains("resets tomorrow at ")
+        })
+    }
+
+    func testFiveHourWarningUsesTomorrowWhenResetCrossesMidnightAfterDelivery() {
+        let calendar = Calendar.current
+        let now = calendar.date(from: DateComponents(year: 2033, month: 5, day: 18, hour: 22, minute: 30))!
+        let reset = calendar.date(byAdding: .hour, value: 2, to: now)!
+        let account = account(named: "Personal")
+
+        let notifications = AccountResetNotificationPlanner.notifications(
+            for: [account],
+            usageByAccountID: [
+                account.id: snapshot(
+                    fiveHourReset: reset,
+                    weeklyReset: nil,
+                    bankedResetExpiration: nil,
+                    now: now
+                ),
+            ],
+            now: now
+        )
+
+        XCTAssertEqual(notifications.count, 1)
+        XCTAssertTrue(notifications[0].body.contains("resets tomorrow at "))
+        XCTAssertFalse(notifications[0].body.contains("2033"))
     }
 
     func testPlansOneDeadlineUpdateWhenTheWarningTimeHasPassed() {
@@ -95,8 +122,8 @@ final class AccountResetNotifierTests: XCTestCase {
 
         XCTAssertEqual(updates.count, 1)
         XCTAssertEqual(updates.first?.title, "5-hour reset time changed")
-        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour reset moved: ") == true)
-        XCTAssertTrue(updates.first?.body.contains("\n5-hour 75% · Weekly 50% · Banked resets 0") == true)
+        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour reset moved: today at ") == true)
+        XCTAssertTrue(updates.first?.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 0") == true)
         XCTAssertTrue(
             AccountResetNotificationPlanner.deadlineUpdateNotifications(
                 from: revised,
@@ -187,7 +214,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex limit reset early")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour: 20% → 90% early") == true)
-        XCTAssertTrue(alerts.first?.body.contains("\n5-hour 90% · Weekly 50% · Banked resets 2") == true)
+        XCTAssertTrue(alerts.first?.body.contains("\n⏱ 5-hour 90% · 📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
     func testPlansAnImmediateAlertWhenUsageDropsAfterTheScheduledReset() {
@@ -221,7 +248,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex limit reset")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour reset: 100% left") == true)
-        XCTAssertTrue(alerts.first?.body.contains("\n5-hour 100% · Weekly 50% · Banked resets 2") == true)
+        XCTAssertTrue(alerts.first?.body.contains("\n⏱ 5-hour 100% · 📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
     func testPlansAWeeklyResetAlertWhenTheNewCycleIsObserved() {
@@ -272,7 +299,8 @@ final class AccountResetNotifierTests: XCTestCase {
         let alerts = AccountResetNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)]
+            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)],
+            now: now
         )
 
         XCTAssertEqual(alerts.count, 5)
@@ -291,7 +319,8 @@ final class AccountResetNotifierTests: XCTestCase {
         let repeatAlerts = AccountResetNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: current.usage)]
+            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: current.usage)],
+            now: now
         )
         XCTAssertTrue(repeatAlerts.isEmpty)
     }
@@ -315,7 +344,8 @@ final class AccountResetNotifierTests: XCTestCase {
             AccountResetNotificationPlanner.usageThresholdNotifications(
                 for: [savedAccount],
                 usageByAccountID: [savedAccount.id: current],
-                previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)]
+                previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)],
+                now: now
             ).isEmpty
         )
     }
@@ -338,7 +368,8 @@ final class AccountResetNotifierTests: XCTestCase {
         let alerts = AccountResetNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)]
+            previousObservations: [savedAccount.id: AccountUsageResetObservation(usage: previous)],
+            now: now
         )
 
         XCTAssertEqual(alerts.map(\.title), ["Codex 5-hour usage below 80%"])

@@ -1,12 +1,18 @@
 import Foundation
 import UserNotifications
 
+enum AccountResetDeadlineStyle: Equatable, Sendable {
+    case fullDate
+    case todayOrTomorrow
+}
+
 struct AccountResetNotification: Equatable, Sendable {
     let identifier: String
     let title: String
     let body: String
     let deadlineUpdateTitle: String
     let deadlineDescription: String
+    let deadlineStyle: AccountResetDeadlineStyle
     let usageSummary: String
     let notificationDate: Date
     let deadlineDate: Date
@@ -22,9 +28,10 @@ struct AccountResetNotification: Equatable, Sendable {
         AccountResetNotification(
             identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
             title: deadlineUpdateTitle,
-            body: "\(deadlineDescription): \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate)).\n\(usageSummary)",
+            body: "\(deadlineDescription): \(AccountResetNotificationPlanner.formattedDeadline(deadlineDate, style: deadlineStyle, relativeTo: date)).\n\(usageSummary)",
             deadlineUpdateTitle: deadlineUpdateTitle,
             deadlineDescription: deadlineDescription,
+            deadlineStyle: deadlineStyle,
             usageSummary: usageSummary,
             notificationDate: date,
             deadlineDate: deadlineDate
@@ -168,7 +175,8 @@ enum AccountResetNotificationPlanner {
     static func usageThresholdNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        previousObservations: [UUID: AccountUsageResetObservation]
+        previousObservations: [UUID: AccountUsageResetObservation],
+        now: Date = .now
     ) -> [AccountLimitResetNotification] {
         accounts.flatMap { account -> [AccountLimitResetNotification] in
             guard let usage = usageByAccountID[account.id]?.usage,
@@ -180,14 +188,16 @@ enum AccountResetNotificationPlanner {
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
-                    usageSummary: usageSummary(for: usage)
+                    usageSummary: usageSummary(for: usage),
+                    now: now
                 ),
                 thresholdNotifications(
                     for: account,
                     windowName: "Weekly",
                     current: usage.weekly,
                     previous: previous.weekly,
-                    usageSummary: usageSummary(for: usage)
+                    usageSummary: usageSummary(for: usage),
+                    now: now
                 ),
             ].flatMap { $0 }
         }.sorted { $0.identifier < $1.identifier }
@@ -215,14 +225,17 @@ enum AccountResetNotificationPlanner {
         let remainingPercent = max(0, min(100, 100 - window.usedPercent))
         return leadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
+            let notificationDate = resetsAt.addingTimeInterval(-leadTime)
+            let deadlineStyle = deadlineStyle(for: windowName)
             return AccountResetNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName): \(remainingPercent)% left · resets \(formattedDeadline(resetsAt)).\n\(usageSummary)",
+                body: "\(account.name)’s \(windowName): \(remainingPercent)% left · resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).\n\(usageSummary)",
                 deadlineUpdateTitle: "\(windowName) reset time changed",
                 deadlineDescription: "\(account.name)’s \(windowName) reset moved",
+                deadlineStyle: deadlineStyle,
                 usageSummary: usageSummary,
-                notificationDate: resetsAt.addingTimeInterval(-leadTime),
+                notificationDate: notificationDate,
                 deadlineDate: resetsAt
             )
         }
@@ -244,19 +257,20 @@ enum AccountResetNotificationPlanner {
 
         let previousAllowance = max(0, min(100, 100 - previous.usedPercent))
         let currentAllowance = max(0, min(100, 100 - current.usedPercent))
+        let nextResetDescription = formattedDeadline(nextReset, style: deadlineStyle(for: windowName), relativeTo: now)
         let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(previousReset.timeIntervalSinceReferenceDate))"
         if previousReset > now {
             guard previous.usedPercent > current.usedPercent else { return nil }
             return AccountLimitResetNotification(
                 identifier: identifier,
                 title: "Codex limit reset early",
-                body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(formattedDeadline(nextReset)).\n\(usageSummary)"
+                body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(nextResetDescription).\n\(usageSummary)"
             )
         }
         return AccountLimitResetNotification(
             identifier: identifier,
             title: "Codex limit reset",
-            body: "\(account.name)’s \(windowName) reset: \(currentAllowance)% left · next \(formattedDeadline(nextReset)).\n\(usageSummary)"
+            body: "\(account.name)’s \(windowName) reset: \(currentAllowance)% left · next \(nextResetDescription).\n\(usageSummary)"
         )
     }
 
@@ -265,7 +279,8 @@ enum AccountResetNotificationPlanner {
         windowName: String,
         current: CodexUsageWindow?,
         previous: AccountUsageResetObservation.Window?,
-        usageSummary: String
+        usageSummary: String,
+        now: Date
     ) -> [AccountLimitResetNotification] {
         guard let current, let previous,
               let reset = current.resetsAt,
@@ -280,7 +295,7 @@ enum AccountResetNotificationPlanner {
             return AccountLimitResetNotification(
                 identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
                 title: "Codex \(windowName) usage below \(threshold)%",
-                body: "\(account.name)’s \(windowName): \(currentRemaining)% left · resets \(formattedDeadline(reset)).\n\(usageSummary)"
+                body: "\(account.name)’s \(windowName): \(currentRemaining)% left · resets \(formattedDeadline(reset, style: deadlineStyle(for: windowName), relativeTo: now)).\n\(usageSummary)"
             )
         }
     }
@@ -303,6 +318,7 @@ enum AccountResetNotificationPlanner {
                 body: "\(account.name): \(countDescription) · next expires \(formattedDeadline(expiration)).\n\(usageSummary)",
                 deadlineUpdateTitle: "Banked reset expiry changed",
                 deadlineDescription: "\(account.name)’s next banked reset will now expire",
+                deadlineStyle: .fullDate,
                 usageSummary: usageSummary,
                 notificationDate: expiration.addingTimeInterval(-leadTime),
                 deadlineDate: expiration
@@ -330,12 +346,30 @@ enum AccountResetNotificationPlanner {
         let fiveHour = remainingUsage(for: usage.fiveHour)
         let weekly = remainingUsage(for: usage.weekly)
         let bankedResets = usage.bankedResets.map { String(max(0, $0.availableCount)) } ?? "unavailable"
-        return "5-hour \(fiveHour) · Weekly \(weekly) · Banked resets \(bankedResets)"
+        return "⏱ 5-hour \(fiveHour) · 📅 Weekly \(weekly) · 🎟 Banked \(bankedResets)"
     }
 
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {
         guard let window else { return "unavailable" }
         return "\(max(0, min(100, 100 - window.usedPercent)))%"
+    }
+
+    private static func deadlineStyle(for windowName: String) -> AccountResetDeadlineStyle {
+        windowName == "5-hour" ? .todayOrTomorrow : .fullDate
+    }
+
+    static func formattedDeadline(
+        _ deadline: Date,
+        style: AccountResetDeadlineStyle,
+        relativeTo referenceDate: Date
+    ) -> String {
+        guard style == .todayOrTomorrow else { return formattedDeadline(deadline) }
+        let calendar = Calendar.current
+        let day = calendar.isDate(deadline, inSameDayAs: referenceDate) ? "today" : "tomorrow"
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return "\(day) at \(formatter.string(from: deadline))"
     }
 
     static func formattedDeadline(_ deadline: Date) -> String {

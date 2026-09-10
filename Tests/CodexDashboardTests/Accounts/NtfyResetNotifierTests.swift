@@ -188,7 +188,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.title, "Codex limit reset")
         XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour reset: 90% left") == true)
-        XCTAssertTrue(messages.first?.body.contains("\n5-hour 90% · Weekly 50% · Banked resets 2") == true)
+        XCTAssertTrue(messages.first?.body.contains("\n⏱ 5-hour 90% · 📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
