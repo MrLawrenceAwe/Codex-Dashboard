@@ -542,6 +542,79 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? Bool, false)
     }
 
+    func testTodosCanBeFilteredByProjectAndTag() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-a"
+                  data-app-action-sidebar-project-label="Project A"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-b"
+                  data-app-action-sidebar-project-label="Project B"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const add = (title, projectID = '', tag = '') => {
+                form.querySelector('[data-todo-new-project]').value = projectID;
+                form.querySelector('[data-todo-new-project]').dispatchEvent(new Event('change', { bubbles: true }));
+                if (tag) {
+                  form.querySelector('[data-todo-new-tag]').value = tag;
+                  form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                form.querySelector('[data-todo-new-title]').value = title;
+                form.requestSubmit();
+              };
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
+              dialog.querySelector('[data-todo-tag-name]').value = 'Work';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              add('Project A work', 'project-a', 'Work');
+              add('Project B task', 'project-b');
+              add('Unassigned work', '', 'Work');
+              const titles = () => [...document.querySelectorAll('[data-todo-title]')].map((input) => input.value);
+              const project = document.querySelector('[data-todo-project-filter]');
+              const tag = document.querySelector('[data-todo-tag-filter]');
+              const projectOptions = [...project.options].map((option) => [option.value, option.textContent]);
+              const tagOptions = [...tag.options].map((option) => option.textContent);
+              project.value = 'project-a';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const projectOnly = titles();
+              tag.value = 'Work';
+              tag.dispatchEvent(new Event('change', { bubbles: true }));
+              const combined = titles();
+              project.value = '';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const tagOnly = titles();
+              project.value = '__none__';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const unassignedOnly = titles();
+              return [projectOptions, tagOptions, projectOnly, combined, tagOnly, unassignedOnly];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? [[String]], [
+            ["", "All projects"], ["__none__", "No project"],
+            ["project-a", "Project A"], ["project-b", "Project B"],
+        ])
+        XCTAssertEqual(values[1] as? [String], ["All tags", "Work"])
+        XCTAssertEqual(values[2] as? [String], ["Project A work"])
+        XCTAssertEqual(values[3] as? [String], ["Project A work"])
+        XCTAssertEqual(values[4] as? [String], ["Unassigned work", "Project A work"])
+        XCTAssertEqual(values[5] as? [String], ["Unassigned work"])
+    }
+
     func testExistingTodoAssignmentUsesProjectsAvailableAfterTheTodoPageMounts() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: """
