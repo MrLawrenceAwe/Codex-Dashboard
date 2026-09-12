@@ -79,6 +79,17 @@ struct RendererCompatibilityChecker {
             in: target
         ))
         checks.append(await inspect(
+            id: "profile-menu",
+            title: "Account menu integration",
+            expression: contractExpression(
+                "Boolean(codexUIContracts.profileMenu() && codexUIContracts.profileMenuPetAction())"
+            ),
+            failureStatus: .warning,
+            compatibleDetail: "Codex exposes the profile-menu controls used for account integration.",
+            failureDetail: "The compatible profile-menu actions are not currently mounted.",
+            in: target
+        ))
+        checks.append(await inspect(
             id: "model-picker",
             title: "Model preset controls",
             expression: contractExpression(

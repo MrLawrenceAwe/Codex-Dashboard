@@ -56,7 +56,7 @@ extension DashboardRendererTests {
             checks.map(\.id),
             [
                 "renderer", "sidebar-host", "thread-navigation", "sidebar-unread",
-                "composer", "composer-controls", "model-picker",
+                "composer", "composer-controls", "profile-menu", "model-picker",
             ]
         )
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
@@ -68,6 +68,9 @@ extension DashboardRendererTests {
         XCTAssertTrue(
             expressions.contains { $0.contains("codexUIContracts.probeModelPickerControls()") }
         )
+        XCTAssertTrue(expressions.contains {
+            $0.contains("codexUIContracts.profileMenuPetAction()")
+        })
     }
 
 }

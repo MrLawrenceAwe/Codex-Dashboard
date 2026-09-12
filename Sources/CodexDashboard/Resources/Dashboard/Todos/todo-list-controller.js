@@ -11,31 +11,23 @@ const todoList = (() => {
   let destroyed = false;
   let savedItems = items;
   let savedTags = availableTags;
-  const imageReaders = new Set();
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton,
     rootClass: 'codex-todo-open',
   });
-  let imageDraft;
-  let tagDraft;
-  resetImageDraft();
-  resetTagDraft();
-
-  function resetImageDraft() {
-    imageDraft = { status: 'empty', image: null, submitWhenReady: false };
-    todoListView?.updateImageDraft?.(null);
-    const imageStatus = document.querySelector('[data-todo-new-image-status]');
-    if (imageStatus) {
-      imageStatus.hidden = true;
-      imageStatus.textContent = '';
-    }
-  }
-
-  function resetTagDraft() {
-    tagDraft = [];
-    todoListView?.updateTagDraft?.(tagDraft);
-  }
+  const imageController = createTodoImageController({
+    isDestroyed: () => destroyed,
+    getItems: () => items,
+    updateItem,
+  });
+  const tagController = createTodoTagController({
+    isDestroyed: () => destroyed,
+    getAvailableTags: () => availableTags,
+    commitChange: (nextTags, transformTag) => commitItems(items.map((item) => ({
+      ...item, tags: item.tags.map(transformTag).filter(Boolean),
+    })), nextTags),
+  });
 
   function refreshProjects() {
     if (destroyed) return;
@@ -56,26 +48,6 @@ const todoList = (() => {
     if (!sidebar) return;
     projectObserver.observe(sidebar, { childList: true, subtree: true, attributes: true,
       attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
-  }
-
-  function addTagDraft(value) {
-    if (!availableTags.includes(value)) return false;
-    const tags = todoStore.normalizeTags([...tagDraft, value]);
-    if (tags.length === tagDraft.length) return false;
-    tagDraft = tags;
-    todoListView.updateTagDraft(tagDraft);
-    return true;
-  }
-
-  const acceptedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
-  const maximumImageBytes = 2 * 1024 * 1024;
-
-  function showImageError(message = '') {
-    if (destroyed) return;
-    const notice = document.querySelector('[data-todo-image-error]');
-    if (!notice) return;
-    notice.textContent = message;
-    notice.hidden = !message;
   }
 
   function renderTags() {
@@ -155,21 +127,6 @@ const todoList = (() => {
     return saved;
   }
 
-  async function commitTagChange(nextTags, transformTag = (tag) => tag) {
-    const previousDraft = tagDraft;
-    const nextDraft = tagDraft.map(transformTag).filter(Boolean);
-    tagDraft = nextDraft;
-    todoListView.updateTagDraft(tagDraft);
-    const saved = await commitItems(items.map((item) => ({
-      ...item, tags: item.tags.map(transformTag).filter(Boolean),
-    })), nextTags);
-    if (!saved && !destroyed && tagDraft === nextDraft) {
-      tagDraft = previousDraft;
-      todoListView.updateTagDraft(tagDraft);
-    }
-    return saved;
-  }
-
   async function add(title, body = '', image = null, tags = [], project = null) {
     const item = todoStore.create(title, body, image, tags);
     if (!item) return false;
@@ -187,64 +144,6 @@ const todoList = (() => {
       ? todoStore.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
       : item);
     return commitItems(nextItems);
-  }
-
-  function imageValidationError(file) {
-    if (!acceptedImageTypes.has(file?.type)) {
-      return 'Choose a JPEG, PNG, GIF, or WebP image.';
-    }
-    if (file.size > maximumImageBytes) {
-      return 'Images must be 2 MB or smaller.';
-    }
-    return '';
-  }
-
-  function readImage(file, onLoad, onError = () => {}) {
-    showImageError();
-    const validationError = imageValidationError(file);
-    if (validationError) {
-      showImageError(validationError);
-      return false;
-    }
-    const reader = new FileReader();
-    imageReaders.add(reader);
-    reader.addEventListener('loadend', () => imageReaders.delete(reader));
-    reader.addEventListener('load', () => {
-      if (destroyed) return;
-      const image = todoStore.normalizeImage({
-        dataURL: reader.result,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-      });
-      if (!image) {
-        showImageError('Codex could not read that image.');
-        onError();
-        return;
-      }
-      onLoad(image);
-    });
-    reader.addEventListener('error', () => {
-      if (destroyed) return;
-      showImageError('Codex could not read that image.');
-      onError();
-    });
-    reader.readAsDataURL(file);
-    return true;
-  }
-
-  function attachImage(id, file) {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item || item.completed) return;
-    readImage(file, (image) => updateItem(id, { image }));
-  }
-
-  function pastedImage(event) {
-    const clipboard = event.clipboardData;
-    if (!clipboard) return null;
-    return Array.from(clipboard.files || []).find((file) => file.type.startsWith('image/'))
-      || Array.from(clipboard.items || []).find((item) => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile()
-      || null;
   }
 
   function mountNavigation() {
@@ -268,8 +167,9 @@ const todoList = (() => {
   function bindAddForm(page) {
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
+      const imageDraft = imageController.draft();
       if (imageDraft.status === 'invalid') {
-        resetImageDraft();
+        imageController.reset();
         return;
       }
       if (imageDraft.status === 'loading') {
@@ -279,155 +179,32 @@ const todoList = (() => {
         imageStatus.hidden = false;
         return;
       }
-      showImageError();
+      imageController.showError();
       const title = page.querySelector('[data-todo-new-title]');
       const body = page.querySelector('[data-todo-new-body]');
       const finish = (saved) => {
         if (!saved || destroyed) return;
         title.value = '';
         body.value = '';
-        resetImageDraft();
-        resetTagDraft();
+        imageController.reset();
+        tagController.reset();
         projectDraft = null;
         todoListView.updateProjectOptions(projects);
         title.focus();
       };
-      const saved = add(title.value, body.value, imageDraft.image, tagDraft, projectDraft);
+      const saved = add(
+        title.value, body.value, imageDraft.image, tagController.draft(), projectDraft,
+      );
       void saved.then(finish);
     });
   }
 
-  function bindImageDraft(page) {
-    page.addEventListener('paste', (event) => {
-      const file = pastedImage(event);
-      if (!file) return;
-      const row = event.target.closest('[data-todo-id]');
-      if (row) {
-        event.preventDefault();
-        attachImage(row.dataset.todoId, file);
-        return;
-      }
-      if (!event.target.closest('[data-todo-form]')) return;
-      event.preventDefault();
-      const validationError = imageValidationError(file);
-      if (validationError) {
-        resetImageDraft();
-        imageDraft.status = 'invalid';
-        showImageError(validationError);
-        return;
-      }
-      resetImageDraft();
-      imageDraft.status = 'loading';
-      const readingDraft = imageDraft;
-      const imageStatus = page.querySelector('[data-todo-new-image-status]');
-      imageStatus.textContent = 'Preparing image…';
-      imageStatus.hidden = false;
-      readImage(file, (image) => {
-        if (imageDraft !== readingDraft) return;
-        imageDraft.image = image;
-        imageDraft.status = 'ready';
-        todoListView.updateImageDraft(image);
-        imageStatus.textContent = 'Image ready to attach when you add this to-do.';
-        imageStatus.hidden = false;
-        if (imageDraft.submitWhenReady) {
-          imageDraft.submitWhenReady = false;
-          page.querySelector('[data-todo-form]').requestSubmit();
-        }
-      }, () => {
-        if (imageDraft !== readingDraft) return;
-        resetImageDraft();
-        imageDraft.status = 'invalid';
-        imageStatus.hidden = true;
-      });
-    });
-    page.querySelector('[data-todo-new-image-remove]').addEventListener('click', () => {
-      resetImageDraft();
-      showImageError();
-      page.querySelector('[data-todo-new-title]').focus();
-    });
-    page.querySelector('[data-todo-new-image-open]').addEventListener('click', () => {
-      if (imageDraft.status === 'ready' && imageDraft.image) {
-        todoListView.showImage(imageDraft.image);
-      }
-    });
-  }
-
   function bindDraftAssignments(page) {
-    const tagInput = page.querySelector('[data-todo-new-tag]');
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
       projectDraft = projects.find((project) => project.id === projectInput.value) || null;
     });
-    const addTag = () => {
-      if (!addTagDraft(tagInput.value)) return;
-      tagInput.value = '';
-      tagInput.focus();
-    };
-    tagInput.addEventListener('change', addTag);
-    page.querySelector('[data-todo-new-tags]').addEventListener('click', (event) => {
-      const button = event.target.closest('[data-todo-tag-remove]');
-      if (!button) return;
-      tagDraft = tagDraft.filter((tag) => tag !== button.dataset.todoTagRemove);
-      todoListView.updateTagDraft(tagDraft);
-      tagInput.focus();
-    });
-  }
-
-  function bindTagManagement(page) {
-    const tagDialog = document.querySelector('[data-todo-tag-dialog]');
-    const closeTagDialog = () => {
-      if (tagDialog.open) tagDialog.close();
-    };
-    page.querySelector('[data-todo-manage-tags]').addEventListener('click', () => {
-      if (!tagDialog.open) tagDialog.showModal();
-    });
-    tagDialog.querySelector('[data-todo-tag-dialog-close]').addEventListener('click', closeTagDialog);
-    tagDialog.addEventListener('click', (event) => {
-      if (event.target === tagDialog) closeTagDialog();
-    });
-    const tagNameInput = tagDialog.querySelector('[data-todo-tag-name]');
-    const tagFormButton = tagDialog.querySelector('[data-todo-tag-form] button[type="submit"]');
-    const resetTagForm = () => {
-      tagNameInput.value = '';
-      delete tagNameInput.dataset.todoTagRename;
-      tagNameInput.setAttribute('aria-label', 'Tag name');
-      tagFormButton.textContent = 'Create tag';
-    };
-    tagDialog.querySelector('[data-todo-tag-form]').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const name = tagNameInput;
-      const oldTag = name.dataset.todoTagRename;
-      const replacement = todoStore.normalizeTags([name.value])[0];
-      if (oldTag && availableTags.some((tag) => tag !== oldTag
-        && tag.toLocaleLowerCase() === replacement?.toLocaleLowerCase())) return;
-      const nextTags = oldTag
-        ? todoStore.normalizeTags(availableTags.map((tag) => tag === oldTag ? name.value : tag))
-        : todoStore.normalizeTags([...availableTags, name.value]);
-      if (!replacement || (!oldTag && nextTags.length === availableTags.length)
-        || (oldTag && nextTags.every((tag, index) => tag === availableTags[index]))) return;
-      void commitTagChange(nextTags, (tag) => tag === oldTag ? replacement : tag);
-      resetTagForm();
-      name.focus();
-    });
-    tagDialog.querySelector('[data-todo-managed-tags]').addEventListener('click', (event) => {
-      const editButton = event.target.closest('[data-todo-managed-tag-edit]');
-      if (editButton) {
-        tagNameInput.value = editButton.dataset.todoManagedTagEdit;
-        tagNameInput.dataset.todoTagRename = editButton.dataset.todoManagedTagEdit;
-        tagNameInput.setAttribute('aria-label', `Rename tag ${editButton.dataset.todoManagedTagEdit}`);
-        tagFormButton.textContent = 'Save tag';
-        tagNameInput.focus();
-        tagNameInput.select();
-        return;
-      }
-      const button = event.target.closest('[data-todo-managed-tag-remove]');
-      if (!button) return;
-      const tag = button.dataset.todoManagedTagRemove;
-      const nextTags = availableTags.filter((candidate) => candidate !== tag);
-      if (nextTags.length === availableTags.length) return;
-      if (tagNameInput.dataset.todoTagRename === tag) resetTagForm();
-      void commitTagChange(nextTags, (candidate) => candidate === tag ? null : candidate);
-    });
+    tagController.bindDraft(page);
   }
 
   function bindFilters(page) {
@@ -552,9 +329,9 @@ const todoList = (() => {
     if (!pageHost) return false;
     const page = todoListView.createPage();
     bindAddForm(page);
-    bindImageDraft(page);
+    imageController.bind(page);
     bindDraftAssignments(page);
-    bindTagManagement(page);
+    tagController.bindManagement(page);
     bindFilters(page);
     bindItemEditing(page);
     bindItemActions(page);
@@ -580,8 +357,7 @@ const todoList = (() => {
     projectObserver?.disconnect();
     projectObserver = undefined;
     observedProjectSidebar = undefined;
-    imageReaders.forEach((reader) => reader.abort());
-    imageReaders.clear();
+    imageController.destroy();
     pageState.close();
   }
 

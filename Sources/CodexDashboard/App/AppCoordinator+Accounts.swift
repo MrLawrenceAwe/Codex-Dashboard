@@ -12,25 +12,33 @@ extension AppCoordinator {
         case .timedOut: return .timedOut
         case .unavailable: return .unavailable
         }
+        let presentationAlreadyUpdated: Bool
         switch action.kind {
         case .updateUsage:
             guard let accountID = action.accountID else { return .unavailable }
             _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
+            presentationAlreadyUpdated = true
         case .refreshInactiveUsage:
-            await accounts.refreshInactiveUsage(interactionAllowed: true)
+            await refreshInactiveAccountUsage(interactionAllowed: true)
+            presentationAlreadyUpdated = true
         case .saveCurrentAccount:
             saveCurrentAccount()
+            presentationAlreadyUpdated = false
         case .switchAccount:
             guard let accountID = action.accountID else { return .unavailable }
             await switchAccount(to: accountID)
+            presentationAlreadyUpdated = false
         case .addAccount:
             await beginAddingAccount()
+            presentationAlreadyUpdated = false
         case .forgetAccount:
             guard let accountID = action.accountID else { return .unavailable }
             accounts.deleteAccount(accountID)
+            presentationAlreadyUpdated = false
         }
-        await updateAccountUsageNotifications()
-        await publishAccountPopoverSnapshot()
+        if !presentationAlreadyUpdated {
+            await updateAccountPresentation()
+        }
         return .handled
     }
 
@@ -165,15 +173,13 @@ extension AppCoordinator {
         await accounts.refreshActiveUsage(
             codexIsRunning: dashboardRuntime?.codexIsRunning == true
         )
-        await updateAccountUsageNotifications()
-        await publishAccountPopoverSnapshot()
+        await updateAccountPresentation()
     }
 
-    func refreshInactiveAccountUsage() async {
+    func refreshInactiveAccountUsage(interactionAllowed: Bool = false) async {
         guard !isPerformingAction else { return }
-        await accounts.refreshInactiveUsage()
-        await updateAccountUsageNotifications()
-        await publishAccountPopoverSnapshot()
+        await accounts.refreshInactiveUsage(interactionAllowed: interactionAllowed)
+        await updateAccountPresentation()
     }
 
     func refreshSavedAccountUsage(
@@ -191,8 +197,13 @@ extension AppCoordinator {
             reportsFailure: reportsFailure,
             interactionAllowed: interactionAllowed
         )
-        await updateAccountUsageNotifications()
+        await updateAccountPresentation()
         return authorization
+    }
+
+    private func updateAccountPresentation() async {
+        await updateAccountUsageNotifications()
+        await publishAccountPopoverSnapshot()
     }
 
     private func publishAccountPopoverSnapshot() async {
