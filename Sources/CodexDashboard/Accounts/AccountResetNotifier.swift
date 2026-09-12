@@ -98,7 +98,7 @@ enum AccountResetNotificationPlanner {
     ) -> [AccountResetNotification] {
         accounts.flatMap { account -> [AccountResetNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) ? limitNotifications(
+            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) && hasFiveHourUsageRemaining(usage) ? limitNotifications(
                 for: account,
                 windowName: "5-hour",
                 window: usage.fiveHour,
@@ -366,6 +366,11 @@ enum AccountResetNotificationPlanner {
     private static func hasWeeklyUsageRemaining(_ usage: CodexAccountUsage) -> Bool {
         guard let weekly = usage.weekly else { return true }
         return weekly.usedPercent < 100
+    }
+
+    private static func hasFiveHourUsageRemaining(_ usage: CodexAccountUsage) -> Bool {
+        guard let fiveHour = usage.fiveHour else { return true }
+        return fiveHour.usedPercent < 100
     }
 
     private static func deadlineStyle(for windowName: String) -> AccountResetDeadlineStyle {
