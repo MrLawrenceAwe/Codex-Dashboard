@@ -24,7 +24,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
         XCTAssertTrue(notifications.contains {
             $0.title == "Codex limit resets in one hour"
-                && $0.body.contains("Personal’s 5-hour: 75% left · resets today at ")
+                && $0.body.contains("Personal’s 5-hour: 75% left · resets at ")
                 && $0.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 2")
         })
         XCTAssertTrue(notifications.allSatisfy { $0.body.filter { $0 == "\n" }.count == 1 })
@@ -56,7 +56,7 @@ final class AccountResetNotifierTests: XCTestCase {
             $0.body.contains("Personal: 2 banked resets · next expires ")
         })
         XCTAssertTrue(notifications.filter { $0.identifier.contains("weekly") }.allSatisfy {
-            !$0.body.contains("resets today at ") && !$0.body.contains("resets tomorrow at ")
+            !$0.body.contains("resets at ") && !$0.body.contains("resets tomorrow at ")
         })
     }
 
@@ -122,7 +122,7 @@ final class AccountResetNotifierTests: XCTestCase {
 
         XCTAssertEqual(updates.count, 1)
         XCTAssertEqual(updates.first?.title, "5-hour reset time changed")
-        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour reset moved: today at ") == true)
+        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour reset moved: at ") == true)
         XCTAssertTrue(updates.first?.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 0") == true)
         XCTAssertTrue(
             AccountResetNotificationPlanner.deadlineUpdateNotifications(
