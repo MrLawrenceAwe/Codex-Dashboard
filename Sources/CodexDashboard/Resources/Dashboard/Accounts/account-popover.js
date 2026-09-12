@@ -167,14 +167,15 @@ const accountPopover = (() => {
     if (document.querySelector(`[${triggerAttribute}]`)) return;
     const host = codexUIContracts.profileMenu();
     if (!host) return;
-    const showPet = codexUIContracts.profileMenuPetAction();
-    const insertionParent = showPet?.parentElement;
-    if (!showPet || !insertionParent || !host.contains(insertionParent)) return;
-    const trigger = showPet.cloneNode(true);
+    const anchor = codexUIContracts.profileMenuAccountAnchor();
+    const insertionParent = anchor?.parentElement;
+    if (!anchor || !insertionParent || !host.contains(insertionParent)) return;
+    const trigger = anchor.cloneNode(true);
     if (trigger instanceof HTMLButtonElement) trigger.type = 'button';
     trigger.setAttribute(triggerAttribute, '');
+    trigger.querySelectorAll('kbd').forEach((shortcut) => shortcut.remove());
     const label = [...trigger.querySelectorAll('span')].find((span) => (
-      span.textContent.trim() === 'Show pet'
+      span.textContent.trim() === 'Settings'
     ));
     if (label) {
       label.textContent = 'Accounts';
@@ -193,7 +194,7 @@ const accountPopover = (() => {
       event.stopPropagation();
       openPanel(trigger);
     });
-    insertionParent.insertBefore(trigger, showPet);
+    insertionParent.insertBefore(trigger, anchor);
     observeMutations(host.parentElement);
   }
 
