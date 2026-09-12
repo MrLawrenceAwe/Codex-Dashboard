@@ -20,8 +20,11 @@ Composer text/image insertion and model-picker interaction live in `Composer/`.
 `Todos/todo-store.js` owns normalisation, migration, and a serial `Promise<boolean>`
 save queue. Item and tag mutations share optimistic rendering and rollback. Image
 writes finish before metadata is committed; obsolete images are pruned after a
-successful commit. Controller teardown disconnects project observation, aborts image
-readers, and prevents pending callbacks from changing a replacement UI.
+successful commit. `todo-image-controller.js` owns image validation, draft state, and
+reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
+controller coordinates these with persistence. Teardown disconnects project
+observation, aborts image readers, and prevents pending callbacks from changing a
+replacement UI.
 
 To-do schema version 5 uses `project`; older `projectTag` and `projectBadge` values
 are migrated when loading. Preference loading migrates `collapsedProjects` to

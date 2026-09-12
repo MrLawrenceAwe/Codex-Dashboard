@@ -76,14 +76,11 @@ final class PromptLibraryBridge {
         guard let nativeLibrary = storedLibrary else { return }
         guard nativeWins || mountedDashboard || nativeLibrary != lastDeliveredLibrary else { return }
 
-        let expression = try RendererScript.deliverPromptLibrary(nativeLibrary)
-        for target in targets {
-            guard try await devTools.evaluateBoolean(expression, in: target) else {
-                throw DashboardError.enableFailed(
-                    "The prompt library was unavailable in the Codex renderer."
-                )
-            }
-        }
+        try await evaluateAcrossTargets(
+            try RendererScript.deliverPromptLibrary(nativeLibrary),
+            targets: targets,
+            failureMessage: "The prompt library was unavailable in the Codex renderer."
+        )
         lastDeliveredLibrary = nativeLibrary
         if nativeWins { nativeLibraryIsAuthoritative = false }
     }
@@ -102,27 +99,32 @@ final class PromptLibraryBridge {
     }
 
     private func discardPendingLibrary(on targets: [DevToolsTarget]) async throws {
-        for target in targets {
-            guard try await devTools.evaluateBoolean(
-                RendererScript.discardPendingPromptLibrary,
-                in: target
-            ) else {
-                throw DashboardError.enableFailed(
-                    "The pending prompt library could not be cleared from the renderer."
-                )
-            }
-        }
+        try await evaluateAcrossTargets(
+            RendererScript.discardPendingPromptLibrary,
+            targets: targets,
+            failureMessage: "The pending prompt library could not be cleared from the renderer."
+        )
     }
 
     private func acknowledgePendingLibrary(
         _ acknowledgement: String,
         on targets: [DevToolsTarget]
     ) async throws {
+        try await evaluateAcrossTargets(
+            acknowledgement,
+            targets: targets,
+            failureMessage: "The prompt library save could not be acknowledged by the renderer."
+        )
+    }
+
+    private func evaluateAcrossTargets(
+        _ expression: String,
+        targets: [DevToolsTarget],
+        failureMessage: String
+    ) async throws {
         for target in targets {
-            guard try await devTools.evaluateBoolean(acknowledgement, in: target) else {
-                throw DashboardError.enableFailed(
-                    "The prompt library save could not be acknowledged by the renderer."
-                )
+            guard try await devTools.evaluateBoolean(expression, in: target) else {
+                throw DashboardError.enableFailed(failureMessage)
             }
         }
     }

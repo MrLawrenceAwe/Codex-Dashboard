@@ -12,23 +12,6 @@ const accountPopover = (() => {
   const actions = [];
   const actionWaiters = [];
 
-  function visibleAction(label) {
-    return [...document.querySelectorAll('[role="menuitem"], button')].find((element) => (
-      element.getClientRects().length > 0
-        && (element.textContent.trim() === label || element.textContent.trim().startsWith(label))
-    ));
-  }
-
-  function menuHost() {
-    const logout = visibleAction('Log out');
-    const settings = visibleAction('Settings');
-    if (!logout || !settings) return null;
-    const semanticMenu = logout.closest('[role="menu"]');
-    if (semanticMenu) return semanticMenu;
-    const sharedParent = logout.parentElement?.parentElement;
-    return sharedParent && sharedParent.contains(settings) ? sharedParent : logout.parentElement;
-  }
-
   function queue(kind, accountID = null) {
     if (snapshot.isBusy || actions.length) return;
     if (kind === 'updateUsage' || kind === 'refreshInactiveUsage') {
@@ -182,9 +165,9 @@ const accountPopover = (() => {
 
   function mountTrigger() {
     if (document.querySelector(`[${triggerAttribute}]`)) return;
-    const host = menuHost();
+    const host = codexUIContracts.profileMenu();
     if (!host) return;
-    const showPet = visibleAction('Show pet');
+    const showPet = codexUIContracts.profileMenuPetAction();
     const insertionParent = showPet?.parentElement;
     if (!showPet || !insertionParent || !host.contains(insertionParent)) return;
     const trigger = showPet.cloneNode(true);

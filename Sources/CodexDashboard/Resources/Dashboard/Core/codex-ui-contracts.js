@@ -24,6 +24,29 @@ const codexUIContracts = (() => {
     return document.querySelector('nav, [role="navigation"]');
   }
 
+  function visibleAction(label) {
+    return [...document.querySelectorAll('[role="menuitem"], button')].find((element) => (
+      isVisible(element)
+        && (element.textContent.trim() === label || element.textContent.trim().startsWith(label))
+    ));
+  }
+
+  function profileMenu() {
+    const logout = visibleAction('Log out');
+    const settings = visibleAction('Settings');
+    if (!logout || !settings) return null;
+    const semanticMenu = logout.closest('[role="menu"]');
+    if (semanticMenu) return semanticMenu;
+    const sharedParent = logout.parentElement?.parentElement;
+    return sharedParent && sharedParent.contains(settings) ? sharedParent : logout.parentElement;
+  }
+
+  function profileMenuPetAction() {
+    const menu = profileMenu();
+    const action = visibleAction('Show pet');
+    return action && menu?.contains(action) ? action : null;
+  }
+
   function threadRows() {
     return [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')];
   }
@@ -293,6 +316,8 @@ const codexUIContracts = (() => {
   return {
     sidebar,
     navigation,
+    profileMenu,
+    profileMenuPetAction,
     threadRows,
     projects,
     selectProject,

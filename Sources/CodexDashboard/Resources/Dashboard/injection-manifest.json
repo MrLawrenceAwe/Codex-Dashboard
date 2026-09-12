@@ -26,6 +26,8 @@
     "Threads/task-dashboard-page",
     "Todos/todo-store",
     "Todos/todo-list-view",
+    "Todos/todo-image-controller",
+    "Todos/todo-tag-controller",
     "Todos/todo-list-controller",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",

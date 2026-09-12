@@ -5,6 +5,46 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testPopoverUsageRefreshPublishesOnce() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorPopoverRefreshTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try testAccountCredential(accountID: "account-lawrence", name: "Lawrence")
+            .write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let account = try accountManager.saveCurrentAccount()
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
+        )
+        let runtime = StubDashboardRuntime(
+            codexIsRunning: true,
+            maintainsDashboard: true,
+            accountPopoverActionWaitResult: .action(AccountPopoverAction(
+                kind: .updateUsage,
+                accountID: account.id
+            ))
+        )
+        let coordinator = makeAppCoordinator(
+            accountManager: accountManager,
+            accountUsageProvider: SequencedAccountUsageProvider(outcomes: [usage]),
+            runtimeFactory: { _ in runtime }
+        )
+
+        let outcome = await coordinator.handleAccountPopoverAction()
+
+        XCTAssertEqual(outcome, .handled)
+        XCTAssertEqual(runtime.accountPopoverSynchronizationCount, 1)
+    }
+
     func testActiveUsageRefreshPublishesUpdatedAccountPopover() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorUsagePublicationTests-\(UUID().uuidString)")

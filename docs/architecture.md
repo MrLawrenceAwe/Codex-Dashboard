@@ -31,7 +31,7 @@
 - A native-looking **Task Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
 - A neighboring **To-dos** destination stores a lightweight personal task list locally.
-- Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Task Dashboard and To-dos own their page controllers, with to-do interactions in `todo-list-controller.js` and markup and rendering in `todo-list-view.js`.
+- Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Task Dashboard and To-dos own their page controllers. To-do orchestration lives in `todo-list-controller.js`, image and tag interactions live in focused controllers, and markup and rendering live in `todo-list-view.js`.
 - Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard
