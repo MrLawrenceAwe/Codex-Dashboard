@@ -199,7 +199,7 @@ function createPromptLibrary({ findThread }) {
       try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
     }
     hideDialog();
-    if (!await composerAdapter.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
+    if (!await composerModelPicker.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
       restoreDialog('Could not apply this prompt’s composer preset. The prompt was not inserted.');
       return false;
     }

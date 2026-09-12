@@ -1,6 +1,6 @@
 import Foundation
 
-struct TaskCompletionObserver {
+struct ThreadCompletionTracker {
     private var eventsByThreadID: [String: ThreadLifecycleEvent]?
     private var observationDate: Date?
 

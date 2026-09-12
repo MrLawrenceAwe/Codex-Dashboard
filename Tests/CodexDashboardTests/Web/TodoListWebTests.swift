@@ -7,8 +7,8 @@ import XCTest
 final class TodoListWebTests: SerializedDashboardWebTestCase {
     func testPageSelectionRemainsExclusiveAcrossRemountAndReinjection() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
-        let result = try await webView.evaluateJavaScript("""
-        (() => {
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
           const state = () => [
             document.getElementById('codex-dashboard-page').classList.contains('is-open'),
             document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
@@ -16,11 +16,13 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
           ];
           window.__codexDashboard.open();
           document.getElementById('codex-dashboard-todo-navigation').click();
+          await window.__waitForTodoSaves?.();
           const todos = state();
           document.getElementById('codex-dashboard-todo-navigation').remove();
           window.__codexDashboard.ensureMounted();
           const remounted = state();
           document.getElementById('codex-dashboard-navigation').click();
+          await window.__waitForTodoSaves?.();
           const tasks = state();
           window.__codexDashboard.openTodos();
           return [todos, remounted, tasks, state()];
@@ -32,15 +34,15 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
 
         let injection = try InjectionBundle.load()
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let sameVersion = try await webView.evaluateJavaScript("""
+        let sameVersion = try await webView.evaluateAsyncJavaScript("""
         [document.querySelectorAll('#codex-dashboard-todo-navigation').length,
          document.getElementById('codex-dashboard-todo-page').classList.contains('is-open')]
         """) as? [AnyHashable]
         XCTAssertEqual(sameVersion, [1, true])
 
-        _ = try await webView.evaluateJavaScript("window.__codexDashboard.version = 'previous-version'")
+        _ = try await webView.evaluateAsyncJavaScript("window.__codexDashboard.version = 'previous-version'")
         _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let replacedVersion = try await webView.evaluateJavaScript("""
+        let replacedVersion = try await webView.evaluateAsyncJavaScript("""
         [document.querySelectorAll('#codex-dashboard-todo-navigation').length,
          window.__codexDashboard.isOpen(),
          document.documentElement.classList.contains('codex-todo-open')]
@@ -49,7 +51,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoDestinationSitsAfterTaskDashboard() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -62,12 +64,13 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const taskButton = document.getElementById('codex-dashboard-navigation');
               const todoButton = document.getElementById('codex-dashboard-todo-navigation');
               todoButton.click();
+              await window.__waitForTodoSaves?.();
               return [
                 taskButton.nextElementSibling === todoButton,
                 todoButton.nextElementSibling?.textContent.trim(),
@@ -88,7 +91,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoCanBeEditedCompletedFilteredAndDeleted() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -98,31 +101,35 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Ship to-do list';
               form.requestSubmit();
-
+              await window.__waitForTodoSaves?.();
               const title = document.querySelector('[data-todo-title]');
               title.value = 'Ship project to-dos';
               title.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const checkbox = document.querySelector('[data-todo-completed]');
               checkbox.checked = true;
               checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-
+              await window.__waitForTodoSaves?.();
               const hiddenFromOpen = document.querySelectorAll('[data-todo-id]').length === 0;
               document.querySelector('[data-todo-filter="completed"]').click();
+              await window.__waitForTodoSaves?.();
               const completedTitle = document.querySelector('[data-todo-title]').value;
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const deleteButton = document.querySelector('[data-todo-delete]');
               deleteButton.click();
+              await window.__waitForTodoSaves?.();
               const deletionWasConfirmed = deleteButton.dataset.todoDeleteConfirm === stored.id
                 && deleteButton.textContent.trim() === 'Confirm delete';
               const remainsAfterFirstClick = document.querySelectorAll('[data-todo-id]').length === 1;
               deleteButton.click();
+              await window.__waitForTodoSaves?.();
               return [
                 hiddenFromOpen,
                 completedTitle,
@@ -147,7 +154,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoTagsCanBeCreatedPersistedAndRemoved() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -157,27 +164,34 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const tagPicker = form.querySelector('[data-todo-new-tag]');
               const unavailableBeforeCreation = tagPicker.options.length === 1;
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const tagDialog = document.querySelector('[data-todo-tag-dialog]');
               tagDialog.querySelector('[data-todo-tag-dialog-close]').click();
+              await window.__waitForTodoSaves?.();
               const closesFromControl = !tagDialog.open;
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               tagDialog.querySelector('[data-todo-tag-name]').value = 'Work';
               tagDialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
               tagPicker.value = 'Work';
               tagPicker.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const renderedTag = document.querySelector('[data-todo-id] .todo-tag').textContent.trim();
               document.querySelector('[data-todo-tag-remove]').click();
+              await window.__waitForTodoSaves?.();
               return [unavailableBeforeCreation, closesFromControl, JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')), stored.tags, renderedTag, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].tags];
             })()
             """
@@ -193,7 +207,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTagCanBeAddedToAnExistingTodo() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -203,20 +217,24 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Follow up';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Important';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
               const picker = document.querySelector('[data-todo-id] [data-todo-tag]');
               picker.value = 'Important';
               picker.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [stored.tags, document.querySelector('[data-todo-id] .todo-tag').textContent.trim()];
             })()
@@ -229,7 +247,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testManagedTagDeletionUnassignsItFromTodosAndPersists() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -239,22 +257,27 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-tag]').value = 'Work';
               form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const deleteButton = dialog.querySelector('[data-todo-managed-tag-remove="Work"]');
               const accessible = deleteButton.getAttribute('aria-label');
               deleteButton.click();
+              await window.__waitForTodoSaves?.();
               return [
                 accessible,
                 JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
@@ -273,7 +296,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testManagedTagCanBeRenamedAcrossTodos() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -283,26 +306,32 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-tag]').value = 'Work';
               form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const renameButton = dialog.querySelector('[data-todo-managed-tag-edit="Work"]');
               const accessible = renameButton.getAttribute('aria-label');
               renameButton.click();
+              await window.__waitForTodoSaves?.();
               const name = dialog.querySelector('[data-todo-tag-name]');
               const savesRename = dialog.querySelector('[data-todo-tag-form] button').textContent === 'Save tag';
               name.value = 'Client';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
               return [
                 accessible,
                 savesRename,
@@ -323,7 +352,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTagDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -333,16 +362,18 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               const rect = dialog.getBoundingClientRect();
               const centered = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < 1
                 && Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2) < 1;
               dialog.querySelector('[data-todo-tag-dialog-close]').click();
+              await window.__waitForTodoSaves?.();
               return [dialog.parentElement.id, centered, !dialog.open];
             })()
             """
@@ -354,8 +385,8 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? Bool, true)
     }
 
-    func testProjectTagsComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+    func testProjectsComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -369,21 +400,23 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const project = form.querySelector('[data-todo-new-project]');
               const projectNames = [...project.options].map((option) => option.textContent);
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               form.querySelector('[data-todo-new-title]').value = 'Ship project tags';
               form.querySelector('[data-todo-new-body]').value = 'Include the new chat action.';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               window.__todoProjectNames = projectNames;
-              window.__todoProjectID = stored.projectTag.id;
+              window.__todoProjectID = stored.project.id;
               window.__todoSelectedProjects = [];
               document.querySelector('[data-app-action-sidebar-project-id="dashboard"]').addEventListener('click', () => {
                 window.__todoSelectedProjects.push('dashboard');
@@ -395,6 +428,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 document.body.append(composer);
               });
               document.querySelector('[data-todo-new-chat]').click();
+              await window.__waitForTodoSaves?.();
             })()
             """
         )
@@ -402,7 +436,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('textarea[placeholder=\"Do anything\"]') !== null",
             in: webView
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
             [
               window.__todoProjectNames,
@@ -425,7 +459,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testNewChatTransfersTheTodoImageToTheComposer() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -439,14 +473,15 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const project = form.querySelector('[data-todo-new-project]');
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const title = form.querySelector('[data-todo-new-title]');
               title.value = 'Review the image';
               const image = new File([new Uint8Array([137, 80, 78, 71])], 'handoff.png', { type: 'image/png' });
@@ -460,16 +495,16 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
             in: webView
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             "document.querySelector('[data-todo-form]').requestSubmit()"
         )
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-new-chat]') !== null",
             in: webView
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.fetch = () => Promise.reject(new TypeError('Codex renderer rejects data URLs'));
               document.getElementById('new-chat').addEventListener('click', () => {
                 const composer = document.createElement('textarea');
@@ -482,6 +517,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 document.body.append(composer);
               });
               document.querySelector('[data-todo-new-chat]').click();
+              await window.__waitForTodoSaves?.();
             })()
             """
         )
@@ -489,14 +525,14 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "Array.isArray(window.__todoHandoffImage)",
             in: webView
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             "[document.querySelector('textarea[placeholder=\"Do anything\"]').value, ...window.__todoHandoffImage]"
         ) as? [AnyHashable]
         XCTAssertEqual(result, ["Review the image", "handoff.png", "image/png", 4])
     }
 
     func testExistingTodoCanBeAssignedAndUnassignedFromAProject() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -512,22 +548,25 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Assign me later';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const project = document.querySelector('[data-todo-project]');
               const options = [...project.options].map((option) => option.textContent);
               project.value = 'project-b';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectTag;
+              await window.__waitForTodoSaves?.();
+              const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
               const newChatVisible = Boolean(document.querySelector('[data-todo-new-chat]'));
               document.querySelector('[data-todo-project]').value = '';
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
-              const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].projectTag;
+              await window.__waitForTodoSaves?.();
+              const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
               return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-chat]'))];
             })()
             """
@@ -543,7 +582,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodosCanBeFilteredByProjectAndTag() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation">
@@ -559,28 +598,33 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
-              const add = (title, projectID = '', tag = '') => {
+              const add = async (title, projectID = '', tag = '') => {
                 form.querySelector('[data-todo-new-project]').value = projectID;
                 form.querySelector('[data-todo-new-project]').dispatchEvent(new Event('change', { bubbles: true }));
+                await window.__waitForTodoSaves?.();
                 if (tag) {
                   form.querySelector('[data-todo-new-tag]').value = tag;
                   form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
+                  await window.__waitForTodoSaves?.();
                 }
                 form.querySelector('[data-todo-new-title]').value = title;
                 form.requestSubmit();
+                await window.__waitForTodoSaves?.();
               };
               document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              add('Project A work', 'project-a', 'Work');
-              add('Project B task', 'project-b');
-              add('Unassigned work', '', 'Work');
+              await window.__waitForTodoSaves?.();
+              await add('Project A work', 'project-a', 'Work');
+              await add('Project B task', 'project-b');
+              await add('Unassigned work', '', 'Work');
               const titles = () => [...document.querySelectorAll('[data-todo-title]')].map((input) => input.value);
               const project = document.querySelector('[data-todo-project-filter]');
               const tag = document.querySelector('[data-todo-tag-filter]');
@@ -588,15 +632,19 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const tagOptions = [...tag.options].map((option) => option.textContent);
               project.value = 'project-a';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const projectOnly = titles();
               tag.value = 'Work';
               tag.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const combined = titles();
               project.value = '';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const tagOnly = titles();
               project.value = '__none__';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const unassignedOnly = titles();
               return [projectOptions, tagOptions, projectOnly, combined, tagOnly, unassignedOnly];
             })()
@@ -616,7 +664,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testExistingTodoAssignmentUsesProjectsAvailableAfterTheTodoPageMounts() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -626,13 +674,14 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Assign after refresh';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               const row = document.querySelector('[data-todo-id]');
               const project = row.querySelector('[data-todo-project]');
               const sidebarProject = document.createElement('div');
@@ -643,8 +692,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               project.innerHTML = '<option value="">No project</option><option value="late-project">Late Project</option>';
               project.value = 'late-project';
               project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              return [stored.projectTag.id, stored.projectTag.name];
+              return [stored.project.id, stored.project.name];
             })()
             """
         ) as? [Any]
@@ -655,7 +705,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testOpeningTodosRefreshesProjectsAfterTheSidebarIsReplaced() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -665,9 +715,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const replacement = document.createElement('aside');
               replacement.setAttribute('role', 'navigation');
               replacement.innerHTML = `
@@ -687,9 +737,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTagPickerOptionsRemainReadableInTheNativeMenu() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
+            <!doctype html><html><head><meta charset="utf-8"><style>:root { --color-background-surface: #fff; --color-text-foreground: #1f1f1f; }</style></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
               <main>Conversation surface</main>
             </body></html>
@@ -697,9 +747,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const option = document.querySelector('[data-todo-new-tag] option');
               const style = getComputedStyle(option);
@@ -712,7 +762,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testFailedTodoSavePreservesTheDraftAndRestoresThePreviousList() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -722,9 +772,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const title = form.querySelector('[data-todo-new-title]');
@@ -739,6 +789,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               });
               title.value = 'Keep this draft';
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               Object.defineProperty(window, 'localStorage', {
                 configurable: true,
                 value: realStorage,
@@ -761,7 +812,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testFailedEditsDeletionAndClearCompletedRestoreSavedItems() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -771,16 +822,19 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript("""
-        (() => {
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
           window.__codexDashboard.openTodos();
           const form = document.querySelector('[data-todo-form]');
           form.querySelector('[data-todo-new-title]').value = 'Saved item';
           form.requestSubmit();
+          await window.__waitForTodoSaves?.();
           const checkbox = document.querySelector('[data-todo-completed]');
           checkbox.checked = true;
           checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          await window.__waitForTodoSaves?.();
           document.querySelector('[data-todo-filter="completed"]').click();
+          await window.__waitForTodoSaves?.();
           const original = localStorage.getItem('codex-dashboard.todos');
           const realStorage = window.localStorage;
           Object.defineProperty(window, 'localStorage', {
@@ -790,12 +844,16 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
           const title = document.querySelector('[data-todo-title]');
           title.value = 'Unsaved edit';
           title.dispatchEvent(new Event('change', { bubbles: true }));
+          await window.__waitForTodoSaves?.();
           const restoredTitle = document.querySelector('[data-todo-title]').value;
           const deletion = document.querySelector('[data-todo-delete]');
           deletion.click();
+          await window.__waitForTodoSaves?.();
           deletion.click();
+          await window.__waitForTodoSaves?.();
           const countAfterDelete = document.querySelectorAll('[data-todo-id]').length;
           document.querySelector('[data-todo-clear-completed]').click();
+          await window.__waitForTodoSaves?.();
           const countAfterClear = document.querySelectorAll('[data-todo-id]').length;
           Object.defineProperty(window, 'localStorage', { configurable: true, value: realStorage });
           return [restoredTitle, countAfterDelete, countAfterClear,
@@ -807,7 +865,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoImageCanBePastedDuringAdditionReplacedAndPreservedWhenCompleted() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -817,9 +875,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const title = form.querySelector('[data-todo-new-title]');
@@ -839,14 +897,15 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "Boolean(document.querySelector('[data-todo-new-image-preview]:not([hidden]) img')?.src.startsWith('data:image/png;base64,'))",
             in: webView
         )
-        let draftPreview = try await webView.evaluateJavaScript(
+        let draftPreview = try await webView.evaluateAsyncJavaScript(
             "[document.querySelector('[data-todo-new-image-preview] img').alt, document.querySelector('[data-todo-new-image-status]').textContent]"
         ) as? [String]
         XCTAssertEqual(draftPreview, ["mockup.png", "Image ready to attach when you add this to-do."])
-        let draftDialog = try await webView.evaluateJavaScript(
+        let draftDialog = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               document.querySelector('[data-todo-new-image-open]').click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-image-dialog]');
               const result = [dialog.open, dialog.querySelector('img').alt];
               dialog.close();
@@ -855,7 +914,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [AnyHashable]
         XCTAssertEqual(draftDialog, [true, "mockup.png"])
-        _ = try await webView.evaluateJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
+        _ = try await webView.evaluateAsyncJavaScript("document.querySelector('[data-todo-form]').requestSubmit()")
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('[data-todo-image-preview]') !== null",
             in: webView
@@ -865,9 +924,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             in: webView
         )
 
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const title = document.querySelector('[data-todo-title]');
               const replacement = new File(
                 [new Uint8Array([137, 80, 78, 71])],
@@ -885,17 +944,20 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             in: webView
         )
 
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const preview = document.querySelector('[data-todo-image-preview]');
               preview.click();
+              await window.__waitForTodoSaves?.();
               const dialog = document.querySelector('[data-todo-image-dialog]');
               const checkbox = document.querySelector('[data-todo-completed]');
               checkbox.checked = true;
               checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
               document.querySelector('[data-todo-filter="completed"]').click();
+              await window.__waitForTodoSaves?.();
               const values = [
                 stored.image.name,
                 stored.image.type,
@@ -924,7 +986,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoImagePasteShowsAnErrorForOversizedImages() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -934,9 +996,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Review notes';
@@ -945,6 +1007,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
               form.querySelector('[data-todo-new-title]').dispatchEvent(paste);
               form.requestSubmit();
+              await window.__waitForTodoSaves?.();
               return [
                 document.querySelector('[data-todo-image-error]').textContent,
                 document.querySelectorAll('[data-todo-id]').length === 0,
@@ -959,7 +1022,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTodoImageDoesNotStoreItsDataURLInLocalStorage() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -969,9 +1032,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const title = document.querySelector('[data-todo-new-title]');
               title.value = 'Keep screenshot';
@@ -986,9 +1049,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
             in: webView
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const realStorage = window.localStorage;
               window.__todoTestStorage = realStorage;
               Object.defineProperty(window, 'localStorage', {
@@ -1002,6 +1065,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 },
               });
               document.querySelector('[data-todo-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
             })()
             """
         )
@@ -1013,9 +1077,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "window.localStorage.getItem('codex-dashboard.todos') !== null",
             in: webView
         )
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               Object.defineProperty(window, 'localStorage', {
                 configurable: true,
                 value: window.__todoTestStorage,
@@ -1035,7 +1099,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPastedTodoImageCanBeRemovedFromTheAddBar() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
+        let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -1045,9 +1109,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               const title = document.querySelector('[data-todo-new-title]');
               const file = new File([new Uint8Array([137, 80, 78, 71])], 'draft.png', { type: 'image/png' });
@@ -1064,10 +1128,11 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             in: webView
         )
 
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               document.querySelector('[data-todo-new-image-remove]').click();
+              await window.__waitForTodoSaves?.();
               return [
                 document.querySelector('[data-todo-new-image-preview]').hidden,
                 document.querySelector('[data-todo-new-image-preview] img').getAttribute('src'),
@@ -1082,9 +1147,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
 
     func testOpenTodoPageIsRepairedAndClosesForCodexNavigation() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
-        _ = try await webView.evaluateJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               window.__codexDashboard.openTodos();
               document.getElementById('codex-dashboard-todo-page').remove();
               return window.__codexDashboard.ensureMounted();
@@ -1093,9 +1158,9 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         )
         try await Task.sleep(for: .milliseconds(250))
 
-        let result = try await webView.evaluateJavaScript(
+        let result = try await webView.evaluateAsyncJavaScript(
             """
-            (() => {
+            (async () => {
               const restoredOpen = window.__codexDashboard.isOpen()
                 && document.documentElement.classList.contains('codex-todo-open');
               const restoredPage = Boolean(document.getElementById('codex-dashboard-todo-page'));

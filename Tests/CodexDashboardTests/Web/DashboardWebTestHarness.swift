@@ -28,7 +28,8 @@ enum DashboardWebTestHarness {
     static func mountedWebView(
         html: String,
         baseURL: URL? = nil,
-        clearLocalStorage: Bool = false
+        clearLocalStorage: Bool = false,
+        trackTodoSaves: Bool = false
     ) async throws -> WKWebView {
         let webView = makeWebView()
         webView.loadHTMLString(html, baseURL: baseURL)
@@ -39,8 +40,39 @@ enum DashboardWebTestHarness {
             )
         }
         let injection = try InjectionBundle.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+        let expression = trackTodoSaves ? trackedTodoInjection(injection) : injection.mountExpression
+        _ = try await webView.evaluateJavaScript(expression)
         return webView
+    }
+
+    // Observe the real persistence promises without exposing a test API in production.
+    static func trackedTodoInjection(_ injection: InjectionBundle) -> String {
+        injection.mountExpression.replacingOccurrences(of: "const todoList = (() => {", with: """
+        window.__todoStoreForTests = todoStore;
+        const pendingTodoSaves = new Set();
+        const saveTodoSnapshot = todoStore.save;
+        todoStore.save = (...args) => {
+          const save = saveTodoSnapshot(...args);
+          pendingTodoSaves.add(save);
+          void save.finally(() => pendingTodoSaves.delete(save));
+          return save;
+        };
+        window.__waitForTodoSaves = async () => {
+          while (pendingTodoSaves.size) await Promise.all([...pendingTodoSaves]);
+          await Promise.resolve();
+        };
+        const todoList = (() => {
+        """)
+    }
+
+    static func todoWebView(
+        html: String,
+        baseURL: URL? = nil,
+        clearLocalStorage: Bool = false
+    ) async throws -> WKWebView {
+        try await mountedWebView(
+            html: html, baseURL: baseURL, clearLocalStorage: clearLocalStorage, trackTodoSaves: true
+        )
     }
 
     static func promptLibraryWebView(includeContentEditableComposer: Bool = false) async throws -> WKWebView {
@@ -142,5 +174,14 @@ class SerializedDashboardWebTestCase: XCTestCase {
         DashboardWebTestHarness.releaseWebViews()
         await Task.yield()
         try await super.tearDown()
+    }
+}
+
+@MainActor
+extension WKWebView {
+    func evaluateAsyncJavaScript(_ expression: String) async throws -> Any? {
+        try await callAsyncJavaScript(
+            "return await (\(expression));", arguments: [:], in: nil, contentWorld: .page
+        )
     }
 }

@@ -3,7 +3,7 @@ const taskDashboardPage = (() => {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = document.createElement('section');
-    page.id = dashboardElements.elementIDs.page;
+    page.id = dashboardElements.elementIDs.taskPage;
     page.setAttribute('aria-label', 'Codex Task Dashboard');
     page.innerHTML = `
       <div class="dashboard-shell">

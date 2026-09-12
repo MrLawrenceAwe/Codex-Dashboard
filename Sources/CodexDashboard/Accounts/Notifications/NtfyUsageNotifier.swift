@@ -1,51 +1,7 @@
 import Foundation
 
-protocol NtfyPublishing: Sendable {
-    func publish(topic: String, title: String, message: String) async throws
-}
-
-enum NtfyPublishError: LocalizedError {
-    case invalidResponse
-    case rejected(Int)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidResponse:
-            return "ntfy returned an invalid response."
-        case .rejected(let statusCode):
-            return "ntfy rejected the notification (HTTP \(statusCode))."
-        }
-    }
-}
-
-struct NtfyPublisher: NtfyPublishing {
-    private let session: URLSession
-
-    init(session: URLSession = .shared) {
-        self.session = session
-    }
-
-    func publish(topic: String, title: String, message: String) async throws {
-        guard let url = URL(string: "https://ntfy.sh/\(topic)") else {
-            throw NtfyPublishError.invalidResponse
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = Data(message.utf8)
-        request.setValue(title, forHTTPHeaderField: "X-Title")
-        request.setValue("default", forHTTPHeaderField: "X-Priority")
-        let (_, response) = try await session.data(for: request)
-        guard let response = response as? HTTPURLResponse else {
-            throw NtfyPublishError.invalidResponse
-        }
-        guard (200..<300).contains(response.statusCode) else {
-            throw NtfyPublishError.rejected(response.statusCode)
-        }
-    }
-}
-
 @MainActor
-protocol PhoneResetNotifying: AnyObject {
+protocol PhoneUsageNotifying: AnyObject {
     var isEnabled: Bool { get }
     var topic: String { get }
 
@@ -59,7 +15,7 @@ protocol PhoneResetNotifying: AnyObject {
 }
 
 @MainActor
-final class NoopPhoneResetNotifier: PhoneResetNotifying {
+final class NoopPhoneUsageNotifier: PhoneUsageNotifying {
     var isEnabled: Bool { false }
     var topic: String { "" }
 
@@ -73,26 +29,25 @@ final class NoopPhoneResetNotifier: PhoneResetNotifying {
 }
 
 @MainActor
-final class NtfyResetNotifier: PhoneResetNotifying {
+final class NtfyUsageNotifier: PhoneUsageNotifying {
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
     private static let deliveredResetsKey = "ntfyDeliveredAccountResets"
-    private static let knownDeadlinesKey = "ntfyKnownAccountDeadlines"
-    private static let sentDeadlineUpdatesKey = "ntfySentAccountDeadlineUpdates"
-    private static let usageObservationsKey = "ntfyAccountUsageObservations"
     private static let deliveredImmediateNotificationsKey = "ntfyDeliveredImmediateAccountNotifications"
 
+    private let history: UsageNotificationHistory
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
     private let now: () -> Date
     private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
-    private var scheduledByIdentifier: [String: AccountResetNotification] = [:]
+    private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
 
     init(
         userDefaults: UserDefaults = .standard,
         publisher: any NtfyPublishing = NtfyPublisher(),
         now: @escaping () -> Date = { .now }
     ) {
+        history = UsageNotificationHistory(userDefaults: userDefaults, channel: .phone)
         self.userDefaults = userDefaults
         self.publisher = publisher
         self.now = now
@@ -137,40 +92,21 @@ final class NtfyResetNotifier: PhoneResetNotifying {
             return
         }
         let currentDate = now()
-        let resetNotifications = AccountResetNotificationPlanner.resetNotifications(
+        let plan = UsageNotificationPlanner.plan(
             for: accounts,
             usageByAccountID: usageByAccountID,
-            previousObservations: observations(),
+            previousObservations: history.observations(),
+            previousDeadlines: history.deadlines(for: .known),
+            sentUpdates: history.deadlines(for: .updates),
             now: currentDate
         )
-        let thresholdNotifications = AccountResetNotificationPlanner.usageThresholdNotifications(
-            for: accounts,
-            usageByAccountID: usageByAccountID,
-            previousObservations: observations()
-        )
-        let allNotifications = AccountResetNotificationPlanner.deliverableNotifications(
-            for: accounts,
-            usageByAccountID: usageByAccountID,
-            now: currentDate
-        )
-        let notifications = allNotifications.filter { $0.notificationDate > currentDate }
-        let deadlineUpdates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
-            from: allNotifications,
-            previousDeadlines: deadlines(forKey: Self.knownDeadlinesKey),
-            sentUpdates: deadlines(forKey: Self.sentDeadlineUpdatesKey),
-            now: currentDate
-        )
-        let updateSources = Set(deadlineUpdates.map(\.sourceIdentifier))
-        saveDeadlines(
-            allNotifications.filter { !updateSources.contains($0.sourceIdentifier) },
-            forKey: Self.knownDeadlinesKey
-        )
-        let desired = Dictionary(uniqueKeysWithValues: (notifications + deadlineUpdates).map { ($0.identifier, $0) })
+        history.saveDeadlines(plan.unchangedDeadlines, for: .known)
+        let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
             cancelTask(identifier)
         }
-        for notification in notifications + deadlineUpdates {
+        for notification in plan.scheduled {
             if deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
                 cancelTask(notification.identifier)
                 continue
@@ -187,7 +123,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 await self?.deliver(notification)
             }
         }
-        let immediateNotifications = (resetNotifications + thresholdNotifications).filter {
+        let immediateNotifications = plan.immediate.filter {
             !deliveredImmediateNotificationIdentifiers().contains($0.identifier)
         }
         for notification in immediateNotifications {
@@ -199,18 +135,18 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 return
             }
         }
-        saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+        history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)
     }
 
     func sendTestNotification() async throws {
         try await publisher.publish(
             topic: topic,
             title: "Codex Dashboard test",
-            message: "Phone reset notifications are connected."
+            message: "Phone usage alerts are connected."
         )
     }
 
-    private func deliver(_ notification: AccountResetNotification) async {
+    private func deliver(_ notification: ScheduledUsageNotification) async {
         guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
         do {
             try await publisher.publish(
@@ -219,8 +155,8 @@ final class NtfyResetNotifier: PhoneResetNotifying {
                 message: notification.body
             )
             if notification.identifier.contains("-deadline-update-") {
-                saveDeadlines([notification], forKey: Self.knownDeadlinesKey)
-                saveDeadlines([notification], forKey: Self.sentDeadlineUpdatesKey)
+                history.saveDeadlines([notification], for: .known)
+                history.saveDeadlines([notification], for: .updates)
             }
             recordDelivered(notification)
             cancelTask(notification.identifier)
@@ -236,7 +172,7 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         return Date(timeIntervalSince1970: timestamp)
     }
 
-    private func recordDelivered(_ notification: AccountResetNotification) {
+    private func recordDelivered(_ notification: ScheduledUsageNotification) {
         var delivered = userDefaults.dictionary(forKey: Self.deliveredResetsKey) ?? [:]
         delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
         userDefaults.set(delivered, forKey: Self.deliveredResetsKey)
@@ -250,42 +186,6 @@ final class NtfyResetNotifier: PhoneResetNotifying {
         var identifiers = deliveredImmediateNotificationIdentifiers()
         identifiers.insert(identifier)
         userDefaults.set(Array(identifiers), forKey: Self.deliveredImmediateNotificationsKey)
-    }
-
-    private func deadlines(forKey key: String) -> [String: Date] {
-        guard let rawValues = userDefaults.dictionary(forKey: key) else { return [:] }
-        return rawValues.reduce(into: [:]) { result, item in
-            guard let timestamp = item.value as? Double else { return }
-            result[item.key] = Date(timeIntervalSinceReferenceDate: timestamp)
-        }
-    }
-
-    private func saveDeadlines(_ notifications: [AccountResetNotification], forKey key: String) {
-        guard !notifications.isEmpty else { return }
-        var values = userDefaults.dictionary(forKey: key) ?? [:]
-        for notification in notifications {
-            values[notification.sourceIdentifier] = notification.deadlineDate.timeIntervalSinceReferenceDate
-        }
-        userDefaults.set(values, forKey: key)
-    }
-
-    private func observations() -> [UUID: AccountUsageResetObservation] {
-        guard let data = userDefaults.data(forKey: Self.usageObservationsKey) else { return [:] }
-        return (try? JSONDecoder().decode([UUID: AccountUsageResetObservation].self, from: data)) ?? [:]
-    }
-
-    private func saveObservations(
-        for accounts: [SavedAccount],
-        usageByAccountID: [UUID: CodexAccountUsageSnapshot]
-    ) {
-        let updatedObservations = AccountResetNotificationPlanner.observations(
-            for: accounts,
-            usageByAccountID: usageByAccountID
-        )
-        var allObservations = observations()
-        allObservations.merge(updatedObservations) { _, updated in updated }
-        guard let data = try? JSONEncoder().encode(allObservations) else { return }
-        userDefaults.set(data, forKey: Self.usageObservationsKey)
     }
 
     private func cancelTask(_ identifier: String) {

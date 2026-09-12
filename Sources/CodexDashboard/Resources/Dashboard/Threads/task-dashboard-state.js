@@ -15,7 +15,14 @@ const taskDashboardState = (() => {
         }
         delete stored.ignoredProjectPaths;
       }
-      if (legacy !== null || hasLegacyMutedPaths) {
+      const hasLegacyCollapsedPaths = Object.hasOwn(stored, 'collapsedProjects');
+      if (hasLegacyCollapsedPaths) {
+        if (!Object.hasOwn(stored, 'collapsedProjectPaths')) {
+          stored.collapsedProjectPaths = stored.collapsedProjects;
+        }
+        delete stored.collapsedProjects;
+      }
+      if (legacy !== null || hasLegacyMutedPaths || hasLegacyCollapsedPaths) {
         localStorage.setItem(preferencesKey, JSON.stringify(stored));
         if (legacy !== null) localStorage.removeItem(legacyPreferencesKey);
       }
@@ -23,24 +30,24 @@ const taskDashboardState = (() => {
     return {
       filterMode: ['recent', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
         ? stored.filterMode : 'recent',
-      collapsedProjects: new Set(Array.isArray(stored.collapsedProjects)
-        ? stored.collapsedProjects.filter((value) => typeof value === 'string') : []),
+      collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
+        ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
       mutedProjectPaths: new Set(Array.isArray(stored.mutedProjectPaths)
         ? stored.mutedProjectPaths.filter((value) => typeof value === 'string') : []),
     };
   }
 
-  function savePreferences({ filterMode, collapsedProjects, mutedProjectPaths }) {
+  function savePreferences({ filterMode, collapsedProjectPaths, mutedProjectPaths }) {
     try {
       localStorage.setItem(preferencesKey, JSON.stringify({
         filterMode,
-        collapsedProjects: [...collapsedProjects],
+        collapsedProjectPaths: [...collapsedProjectPaths],
         mutedProjectPaths: [...mutedProjectPaths],
       }));
     } catch (_) {}
   }
 
-  function derive(threads, isThreadUnread, mutedProjectPaths) {
+  function summarizeActivity(threads, isThreadUnread, mutedProjectPaths) {
     let runningCount = 0;
     const unmutedChangedProjectPaths = new Set();
     const allChangedProjectPaths = new Set();
@@ -82,5 +89,5 @@ const taskDashboardState = (() => {
     });
   }
 
-  return { derive, filter, loadPreferences, sortThreadsByRecency, savePreferences };
+  return { summarizeActivity, filter, loadPreferences, sortThreadsByRecency, savePreferences };
 })();

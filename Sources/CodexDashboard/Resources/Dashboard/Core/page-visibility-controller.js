@@ -1,7 +1,7 @@
 function createPageVisibilityController({ pageID, navigationID, rootClass }) {
   let isOpen = false;
 
-  function restoreOpenState() {
+  function applyVisibility() {
     document.getElementById(pageID)?.classList.toggle('is-open', isOpen);
     document.documentElement.classList.toggle(rootClass, isOpen);
     const navigation = document.getElementById(navigationID);
@@ -12,14 +12,14 @@ function createPageVisibilityController({ pageID, navigationID, rootClass }) {
   function open() {
     if (!document.getElementById(pageID)) return false;
     isOpen = true;
-    restoreOpenState();
+    applyVisibility();
     return true;
   }
 
   function close() {
     isOpen = false;
-    restoreOpenState();
+    applyVisibility();
   }
 
-  return { open, close, restoreOpenState, isOpen: () => isOpen };
+  return { open, close, applyVisibility, isOpen: () => isOpen };
 }

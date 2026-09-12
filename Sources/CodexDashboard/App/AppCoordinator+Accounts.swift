@@ -29,14 +29,14 @@ extension AppCoordinator {
             guard let accountID = action.accountID else { return .unavailable }
             accounts.deleteAccount(accountID)
         }
-        await updateAccountResetNotifications()
+        await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()
         return .handled
     }
 
     func refreshAccountStateAfterFileChange() async {
         accounts.refreshState()
-        await updateAccountResetNotifications()
+        await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()
     }
 
@@ -165,14 +165,14 @@ extension AppCoordinator {
         await accounts.refreshActiveUsage(
             codexIsRunning: dashboardRuntime?.codexIsRunning == true
         )
-        await updateAccountResetNotifications()
+        await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()
     }
 
     func refreshInactiveAccountUsage() async {
         guard !isPerformingAction else { return }
         await accounts.refreshInactiveUsage()
-        await updateAccountResetNotifications()
+        await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()
     }
 
@@ -191,7 +191,7 @@ extension AppCoordinator {
             reportsFailure: reportsFailure,
             interactionAllowed: interactionAllowed
         )
-        await updateAccountResetNotifications()
+        await updateAccountUsageNotifications()
         return authorization
     }
 
@@ -201,32 +201,32 @@ extension AppCoordinator {
         )
     }
 
-    func updateAccountResetNotifications() async {
-        await accountResetNotifier.updateNotifications(
+    func updateAccountUsageNotifications() async {
+        await accountUsageNotifier.updateNotifications(
             for: accounts.savedAccounts,
             usageByAccountID: accounts.usageByAccountID
         )
-        await phoneResetNotifier.updateNotifications(
+        await phoneUsageNotifier.updateNotifications(
             for: accounts.savedAccounts,
             usageByAccountID: accounts.usageByAccountID
         )
     }
 
     var phoneNotificationsEnabled: Bool {
-        phoneResetNotifier.isEnabled
+        phoneUsageNotifier.isEnabled
     }
 
     var phoneNotificationTopic: String {
-        phoneResetNotifier.topic
+        phoneUsageNotifier.topic
     }
 
     func setPhoneNotificationsEnabled(_ enabled: Bool) {
-        phoneResetNotifier.setEnabled(enabled)
+        phoneUsageNotifier.setEnabled(enabled)
         phoneNotificationStatusMessage = enabled
             ? "Subscribe to the topic on your phone, then send a test."
             : nil
         objectWillChange.send()
-        Task { await updateAccountResetNotifications() }
+        Task { await updateAccountUsageNotifications() }
     }
 
     func copyPhoneNotificationTopic() {
@@ -236,14 +236,14 @@ extension AppCoordinator {
     }
 
     func generateNewPhoneNotificationTopic() {
-        phoneResetNotifier.generateNewTopic()
+        phoneUsageNotifier.generateNewTopic()
         phoneNotificationStatusMessage = "New topic generated. Subscribe to it, then send a test."
         objectWillChange.send()
     }
 
     func testPhoneNotification() async {
         do {
-            try await phoneResetNotifier.sendTestNotification()
+            try await phoneUsageNotifier.sendTestNotification()
             phoneNotificationStatusMessage = "Test sent. Check your phone."
         } catch {
             phoneNotificationStatusMessage = "Test failed: \(error.localizedDescription)"
