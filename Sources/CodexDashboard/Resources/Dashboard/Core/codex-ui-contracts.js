@@ -41,9 +41,15 @@ const codexUIContracts = (() => {
     return sharedParent && sharedParent.contains(settings) ? sharedParent : logout.parentElement;
   }
 
-  function profileMenuPetAction() {
+  function profileMenuTrigger() {
+    return [...document.querySelectorAll('button[aria-haspopup="menu"]')].find((button) => (
+      isVisible(button) && button.getAttribute('aria-label') === 'Open profile menu'
+    )) || null;
+  }
+
+  function profileMenuAccountAnchor() {
     const menu = profileMenu();
-    const action = visibleAction('Show pet');
+    const action = visibleAction('Settings');
     return action && menu?.contains(action) ? action : null;
   }
 
@@ -317,7 +323,8 @@ const codexUIContracts = (() => {
     sidebar,
     navigation,
     profileMenu,
-    profileMenuPetAction,
+    profileMenuTrigger,
+    profileMenuAccountAnchor,
     threadRows,
     projects,
     selectProject,

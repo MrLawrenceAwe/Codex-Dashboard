@@ -69,7 +69,6 @@ extension TaskDashboardWebTests {
           <div role="menu" id="profile-menu">
             <div class="menu-items">
               <div role="menuitem"><span>Usage remaining</span></div>
-              <div role="menuitem"><span>Show pet</span></div>
               <div role="menuitem"><span>Settings</span><kbd>⌘,</kbd></div>
               <div role="menuitem"><span>Log out</span></div>
             </div>
@@ -130,6 +129,24 @@ extension TaskDashboardWebTests {
         )
         XCTAssertEqual(action["kind"] as? String, "updateUsage")
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
+    }
+
+    func testClosedProfileMenuExposesPersistentCompatibilityContract() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <button aria-label="Open profile menu" aria-haspopup="menu">Lawrence</button>
+        </body></html>
+        """)
+        let contractSource = try InjectionBundle.loadRendererContractSource()
+
+        let compatible = try await webView.evaluateJavaScript("""
+        (() => {
+          \(contractSource)
+          return Boolean(codexUIContracts.profileMenuTrigger());
+        })()
+        """) as? Bool
+
+        XCTAssertEqual(compatible, true)
     }
 
     func testAccountsPanelStaysWithinANarrowWindow() async throws {

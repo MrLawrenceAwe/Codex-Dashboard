@@ -82,11 +82,11 @@ struct RendererCompatibilityChecker {
             id: "profile-menu",
             title: "Account menu integration",
             expression: contractExpression(
-                "Boolean(codexUIContracts.profileMenu() && codexUIContracts.profileMenuPetAction())"
+                "Boolean(codexUIContracts.profileMenuTrigger())"
             ),
             failureStatus: .warning,
-            compatibleDetail: "Codex exposes the profile-menu controls used for account integration.",
-            failureDetail: "The compatible profile-menu actions are not currently mounted.",
+            compatibleDetail: "Codex exposes the profile-menu entry point used for account integration.",
+            failureDetail: "The compatible profile-menu entry point was not found.",
             in: target
         ))
         checks.append(await inspect(

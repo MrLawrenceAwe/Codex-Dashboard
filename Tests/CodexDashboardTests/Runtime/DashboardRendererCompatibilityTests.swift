@@ -69,7 +69,7 @@ extension DashboardRendererTests {
             expressions.contains { $0.contains("codexUIContracts.probeModelPickerControls()") }
         )
         XCTAssertTrue(expressions.contains {
-            $0.contains("codexUIContracts.profileMenuPetAction()")
+            $0.contains("codexUIContracts.profileMenuTrigger()")
         })
     }
 
