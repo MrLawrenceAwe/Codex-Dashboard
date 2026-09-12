@@ -379,11 +379,11 @@ enum AccountResetNotificationPlanner {
     ) -> String {
         guard style == .todayOrTomorrow else { return formattedDeadline(deadline) }
         let calendar = Calendar.current
-        let day = calendar.isDate(deadline, inSameDayAs: referenceDate) ? "today" : "tomorrow"
         let formatter = DateFormatter()
         formatter.dateStyle = .none
         formatter.timeStyle = .short
-        return "\(day) at \(formatter.string(from: deadline))"
+        let time = formatter.string(from: deadline)
+        return calendar.isDate(deadline, inSameDayAs: referenceDate) ? "at \(time)" : "tomorrow at \(time)"
     }
 
     static func formattedDeadline(_ deadline: Date) -> String {
