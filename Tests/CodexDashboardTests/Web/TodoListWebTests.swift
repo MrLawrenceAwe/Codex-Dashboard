@@ -605,10 +605,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [[String]], [
-            ["", "All projects"], ["__none__", "No project"],
-            ["project-a", "Project A"], ["project-b", "Project B"],
+            ["", "All projects"], ["__none__", "No project (1)"],
+            ["project-a", "Project A (1)"], ["project-b", "Project B (1)"],
         ])
-        XCTAssertEqual(values[1] as? [String], ["All tags", "Work"])
+        XCTAssertEqual(values[1] as? [String], ["All tags", "Work (2)"])
         XCTAssertEqual(values[2] as? [String], ["Project A work"])
         XCTAssertEqual(values[3] as? [String], ["Project A work"])
         XCTAssertEqual(values[4] as? [String], ["Unassigned work", "Project A work"])
