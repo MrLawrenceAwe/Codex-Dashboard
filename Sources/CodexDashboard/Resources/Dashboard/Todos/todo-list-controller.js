@@ -129,7 +129,7 @@ const todoList = (() => {
   }
 
   function updateFilterOptions() {
-    todoListView?.updateFilterOptions?.(filterProjects(), availableTags, {
+    todoListView?.updateFilterOptions?.(filterProjects(), availableTags, items, {
       project: projectFilter,
       tag: tagFilter,
     });

@@ -40,15 +40,25 @@ const todoListView = (() => {
     )).join('')}`;
   }
 
-  function filterProjectOptions(projects, selectedID = '') {
-    return `<option value="">All projects</option><option value="__none__"${selectedID === '__none__' ? ' selected' : ''}>No project</option>${projects.map((project) => (
-      `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
+  function filterProjectOptions(projects, items, selectedID = '') {
+    const projectCounts = new Map();
+    items.forEach((item) => {
+      const projectID = item.projectTag?.id || '__none__';
+      projectCounts.set(projectID, (projectCounts.get(projectID) || 0) + 1);
+    });
+    const noProjectCount = projectCounts.get('__none__') || 0;
+    return `<option value="">All projects</option><option value="__none__"${selectedID === '__none__' ? ' selected' : ''}>No project (${noProjectCount})</option>${projects.map((project) => (
+      `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)} (${projectCounts.get(project.id) || 0})</option>`
     )).join('')}`;
   }
 
-  function filterTagOptions(tags, selectedTag = '') {
+  function filterTagOptions(tags, items, selectedTag = '') {
+    const tagCounts = new Map();
+    items.forEach((item) => item.tags.forEach((tag) => {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }));
     return `<option value="">All tags</option>${tags.map((tag) => (
-      `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)}</option>`
+      `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)} (${tagCounts.get(tag) || 0})</option>`
     )).join('')}`;
   }
 
@@ -91,8 +101,8 @@ const todoListView = (() => {
     page.querySelector('[data-todo-clear-completed]').hidden = completedCount === 0;
     const projectFilter = page.querySelector('[data-todo-project-filter]');
     const tagFilter = page.querySelector('[data-todo-tag-filter]');
-    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, filters.project || '');
-    if (tagFilter) tagFilter.innerHTML = filterTagOptions(availableTags, filters.tag || '');
+    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, items, filters.project || '');
+    if (tagFilter) tagFilter.innerHTML = filterTagOptions(availableTags, items, filters.tag || '');
     const list = page.querySelector('[data-todo-list]');
     const visible = visibleItems(items, filterMode, filters.project, filters.tag);
     if (!visible.length) {
@@ -250,11 +260,11 @@ const todoListView = (() => {
     });
   }
 
-  function updateFilterOptions(projects, tags, filters = {}) {
+  function updateFilterOptions(projects, tags, items, filters = {}) {
     const projectFilter = document.querySelector('[data-todo-project-filter]');
     const tagFilter = document.querySelector('[data-todo-tag-filter]');
-    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, filters.project || '');
-    if (tagFilter) tagFilter.innerHTML = filterTagOptions(tags, filters.tag || '');
+    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, items, filters.project || '');
+    if (tagFilter) tagFilter.innerHTML = filterTagOptions(tags, items, filters.tag || '');
   }
 
   function updateManagedTags(tags) {
