@@ -129,13 +129,20 @@ enum AccountResetNotificationPlanner {
         now: Date
     ) -> [AccountResetNotification] {
         notifications.compactMap { notification in
+            let updateAlreadySent = sentUpdates[notification.sourceIdentifier].map { sentDeadline in
+                !deadlinesDifferMeaningfully(sentDeadline, notification.deadlineDate)
+            } ?? false
             guard let previousDeadline = previousDeadlines[notification.identifier],
-                  previousDeadline != notification.deadlineDate,
+                  deadlinesDifferMeaningfully(previousDeadline, notification.deadlineDate),
                   notification.notificationDate <= now,
-                  sentUpdates[notification.sourceIdentifier] != notification.deadlineDate
+                  !updateAlreadySent
             else { return nil }
             return notification.deadlineUpdateNotification(at: now.addingTimeInterval(1))
         }
+    }
+
+    private static func deadlinesDifferMeaningfully(_ lhs: Date, _ rhs: Date) -> Bool {
+        abs(lhs.timeIntervalSince(rhs)) > resetTimeCorrectionTolerance
     }
 
     static func resetNotifications(

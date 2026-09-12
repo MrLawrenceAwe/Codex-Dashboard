@@ -134,6 +134,60 @@ final class AccountResetNotifierTests: XCTestCase {
         )
     }
 
+    func testDoesNotPlanDeadlineUpdateForSmallResetTimeCorrection() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let reset = now.addingTimeInterval(30 * 60)
+        let notifications = AccountResetNotificationPlanner.deliverableNotifications(
+            for: [savedAccount],
+            usageByAccountID: [
+                savedAccount.id: snapshot(
+                    fiveHourReset: reset,
+                    weeklyReset: nil,
+                    bankedResetExpiration: nil,
+                    now: now
+                ),
+            ],
+            now: now
+        )
+
+        let updates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
+            from: notifications,
+            previousDeadlines: [notifications[0].sourceIdentifier: reset.addingTimeInterval(-60)],
+            sentUpdates: [:],
+            now: now
+        )
+
+        XCTAssertTrue(updates.isEmpty)
+    }
+
+    func testDoesNotRepeatDeadlineUpdateForSmallCorrectionAfterDelivery() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let reset = now.addingTimeInterval(30 * 60)
+        let notifications = AccountResetNotificationPlanner.deliverableNotifications(
+            for: [savedAccount],
+            usageByAccountID: [
+                savedAccount.id: snapshot(
+                    fiveHourReset: reset,
+                    weeklyReset: nil,
+                    bankedResetExpiration: nil,
+                    now: now
+                ),
+            ],
+            now: now
+        )
+
+        let updates = AccountResetNotificationPlanner.deadlineUpdateNotifications(
+            from: notifications,
+            previousDeadlines: [notifications[0].sourceIdentifier: reset.addingTimeInterval(-10 * 60)],
+            sentUpdates: [notifications[0].sourceIdentifier: reset.addingTimeInterval(-60)],
+            now: now
+        )
+
+        XCTAssertTrue(updates.isEmpty)
+    }
+
     func testSkipsResetNotificationsWhoseOneHourWarningHasAlreadyPassed() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
