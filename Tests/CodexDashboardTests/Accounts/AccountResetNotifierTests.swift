@@ -207,7 +207,7 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.isEmpty)
     }
 
-    func testSkipsFiveHourWarningsWhenWeeklyUsageIsZero() {
+    func testSkipsFiveHourWarningsWhenWeeklyUsageIsExhausted() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let notifications = AccountResetNotificationPlanner.notifications(
@@ -220,7 +220,7 @@ final class AccountResetNotifierTests: XCTestCase {
                             resetsAt: now.addingTimeInterval(2 * 60 * 60)
                         ),
                         weekly: CodexUsageWindow(
-                            usedPercent: 0,
+                            usedPercent: 100,
                             resetsAt: now.addingTimeInterval(96 * 60 * 60)
                         ),
                         bankedResets: nil
@@ -234,6 +234,40 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertEqual(notifications.count, 7)
         XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.contains("-weekly-") })
+    }
+
+    func testSkipsAllFiveHourImmediateAlertsWhenWeeklyUsageIsExhausted() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let previous = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 80, resetsAt: now.addingTimeInterval(2 * 60 * 60)),
+            weekly: CodexUsageWindow(usedPercent: 99, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60))
+        )
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
+                weekly: CodexUsageWindow(usedPercent: 100, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60))
+            ),
+            fetchedAt: now
+        )
+        let observations = [savedAccount.id: AccountUsageResetObservation(usage: previous)]
+
+        XCTAssertTrue(
+            AccountResetNotificationPlanner.resetNotifications(
+                for: [savedAccount],
+                usageByAccountID: [savedAccount.id: current],
+                previousObservations: observations,
+                now: now
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            AccountResetNotificationPlanner.usageThresholdNotifications(
+                for: [savedAccount],
+                usageByAccountID: [savedAccount.id: current],
+                previousObservations: observations,
+                now: now
+            ).isEmpty
+        )
     }
 
     func testPlansAnImmediateAlertWhenUsageDropsBeforeTheKnownReset() {

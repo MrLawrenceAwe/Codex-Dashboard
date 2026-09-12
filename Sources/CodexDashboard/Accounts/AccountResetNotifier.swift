@@ -98,14 +98,14 @@ enum AccountResetNotificationPlanner {
     ) -> [AccountResetNotification] {
         accounts.flatMap { account -> [AccountResetNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let fiveHourNotifications = usage.weekly?.usedPercent == 0 ? [] : limitNotifications(
+            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) ? limitNotifications(
                 for: account,
                 windowName: "5-hour",
                 window: usage.fiveHour,
                 leadTimes: [oneHour],
                 usageSummary: usageSummary(for: usage),
                 now: now
-            )
+            ) : []
             return fiveHourNotifications + limitNotifications(
                 for: account,
                 windowName: "Weekly",
@@ -155,15 +155,16 @@ enum AccountResetNotificationPlanner {
             guard let usage = usageByAccountID[account.id]?.usage,
                   let previous = previousObservations[account.id]
             else { return [] }
-            return [
-                resetNotification(
+            let fiveHourNotification = hasWeeklyUsageRemaining(usage) ? resetNotification(
                     for: account,
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     usageSummary: usageSummary(for: usage),
                     now: now
-                ),
+                ) : nil
+            return [
+                fiveHourNotification,
                 resetNotification(
                     for: account,
                     windowName: "Weekly",
@@ -189,15 +190,16 @@ enum AccountResetNotificationPlanner {
             guard let usage = usageByAccountID[account.id]?.usage,
                   let previous = previousObservations[account.id]
             else { return [] }
-            return [
-                thresholdNotifications(
+            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) ? thresholdNotifications(
                     for: account,
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     usageSummary: usageSummary(for: usage),
                     now: now
-                ),
+                ) : []
+            return [
+                fiveHourNotifications,
                 thresholdNotifications(
                     for: account,
                     windowName: "Weekly",
@@ -359,6 +361,11 @@ enum AccountResetNotificationPlanner {
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {
         guard let window else { return "unavailable" }
         return "\(max(0, min(100, 100 - window.usedPercent)))%"
+    }
+
+    private static func hasWeeklyUsageRemaining(_ usage: CodexAccountUsage) -> Bool {
+        guard let weekly = usage.weekly else { return true }
+        return weekly.usedPercent < 100
     }
 
     private static func deadlineStyle(for windowName: String) -> AccountResetDeadlineStyle {
