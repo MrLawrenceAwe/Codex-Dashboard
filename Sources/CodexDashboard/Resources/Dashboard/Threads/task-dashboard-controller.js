@@ -5,12 +5,12 @@ const storedPreferences = taskDashboardState.loadPreferences();
 let filterMode = storedPreferences.filterMode;
 const pageSize = 10;
 let visibleLimit = pageSize;
-const { collapsedProjects, mutedProjectPaths } = storedPreferences;
+const { collapsedProjectPaths, mutedProjectPaths } = storedPreferences;
 let renderFrame;
 let renderFallbackTimer;
 const pageState = createPageVisibilityController({
-  pageID: dashboardElements.elementIDs.page,
-  navigationID: dashboardElements.elementIDs.navButton,
+  pageID: dashboardElements.elementIDs.taskPage,
+  navigationID: dashboardElements.elementIDs.taskNavButton,
   rootClass: 'codex-dashboard-open',
 });
 let viewNeedsRender = true;
@@ -21,13 +21,13 @@ const { isThreadUnread, isCompletionTickVisible } = unreadState;
 function savePreferences() {
   taskDashboardState.savePreferences({
     filterMode,
-    collapsedProjects,
+    collapsedProjectPaths,
     mutedProjectPaths,
   });
 }
 
 function deriveViewState() {
-  return taskDashboardState.derive(threads, isThreadUnread, mutedProjectPaths);
+  return taskDashboardState.summarizeActivity(threads, isThreadUnread, mutedProjectPaths);
 }
 
 function openThread(thread) {
@@ -64,7 +64,7 @@ function renderDashboard() {
     threads,
     filterMode,
     visibleThreadLimit: visibleLimit,
-    collapsedProjects,
+    collapsedProjectPaths,
     mutedProjectPaths,
     commitOrPushError,
     isThreadUnread,
@@ -109,9 +109,9 @@ function requestRender() {
 }
 
 function mountTaskNavigationButton() {
-  if (document.getElementById(dashboardElements.elementIDs.navButton)) return true;
+  if (document.getElementById(dashboardElements.elementIDs.taskNavButton)) return true;
   if (!mountDashboardNavigationButton({
-    id: dashboardElements.elementIDs.navButton,
+    id: dashboardElements.elementIDs.taskNavButton,
     label: 'Task Dashboard',
     markup: `
     <div class="dashboard-nav-copy">
@@ -125,12 +125,12 @@ function mountTaskNavigationButton() {
     </div>`,
   })) return false;
   taskDashboardView.updateSidebarStatus(deriveViewState());
-  pageState.restoreOpenState();
+  pageState.applyVisibility();
   return true;
 }
 
 function mountTaskDashboardPage() {
-  if (document.getElementById(dashboardElements.elementIDs.page)) return true;
+  if (document.getElementById(dashboardElements.elementIDs.taskPage)) return true;
   viewNeedsRender = true;
   const mounted = taskDashboardPage.mount({
     onFilter: (nextFilterMode) => {
@@ -165,8 +165,8 @@ function mountTaskDashboardPage() {
       const projectToggle = event.target.closest('[data-project-toggle]');
       if (projectToggle) {
         const projectPath = projectToggle.dataset.projectToggle;
-        if (collapsedProjects.has(projectPath)) collapsedProjects.delete(projectPath);
-        else collapsedProjects.add(projectPath);
+        if (collapsedProjectPaths.has(projectPath)) collapsedProjectPaths.delete(projectPath);
+        else collapsedProjectPaths.add(projectPath);
         savePreferences();
         renderDashboard();
         return;
@@ -174,7 +174,7 @@ function mountTaskDashboardPage() {
       openThreadFromEvent(event);
     },
   });
-  if (mounted) pageState.restoreOpenState();
+  if (mounted) pageState.applyVisibility();
   return mounted;
 }
 
@@ -225,7 +225,7 @@ function destroy() {
 return {
   mountNavigation: mountTaskNavigationButton,
   mountPage: mountTaskDashboardPage,
-  restoreOpenState: pageState.restoreOpenState,
+  applyVisibility: pageState.applyVisibility,
   startMonitoring: unreadState.startMonitoring,
   requestRender,
   syncUnread: unreadState.syncUnread,

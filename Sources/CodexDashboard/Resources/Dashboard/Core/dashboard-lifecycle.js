@@ -33,7 +33,7 @@ const dashboardLifecycle = (() => {
       return;
     }
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest(`#${dashboardElements.elementIDs.navButton}`)) {
+    if (target?.closest(`#${dashboardElements.elementIDs.taskNavButton}`)) {
       event.preventDefault();
       event.stopPropagation();
       if (event.type === 'click') hooks.openTasks();
@@ -76,7 +76,7 @@ const dashboardLifecycle = (() => {
 
   function attachPage() {
     const pageHost = codexHost.pageHost();
-    [dashboardElements.elementIDs.page, dashboardElements.elementIDs.todoPage].forEach((id) => {
+    [dashboardElements.elementIDs.taskPage, dashboardElements.elementIDs.todoPage].forEach((id) => {
       const page = document.getElementById(id);
       if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
     });
@@ -141,9 +141,9 @@ const dashboardLifecycle = (() => {
       [...record.removedNodes].some(containsDashboardElement)
     ));
     const dashboardElementIsMissing = [
-      dashboardElements.elementIDs.page,
+      dashboardElements.elementIDs.taskPage,
       dashboardElements.elementIDs.todoPage,
-      dashboardElements.elementIDs.navButton,
+      dashboardElements.elementIDs.taskNavButton,
       dashboardElements.elementIDs.todoNavButton,
     ].some((id) => !document.getElementById(id));
     if (!dashboardWasRemoved && !dashboardElementIsMissing && observedStructureRoot?.isConnected) return;
@@ -178,7 +178,7 @@ const dashboardLifecycle = (() => {
     hooks.mountPage();
     hooks.mountNavigation();
     attachPage();
-    hooks.restoreOpenState();
+    hooks.applyVisibility();
   }
 
   function ensureMounted(nextHooks) {
@@ -209,8 +209,8 @@ const dashboardLifecycle = (() => {
     }
     return Boolean(
       document.getElementById(dashboardElements.elementIDs.style)
-        && document.getElementById(dashboardElements.elementIDs.page)
-        && document.getElementById(dashboardElements.elementIDs.navButton)
+        && document.getElementById(dashboardElements.elementIDs.taskPage)
+        && document.getElementById(dashboardElements.elementIDs.taskNavButton)
         && document.getElementById(dashboardElements.elementIDs.todoPage)
         && document.getElementById(dashboardElements.elementIDs.todoNavButton)
     );

@@ -69,7 +69,7 @@ const threadMarkup = (() => {
 
   function list(visibleThreads, {
     filterMode,
-    collapsedProjects,
+    collapsedProjectPaths,
     mutedProjectPaths,
     isUnread,
     isCompletionTickVisible,
@@ -114,7 +114,7 @@ const threadMarkup = (() => {
           </details>` : ''}`;
     }
     return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
-      const isCollapsed = collapsedProjects.has(projectPath);
+      const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
       const isMuted = mutedProjectPaths.has(projectPath);

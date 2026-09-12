@@ -507,8 +507,7 @@ extension AppCoordinatorTests {
         let coordinator = makeAppCoordinator(
             accountManager: accountManager,
             accountUsageProvider: SavedAccountRecordingUsageProvider(
-                usage: usage,
-                refreshedCredential: credentials[0]
+                usage: usage
             ),
             accountUsageCacheStore: cache,
             runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }

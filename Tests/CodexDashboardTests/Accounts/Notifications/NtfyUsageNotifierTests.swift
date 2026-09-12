@@ -48,13 +48,13 @@ private actor FailSecondNtfyPublisher: NtfyPublishing {
 }
 
 @MainActor
-final class NtfyResetNotifierTests: XCTestCase {
+final class NtfyUsageNotifierTests: XCTestCase {
     func testDeliversImminentResetWarningOnceWithAccountAndRemainingUsage() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
-        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = RecordingNtfyPublisher()
-        let notifier = NtfyResetNotifier(
+        let notifier = NtfyUsageNotifier(
             userDefaults: defaults,
             publisher: publisher,
             now: { now }
@@ -95,7 +95,7 @@ final class NtfyResetNotifierTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         let publisher = RecordingNtfyPublisher()
-        let notifier = NtfyResetNotifier(
+        let notifier = NtfyUsageNotifier(
             userDefaults: defaults,
             publisher: publisher,
             now: { now }
@@ -121,9 +121,9 @@ final class NtfyResetNotifierTests: XCTestCase {
     func testDeliversAnUnexpectedEarlyResetOnlyOnce() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
-        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = RecordingNtfyPublisher()
-        let notifier = NtfyResetNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
         )
@@ -155,9 +155,9 @@ final class NtfyResetNotifierTests: XCTestCase {
     func testDeliversACompletedResetOnlyOnce() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
-        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = RecordingNtfyPublisher()
-        let notifier = NtfyResetNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
         )
@@ -194,9 +194,9 @@ final class NtfyResetNotifierTests: XCTestCase {
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
-        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = FailOnceNtfyPublisher()
-        let notifier = NtfyResetNotifier(
+        let notifier = NtfyUsageNotifier(
             userDefaults: defaults,
             publisher: publisher,
             now: { now }
@@ -236,9 +236,9 @@ final class NtfyResetNotifierTests: XCTestCase {
     func testRetriesOnlyUndeliveredThresholdAlertsAfterAPartialFailure() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
-        defaults.set(true, forKey: NtfyResetNotifier.enabledKey)
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = FailSecondNtfyPublisher()
-        let notifier = NtfyResetNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
         )
@@ -265,14 +265,14 @@ final class NtfyResetNotifierTests: XCTestCase {
         let titles = await publisher.recordedTitles()
         XCTAssertEqual(titles.count, 3)
         XCTAssertEqual(Set(titles), [
-            "Codex 5-hour usage below 80%",
-            "Codex 5-hour usage below 50%",
-            "Codex 5-hour usage below 20%",
+            "Codex 5-hour: less than 80% remaining",
+            "Codex 5-hour: less than 50% remaining",
+            "Codex 5-hour: less than 20% remaining",
         ])
     }
 
     func testGeneratesAFriendlyReplacementTopic() throws {
-        let notifier = NtfyResetNotifier(userDefaults: try makeDefaults())
+        let notifier = NtfyUsageNotifier(userDefaults: try makeDefaults())
         let initialTopic = notifier.topic
 
         notifier.generateNewTopic()
@@ -286,18 +286,18 @@ final class NtfyResetNotifierTests: XCTestCase {
         let defaults = try makeDefaults()
         defaults.set(
             "codex-dashboard-6a16a2d54e074acebd459180c2c8250e45892ace75b84d98980687ae00809342",
-            forKey: NtfyResetNotifier.topicKey
+            forKey: NtfyUsageNotifier.topicKey
         )
 
-        let notifier = NtfyResetNotifier(userDefaults: defaults)
+        let notifier = NtfyUsageNotifier(userDefaults: defaults)
 
         XCTAssertTrue(notifier.topic.hasPrefix("codex-dashboard-"))
         XCTAssertEqual(notifier.topic.count, 32)
-        XCTAssertEqual(defaults.string(forKey: NtfyResetNotifier.topicKey), notifier.topic)
+        XCTAssertEqual(defaults.string(forKey: NtfyUsageNotifier.topicKey), notifier.topic)
     }
 
     private func makeDefaults() throws -> UserDefaults {
-        let suiteName = "NtfyResetNotifierTests-\(UUID().uuidString)"
+        let suiteName = "NtfyUsageNotifierTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }

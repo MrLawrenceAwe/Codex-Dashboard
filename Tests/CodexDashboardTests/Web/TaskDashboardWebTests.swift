@@ -164,7 +164,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-filter="running"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
-              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjects[0], saved.mutedProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
+              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.mutedProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }

@@ -1,6 +1,6 @@
 const todoList = (() => {
-  let items = todoListState.load();
-  let availableTags = todoListState.loadTags(items);
+  let items = todoStore.load();
+  let availableTags = todoStore.loadTags(items);
   let projects = [];
   let projectDraft = null;
   let projectObserver;
@@ -8,11 +8,10 @@ const todoList = (() => {
   let filterMode = 'open';
   let projectFilter = '';
   let tagFilter = '';
-  // Image saves use IndexedDB and therefore complete asynchronously. Keep every
-  // snapshot in order so a slower, older save cannot overwrite a newer edit in
-  // localStorage after it finishes.
-  let persistenceTail = Promise.resolve();
-  let persistencePending = false;
+  let destroyed = false;
+  let savedItems = items;
+  let savedTags = availableTags;
+  const imageReaders = new Set();
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton,
@@ -39,6 +38,7 @@ const todoList = (() => {
   }
 
   function refreshProjects() {
+    if (destroyed) return;
     projects = codexUIContracts.projects();
     const selected = projectDraft && projects.some((project) => project.id === projectDraft.id)
       ? projectDraft.id : '';
@@ -60,7 +60,7 @@ const todoList = (() => {
 
   function addTagDraft(value) {
     if (!availableTags.includes(value)) return false;
-    const tags = todoListState.normalizeTags([...tagDraft, value]);
+    const tags = todoStore.normalizeTags([...tagDraft, value]);
     if (tags.length === tagDraft.length) return false;
     tagDraft = tags;
     todoListView.updateTagDraft(tagDraft);
@@ -71,86 +71,55 @@ const todoList = (() => {
   const maximumImageBytes = 2 * 1024 * 1024;
 
   function showImageError(message = '') {
+    if (destroyed) return;
     const notice = document.querySelector('[data-todo-image-error]');
     if (!notice) return;
     notice.textContent = message;
     notice.hidden = !message;
   }
 
-  function persist(snapshot) {
-    const notice = document.querySelector('[data-todo-storage-error]');
-    const updateNotice = (result) => {
-      if (notice) notice.hidden = result;
-      return result;
-    };
-    const write = () => {
-      const saved = todoListState.save(snapshot);
-      return saved instanceof Promise ? saved : Promise.resolve(saved);
-    };
-    if (!persistencePending) {
-      const saved = todoListState.save(snapshot);
-      if (!(saved instanceof Promise)) return updateNotice(saved);
-      persistencePending = true;
-      persistenceTail = saved.then(updateNotice).finally(() => {
-        persistencePending = false;
-      });
-      return persistenceTail;
-    }
-    // Recover the chain after a failed write: later changes must still have an
-    // opportunity to become durable.
-    persistenceTail = persistenceTail.catch(() => false).then(write).then(updateNotice)
-      .finally(() => {
-        persistencePending = false;
-      });
-    return persistenceTail;
-  }
-
-  function persistTags() {
-    const saved = todoListState.saveTags(availableTags);
-    const notice = document.querySelector('[data-todo-storage-error]');
-    if (notice) notice.hidden = saved;
-    return saved;
-  }
-
   function renderTags() {
+    if (destroyed) return;
     todoListView.updateTagOptions(availableTags);
     todoListView.updateManagedTags(availableTags);
     updateFilterOptions();
   }
 
-  function filterProjects() {
+  function collectFilterProjects() {
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     items.forEach((item) => {
-      if (item.projectTag && !projectMap.has(item.projectTag.id)) {
-        projectMap.set(item.projectTag.id, item.projectTag);
+      if (item.project && !projectMap.has(item.project.id)) {
+        projectMap.set(item.project.id, item.project);
       }
     });
     return [...projectMap.values()];
   }
 
   function updateFilterOptions() {
-    todoListView?.updateFilterOptions?.(filterProjects(), availableTags, items, {
+    todoListView?.updateFilterOptions?.(collectFilterProjects(), availableTags, items, {
       project: projectFilter,
       tag: tagFilter,
     });
   }
 
   function render() {
-    const selectableProjects = filterProjects();
+    if (destroyed) return;
+    const selectableProjects = collectFilterProjects();
     if (projectFilter !== '__none__'
       && projectFilter
       && !selectableProjects.some((project) => project.id === projectFilter)) {
       projectFilter = '';
     }
     if (tagFilter && !availableTags.includes(tagFilter)) tagFilter = '';
-    todoListView.render(items, filterMode, availableTags, filterProjects(), {
+    todoListView.render(items, filterMode, availableTags, collectFilterProjects(), {
       project: projectFilter,
       tag: tagFilter,
     });
   }
 
   function hydrateImages() {
-    todoListState.hydrate(items).then((hydratedItems) => {
+    todoStore.hydrate(items).then((hydratedItems) => {
+      if (destroyed) return;
       const hydratedImages = new Map(hydratedItems.map((item) => [item.id, item.image?.dataURL]));
       let changed = false;
       items = items.map((item) => {
@@ -163,39 +132,59 @@ const todoList = (() => {
     });
   }
 
-  function commitItems(nextItems) {
-    const previousItems = items;
+  async function commitItems(nextItems, nextTags = availableTags) {
+    if (destroyed) return false;
     items = nextItems;
+    availableTags = nextTags;
+    renderTags();
     render();
-    const finish = (saved) => {
-      if (saved) return true;
-      if (items === nextItems) {
-        items = previousItems;
-        render();
-      }
-      return false;
-    };
-    const saved = persist(nextItems);
-    return saved instanceof Promise ? saved.then(finish) : finish(saved);
+    const saved = await todoStore.save(nextItems, nextTags);
+    if (saved) {
+      savedItems = nextItems;
+      savedTags = nextTags;
+    }
+    if (destroyed) return saved;
+    const notice = document.querySelector('[data-todo-storage-error]');
+    if (notice) notice.hidden = saved;
+    if (!saved && items === nextItems) {
+      items = savedItems;
+      availableTags = savedTags;
+      renderTags();
+      render();
+    }
+    return saved;
   }
 
-  function add(title, body = '', image = null, tags = [], projectTag = null) {
-    const item = todoListState.create(title, body, image, tags);
-    if (item) item.projectTag = todoListState.normalizeProjectTag(projectTag);
+  async function commitTagChange(nextTags, transformTag = (tag) => tag) {
+    const previousDraft = tagDraft;
+    const nextDraft = tagDraft.map(transformTag).filter(Boolean);
+    tagDraft = nextDraft;
+    todoListView.updateTagDraft(tagDraft);
+    const saved = await commitItems(items.map((item) => ({
+      ...item, tags: item.tags.map(transformTag).filter(Boolean),
+    })), nextTags);
+    if (!saved && !destroyed && tagDraft === nextDraft) {
+      tagDraft = previousDraft;
+      todoListView.updateTagDraft(tagDraft);
+    }
+    return saved;
+  }
+
+  async function add(title, body = '', image = null, tags = [], project = null) {
+    const item = todoStore.create(title, body, image, tags);
     if (!item) return false;
-    const finish = (saved) => {
-      if (!saved) return false;
+    item.project = todoStore.normalizeProject(project);
+    const saved = await commitItems([item, ...items]);
+    if (saved && !destroyed) {
       filterMode = 'open';
       render();
-      return true;
-    };
-    const saved = commitItems([item, ...items]);
-    return saved instanceof Promise ? saved.then(finish) : finish(saved);
+    }
+    return saved;
   }
 
   function updateItem(id, changes) {
     const nextItems = items.map((item) => item.id === id
-      ? todoListState.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
+      ? todoStore.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
       : item);
     return commitItems(nextItems);
   }
@@ -218,8 +207,11 @@ const todoList = (() => {
       return false;
     }
     const reader = new FileReader();
+    imageReaders.add(reader);
+    reader.addEventListener('loadend', () => imageReaders.delete(reader));
     reader.addEventListener('load', () => {
-      const image = todoListState.normalizeImage({
+      if (destroyed) return;
+      const image = todoStore.normalizeImage({
         dataURL: reader.result,
         name: file.name,
         type: file.type,
@@ -233,6 +225,7 @@ const todoList = (() => {
       onLoad(image);
     });
     reader.addEventListener('error', () => {
+      if (destroyed) return;
       showImageError('Codex could not read that image.');
       onError();
     });
@@ -259,7 +252,7 @@ const todoList = (() => {
     if (!mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.todoNavButton,
       label: 'To-dos',
-      afterID: dashboardElements.elementIDs.navButton,
+      afterID: dashboardElements.elementIDs.taskNavButton,
       markup: `
       <span class="todo-nav-copy">
         <span class="todo-nav-icon">${dashboardIcons.render('completed')}</span>
@@ -268,15 +261,11 @@ const todoList = (() => {
       <strong class="todo-nav-count" data-todo-navigation-count aria-label="0 open to-dos" hidden>0</strong>`,
     })) return false;
     todoListView.updateNavigation(items.filter((item) => !item.completed).length);
-    pageState.restoreOpenState();
+    pageState.applyVisibility();
     return true;
   }
 
-  function mountPage() {
-    if (document.getElementById(dashboardElements.elementIDs.todoPage)) return true;
-    const pageHost = codexHost.pageHost();
-    if (!pageHost) return false;
-    const page = todoListView.createPage();
+  function bindAddForm(page) {
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       if (imageDraft.status === 'invalid') {
@@ -294,7 +283,7 @@ const todoList = (() => {
       const title = page.querySelector('[data-todo-new-title]');
       const body = page.querySelector('[data-todo-new-body]');
       const finish = (saved) => {
-        if (!saved) return;
+        if (!saved || destroyed) return;
         title.value = '';
         body.value = '';
         resetImageDraft();
@@ -304,9 +293,11 @@ const todoList = (() => {
         title.focus();
       };
       const saved = add(title.value, body.value, imageDraft.image, tagDraft, projectDraft);
-      if (saved instanceof Promise) void saved.then(finish);
-      else finish(saved);
+      void saved.then(finish);
     });
+  }
+
+  function bindImageDraft(page) {
     page.addEventListener('paste', (event) => {
       const file = pastedImage(event);
       if (!file) return;
@@ -359,6 +350,9 @@ const todoList = (() => {
         todoListView.showImage(imageDraft.image);
       }
     });
+  }
+
+  function bindDraftAssignments(page) {
     const tagInput = page.querySelector('[data-todo-new-tag]');
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
@@ -377,6 +371,9 @@ const todoList = (() => {
       todoListView.updateTagDraft(tagDraft);
       tagInput.focus();
     });
+  }
+
+  function bindTagManagement(page) {
     const tagDialog = document.querySelector('[data-todo-tag-dialog]');
     const closeTagDialog = () => {
       if (tagDialog.open) tagDialog.close();
@@ -399,43 +396,17 @@ const todoList = (() => {
     tagDialog.querySelector('[data-todo-tag-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       const name = tagNameInput;
-      const previousTags = availableTags;
       const oldTag = name.dataset.todoTagRename;
-      const replacement = todoListState.normalizeTags([name.value])[0];
+      const replacement = todoStore.normalizeTags([name.value])[0];
       if (oldTag && availableTags.some((tag) => tag !== oldTag
         && tag.toLocaleLowerCase() === replacement?.toLocaleLowerCase())) return;
       const nextTags = oldTag
-        ? todoListState.normalizeTags(availableTags.map((tag) => tag === oldTag ? name.value : tag))
-        : todoListState.normalizeTags([...availableTags, name.value]);
+        ? todoStore.normalizeTags(availableTags.map((tag) => tag === oldTag ? name.value : tag))
+        : todoStore.normalizeTags([...availableTags, name.value]);
       if (!replacement || (!oldTag && nextTags.length === availableTags.length)
         || (oldTag && nextTags.every((tag, index) => tag === availableTags[index]))) return;
-      availableTags = nextTags;
-      if (!persistTags()) {
-        availableTags = previousTags;
-        return;
-      }
-      if (oldTag) {
-        const previousTagDraft = tagDraft;
-        const nextItems = items.map((item) => ({
-          ...item,
-          tags: item.tags.map((tag) => tag === oldTag ? replacement : tag),
-        }));
-        tagDraft = tagDraft.map((tag) => tag === oldTag ? replacement : tag);
-        const saved = commitItems(nextItems);
-        const restoreTagsAfterFailedItemSave = (success) => {
-          if (success) return;
-          availableTags = previousTags;
-          tagDraft = previousTagDraft;
-          persistTags();
-          renderTags();
-          todoListView.updateTagDraft(tagDraft);
-        };
-        if (saved instanceof Promise) void saved.then(restoreTagsAfterFailedItemSave);
-        else restoreTagsAfterFailedItemSave(saved);
-      }
+      void commitTagChange(nextTags, (tag) => tag === oldTag ? replacement : tag);
       resetTagForm();
-      renderTags();
-      todoListView.updateTagDraft(tagDraft);
       name.focus();
     });
     tagDialog.querySelector('[data-todo-managed-tags]').addEventListener('click', (event) => {
@@ -452,35 +423,14 @@ const todoList = (() => {
       const button = event.target.closest('[data-todo-managed-tag-remove]');
       if (!button) return;
       const tag = button.dataset.todoManagedTagRemove;
-      const previousTags = availableTags;
-      const previousTagDraft = tagDraft;
       const nextTags = availableTags.filter((candidate) => candidate !== tag);
-      if (nextTags.length === previousTags.length) return;
-      const nextItems = items.map((item) => ({
-        ...item,
-        tags: item.tags.filter((candidate) => candidate !== tag),
-      }));
-      availableTags = nextTags;
-      tagDraft = tagDraft.filter((candidate) => candidate !== tag);
+      if (nextTags.length === availableTags.length) return;
       if (tagNameInput.dataset.todoTagRename === tag) resetTagForm();
-      if (!persistTags()) {
-        availableTags = previousTags;
-        return;
-      }
-      renderTags();
-      todoListView.updateTagDraft(tagDraft);
-      const saved = commitItems(nextItems);
-      const restoreTagsAfterFailedItemSave = (success) => {
-          if (success) return;
-          availableTags = previousTags;
-          tagDraft = previousTagDraft;
-          persistTags();
-          renderTags();
-          todoListView.updateTagDraft(tagDraft);
-      };
-      if (saved instanceof Promise) void saved.then(restoreTagsAfterFailedItemSave);
-      else restoreTagsAfterFailedItemSave(saved);
+      void commitTagChange(nextTags, (candidate) => candidate === tag ? null : candidate);
     });
+  }
+
+  function bindFilters(page) {
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {
         filterMode = button.dataset.todoFilter;
@@ -498,6 +448,9 @@ const todoList = (() => {
     page.querySelector('[data-todo-clear-completed]').addEventListener('click', () => {
       void commitItems(items.filter((item) => !item.completed));
     });
+  }
+
+  function bindItemEditing(page) {
     page.querySelector('[data-todo-list]').addEventListener('change', (event) => {
       const row = event.target.closest('[data-todo-id]');
       if (!row) return;
@@ -512,14 +465,42 @@ const todoList = (() => {
       } else if (event.target.matches('[data-todo-project]')) {
         const project = codexUIContracts.projects()
           .find((candidate) => candidate.id === event.target.value) || null;
-        void updateItem(row.dataset.todoId, { projectTag: project });
+        void updateItem(row.dataset.todoId, { project });
       } else if (event.target.matches('[data-todo-tag]')) {
         const item = items.find((candidate) => candidate.id === row.dataset.todoId);
         if (item && event.target.value) void updateItem(item.id, {
-          tags: todoListState.normalizeTags([...item.tags, event.target.value]),
+          tags: todoStore.normalizeTags([...item.tags, event.target.value]),
         });
       }
     });
+  }
+
+  async function openTodoInNewChat(item) {
+    if (destroyed || !item?.project || !await codexHost.newChat(item.project.id) || destroyed) return;
+    pageState.close();
+    const content = [item.title, item.body].filter(Boolean).join('\n\n');
+    let inserted = false;
+    const transfer = async () => {
+      if (destroyed) return false;
+      let image = item.image;
+      if (image && !image.dataURL) {
+        const [hydratedItem] = await todoStore.hydrate([item]);
+        image = hydratedItem?.image;
+      }
+      if (destroyed) return false;
+      if (!inserted) inserted = composerAdapter.insert(content);
+      if (!inserted) return false;
+      return !image || composerAdapter.attachImage(image);
+    };
+    if (await transfer() || destroyed) return;
+    const composer = await domUtils.waitFor(
+      () => destroyed || codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+      { timeout: 3000, interval: 25 },
+    );
+    if (composer && !destroyed) await transfer();
+  }
+
+  function bindItemActions(page) {
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
       const previewButton = event.target.closest('[data-todo-image-preview]');
       if (previewButton) {
@@ -532,33 +513,7 @@ const todoList = (() => {
       if (newChatButton) {
         const row = newChatButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        const openNewChat = async () => {
-          if (!item?.projectTag || !await codexHost.newChat(item.projectTag.id)) return;
-          pageState.close();
-          const content = [item.title, item.body].filter(Boolean).join('\n\n');
-          let inserted = false;
-          const transfer = async () => {
-            let image = item.image;
-            if (image && !image.dataURL) {
-              const [hydratedItem] = await todoListState.hydrate([item]);
-              image = hydratedItem?.image;
-            }
-            if (!inserted) inserted = composerAdapter.insert(content);
-            if (!inserted) return false;
-            return !image || composerAdapter.attachImage(image);
-          };
-          void transfer().then((transferred) => {
-            if (transferred) return;
-            return domUtils.waitFor(
-              () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
-              { timeout: 3000, interval: 25 },
-            ).then((composer) => {
-              if (composer) return transfer();
-              return false;
-            });
-          });
-        };
-        void openNewChat();
+        void openTodoInNewChat(item);
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
@@ -589,11 +544,25 @@ const todoList = (() => {
       }
       void commitItems(items.filter((item) => item.id !== row.dataset.todoId));
     });
+  }
+
+  function mountPage() {
+    if (document.getElementById(dashboardElements.elementIDs.todoPage)) return true;
+    const pageHost = codexHost.pageHost();
+    if (!pageHost) return false;
+    const page = todoListView.createPage();
+    bindAddForm(page);
+    bindImageDraft(page);
+    bindDraftAssignments(page);
+    bindTagManagement(page);
+    bindFilters(page);
+    bindItemEditing(page);
+    bindItemActions(page);
     pageHost.append(page);
     renderTags();
     refreshProjects();
     startProjectObserver();
-    pageState.restoreOpenState();
+    pageState.applyVisibility();
     render();
     hydrateImages();
     return true;
@@ -606,13 +575,23 @@ const todoList = (() => {
     if (pageState.open()) render();
   }
 
+  function destroy() {
+    destroyed = true;
+    projectObserver?.disconnect();
+    projectObserver = undefined;
+    observedProjectSidebar = undefined;
+    imageReaders.forEach((reader) => reader.abort());
+    imageReaders.clear();
+    pageState.close();
+  }
+
   return {
     close: pageState.close,
-    destroy: pageState.close,
+    destroy,
     isOpen: pageState.isOpen,
     mountNavigation,
     mountPage,
     open,
-    restoreOpenState: pageState.restoreOpenState,
+    applyVisibility: pageState.applyVisibility,
   };
 })();

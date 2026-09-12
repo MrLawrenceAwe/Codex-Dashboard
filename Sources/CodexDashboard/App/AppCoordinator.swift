@@ -37,8 +37,8 @@ final class AppCoordinator: ObservableObject {
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
-    let accountResetNotifier: any AccountResetNotifying
-    let phoneResetNotifier: any PhoneResetNotifying
+    let accountUsageNotifier: any AccountUsageNotifying
+    let phoneUsageNotifier: any PhoneUsageNotifying
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
@@ -47,7 +47,7 @@ final class AppCoordinator: ObservableObject {
     private var activationObserver: NSObjectProtocol?
     private var codexActivationObserver: NSObjectProtocol?
     private var accountStateObserver: AnyCancellable?
-    private var taskCompletionObserver = TaskCompletionObserver()
+    private var threadCompletionTracker = ThreadCompletionTracker()
     var didNotifyAboutDetectedUpdate = false
 
     var statusPresentation: (title: String, detail: String) {
@@ -80,8 +80,8 @@ final class AppCoordinator: ObservableObject {
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
-        accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
-        phoneResetNotifier: any PhoneResetNotifying = NoopPhoneResetNotifier(),
+        accountUsageNotifier: any AccountUsageNotifying = NoopAccountUsageNotifier(),
+        phoneUsageNotifier: any PhoneUsageNotifying = NoopPhoneUsageNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
         }
@@ -96,8 +96,8 @@ final class AppCoordinator: ObservableObject {
         self.typingActivityDetector = typingActivityDetector
         self.promptLibraryStore = promptLibraryStore
         self.compatibilityIssueNotifier = compatibilityIssueNotifier
-        self.accountResetNotifier = accountResetNotifier
-        self.phoneResetNotifier = phoneResetNotifier
+        self.accountUsageNotifier = accountUsageNotifier
+        self.phoneUsageNotifier = phoneUsageNotifier
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,
@@ -139,7 +139,7 @@ final class AppCoordinator: ObservableObject {
         accountPopoverActionListener.start { [weak self] in
             await self?.handleAccountPopoverAction() ?? .unavailable
         }
-        Task { await updateAccountResetNotifications() }
+        Task { await updateAccountUsageNotifications() }
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,
@@ -316,7 +316,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> String? {
-        taskCompletionObserver.recordSnapshotAndFindNewestCompletion(in: threads)
+        threadCompletionTracker.recordSnapshotAndFindNewestCompletion(in: threads)
     }
 
     static let incompatibleContractMessage =

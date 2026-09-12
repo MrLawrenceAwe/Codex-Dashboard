@@ -43,7 +43,7 @@ const todoListView = (() => {
   function filterProjectOptions(projects, items, selectedID = '') {
     const projectCounts = new Map();
     items.forEach((item) => {
-      const projectID = item.projectTag?.id || '__none__';
+      const projectID = item.project?.id || '__none__';
       projectCounts.set(projectID, (projectCounts.get(projectID) || 0) + 1);
     });
     const noProjectCount = projectCounts.get('__none__') || 0;
@@ -68,8 +68,8 @@ const todoListView = (() => {
         || (filterMode === 'open' && !item.completed)
         || (filterMode === 'completed' && item.completed);
       const matchesProject = !projectFilter
-        || (projectFilter === '__none__' && !item.projectTag)
-        || item.projectTag?.id === projectFilter;
+        || (projectFilter === '__none__' && !item.project)
+        || item.project?.id === projectFilter;
       const matchesTag = !tagFilter || item.tags.includes(tagFilter);
       return matchesStatus && matchesProject && matchesTag;
     });
@@ -121,7 +121,7 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
-          ${projectPickerMarkup(item.projectTag)}
+          ${projectPickerMarkup(item.project)}
           ${tagMarkup(item.tags, !item.completed)}
           ${!item.completed ? tagPickerMarkup(availableTags) : ''}
           ${imageMarkup(item)}
@@ -129,7 +129,7 @@ const todoListView = (() => {
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
         </div>
-        ${!item.completed && item.projectTag ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.projectTag.name)}" title="Start a new chat">New chat</button>` : ''}
+        ${!item.completed && item.project ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.project.name)}" title="Start a new chat">New chat</button>` : ''}
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>

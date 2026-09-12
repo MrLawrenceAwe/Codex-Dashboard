@@ -43,7 +43,7 @@ const taskDashboardView = (() => {
     threads,
     filterMode,
     visibleThreadLimit,
-    collapsedProjects,
+    collapsedProjectPaths,
     mutedProjectPaths,
     commitOrPushError,
     isThreadUnread,
@@ -51,7 +51,7 @@ const taskDashboardView = (() => {
     state,
   }) {
     updateSidebarStatus(state);
-    const page = document.getElementById(dashboardElements.elementIDs.page);
+    const page = document.getElementById(dashboardElements.elementIDs.taskPage);
     if (!page) return false;
     const notice = page.querySelector('[data-commit-notice]');
     if (notice) {
@@ -102,7 +102,7 @@ const taskDashboardView = (() => {
       list,
       threadMarkup.list(displayedThreads, {
         filterMode,
-        collapsedProjects,
+        collapsedProjectPaths,
         mutedProjectPaths,
         isUnread: isThreadUnread,
         isCompletionTickVisible,

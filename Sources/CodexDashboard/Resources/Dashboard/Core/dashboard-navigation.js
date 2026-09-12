@@ -32,9 +32,9 @@ const dashboardNavigation = (() => {
     return tasksMounted && todosMounted;
   }
 
-  function restoreOpenState() {
-    taskDashboard.restoreOpenState();
-    todoList.restoreOpenState();
+  function applyVisibility() {
+    taskDashboard.applyVisibility();
+    todoList.applyVisibility();
   }
 
   function ensureMounted() {
@@ -45,7 +45,7 @@ const dashboardNavigation = (() => {
       mountPage: mountPages,
       openTasks,
       openTodos,
-      restoreOpenState,
+      applyVisibility,
       requestRender: taskDashboard.requestRender,
       syncUnread: taskDashboard.syncUnread,
     });

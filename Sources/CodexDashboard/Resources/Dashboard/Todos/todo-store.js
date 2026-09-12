@@ -1,11 +1,11 @@
-const todoListState = (() => {
+const todoStore = (() => {
   const storageKey = 'codex-dashboard.todos';
   const tagsStorageKey = 'codex-dashboard.todo-tags';
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 4;
-  const supportedVersions = new Set([1, 2, 3, version]);
+  const version = 5;
+  const supportedVersions = new Set([1, 2, 3, 4, version]);
   const maximumTags = 8;
   const maximumTagLength = 40;
 
@@ -41,7 +41,7 @@ const todoListState = (() => {
     };
   }
 
-  function normalizeProjectTag(project) {
+  function normalizeProject(project) {
     const id = cleanText(project?.id);
     const name = cleanText(project?.name).slice(0, maximumTagLength);
     return id && name ? { id, name } : null;
@@ -51,7 +51,7 @@ const todoListState = (() => {
     return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type);
   }
 
-  function normalizeItem(item, isLegacy = false) {
+  function normalizeItem(item) {
     const title = cleanText(item?.title);
     const body = cleanText(item?.body);
     const id = cleanText(item?.id);
@@ -61,19 +61,33 @@ const todoListState = (() => {
       title,
       body,
       completed: item?.completed === true,
-      tags: normalizeTags(isLegacy ? item?.badges : item?.tags),
-      projectTag: normalizeProjectTag(isLegacy ? item?.projectBadge : item?.projectTag),
+      tags: normalizeTags(item?.tags),
+      project: normalizeProject(item?.project),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
     };
   }
 
+  function migrateItem(item, sourceVersion) {
+    if (sourceVersion < 4) {
+      return { ...item, tags: item?.badges, project: item?.projectBadge };
+    }
+    if (sourceVersion === 4) return { ...item, project: item?.projectTag };
+    return item;
+  }
+
   function load() {
     try {
       const document = JSON.parse(localStorage.getItem(storageKey));
       if (!supportedVersions.has(document?.version) || !Array.isArray(document.items)) return [];
-      return document.items.map((item) => normalizeItem(item, document.version < version)).filter(Boolean);
+      const migrated = document.items.map((item) => migrateItem(item, document.version))
+        .map(normalizeItem).filter(Boolean);
+      if (document.version !== version) {
+        // Preserve inline image data and leave the old document intact if storage is full.
+        try { localStorage.setItem(storageKey, documentData(migrated, true)); } catch (_) {}
+      }
+      return migrated;
     } catch (_) {
       return [];
     }
@@ -81,23 +95,22 @@ const todoListState = (() => {
 
   function loadTags(items = []) {
     try {
-      const savedTags = JSON.parse(localStorage.getItem(tagsStorageKey)
-        ?? localStorage.getItem(legacyTagsStorageKey));
-      return normalizeTags([
+      const current = localStorage.getItem(tagsStorageKey);
+      const legacy = current === null ? localStorage.getItem(legacyTagsStorageKey) : null;
+      const savedTags = JSON.parse(current ?? legacy);
+      const tags = normalizeTags([
         ...(Array.isArray(savedTags) ? savedTags : []),
         ...items.flatMap((item) => item.tags || []),
       ]);
+      if (legacy !== null) {
+        try {
+          localStorage.setItem(tagsStorageKey, JSON.stringify(tags));
+          localStorage.removeItem(legacyTagsStorageKey);
+        } catch (_) {}
+      }
+      return tags;
     } catch (_) {
       return normalizeTags(items.flatMap((item) => item.tags || []));
-    }
-  }
-
-  function saveTags(tags) {
-    try {
-      localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
-      return true;
-    } catch (_) {
-      return false;
     }
   }
 
@@ -113,35 +126,36 @@ const todoListState = (() => {
     });
   }
 
-  function save(items) {
-    // An image-bearing item is not durable until both stores have accepted it.
-    // Persist its binary data first: writing compact metadata first would turn an
-    // IndexedDB failure into a permanently missing image after the next reload.
-    const hasNewImageData = items.some((item) => item.image?.dataURL);
-    if (!hasNewImageData) {
-      try {
-        localStorage.setItem(storageKey, documentData(items, false));
-        // Deletions and text-only edits can update their small localStorage index
-        // immediately. Finish pruning obsolete IndexedDB blobs in the background.
-        void persistImages(items).catch(() => {});
-        return true;
-      } catch (_) {
-        return false;
-      }
+  let saveQueue = Promise.resolve();
+
+  function save(items, tags) {
+    // Every write, including image pruning, completes before the next snapshot starts.
+    const result = saveQueue.then(() => writeSnapshot(items, tags)).catch(() => false);
+    saveQueue = result;
+    return result;
+  }
+
+  async function writeSnapshot(items, tags) {
+    let includesImageData = false;
+    try {
+      await persistImages(items);
+    } catch (_) {
+      // Inline storage preserves images when IndexedDB is unavailable.
+      includesImageData = true;
     }
-    return persistImages(items).then(() => {
-      localStorage.setItem(storageKey, documentData(items, false));
+    const previousTags = localStorage.getItem(tagsStorageKey);
+    try {
+      localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
+      localStorage.setItem(storageKey, documentData(items, includesImageData));
+      await pruneImages(items).catch(() => {});
       return true;
-    }).catch(() => {
-      // Older WebKit renderers can disable IndexedDB. Keep the image in the
-      // primary document rather than claiming success and losing it on reload.
+    } catch (_) {
       try {
-        localStorage.setItem(storageKey, documentData(items, true));
-        return true;
-      } catch (_) {
-        return false;
-      }
-    });
+        if (previousTags === null) localStorage.removeItem(tagsStorageKey);
+        else localStorage.setItem(tagsStorageKey, previousTags);
+      } catch (_) {}
+      return false;
+    }
   }
 
   function imageDatabase() {
@@ -158,44 +172,51 @@ const todoListState = (() => {
     });
   }
 
+  async function withImageStore(mode, operation) {
+    const database = await imageDatabase();
+    try {
+      return await new Promise((resolve, reject) => {
+        const transaction = database.transaction(imageStoreName, mode);
+        const result = operation(transaction.objectStore(imageStoreName));
+        transaction.addEventListener('complete', () => resolve(result));
+        transaction.addEventListener('abort', () => reject(transaction.error));
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
   function persistImages(items) {
+    return withImageStore('readwrite', (store) => {
+      items.filter((item) => item.image?.dataURL)
+        .forEach((item) => store.put(item.image.dataURL, item.id));
+    });
+  }
+
+  function pruneImages(items) {
     const imageIDs = new Set(items.filter((item) => item.image).map((item) => item.id));
-    const imagesWithData = items.filter((item) => item.image?.dataURL);
-    return imageDatabase().then((database) => new Promise((resolve, reject) => {
-      const transaction = database.transaction(imageStoreName, 'readwrite');
-      const store = transaction.objectStore(imageStoreName);
+    return withImageStore('readwrite', (store) => {
       const keys = store.getAllKeys();
       keys.addEventListener('success', () => {
-        keys.result.forEach((id) => {
-          if (!imageIDs.has(id)) store.delete(id);
-        });
-        imagesWithData.forEach((item) => store.put(item.image.dataURL, item.id));
+        keys.result.forEach((id) => { if (!imageIDs.has(id)) store.delete(id); });
       });
-      transaction.addEventListener('complete', () => { database.close(); resolve(); });
-      transaction.addEventListener('abort', () => { database.close(); reject(transaction.error); });
-      transaction.addEventListener('error', () => { database.close(); reject(transaction.error); });
-    }));
+    });
   }
 
   function hydrate(items) {
     const pending = items.filter((item) => item.image && !item.image.dataURL);
     if (!pending.length) return Promise.resolve(items);
-    return imageDatabase().then((database) => new Promise((resolve) => {
-      const transaction = database.transaction(imageStoreName, 'readonly');
-      const store = transaction.objectStore(imageStoreName);
+    return withImageStore('readonly', (store) => {
       const hydrated = new Map();
       pending.forEach((item) => {
         const request = store.get(item.id);
         request.addEventListener('success', () => hydrated.set(item.id, request.result || ''));
       });
-      transaction.addEventListener('complete', () => {
-        database.close();
-        resolve(items.map((item) => item.image && hydrated.has(item.id)
-          ? { ...item, image: { ...item.image, dataURL: hydrated.get(item.id) } }
-          : item));
-      });
-      transaction.addEventListener('error', () => { database.close(); resolve(items); });
-    })).catch(() => items);
+      return hydrated;
+    }).then((hydrated) => items.map((item) => item.image && hydrated.has(item.id)
+      ? { ...item, image: { ...item.image, dataURL: hydrated.get(item.id) } }
+      : item)).catch(() => items);
   }
 
   function create(title, body = '', image = null, tags = []) {
@@ -211,5 +232,5 @@ const todoListState = (() => {
     });
   }
 
-  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProjectTag, save, saveTags };
+  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, save };
 })();

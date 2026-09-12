@@ -186,7 +186,7 @@ struct DiagnosticsWindowView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Toggle(
-                    "Send reset notifications to my phone",
+                    "Send usage alerts to my phone",
                     isOn: Binding(
                         get: { coordinator.phoneNotificationsEnabled },
                         set: { coordinator.setPhoneNotificationsEnabled($0) }

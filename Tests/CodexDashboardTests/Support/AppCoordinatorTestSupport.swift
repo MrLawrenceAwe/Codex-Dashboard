@@ -233,10 +233,10 @@ actor SuspendedAccountUsageProvider: AccountUsageProviding {
 
 actor SavedAccountRecordingUsageProvider: AccountUsageProviding {
     private let usageResult: CodexAccountUsage
-    private let refreshedCredential: Data
+    private let refreshedCredential: Data?
     private(set) var receivedCredentials: [Data] = []
 
-    init(usage: CodexAccountUsage, refreshedCredential: Data) {
+    init(usage: CodexAccountUsage, refreshedCredential: Data? = nil) {
         usageResult = usage
         self.refreshedCredential = refreshedCredential
     }
@@ -249,7 +249,7 @@ actor SavedAccountRecordingUsageProvider: AccountUsageProviding {
         receivedCredentials.append(credential)
         return SavedAccountUsageResult(
             usage: usageResult,
-            credential: refreshedCredential
+            credential: refreshedCredential ?? credential
         )
     }
 
@@ -404,8 +404,8 @@ extension XCTestCase {
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
-        accountResetNotifier: any AccountResetNotifying = NoopAccountResetNotifier(),
-        phoneResetNotifier: any PhoneResetNotifying = NoopPhoneResetNotifier(),
+        accountUsageNotifier: any AccountUsageNotifying = NoopAccountUsageNotifier(),
+        phoneUsageNotifier: any PhoneUsageNotifying = NoopPhoneUsageNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
         let accountDirectory = FileManager.default.temporaryDirectory
@@ -430,8 +430,8 @@ extension XCTestCase {
             accountUsageProvider: accountUsageProvider,
             accountUsageCacheStore: accountUsageCacheStore,
             compatibilityIssueNotifier: compatibilityIssueNotifier,
-            accountResetNotifier: accountResetNotifier,
-            phoneResetNotifier: phoneResetNotifier,
+            accountUsageNotifier: accountUsageNotifier,
+            phoneUsageNotifier: phoneUsageNotifier,
             runtimeFactory: runtimeFactory
         )
         addTeardownBlock {

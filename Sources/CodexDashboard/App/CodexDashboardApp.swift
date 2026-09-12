@@ -5,8 +5,8 @@ import SwiftUI
 final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
     let coordinator = AppCoordinator(
         compatibilityIssueNotifier: CompatibilityIssueNotifier(),
-        accountResetNotifier: AccountResetNotifier(),
-        phoneResetNotifier: NtfyResetNotifier()
+        accountUsageNotifier: AccountUsageNotifier(),
+        phoneUsageNotifier: NtfyUsageNotifier()
     )
     let launchAtLogin = LaunchAtLoginController()
     private var statusItemController: DashboardStatusItemController?
