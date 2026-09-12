@@ -236,6 +236,35 @@ final class AccountResetNotifierTests: XCTestCase {
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.contains("-weekly-") })
     }
 
+    func testSkipsFiveHourWarningWhenFiveHourUsageIsExhausted() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let notifications = AccountResetNotificationPlanner.notifications(
+            for: [savedAccount],
+            usageByAccountID: [
+                savedAccount.id: CodexAccountUsageSnapshot(
+                    usage: CodexAccountUsage(
+                        fiveHour: CodexUsageWindow(
+                            usedPercent: 100,
+                            resetsAt: now.addingTimeInterval(2 * 60 * 60)
+                        ),
+                        weekly: CodexUsageWindow(
+                            usedPercent: 50,
+                            resetsAt: now.addingTimeInterval(96 * 60 * 60)
+                        ),
+                        bankedResets: nil
+                    ),
+                    fetchedAt: now
+                ),
+            ],
+            now: now
+        )
+
+        XCTAssertEqual(notifications.count, 7)
+        XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
+        XCTAssertTrue(notifications.allSatisfy { $0.identifier.contains("-weekly-") })
+    }
+
     func testSkipsAllFiveHourImmediateAlertsWhenWeeklyUsageIsExhausted() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
