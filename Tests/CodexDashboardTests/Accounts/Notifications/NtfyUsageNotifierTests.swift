@@ -233,6 +233,42 @@ final class NtfyUsageNotifierTests: XCTestCase {
         XCTAssertEqual(messageCount, 1)
     }
 
+    func testRetriesAnOrdinaryDueDeadlineAfterPhoneDeliveryFails() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = FailOnceNtfyPublisher()
+        let notifier = NtfyUsageNotifier(
+            userDefaults: defaults,
+            publisher: publisher,
+            now: { now },
+            retryDelay: { _ in .milliseconds(100) }
+        )
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        let usage = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(60 * 60 + 0.01)),
+                weekly: nil
+            ),
+            fetchedAt: now
+        )
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
+        try await Task.sleep(for: .milliseconds(20))
+        // The deadline is now in the past, so it is absent from the next plan.
+        // Its retry must nevertheless remain scheduled.
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
+        for _ in 0..<50 {
+            if await publisher.messageCount() == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let messageCount = await publisher.messageCount()
+        XCTAssertEqual(messageCount, 1)
+    }
+
     func testRetriesOnlyUndeliveredThresholdAlertsAfterAPartialFailure() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()

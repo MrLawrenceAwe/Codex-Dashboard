@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 final class CodexDataChangeMonitor {
+    static let dataRefreshQuietPeriod: Duration = .milliseconds(100)
+    static let dataRefreshMaximumDelay: Duration = .seconds(2)
     private struct FileSignature: Equatable {
         let size: UInt64
         let modifiedAt: Date
@@ -27,6 +29,16 @@ final class CodexDataChangeMonitor {
     private var refreshCatalog: (@MainActor () async -> Void)?
     private var refreshUnread: (@MainActor () async -> Void)?
     private var refreshAccounts: (@MainActor () async -> Void)?
+    private let dataRefreshQuietPeriod: Duration
+    private let dataRefreshMaximumDelay: Duration
+
+    init(
+        dataRefreshQuietPeriod: Duration = CodexDataChangeMonitor.dataRefreshQuietPeriod,
+        dataRefreshMaximumDelay: Duration = CodexDataChangeMonitor.dataRefreshMaximumDelay
+    ) {
+        self.dataRefreshQuietPeriod = dataRefreshQuietPeriod
+        self.dataRefreshMaximumDelay = dataRefreshMaximumDelay
+    }
 
     func start(
         catalogURL: URL,
@@ -79,18 +91,26 @@ final class CodexDataChangeMonitor {
         dataRefreshTaskID = taskID
         dataRefreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            var maximumDelayDeadline = ContinuousClock.now + self.dataRefreshMaximumDelay
             while !Task.isCancelled {
                 let generationBeforeQuietPeriod = self.dataRefreshGeneration
-                try? await Task.sleep(for: .milliseconds(100))
+                let now = ContinuousClock.now
+                if now < maximumDelayDeadline {
+                    try? await Task.sleep(for: min(
+                        self.dataRefreshQuietPeriod,
+                        now.duration(to: maximumDelayDeadline)
+                    ))
+                }
                 guard !Task.isCancelled else { break }
                 if self.dataRefreshGeneration != generationBeforeQuietPeriod {
-                    continue
+                    if ContinuousClock.now < maximumDelayDeadline { continue }
                 }
 
                 await self.refreshChangedData()
                 guard !Task.isCancelled,
                       self.dataRefreshGeneration != generationBeforeQuietPeriod
                 else { break }
+                maximumDelayDeadline = ContinuousClock.now + self.dataRefreshMaximumDelay
             }
 
             if self.dataRefreshTaskID == taskID {

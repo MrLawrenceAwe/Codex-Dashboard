@@ -262,6 +262,38 @@ final class ChangeMonitorTests: XCTestCase {
         XCTAssertEqual(refreshes.first, [projectDirectory.path])
     }
 
+    func testContinuousDataChangesCannotPostponeRefreshIndefinitely() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-bounded-data-refresh-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let catalogURL = root.appendingPathComponent("state.sqlite")
+        try Data("initial".utf8).write(to: catalogURL)
+
+        let monitor = CodexDataChangeMonitor(
+            dataRefreshQuietPeriod: .milliseconds(100),
+            dataRefreshMaximumDelay: .milliseconds(250)
+        )
+        var refreshes = 0
+        monitor.start(
+            catalogURL: catalogURL,
+            unreadStateURL: root.appendingPathComponent("state.json"),
+            accountMetadataURL: root.appendingPathComponent("accounts.json"),
+            authenticationURL: root.appendingPathComponent("auth.json"),
+            refreshCatalog: { refreshes += 1 },
+            refreshUnread: {},
+            refreshAccounts: {}
+        )
+        defer { monitor.stop() }
+
+        for index in 0..<8 {
+            try Data("\(index)".utf8).write(to: catalogURL)
+            try await Task.sleep(for: .milliseconds(50))
+        }
+
+        XCTAssertGreaterThanOrEqual(refreshes, 1)
+    }
+
     func testContinuousProjectChangesCannotPostponeRefreshIndefinitely() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-bounded-project-refresh-\(UUID().uuidString)", isDirectory: true)
