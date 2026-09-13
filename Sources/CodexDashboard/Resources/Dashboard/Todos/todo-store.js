@@ -7,7 +7,7 @@ const todoStore = (() => {
   const version = 5;
   const supportedVersions = new Set([1, 2, 3, 4, version]);
   const maximumTags = 8;
-  const maximumTagLength = 40;
+  const maximumProjectNameLength = 40;
 
   function cleanText(value) {
     return String(value || '').trim();
@@ -17,7 +17,7 @@ const todoStore = (() => {
     if (!Array.isArray(tags)) return [];
     const seen = new Set();
     return tags.reduce((normalized, tag) => {
-      const name = cleanText(tag).slice(0, maximumTagLength);
+      const name = cleanText(tag);
       const key = name.toLocaleLowerCase();
       if (!name || seen.has(key) || normalized.length === maximumTags) return normalized;
       seen.add(key);
@@ -43,7 +43,7 @@ const todoStore = (() => {
 
   function normalizeProject(project) {
     const id = cleanText(project?.id);
-    const name = cleanText(project?.name).slice(0, maximumTagLength);
+    const name = cleanText(project?.name).slice(0, maximumProjectNameLength);
     return id && name ? { id, name } : null;
   }
 

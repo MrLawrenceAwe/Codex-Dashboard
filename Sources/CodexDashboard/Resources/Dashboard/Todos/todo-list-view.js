@@ -205,7 +205,7 @@ const todoListView = (() => {
       <dialog class="todo-tag-dialog" data-todo-tag-dialog aria-label="Manage tags">
         <header class="todo-tag-dialog-header"><strong>Tags</strong><button type="button" data-todo-tag-dialog-close aria-label="Close tags">&times;</button></header>
         <form data-todo-tag-form class="todo-tag-form">
-          <input data-todo-tag-name aria-label="Tag name" maxlength="40" placeholder="New tag name" autocomplete="off">
+          <input data-todo-tag-name aria-label="Tag name" placeholder="New tag name" autocomplete="off">
           <button type="submit">Create tag</button>
         </form>
         <div class="todo-tags" data-todo-managed-tags aria-label="Available tags"></div>
