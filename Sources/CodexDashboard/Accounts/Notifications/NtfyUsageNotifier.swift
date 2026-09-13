@@ -39,18 +39,26 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
     private let now: () -> Date
+    private let retryDelay: (Int) -> Duration
     private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
+    private var retryAttemptsByIdentifier: [String: Int] = [:]
+
+    private static let maximumDeliveryAttempts = 6
 
     init(
         userDefaults: UserDefaults = .standard,
         publisher: any NtfyPublishing = NtfyPublisher(),
-        now: @escaping () -> Date = { .now }
+        now: @escaping () -> Date = { .now },
+        retryDelay: @escaping (Int) -> Duration = { attempt in
+            .seconds(min(30 * 60, 60 * (1 << min(attempt - 1, 5))))
+        }
     ) {
         history = UsageNotificationHistory(userDefaults: userDefaults, channel: .phone)
         self.userDefaults = userDefaults
         self.publisher = publisher
         self.now = now
+        self.retryDelay = retryDelay
         if !Self.isValidTopic(userDefaults.string(forKey: Self.topicKey)) {
             userDefaults.set(Self.makeTopic(), forKey: Self.topicKey)
         }
@@ -104,12 +112,22 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
-            cancelTask(identifier)
+            // A due alert that failed to reach ntfy is no longer in the planner's
+            // future schedule. Keep its bounded retry alive instead of dropping it.
+            if retryAttemptsByIdentifier[identifier] == nil {
+                cancelTask(identifier)
+            }
         }
         for notification in plan.scheduled {
             if deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
                 cancelTask(notification.identifier)
                 continue
+            }
+            // A planner-visible alert (notably a revised deadline) can be
+            // retried immediately on this refresh instead of waiting for its
+            // delivery backoff. Due alerts absent from the plan retain theirs.
+            if retryAttemptsByIdentifier[notification.identifier] != nil {
+                cancelTask(notification.identifier)
             }
             if scheduledByIdentifier[notification.identifier] == notification { continue }
             cancelTask(notification.identifier)
@@ -161,8 +179,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             recordDelivered(notification)
             cancelTask(notification.identifier)
         } catch {
-            tasksByIdentifier[notification.identifier] = nil
-            scheduledByIdentifier[notification.identifier] = nil
+            scheduleRetry(for: notification)
         }
     }
 
@@ -192,12 +209,29 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         tasksByIdentifier[identifier]?.cancel()
         tasksByIdentifier[identifier] = nil
         scheduledByIdentifier[identifier] = nil
+        retryAttemptsByIdentifier[identifier] = nil
     }
 
     private func cancelAllTasks() {
         tasksByIdentifier.values.forEach { $0.cancel() }
         tasksByIdentifier = [:]
         scheduledByIdentifier = [:]
+        retryAttemptsByIdentifier = [:]
+    }
+
+    private func scheduleRetry(for notification: ScheduledUsageNotification) {
+        let identifier = notification.identifier
+        let attempt = (retryAttemptsByIdentifier[identifier] ?? 0) + 1
+        guard attempt < Self.maximumDeliveryAttempts else {
+            cancelTask(identifier)
+            return
+        }
+        retryAttemptsByIdentifier[identifier] = attempt
+        tasksByIdentifier[identifier] = Task { [weak self] in
+            try? await Task.sleep(for: self?.retryDelay(attempt) ?? .seconds(0))
+            guard !Task.isCancelled else { return }
+            await self?.deliver(notification)
+        }
     }
 
     private static func makeTopic() -> String {
