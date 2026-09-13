@@ -246,6 +246,38 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? String, "Important×")
     }
 
+    func testTodoTagsHaveNoCharacterLimit() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              const tag = 'A'.repeat(80);
+              window.__codexDashboard.openTodos();
+              document.querySelector('[data-todo-manage-tags]').click();
+              await window.__waitForTodoSaves?.();
+              const input = document.querySelector('[data-todo-tag-name]');
+              input.value = tag;
+              input.form.requestSubmit();
+              await window.__waitForTodoSaves?.();
+              return [input.maxLength, JSON.parse(localStorage.getItem('codex-dashboard.todo-tags'))[0]];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, -1)
+        XCTAssertEqual(values[1] as? String, String(repeating: "A", count: 80))
+    }
+
     func testManagedTagDeletionUnassignsItFromTodosAndPersists() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
