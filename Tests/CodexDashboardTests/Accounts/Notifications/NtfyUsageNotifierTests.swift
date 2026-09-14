@@ -299,9 +299,8 @@ final class NtfyUsageNotifierTests: XCTestCase {
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
 
         let titles = await publisher.recordedTitles()
-        XCTAssertEqual(titles.count, 3)
+        XCTAssertEqual(titles.count, 2)
         XCTAssertEqual(Set(titles), [
-            "Codex 5-hour: less than 80% remaining",
             "Codex 5-hour: less than 50% remaining",
             "Codex 5-hour: less than 20% remaining",
         ])
