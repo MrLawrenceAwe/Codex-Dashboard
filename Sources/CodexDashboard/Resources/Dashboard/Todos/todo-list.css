@@ -102,7 +102,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-check input:focus-visible + span { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-todo-page .todo-check input:checked + span { border-color: color-mix(in srgb, var(--todo-green) 70%, transparent); background: color-mix(in srgb, var(--todo-green) 12%, transparent); color: var(--todo-green); }
 #codex-dashboard-todo-page .todo-item-copy { display: grid; min-width: 0; gap: 3px; }
-#codex-dashboard-todo-page .todo-title { width: 100%; min-width: 0; padding: 2px 4px; border: 0; border-radius: 4px; background: transparent; color: var(--todo-text); font-size: 14px; font-weight: 550; }
+#codex-dashboard-todo-page .todo-title { width: 100%; min-width: 0; min-height: 24px; max-height: 144px; padding: 2px 4px; border: 0; border-radius: 4px; overflow-y: auto; resize: none; background: transparent; color: var(--todo-text); font-size: 14px; font-weight: 550; line-height: 20px; }
 #codex-dashboard-todo-page .todo-title:hover,
 #codex-dashboard-todo-page .todo-title:focus { background: var(--todo-active); }
 #codex-dashboard-todo-page .todo-item.is-completed .todo-title { color: var(--todo-dim); text-decoration: line-through; }

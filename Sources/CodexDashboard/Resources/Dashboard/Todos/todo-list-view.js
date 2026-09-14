@@ -83,6 +83,11 @@ const todoListView = (() => {
     count.setAttribute('aria-label', `${openCount} open ${openCount === 1 ? 'to-do' : 'to-dos'}`);
   }
 
+  function sizeTitle(title) {
+    title.style.height = 'auto';
+    title.style.height = `${Math.min(title.scrollHeight, 144)}px`;
+  }
+
   function render(items, filterMode, availableTags = [], projects = [], filters = {}) {
     const openCount = items.filter((item) => !item.completed).length;
     updateNavigation(openCount);
@@ -119,7 +124,7 @@ const todoListView = (() => {
           <span>${dashboardIcons.render('completed')}</span>
         </label>
         <div class="todo-item-copy">
-          <input class="todo-title" data-todo-title value="${domUtils.escapeHTML(item.title)}" aria-label="To-do title" maxlength="240">
+          <textarea class="todo-title" data-todo-title aria-label="To-do title" maxlength="240" rows="1">${domUtils.escapeHTML(item.title)}</textarea>
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
           ${projectPickerMarkup(item.project)}
           ${tagMarkup(item.tags, !item.completed)}
@@ -135,6 +140,7 @@ const todoListView = (() => {
         </button>
       </article>
     `).join('');
+    list.querySelectorAll('[data-todo-title]').forEach(sizeTitle);
   }
 
   function createPage() {
@@ -281,5 +287,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateFilterOptions };
+  return { createPage, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateFilterOptions };
 })();
