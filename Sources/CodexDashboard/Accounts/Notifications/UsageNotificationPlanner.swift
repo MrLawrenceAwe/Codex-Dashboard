@@ -154,6 +154,7 @@ enum UsageNotificationPlanner {
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
+                    thresholds: [50, 20],
                     usageSummary: usageSummary(for: usage),
                     now: now
                 ) : []
@@ -164,6 +165,7 @@ enum UsageNotificationPlanner {
                     windowName: "Weekly",
                     current: usage.weekly,
                     previous: previous.weekly,
+                    thresholds: [80, 50, 20],
                     usageSummary: usageSummary(for: usage),
                     now: now
                 ),
@@ -247,6 +249,7 @@ enum UsageNotificationPlanner {
         windowName: String,
         current: CodexUsageWindow?,
         previous: UsageObservation.Window?,
+        thresholds: [Int],
         usageSummary: String,
         now: Date
     ) -> [ImmediateUsageNotification] {
@@ -258,7 +261,7 @@ enum UsageNotificationPlanner {
 
         let currentRemaining = max(0, min(100, 100 - current.usedPercent))
         let previousRemaining = max(0, min(100, 100 - previous.usedPercent))
-        return [80, 50, 20].compactMap { threshold in
+        return thresholds.compactMap { threshold in
             guard previousRemaining >= threshold, currentRemaining < threshold else { return nil }
             return ImmediateUsageNotification(
                 identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
@@ -350,4 +353,3 @@ enum UsageNotificationPlanner {
         return formatter.string(from: deadline)
     }
 }
-

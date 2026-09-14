@@ -420,11 +420,10 @@ final class UsageNotificationPlannerTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(alerts.count, 5)
+        XCTAssertEqual(alerts.count, 4)
         XCTAssertEqual(
             Set(alerts.map(\.title)),
             [
-                "Codex 5-hour: less than 80% remaining",
                 "Codex 5-hour: less than 50% remaining",
                 "Codex 5-hour: less than 20% remaining",
                 "Codex Weekly: less than 50% remaining",
@@ -467,7 +466,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
     }
 
-    func testPlansThresholdAlertWhenTheResetTimeHasASmallCorrection() {
+    func testSkipsTheFiveHourEightyPercentThresholdWhenTheResetTimeHasASmallCorrection() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let previous = CodexAccountUsage(
@@ -489,7 +488,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(alerts.map(\.title), ["Codex 5-hour: less than 80% remaining"])
+        XCTAssertTrue(alerts.isEmpty)
     }
 
     private func account(named name: String) -> SavedAccount {
