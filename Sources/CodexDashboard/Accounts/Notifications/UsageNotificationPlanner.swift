@@ -57,15 +57,7 @@ enum UsageNotificationPlanner {
     ) -> [ScheduledUsageNotification] {
         accounts.flatMap { account -> [ScheduledUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) && hasFiveHourUsageRemaining(usage) ? limitNotifications(
-                for: account,
-                windowName: "5-hour",
-                window: usage.fiveHour,
-                leadTimes: [oneHour],
-                usageSummary: usageSummary(for: usage),
-                now: now
-            ) : []
-            return fiveHourNotifications + limitNotifications(
+            return limitNotifications(
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,
