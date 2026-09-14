@@ -228,6 +228,9 @@ const todoList = (() => {
   }
 
   function bindItemEditing(page) {
+    page.querySelector('[data-todo-list]').addEventListener('input', (event) => {
+      if (event.target.matches('[data-todo-title]')) todoListView.sizeTitle(event.target);
+    });
     page.querySelector('[data-todo-list]').addEventListener('change', (event) => {
       const row = event.target.closest('[data-todo-id]');
       if (!row) return;
