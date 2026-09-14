@@ -20,13 +20,9 @@ final class UsageNotificationPlannerTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(notifications.count, 15)
+        XCTAssertEqual(notifications.count, 14)
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
-        XCTAssertTrue(notifications.contains {
-            $0.title == "Codex limit resets in one hour"
-                && $0.body.contains("Personal’s 5-hour: 75% left · resets at ")
-                && $0.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 2")
-        })
+        XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
         XCTAssertTrue(notifications.allSatisfy { $0.body.filter { $0 == "\n" }.count == 1 })
         XCTAssertEqual(
             Set(notifications.filter { $0.identifier.contains("weekly") }.map(\.title)),
@@ -60,30 +56,6 @@ final class UsageNotificationPlannerTests: XCTestCase {
         })
     }
 
-    func testFiveHourWarningUsesTomorrowWhenResetCrossesMidnightAfterDelivery() {
-        let calendar = Calendar.current
-        let now = calendar.date(from: DateComponents(year: 2033, month: 5, day: 18, hour: 22, minute: 30))!
-        let reset = calendar.date(byAdding: .hour, value: 2, to: now)!
-        let account = account(named: "Personal")
-
-        let notifications = UsageNotificationPlanner.notifications(
-            for: [account],
-            usageByAccountID: [
-                account.id: snapshot(
-                    fiveHourReset: reset,
-                    weeklyReset: nil,
-                    bankedResetExpiration: nil,
-                    now: now
-                ),
-            ],
-            now: now
-        )
-
-        XCTAssertEqual(notifications.count, 1)
-        XCTAssertTrue(notifications[0].body.contains("resets tomorrow at "))
-        XCTAssertFalse(notifications[0].body.contains("2033"))
-    }
-
     func testPlansOneDeadlineUpdateWhenTheWarningTimeHasPassed() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
@@ -91,8 +63,8 @@ final class UsageNotificationPlannerTests: XCTestCase {
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
-                    fiveHourReset: now.addingTimeInterval(5 * 60 * 60),
-                    weeklyReset: nil,
+                    fiveHourReset: nil,
+                    weeklyReset: now.addingTimeInterval(5 * 60 * 60),
                     bankedResetExpiration: nil,
                     now: now
                 ),
@@ -103,32 +75,32 @@ final class UsageNotificationPlannerTests: XCTestCase {
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
-                    fiveHourReset: now.addingTimeInterval(30 * 60),
-                    weeklyReset: nil,
+                    fiveHourReset: nil,
+                    weeklyReset: now.addingTimeInterval(30 * 60),
                     bankedResetExpiration: nil,
                     now: now
                 ),
             ],
             now: now
         )
-        let previousDeadlines = Dictionary(uniqueKeysWithValues: original.map { ($0.sourceIdentifier, $0.deadlineDate) })
+        let fiveHourLeadTimeOriginal = original.filter { $0.identifier.hasSuffix("-weekly-5h") }
+        let fiveHourLeadTimeRevised = revised.filter { $0.identifier.hasSuffix("-weekly-5h") }
+        let previousDeadlines = Dictionary(uniqueKeysWithValues: fiveHourLeadTimeOriginal.map { ($0.sourceIdentifier, $0.deadlineDate) })
 
         let updates = UsageNotificationPlanner.deadlineUpdateNotifications(
-            from: revised,
+            from: fiveHourLeadTimeRevised,
             previousDeadlines: previousDeadlines,
             sentUpdates: [:],
             now: now
         )
 
         XCTAssertEqual(updates.count, 1)
-        XCTAssertEqual(updates.first?.title, "5-hour reset time changed")
-        XCTAssertTrue(updates.first?.body.contains("Personal’s 5-hour reset moved: at ") == true)
-        XCTAssertTrue(updates.first?.body.contains("\n⏱ 5-hour 75% · 📅 Weekly 50% · 🎟 Banked 0") == true)
+        XCTAssertEqual(updates.first?.title, "Weekly reset time changed")
         XCTAssertTrue(
             UsageNotificationPlanner.deadlineUpdateNotifications(
-                from: revised,
+                from: fiveHourLeadTimeRevised,
                 previousDeadlines: previousDeadlines,
-                sentUpdates: [revised[0].sourceIdentifier: revised[0].deadlineDate],
+                sentUpdates: [fiveHourLeadTimeRevised[0].sourceIdentifier: fiveHourLeadTimeRevised[0].deadlineDate],
                 now: now
             ).isEmpty
         )
@@ -142,8 +114,8 @@ final class UsageNotificationPlannerTests: XCTestCase {
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
-                    fiveHourReset: reset,
-                    weeklyReset: nil,
+                    fiveHourReset: nil,
+                    weeklyReset: reset,
                     bankedResetExpiration: nil,
                     now: now
                 ),
@@ -169,8 +141,8 @@ final class UsageNotificationPlannerTests: XCTestCase {
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
-                    fiveHourReset: reset,
-                    weeklyReset: nil,
+                    fiveHourReset: nil,
+                    weeklyReset: reset,
                     bankedResetExpiration: nil,
                     now: now
                 ),
@@ -188,7 +160,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertTrue(updates.isEmpty)
     }
 
-    func testSkipsResetNotificationsWhoseOneHourWarningHasAlreadyPassed() {
+    func testDoesNotScheduleFiveHourResetWarnings() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let notifications = UsageNotificationPlanner.notifications(
@@ -205,64 +177,6 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
 
         XCTAssertTrue(notifications.isEmpty)
-    }
-
-    func testSkipsFiveHourWarningsWhenWeeklyUsageIsExhausted() {
-        let now = Date(timeIntervalSince1970: 2_000_000_000)
-        let savedAccount = account(named: "Personal")
-        let notifications = UsageNotificationPlanner.notifications(
-            for: [savedAccount],
-            usageByAccountID: [
-                savedAccount.id: CodexAccountUsageSnapshot(
-                    usage: CodexAccountUsage(
-                        fiveHour: CodexUsageWindow(
-                            usedPercent: 25,
-                            resetsAt: now.addingTimeInterval(2 * 60 * 60)
-                        ),
-                        weekly: CodexUsageWindow(
-                            usedPercent: 100,
-                            resetsAt: now.addingTimeInterval(96 * 60 * 60)
-                        ),
-                        bankedResets: nil
-                    ),
-                    fetchedAt: now
-                ),
-            ],
-            now: now
-        )
-
-        XCTAssertEqual(notifications.count, 7)
-        XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
-        XCTAssertTrue(notifications.allSatisfy { $0.identifier.contains("-weekly-") })
-    }
-
-    func testSkipsFiveHourWarningWhenFiveHourUsageIsExhausted() {
-        let now = Date(timeIntervalSince1970: 2_000_000_000)
-        let savedAccount = account(named: "Personal")
-        let notifications = UsageNotificationPlanner.notifications(
-            for: [savedAccount],
-            usageByAccountID: [
-                savedAccount.id: CodexAccountUsageSnapshot(
-                    usage: CodexAccountUsage(
-                        fiveHour: CodexUsageWindow(
-                            usedPercent: 100,
-                            resetsAt: now.addingTimeInterval(2 * 60 * 60)
-                        ),
-                        weekly: CodexUsageWindow(
-                            usedPercent: 50,
-                            resetsAt: now.addingTimeInterval(96 * 60 * 60)
-                        ),
-                        bankedResets: nil
-                    ),
-                    fetchedAt: now
-                ),
-            ],
-            now: now
-        )
-
-        XCTAssertEqual(notifications.count, 7)
-        XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
-        XCTAssertTrue(notifications.allSatisfy { $0.identifier.contains("-weekly-") })
     }
 
     func testSkipsAllFiveHourImmediateAlertsWhenWeeklyUsageIsExhausted() {
