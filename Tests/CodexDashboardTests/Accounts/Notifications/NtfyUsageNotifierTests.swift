@@ -68,11 +68,11 @@ final class NtfyUsageNotifierTests: XCTestCase {
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
-                fiveHour: CodexUsageWindow(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(
                     usedPercent: 18,
                     resetsAt: now.addingTimeInterval(60 * 60 + 0.01)
-                ),
-                weekly: nil
+                )
             ),
             fetchedAt: now
         )
@@ -88,7 +88,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.topic, notifier.topic)
-        XCTAssertTrue(messages.first?.body.contains("Personal’s 5-hour: 82% left · resets ") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly: 82% left · resets ") == true)
     }
 
     func testDisabledNotifierDoesNotPublishDueReset() async throws {
@@ -206,15 +206,15 @@ final class NtfyUsageNotifierTests: XCTestCase {
         )
         let initialUsage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
-                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(2 * 60 * 60)),
-                weekly: nil
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(2 * 60 * 60))
             ),
             fetchedAt: now
         )
         let revisedUsage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
-                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(30 * 60)),
-                weekly: nil
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(30 * 60))
             ),
             fetchedAt: now
         )
@@ -249,8 +249,8 @@ final class NtfyUsageNotifierTests: XCTestCase {
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
-                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(60 * 60 + 0.01)),
-                weekly: nil
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(60 * 60 + 0.01))
             ),
             fetchedAt: now
         )
