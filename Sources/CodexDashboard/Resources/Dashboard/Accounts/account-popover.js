@@ -233,7 +233,7 @@ const accountPopover = (() => {
     // portal its profile menu through deep wrappers or use plain buttons.
     if (root.closest?.(`#${panelID}`)) return false;
     const selector = '[role="menu"], [role="menuitem"], button';
-    return root.matches?.(selector) || Boolean(root.querySelector?.(selector));
+    return root.matches?.(selector) || (root.childElementCount > 0 && Boolean(root.querySelector?.(selector)));
   }
 
   function applySnapshot(next) {

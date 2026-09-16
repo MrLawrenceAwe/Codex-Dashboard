@@ -79,17 +79,32 @@ enum UsageNotificationPlanner {
         sentUpdates: [String: Date],
         now: Date
     ) -> [ScheduledUsageNotification] {
-        notifications.compactMap { notification in
-            let updateAlreadySent = sentUpdates[notification.sourceIdentifier].map { sentDeadline in
-                !deadlinesDifferMeaningfully(sentDeadline, notification.deadlineDate)
-            } ?? false
+        let deliveredUpdateResetIdentifiers = Set<String>(notifications.compactMap { notification -> String? in
+            guard let sentDeadline = sentUpdates[notification.sourceIdentifier],
+                  !deadlinesDifferMeaningfully(sentDeadline, notification.deadlineDate)
+            else { return nil }
+            return resetIdentifier(for: notification)
+        })
+        let candidates = notifications.compactMap { notification -> ScheduledUsageNotification? in
             guard let previousDeadline = previousDeadlines[notification.identifier],
                   deadlinesDifferMeaningfully(previousDeadline, notification.deadlineDate),
                   notification.notificationDate <= now,
-                  !updateAlreadySent
+                  !deliveredUpdateResetIdentifiers.contains(resetIdentifier(for: notification))
             else { return nil }
-            return notification.deadlineUpdateNotification(at: now.addingTimeInterval(1))
+            return notification
         }
+        let latestMissedWarningByReset = Dictionary(grouping: candidates, by: resetIdentifier)
+            .compactMapValues { warnings in warnings.max { $0.notificationDate < $1.notificationDate } }
+        return latestMissedWarningByReset.values
+            .map { $0.deadlineUpdateNotification(at: now.addingTimeInterval(1)) }
+            .sorted { $0.identifier < $1.identifier }
+    }
+
+    private static func resetIdentifier(for notification: ScheduledUsageNotification) -> String {
+        guard let separator = notification.identifier.lastIndex(of: "-") else {
+            return notification.identifier
+        }
+        return String(notification.identifier[..<separator])
     }
 
     private static func deadlinesDifferMeaningfully(_ lhs: Date, _ rhs: Date) -> Bool {

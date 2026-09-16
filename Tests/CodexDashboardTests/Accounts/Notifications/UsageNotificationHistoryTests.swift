@@ -14,7 +14,8 @@ final class UsageNotificationHistoryTests: XCTestCase {
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
         )
         let oldUsage = CodexAccountUsage(
-            fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(7200)), weekly: nil
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(96 * 60 * 60))
         )
         let oldObservations = [account.id: UsageObservation(usage: oldUsage)]
         defaults.set(try JSONEncoder().encode(oldObservations), forKey: "accountResetNotificationUsageObservations")
@@ -27,7 +28,8 @@ final class UsageNotificationHistoryTests: XCTestCase {
         XCTAssertTrue(phone.deadlines(for: .known).isEmpty)
 
         let currentUsage = CodexAccountUsage(
-            fiveHour: CodexUsageWindow(usedPercent: 30, resetsAt: now.addingTimeInterval(7200)), weekly: nil
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 30, resetsAt: now.addingTimeInterval(96 * 60 * 60))
         )
         let snapshots = [account.id: CodexAccountUsageSnapshot(usage: currentUsage, fetchedAt: now)]
         desktop.saveObservations(for: [account], usageByAccountID: snapshots)

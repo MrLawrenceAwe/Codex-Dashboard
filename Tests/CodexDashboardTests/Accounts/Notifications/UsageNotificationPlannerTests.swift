@@ -83,12 +83,10 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ],
             now: now
         )
-        let fiveHourLeadTimeOriginal = original.filter { $0.identifier.hasSuffix("-weekly-5h") }
-        let fiveHourLeadTimeRevised = revised.filter { $0.identifier.hasSuffix("-weekly-5h") }
-        let previousDeadlines = Dictionary(uniqueKeysWithValues: fiveHourLeadTimeOriginal.map { ($0.sourceIdentifier, $0.deadlineDate) })
+        let previousDeadlines = Dictionary(uniqueKeysWithValues: original.map { ($0.sourceIdentifier, $0.deadlineDate) })
 
         let updates = UsageNotificationPlanner.deadlineUpdateNotifications(
-            from: fiveHourLeadTimeRevised,
+            from: revised,
             previousDeadlines: previousDeadlines,
             sentUpdates: [:],
             now: now
@@ -98,9 +96,9 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertEqual(updates.first?.title, "Weekly reset time changed")
         XCTAssertTrue(
             UsageNotificationPlanner.deadlineUpdateNotifications(
-                from: fiveHourLeadTimeRevised,
+                from: revised,
                 previousDeadlines: previousDeadlines,
-                sentUpdates: [fiveHourLeadTimeRevised[0].sourceIdentifier: fiveHourLeadTimeRevised[0].deadlineDate],
+                sentUpdates: [revised[0].sourceIdentifier: revised[0].deadlineDate],
                 now: now
             ).isEmpty
         )

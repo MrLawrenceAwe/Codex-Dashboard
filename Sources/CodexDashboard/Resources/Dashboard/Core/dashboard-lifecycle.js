@@ -131,9 +131,7 @@ const dashboardLifecycle = (() => {
 
   function containsDashboardElement(node) {
     if (!(node instanceof Element)) return false;
-    return Object.values(dashboardElements.elementIDs).some((id) => (
-      node.id === id || Boolean(node.querySelector(`#${id}`))
-    ));
+    return Object.values(dashboardElements.elementIDs).includes(node.id);
   }
 
   function handleStructureMutations(records) {
