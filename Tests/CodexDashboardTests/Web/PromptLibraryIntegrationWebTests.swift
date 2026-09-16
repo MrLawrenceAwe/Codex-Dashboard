@@ -279,8 +279,8 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.documentElement.style.setProperty('--color-background-button-primary', '#000000');
-              document.documentElement.style.setProperty('--color-text-button-primary', '#000000');
+              document.documentElement.style.setProperty('--app-color-background-button-primary', '#000000');
+              document.documentElement.style.setProperty('--app-color-text-button-primary', '#000000');
               document.querySelector('[data-codex-prompt-launcher]').click();
               const newPrompt = document.querySelector('[data-prompt-new]');
               const styles = getComputedStyle(newPrompt);

@@ -34,7 +34,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
         webView.loadHTMLString(
             """
             <!doctype html><html><head><meta charset="utf-8"><style>
-              :root { color-scheme: \(scheme); --color-background-surface: \(background); --color-text-foreground: \(text); }
+              :root { color-scheme: \(scheme); --app-color-background-surface: \(background); --app-color-text-foreground: \(text); }
               * { box-sizing: border-box; }
               body { margin: 0; background: \(background); color: \(text); font-family: -apple-system, sans-serif; }
               .host { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }

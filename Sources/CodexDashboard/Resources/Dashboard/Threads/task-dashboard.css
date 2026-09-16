@@ -1,18 +1,18 @@
 #codex-dashboard-navigation,
 #codex-dashboard-page {
-  --dashboard-bg: var(--color-background-surface, #212121);
-  --dashboard-surface: var(--color-background-elevated-secondary, rgba(255, 255, 255, .022));
-  --dashboard-surface-hover: var(--color-background-button-secondary-hover, rgba(255, 255, 255, .05));
-  --dashboard-control: var(--color-background-control, rgba(255, 255, 255, .025));
-  --dashboard-active: var(--color-background-button-secondary-active, rgba(255, 255, 255, .07));
-  --dashboard-line: var(--color-border, rgba(255, 255, 255, .075));
-  --dashboard-line-strong: var(--color-border-heavy, rgba(255, 255, 255, .12));
-  --dashboard-text: var(--color-text-foreground, #ececec);
-  --dashboard-muted: var(--color-text-foreground-secondary, #a2a2a2);
-  --dashboard-dim: var(--color-text-foreground-tertiary, #858585);
-  --dashboard-green: var(--color-decoration-added, #79c98c);
-  --dashboard-amber: var(--color-decoration-modified, #c9a86a);
-  --dashboard-unread: var(--color-text-accent, #78a9ff);
+  --dashboard-bg: var(--app-color-background-surface, #212121);
+  --dashboard-surface: var(--app-color-background-elevated-secondary, rgba(255, 255, 255, .022));
+  --dashboard-surface-hover: var(--app-color-background-button-secondary-hover, rgba(255, 255, 255, .05));
+  --dashboard-control: var(--app-color-background-control, rgba(255, 255, 255, .025));
+  --dashboard-active: var(--app-color-background-button-secondary-active, rgba(255, 255, 255, .07));
+  --dashboard-line: var(--app-color-border, rgba(255, 255, 255, .075));
+  --dashboard-line-strong: var(--app-color-border-heavy, rgba(255, 255, 255, .12));
+  --dashboard-text: var(--app-color-text-foreground, #ececec);
+  --dashboard-muted: var(--app-color-text-foreground-secondary, #a2a2a2);
+  --dashboard-dim: var(--app-color-text-foreground-tertiary, #858585);
+  --dashboard-green: var(--app-color-decoration-added, #79c98c);
+  --dashboard-amber: var(--app-color-decoration-modified, #c9a86a);
+  --dashboard-unread: var(--app-color-text-accent, #78a9ff);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -87,7 +87,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page.is-open { visibility: visible; opacity: 1; transform: none; pointer-events: auto; transition-delay: 0s; }
 #codex-dashboard-page * { box-sizing: border-box; }
 #codex-dashboard-page button, #codex-dashboard-page input { font: inherit; }
-#codex-dashboard-page button:focus-visible, #codex-dashboard-page input:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
+#codex-dashboard-page button:focus-visible, #codex-dashboard-page input:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-page .dashboard-shell { width: min(1000px, calc(100% - 64px)); margin: 0 auto; padding: 48px 0 72px; }
 
 #codex-dashboard-page .dashboard-header { display: flex; align-items: flex-end; }
@@ -151,7 +151,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-thread { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: 50px; align-items: center; padding: 6px 14px; appearance: none; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; transition: background 120ms ease, box-shadow 120ms ease; }
 #codex-dashboard-page .dashboard-thread + .dashboard-thread { border-top: 1px solid var(--dashboard-line); }
 #codex-dashboard-page .dashboard-thread:hover { background: var(--dashboard-surface-hover); box-shadow: inset 2px 0 color-mix(in srgb, var(--dashboard-text) 22%, transparent); }
-#codex-dashboard-page .dashboard-thread:focus-visible { z-index: 1; outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: -2px; box-shadow: 0 0 0 3px rgba(121, 201, 140, .08); }
+#codex-dashboard-page .dashboard-thread:focus-visible { z-index: 1; outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: -2px; box-shadow: 0 0 0 3px rgba(121, 201, 140, .08); }
 #codex-dashboard-page .dashboard-thread[data-unread="true"] { background: color-mix(in srgb, var(--dashboard-unread) 6%, var(--dashboard-surface)); box-shadow: inset 2px 0 var(--dashboard-unread); }
 #codex-dashboard-page .dashboard-thread[data-unread="true"]:hover { background: color-mix(in srgb, var(--dashboard-unread) 10%, var(--dashboard-surface-hover)); }
 #codex-dashboard-page .dashboard-thread[data-run-state="running"] { background: transparent; }

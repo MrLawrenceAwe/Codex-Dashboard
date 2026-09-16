@@ -1,15 +1,15 @@
 #codex-dashboard-todo-navigation,
 #codex-dashboard-todo-page {
-  --todo-bg: var(--color-background-surface, #212121);
-  --todo-surface: var(--color-background-elevated-secondary, rgba(255, 255, 255, .022));
-  --todo-hover: var(--color-background-button-secondary-hover, rgba(255, 255, 255, .05));
-  --todo-active: var(--color-background-button-secondary-active, rgba(255, 255, 255, .07));
-  --todo-line: var(--color-border, rgba(255, 255, 255, .075));
-  --todo-line-strong: var(--color-border-heavy, rgba(255, 255, 255, .13));
-  --todo-text: var(--color-text-foreground, #ececec);
-  --todo-muted: var(--color-text-foreground-secondary, #a2a2a2);
-  --todo-dim: var(--color-text-foreground-tertiary, #858585);
-  --todo-green: var(--color-decoration-added, #79c98c);
+  --todo-bg: var(--app-color-background-surface, #212121);
+  --todo-surface: var(--app-color-background-elevated-secondary, rgba(255, 255, 255, .022));
+  --todo-hover: var(--app-color-background-button-secondary-hover, rgba(255, 255, 255, .05));
+  --todo-active: var(--app-color-background-button-secondary-active, rgba(255, 255, 255, .07));
+  --todo-line: var(--app-color-border, rgba(255, 255, 255, .075));
+  --todo-line-strong: var(--app-color-border-heavy, rgba(255, 255, 255, .13));
+  --todo-text: var(--app-color-text-foreground, #ececec);
+  --todo-muted: var(--app-color-text-foreground-secondary, #a2a2a2);
+  --todo-dim: var(--app-color-text-foreground-tertiary, #858585);
+  --todo-green: var(--app-color-decoration-added, #79c98c);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -47,7 +47,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page button:focus-visible,
 #codex-dashboard-todo-page input:focus-visible,
 #codex-dashboard-todo-page textarea:focus-visible,
-#codex-dashboard-todo-page select:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
+#codex-dashboard-todo-page select:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-todo-page .todo-shell { width: min(760px, calc(100% - 64px)); margin: 0 auto; padding: 56px 0 72px; }
 #codex-dashboard-todo-page .todo-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 #codex-dashboard-todo-page h1 { margin: 0; color: var(--todo-text); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.025em; }
@@ -99,7 +99,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-check input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 #codex-dashboard-todo-page .todo-check span { display: grid; width: 18px; height: 18px; border: 1px solid var(--todo-line-strong); border-radius: 50%; color: transparent; place-items: center; }
 #codex-dashboard-todo-page .todo-check svg { width: 17px; height: 17px; }
-#codex-dashboard-todo-page .todo-check input:focus-visible + span { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
+#codex-dashboard-todo-page .todo-check input:focus-visible + span { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-todo-page .todo-check input:checked + span { border-color: color-mix(in srgb, var(--todo-green) 70%, transparent); background: color-mix(in srgb, var(--todo-green) 12%, transparent); color: var(--todo-green); }
 #codex-dashboard-todo-page .todo-item-copy { display: grid; min-width: 0; gap: 3px; }
 #codex-dashboard-todo-page .todo-title { width: 100%; min-width: 0; min-height: 24px; max-height: 144px; padding: 2px 4px; border: 0; border-radius: 4px; overflow-y: auto; resize: none; background: transparent; color: var(--todo-text); font-size: 14px; font-weight: 550; line-height: 20px; }
@@ -132,7 +132,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-item:focus-within .todo-image-actions { opacity: 1; }
 #codex-dashboard-todo-page .todo-image-actions button { padding: 2px 0; border: 0; background: transparent; color: var(--todo-dim); font-size: 10px; }
 #codex-dashboard-todo-page .todo-image-actions button:hover { color: var(--todo-text); }
-#codex-dashboard-todo-dialogs { --todo-bg: var(--color-background-surface, #212121); --todo-surface: var(--color-background-elevated-secondary, rgba(255, 255, 255, .022)); --todo-active: var(--color-background-button-secondary-active, rgba(255, 255, 255, .07)); --todo-line: var(--color-border, rgba(255, 255, 255, .075)); --todo-line-strong: var(--color-border-heavy, rgba(255, 255, 255, .13)); --todo-text: var(--color-text-foreground, #ececec); --todo-muted: var(--color-text-foreground-secondary, #a2a2a2); font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+#codex-dashboard-todo-dialogs { --todo-bg: var(--app-color-background-surface, #212121); --todo-surface: var(--app-color-background-elevated-secondary, rgba(255, 255, 255, .022)); --todo-active: var(--app-color-background-button-secondary-active, rgba(255, 255, 255, .07)); --todo-line: var(--app-color-border, rgba(255, 255, 255, .075)); --todo-line-strong: var(--app-color-border-heavy, rgba(255, 255, 255, .13)); --todo-text: var(--app-color-text-foreground, #ececec); --todo-muted: var(--app-color-text-foreground-secondary, #a2a2a2); font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 #codex-dashboard-todo-dialogs .todo-image-dialog,
 #codex-dashboard-todo-dialogs .todo-tag-dialog { position: fixed; top: 50%; left: 50%; margin: 0; box-sizing: border-box; transform: translate(-50%, -50%); }
 #codex-dashboard-todo-dialogs .todo-image-dialog { width: min(900px, calc(100vw - 48px)); max-height: calc(100vh - 48px); padding: 40px 16px 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }

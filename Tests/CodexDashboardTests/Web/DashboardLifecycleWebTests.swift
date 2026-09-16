@@ -125,13 +125,14 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
                 const page = getComputedStyle(document.getElementById('codex-dashboard-page'));
                 const navigation = getComputedStyle(document.getElementById('codex-dashboard-navigation'));
                 const navigationCopy = getComputedStyle(document.querySelector('.dashboard-nav-copy'));
-                return [page.backgroundColor, page.color, navigationCopy.color, navigation.color];
+                const todo = getComputedStyle(document.getElementById('codex-dashboard-todo-page'));
+                return [page.backgroundColor, page.color, navigationCopy.color, navigation.color, todo.backgroundColor, todo.color];
               };
-              root.setProperty('--color-background-surface', '#ffffff');
-              root.setProperty('--color-text-foreground', '#1a1c1f');
+              root.setProperty('--app-color-background-surface', '#ffffff');
+              root.setProperty('--app-color-text-foreground', '#1a1c1f');
               const light = readStyles();
-              root.setProperty('--color-background-surface', '#212121');
-              root.setProperty('--color-text-foreground', '#ececec');
+              root.setProperty('--app-color-background-surface', '#212121');
+              root.setProperty('--app-color-text-foreground', '#ececec');
               document.getElementById('codex-dashboard-navigation').style.color = '#ececec';
               const dark = readStyles();
               return [light, dark];
@@ -139,8 +140,8 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [[String]]
         XCTAssertEqual(themedDashboardStyles, [
-            ["rgb(255, 255, 255)", "rgb(26, 28, 31)", "rgba(0, 0, 0, 0.847)", "rgba(0, 0, 0, 0.847)"],
-            ["rgb(33, 33, 33)", "rgb(236, 236, 236)", "rgb(236, 236, 236)", "rgb(236, 236, 236)"],
+            ["rgb(255, 255, 255)", "rgb(26, 28, 31)", "rgba(0, 0, 0, 0.847)", "rgba(0, 0, 0, 0.847)", "rgb(255, 255, 255)", "rgb(26, 28, 31)"],
+            ["rgb(33, 33, 33)", "rgb(236, 236, 236)", "rgb(236, 236, 236)", "rgb(236, 236, 236)", "rgb(33, 33, 33)", "rgb(236, 236, 236)"],
         ])
 
         let threads = [

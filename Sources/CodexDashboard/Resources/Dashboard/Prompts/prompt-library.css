@@ -1,23 +1,23 @@
 #codex-dashboard-prompt-library-dialog {
-  --dashboard-bg: var(--color-background-surface, #212121);
-  --dashboard-surface: var(--color-background-elevated-secondary, rgba(255, 255, 255, .018));
-  --dashboard-surface-hover: var(--color-background-button-secondary-hover, rgba(255, 255, 255, .035));
-  --dashboard-control: var(--color-background-control, rgba(255, 255, 255, .025));
-  --dashboard-line: var(--color-border, rgba(255, 255, 255, .075));
-  --dashboard-line-strong: var(--color-border-heavy, rgba(255, 255, 255, .12));
-  --dashboard-text: var(--color-text-foreground, #ececec);
-  --dashboard-muted: var(--color-text-foreground-secondary, #a2a2a2);
-  --dashboard-dim: var(--color-text-foreground-tertiary, #858585);
-  --dashboard-green: var(--color-decoration-added, #79c98c);
-  --dashboard-amber: var(--color-decoration-modified, #c9a86a);
-  --dashboard-unread: var(--color-text-accent, #78a9ff);
+  --dashboard-bg: var(--app-color-background-surface, #212121);
+  --dashboard-surface: var(--app-color-background-elevated-secondary, rgba(255, 255, 255, .018));
+  --dashboard-surface-hover: var(--app-color-background-button-secondary-hover, rgba(255, 255, 255, .035));
+  --dashboard-control: var(--app-color-background-control, rgba(255, 255, 255, .025));
+  --dashboard-line: var(--app-color-border, rgba(255, 255, 255, .075));
+  --dashboard-line-strong: var(--app-color-border-heavy, rgba(255, 255, 255, .12));
+  --dashboard-text: var(--app-color-text-foreground, #ececec);
+  --dashboard-muted: var(--app-color-text-foreground-secondary, #a2a2a2);
+  --dashboard-dim: var(--app-color-text-foreground-tertiary, #858585);
+  --dashboard-green: var(--app-color-decoration-added, #79c98c);
+  --dashboard-amber: var(--app-color-decoration-modified, #c9a86a);
+  --dashboard-unread: var(--app-color-text-accent, #78a9ff);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.dashboard-prompt-launcher { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-foreground-secondary, #a2a2a2); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; }
+.dashboard-prompt-launcher { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--app-color-text-foreground-secondary, #a2a2a2); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; }
 .dashboard-prompt-launcher svg { width: 18px; height: 18px; flex: 0 0 auto; }
-.dashboard-prompt-launcher:hover { background: var(--color-background-button-secondary-hover, rgba(255,255,255,.06)); color: var(--color-text-foreground, #ececec); }
-.dashboard-prompt-launcher:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 1px; }
+.dashboard-prompt-launcher:hover { background: var(--app-color-background-button-secondary-hover, rgba(255,255,255,.06)); color: var(--app-color-text-foreground, #ececec); }
+.dashboard-prompt-launcher:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 1px; }
 #codex-dashboard-prompt-library-dialog { position: fixed; z-index: 2147483647; inset: 0; display: grid; place-items: end center; padding: 24px; color: var(--dashboard-text); }
 #codex-dashboard-prompt-library-dialog * { box-sizing: border-box; }
 #codex-dashboard-prompt-library-dialog button,
@@ -27,12 +27,12 @@
 #codex-dashboard-prompt-library-dialog button:focus-visible,
 #codex-dashboard-prompt-library-dialog input:focus-visible,
 #codex-dashboard-prompt-library-dialog select:focus-visible,
-#codex-dashboard-prompt-library-dialog textarea:focus-visible { outline: 1px solid var(--color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
+#codex-dashboard-prompt-library-dialog textarea:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--dashboard-line-strong); border-radius: 16px; background: var(--color-background-elevated-primary-opaque, #292929); box-shadow: 0 24px 80px rgba(0,0,0,.48); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--dashboard-line-strong); border-radius: 16px; background: var(--app-color-background-elevated-primary-opaque, #292929); box-shadow: 0 24px 80px rgba(0,0,0,.48); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 20px; border-bottom: 1px solid var(--dashboard-line); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-header h2 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -.01em; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error { margin: 0; padding: 9px 20px; border-bottom: 1px solid var(--color-border-error, rgba(255, 120, 120, .22)); background: var(--color-background-status-error, rgba(180, 45, 45, .13)); color: var(--color-text-error, #ffb0b0); font-size: 11px; line-height: 1.4; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error { margin: 0; padding: 9px 20px; border-bottom: 1px solid var(--app-color-border-error, rgba(255, 120, 120, .22)); background: var(--app-color-background-status-error, rgba(180, 45, 45, .13)); color: var(--app-color-text-error, #ffb0b0); font-size: 11px; line-height: 1.4; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error[hidden] { display: none; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-icon-button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--dashboard-muted); font-size: 22px; line-height: 1; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-icon-button:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
@@ -42,7 +42,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"] { display: block; width: 100%; height: 32px; min-height: 0; margin: 0; padding: 0 10px; appearance: none; -webkit-appearance: none; border: 1px solid var(--dashboard-line-strong); border-radius: 7px; outline: 0; background: var(--dashboard-control); color: var(--dashboard-text); font-family: inherit; font-size: 12px; font-weight: 400; line-height: 30px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-appearance: none; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]::placeholder { color: var(--dashboard-dim); opacity: 1; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]:focus { border-color: var(--color-border-focus, rgba(121, 201, 140, .75)); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]:focus { border-color: var(--app-color-border-focus, rgba(121, 201, 140, .75)); }
 #codex-dashboard-prompt-library-dialog .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-list { display: grid; gap: 12px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-scope { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--dashboard-line); border-radius: 12px; }
@@ -106,7 +106,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea { min-height: 170px; resize: vertical; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form input:focus,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea:focus,
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-form select:focus { border-color: var(--color-border-focus, rgba(255,255,255,.22)); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-form select:focus { border-color: var(--app-color-border-focus, rgba(255,255,255,.22)); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form-actions { display: flex; justify-content: flex-end; gap: 7px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form-actions button { padding: 8px 11px; border-radius: 7px; font-size: 11px; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-secondary { border: 1px solid var(--dashboard-line-strong); background: transparent; color: var(--dashboard-muted); }

@@ -26,10 +26,10 @@ aside [data-codex-project-colour]:focus-visible { outline: 2px solid currentColo
   gap: 5px;
   width: 220px;
   padding: 10px;
-  border: 1px solid var(--color-border, #666);
+  border: 1px solid var(--app-color-border, #666);
   border-radius: 10px;
-  background: var(--color-background-surface, #212121);
-  color: var(--color-text-foreground, #ececec);
+  background: var(--app-color-background-surface, #212121);
+  color: var(--app-color-text-foreground, #ececec);
   box-shadow: 0 8px 28px #0005;
   font: 12px -apple-system, sans-serif;
 }
