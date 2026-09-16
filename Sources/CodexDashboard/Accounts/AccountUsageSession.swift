@@ -81,11 +81,6 @@ final class AccountUsageSession {
         }
     }
 
-    func reset() async {
-        invalidate()
-        await resetTask?.value
-    }
-
     func saveCache(
         _ snapshots: [UUID: CodexAccountUsageSnapshot],
         for accountIDs: Set<UUID>,

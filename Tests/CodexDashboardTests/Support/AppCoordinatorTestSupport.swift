@@ -95,12 +95,14 @@ actor SuspendedCatalogProvider: ThreadCatalogProviding {
 
 actor SequencedCatalogProvider: ThreadCatalogProviding {
     private var catalogs: [ThreadCatalog]
+    private(set) var requestCount = 0
 
     init(catalogs: [ThreadCatalog]) {
         self.catalogs = catalogs
     }
 
     func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) async -> ThreadCatalog {
+        requestCount += 1
         guard catalogs.count > 1 else {
             return catalogs.first ?? ThreadCatalog(threads: [], totalThreadCount: 0)
         }
