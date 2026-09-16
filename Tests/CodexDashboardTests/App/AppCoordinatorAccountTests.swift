@@ -282,10 +282,11 @@ extension AppCoordinatorTests {
         try mumCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
         let runtime = StubDashboardRuntime(synchronizationError: AccountTestError.mountFailed)
+        let catalogProvider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(threads: [], totalThreadCount: 0),
+        ])
         let coordinator = makeAppCoordinator(
-            catalogProvider: StubCatalogProvider(
-                catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
-            ),
+            catalogProvider: catalogProvider,
             workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
@@ -300,6 +301,8 @@ extension AppCoordinatorTests {
         XCTAssertEqual(try Data(contentsOf: authenticationURL), lawrenceCredential)
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(runtime.synchronizeCallCount, 1)
+        let catalogRequestCount = await catalogProvider.requestCount
+        XCTAssertEqual(catalogRequestCount, 1)
         XCTAssertEqual(coordinator.connectionState, .rendererAvailable)
         XCTAssertEqual(
             coordinator.accounts.statusMessage,

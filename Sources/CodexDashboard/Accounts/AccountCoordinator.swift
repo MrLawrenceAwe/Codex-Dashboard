@@ -125,9 +125,11 @@ final class AccountCoordinator: ObservableObject {
             ?? .unavailable
     }
 
-    func invalidateUsage() async {
+    func invalidateUsage() {
         usageGeneration += 1
-        await usageSession.reset()
+        // New usage requests already wait for the queued provider reset. Account
+        // transitions only need to cancel old requests and reject their results.
+        usageSession.invalidate()
     }
 
     func refreshActiveUsage(codexIsRunning: Bool) async {

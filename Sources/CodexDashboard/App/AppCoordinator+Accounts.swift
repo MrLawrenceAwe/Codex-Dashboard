@@ -83,7 +83,7 @@ extension AppCoordinator {
         defer { isPerformingAction = false }
         refreshGeneration += 1
         await synchronizationGate.cancel()
-        await accounts.invalidateUsage()
+        accounts.invalidateUsage()
         do {
             try await loadThreadSnapshot()
         } catch {
@@ -121,7 +121,7 @@ extension AppCoordinator {
             do {
                 try accounts.rollback(accountTransaction)
             } catch let rollbackError {
-                await accounts.invalidateUsage()
+                accounts.invalidateUsage()
                 accounts.refreshState()
                 accounts.setStatusMessage(
                     "Codex could not restart, and the account change could not be rolled back. "
@@ -130,7 +130,7 @@ extension AppCoordinator {
                 setFailure(rollbackError, lastKnownState: .codexClosed)
                 return
             }
-            await accounts.invalidateUsage()
+            accounts.invalidateUsage()
             accounts.refreshState()
             accounts.setStatusMessage("Codex could not restart, so the account change was rolled back.")
             dashboardRuntime.prepareForRestart()
@@ -156,7 +156,8 @@ extension AppCoordinator {
         }
 
         do {
-            try await loadThreadSnapshot()
+            // The preflight snapshot is fresh and contains no running tasks.
+            // Mount it immediately; normal polling refreshes the new process state.
             try await dashboardRuntime.synchronizeDashboard(
                 with: dashboardSnapshotPayload(), on: targets, forceRemount: true
             )
