@@ -24,10 +24,10 @@ const codexUIContracts = (() => {
     return document.querySelector('nav, [role="navigation"]');
   }
 
-  function visibleAction(label) {
-    return [...document.querySelectorAll('[role="menuitem"], button')].find((element) => (
-      isVisible(element)
-        && (element.textContent.trim() === label || element.textContent.trim().startsWith(label))
+  function visibleAction(label, root = document) {
+    return [...root.querySelectorAll('[role="menuitem"], button')].find((element) => (
+      (element.textContent.trim() === label || element.textContent.trim().startsWith(label))
+        && isVisible(element)
     ));
   }
 
@@ -47,10 +47,8 @@ const codexUIContracts = (() => {
     )) || null;
   }
 
-  function profileMenuAccountAnchor() {
-    const menu = profileMenu();
-    const action = visibleAction('Settings');
-    return action && menu?.contains(action) ? action : null;
+  function profileMenuAccountAnchor(menu) {
+    return menu ? visibleAction('Settings', menu) || null : null;
   }
 
   function threadRows() {

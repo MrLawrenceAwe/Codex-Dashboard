@@ -167,7 +167,7 @@ const accountPopover = (() => {
     if (document.querySelector(`[${triggerAttribute}]`)) return;
     const host = codexUIContracts.profileMenu();
     if (!host) return;
-    const anchor = codexUIContracts.profileMenuAccountAnchor();
+    const anchor = codexUIContracts.profileMenuAccountAnchor(host);
     const insertionParent = anchor?.parentElement;
     if (!anchor || !insertionParent || !host.contains(insertionParent)) return;
     const trigger = anchor.cloneNode(true);
@@ -220,7 +220,7 @@ const accountPopover = (() => {
       observeMutations();
     }
     const shouldMountTrigger = !document.querySelector(`[${triggerAttribute}]`) && records.some((record) => (
-      [...record.addedNodes].some((node) => {
+      (record.type === 'attributes' ? [record.target] : [...record.addedNodes]).some((node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return false;
         return containsMenuNode(node);
       })
@@ -229,17 +229,11 @@ const accountPopover = (() => {
   }
 
   function containsMenuNode(root) {
-    const pending = [{ element: root, depth: 0 }];
-    let inspected = 0;
-    while (pending.length && inspected < 40) {
-      const { element, depth } = pending.shift();
-      inspected += 1;
-      const role = element.getAttribute?.('role');
-      if (role === 'menu' || role === 'menuitem') return true;
-      if (depth >= 4) continue;
-      [...element.children].forEach((child) => pending.push({ element: child, depth: depth + 1 }));
-    }
-    return false;
+    // Ignore our own UI, but inspect the complete added subtree. Codex can
+    // portal its profile menu through deep wrappers or use plain buttons.
+    if (root.closest?.(`#${panelID}`)) return false;
+    const selector = '[role="menu"], [role="menuitem"], button';
+    return root.matches?.(selector) || Boolean(root.querySelector?.(selector));
   }
 
   function applySnapshot(next) {
@@ -260,7 +254,12 @@ const accountPopover = (() => {
     const nextRoot = root?.isConnected ? root : document.body;
     if (nextRoot === observedRoot) return;
     observer.disconnect();
-    observer.observe(nextRoot, { childList: true, subtree: true });
+    observer.observe(nextRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'style', 'class', 'role'],
+    });
     observedRoot = nextRoot;
   }
 

@@ -131,6 +131,46 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
     }
 
+    func testAccountsMountImmediatelyForDeeplyWrappedButtonMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation surface</main></body></html>
+        """)
+
+        let mounted = try await webView.callAsyncJavaScript("""
+        const portal = document.createElement('div');
+        let parent = portal;
+        for (let depth = 0; depth < 8; depth++) {
+          const wrapper = document.createElement('div');
+          parent.append(wrapper);
+          parent = wrapper;
+        }
+        parent.innerHTML = '<div><button><span>Settings</span></button><button>Log out</button></div>';
+        document.body.append(portal);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return Boolean(document.querySelector('[data-codex-accounts-trigger]'));
+        """, contentWorld: .page) as? Bool
+
+        XCTAssertEqual(mounted, true)
+    }
+
+    func testAccountsMountWhenExistingProfileMenuBecomesVisible() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <div id="profile-menu" hidden>
+            <button><span>Settings</span></button><button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let mounted = try await webView.callAsyncJavaScript("""
+        document.querySelector('#profile-menu').hidden = false;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return Boolean(document.querySelector('[data-codex-accounts-trigger]'));
+        """, contentWorld: .page) as? Bool
+
+        XCTAssertEqual(mounted, true)
+    }
+
     func testClosedProfileMenuExposesPersistentCompatibilityContract() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
