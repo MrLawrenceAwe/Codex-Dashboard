@@ -771,7 +771,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
     func testTagPickerOptionsRemainReadableInTheNativeMenu() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
-            <!doctype html><html><head><meta charset="utf-8"><style>:root { --color-background-surface: #fff; --color-text-foreground: #1f1f1f; }</style></head><body>
+            <!doctype html><html><head><meta charset="utf-8"><style>:root { --app-color-background-surface: #fff; --app-color-text-foreground: #1f1f1f; }</style></head><body>
               <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
               <main>Conversation surface</main>
             </body></html>
