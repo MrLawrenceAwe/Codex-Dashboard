@@ -110,11 +110,13 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         )
         history.saveDeadlines(plan.unchangedDeadlines, for: .known)
         let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
+        let eligibleSources = Set((plan.unchangedDeadlines + plan.scheduled).map(\.sourceIdentifier))
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
             // A due alert that failed to reach ntfy is no longer in the planner's
             // future schedule. Keep its bounded retry alive instead of dropping it.
-            if retryAttemptsByIdentifier[identifier] == nil {
+            if retryAttemptsByIdentifier[identifier] == nil ||
+                scheduledByIdentifier[identifier].map({ !eligibleSources.contains($0.sourceIdentifier) }) == true {
                 cancelTask(identifier)
             }
         }

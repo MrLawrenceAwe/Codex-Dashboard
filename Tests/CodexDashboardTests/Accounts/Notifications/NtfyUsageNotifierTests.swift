@@ -49,6 +49,35 @@ private actor FailSecondNtfyPublisher: NtfyPublishing {
 
 @MainActor
 final class NtfyUsageNotifierTests: XCTestCase {
+    func testCancelsFailedDeadlineRetryWhenWeeklyUsageBecomesExhausted() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = FailOnceNtfyPublisher()
+        let notifier = NtfyUsageNotifier(
+            userDefaults: defaults, publisher: publisher, now: { now },
+            retryDelay: { _ in .milliseconds(100) }
+        )
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        let reset = now.addingTimeInterval(60 * 60 + 0.01)
+        let available = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(usedPercent: 20, resetsAt: reset)),
+            fetchedAt: now
+        )
+        let exhausted = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(usedPercent: 100, resetsAt: reset)),
+            fetchedAt: now
+        )
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: available])
+        try await Task.sleep(for: .milliseconds(30))
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: exhausted])
+        try await Task.sleep(for: .milliseconds(150))
+        let count = await publisher.messageCount()
+        XCTAssertEqual(count, 0)
+    }
+
     func testDeliversImminentResetWarningOnceWithAccountAndRemainingUsage() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()

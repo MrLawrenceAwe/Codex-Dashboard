@@ -4,6 +4,55 @@ import XCTest
 @testable import CodexDashboard
 
 final class UsageNotificationPlannerTests: XCTestCase {
+    func testKeepsOnlyBankedExpiryRemindersWhileWeeklyUsageIsExhausted() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let weeklyReset = now.addingTimeInterval(96 * 60 * 60)
+        let previous = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
+            weekly: CodexUsageWindow(usedPercent: 10, resetsAt: weeklyReset)
+        )
+        for usedPercent in [100, 101] {
+            let current = CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: CodexUsageWindow(usedPercent: 90, resetsAt: previous.fiveHour?.resetsAt),
+                    weekly: CodexUsageWindow(usedPercent: usedPercent, resetsAt: weeklyReset),
+                    bankedResets: CodexBankedResetSummary(availableCount: 2, nextExpiration: weeklyReset)
+                ),
+                fetchedAt: now
+            )
+            let plan = UsageNotificationPlanner.plan(
+                for: [savedAccount], usageByAccountID: [savedAccount.id: current],
+                previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+                previousDeadlines: [:], sentUpdates: [:], now: now
+            )
+            XCTAssertEqual(plan.scheduled.count, 7)
+            XCTAssertTrue(plan.scheduled.allSatisfy { $0.identifier.contains("banked-reset-expiry") })
+            XCTAssertTrue(plan.immediate.isEmpty)
+            XCTAssertEqual(plan.unchangedDeadlines.count, 7)
+        }
+    }
+
+    func testResumesAlertsWhenExhaustedWeeklyUsageResets() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let current = snapshot(
+            fiveHourReset: nil, weeklyReset: now.addingTimeInterval(7 * 24 * 60 * 60),
+            bankedResetExpiration: now.addingTimeInterval(96 * 60 * 60), now: now
+        )
+        let previous = CodexAccountUsage(
+            fiveHour: nil, weekly: CodexUsageWindow(usedPercent: 100, resetsAt: now.addingTimeInterval(-30))
+        )
+        let plan = UsageNotificationPlanner.plan(
+            for: [savedAccount], usageByAccountID: [savedAccount.id: current],
+            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            previousDeadlines: [:], sentUpdates: [:], now: now
+        )
+        XCTAssertEqual(plan.scheduled.count, 14)
+        XCTAssertEqual(plan.immediate.count, 1)
+        XCTAssertEqual(plan.immediate.first?.title, "Codex limit reset")
+    }
+
     func testPlansWeeklyAndBankedExpiryWarningsAtEveryRequestedLeadTime() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let account = account(named: "Personal")

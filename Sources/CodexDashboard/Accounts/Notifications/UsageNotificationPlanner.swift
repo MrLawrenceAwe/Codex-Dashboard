@@ -57,14 +57,15 @@ enum UsageNotificationPlanner {
     ) -> [ScheduledUsageNotification] {
         accounts.flatMap { account -> [ScheduledUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            return limitNotifications(
+            let weeklyNotifications = hasWeeklyUsageRemaining(usage) ? limitNotifications(
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,
                 leadTimes: extendedLeadTimes,
                 usageSummary: usageSummary(for: usage),
                 now: now
-            ) + bankedResetExpiryNotifications(
+            ) : []
+            return weeklyNotifications + bankedResetExpiryNotifications(
                 for: account,
                 resets: usage.bankedResets,
                 usageSummary: usageSummary(for: usage),
@@ -119,16 +120,17 @@ enum UsageNotificationPlanner {
     ) -> [ImmediateUsageNotification] {
         accounts.flatMap { account -> [ImmediateUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage,
+                  hasWeeklyUsageRemaining(usage),
                   let previous = previousObservations[account.id]
             else { return [] }
-            let fiveHourNotification = hasWeeklyUsageRemaining(usage) ? resetNotification(
+            let fiveHourNotification = resetNotification(
                     for: account,
                     windowName: "5-hour",
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     usageSummary: usageSummary(for: usage),
                     now: now
-                ) : nil
+                )
             return [
                 fiveHourNotification,
                 resetNotification(
@@ -154,9 +156,10 @@ enum UsageNotificationPlanner {
     ) -> [ImmediateUsageNotification] {
         accounts.flatMap { account -> [ImmediateUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage,
+                  hasWeeklyUsageRemaining(usage),
                   let previous = previousObservations[account.id]
             else { return [] }
-            let fiveHourNotifications = hasWeeklyUsageRemaining(usage) ? thresholdNotifications(
+            let fiveHourNotifications = thresholdNotifications(
                     for: account,
                     windowName: "5-hour",
                     current: usage.fiveHour,
@@ -164,7 +167,7 @@ enum UsageNotificationPlanner {
                     thresholds: [50, 20],
                     usageSummary: usageSummary(for: usage),
                     now: now
-                ) : []
+                )
             return [
                 fiveHourNotifications,
                 thresholdNotifications(
