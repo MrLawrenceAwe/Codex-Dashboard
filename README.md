@@ -4,6 +4,19 @@ Codex Dashboard is a native macOS menu-bar utility that adds a recent-task dashb
 to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
+This is an independent personal project and is not affiliated with OpenAI.
+
+## Project overview
+
+- **Task monitoring:** recent activity, unread status, completion tracking and Git working-tree changes.
+- **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
+- **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
+- **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
+
+The project explores reliable desktop workflow automation, including file-change
+monitoring, scheduled refresh, asynchronous persistence and recovery after failed
+writes. Test fixtures use synthetic data.
+
 The DevTools connection is limited to the local machine and uses a new high port each
 time the dashboard launches, but Chromium DevTools does not authenticate local clients.
 Use this utility only on a trusted personal macOS account; do not leave Codex running
