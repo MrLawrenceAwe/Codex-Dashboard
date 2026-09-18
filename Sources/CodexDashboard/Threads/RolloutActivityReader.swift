@@ -195,7 +195,10 @@ struct RolloutActivityReader {
             envelope.type == "event_msg",
             let payloadType = envelope.payload?.type,
             let timestamp = envelope.timestamp,
-            let date = try? Date(timestamp, strategy: .iso8601)
+            let date = try? Date(
+                timestamp,
+                strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: timestamp.contains("."))
+            )
         else { return nil }
         let kind: ThreadLifecycleEventKind
         switch payloadType {

@@ -3,6 +3,21 @@ import XCTest
 @testable import CodexDashboard
 
 final class RolloutActivityReaderTests: XCTestCase {
+    func testParsesLifecycleTimestampsWithAndWithoutFractionalSeconds() throws {
+        for (timestamp, seconds) in [
+            ("2026-09-18T12:00:00Z", 1_789_732_800.0),
+            ("2026-09-18T12:00:00.487Z", 1_789_732_800.487),
+        ] {
+            let url = try makeRollout(lines: [
+                #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_started"}}"#,
+            ])
+            var reader = RolloutActivityReader()
+            let event = try XCTUnwrap(reader.latestEvent(at: url.path, codexLaunchDate: .distantPast))
+            XCTAssertEqual(event.kind, .started)
+            XCTAssertEqual(event.timestamp.timeIntervalSince1970, seconds, accuracy: 0.001)
+        }
+    }
+
     func testPrunesCachedRolloutsOutsideCurrentCatalog() throws {
         let firstURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_started"],

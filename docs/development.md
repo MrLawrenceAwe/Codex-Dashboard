@@ -2,10 +2,10 @@
 
 ## Build toolchain
 
-GitHub Actions selects Xcode 26.3 explicitly on macOS 15 and runs the test suite
-followed by a release build. The runner's default Xcode 16.4 compiler crashes
-while compiling the application delegate, before tests can execute. Use Xcode
-26.3 or newer for development; the application's deployment target remains macOS 14.
+GitHub Actions selects Xcode 26.6 explicitly on macOS 26 and runs the test suite
+followed by a release build. The WebKit tests require Safari 26.4 or newer's
+CSS zoom coordinate behavior; older WebKit versions report unscaled rectangles.
+Use Xcode 26.6 for development; the application's deployment target remains macOS 14.
 
 ## Preview
 
@@ -44,7 +44,11 @@ save completion instead of assuming that persistence finishes during a DOM event
 
 ## Visual baselines
 
-The web test suite compares wide dark, medium light, and narrow dark screenshots against committed baselines. After an intentional visual change, regenerate them with:
+The web test suite compares wide dark, medium light, and narrow dark screenshots against committed baselines.
+Snapshots explicitly use two pixels per point so Retina and headless CI displays
+produce the same dimensions.
+
+After an intentional visual change, regenerate them with:
 
 ```sh
 UPDATE_VISUAL_BASELINES=1 swift test --filter DashboardVisualRegressionTests
