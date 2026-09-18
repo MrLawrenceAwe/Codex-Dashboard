@@ -124,6 +124,9 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             ) {
                 return .repository
             }
+            guard candidate.path != "/", !candidate.path.isEmpty else {
+                return .terminal(.notRepository)
+            }
             let parent = candidate.deletingLastPathComponent()
             guard parent.path != candidate.path else { return .terminal(.notRepository) }
             candidate = parent
