@@ -10,6 +10,9 @@ enum GitMetadataLocator {
                 if isDirectory.boolValue { return gitURL }
                 return linkedMetadataURL(from: gitURL)
             }
+            // Foundation versions differ in how deleting the root component is
+            // represented. Stop before traversing above the filesystem root.
+            guard candidate.path != "/", !candidate.path.isEmpty else { return nil }
             let parent = candidate.deletingLastPathComponent()
             guard parent.path != candidate.path else { return nil }
             candidate = parent
