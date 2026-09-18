@@ -171,6 +171,31 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(mounted, true)
     }
 
+    func testAccountsMountOnEveryOpeningAfterWholePortalIsRemoved() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation surface</main></body></html>
+        """)
+
+        let results = try await webView.callAsyncJavaScript("""
+        const results = [];
+        for (let opening = 0; opening < 3; opening++) {
+          const portal = document.createElement('div');
+          portal.innerHTML = '<div><div role="menu"><button><span>Settings</span></button><button>Log out</button></div></div>';
+          document.body.append(portal);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          const trigger = portal.querySelector('[data-codex-accounts-trigger]');
+          results.push(Boolean(trigger));
+          trigger?.click();
+          portal.remove();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          results.push(document.querySelector('#codex-accounts-panel') === null);
+        }
+        return results;
+        """, contentWorld: .page) as? [Bool]
+
+        XCTAssertEqual(results, Array(repeating: true, count: 6))
+    }
+
     func testClosedProfileMenuExposesPersistentCompatibilityContract() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>

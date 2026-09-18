@@ -4,7 +4,6 @@ const accountPopover = (() => {
   let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
   let snapshotFingerprint = '';
   let observer;
-  let observedRoot;
   let outsidePointerHandler;
   let outsidePointerTimer;
   let escapeHandler;
@@ -195,7 +194,6 @@ const accountPopover = (() => {
       openPanel(trigger);
     });
     insertionParent.insertBefore(trigger, anchor);
-    observeMutations(host.parentElement);
   }
 
   function accountIcon() {
@@ -217,7 +215,6 @@ const accountPopover = (() => {
     ));
     if (triggerWasRemoved) {
       if (!retainPanelAfterRefresh) closePanel();
-      observeMutations();
     }
     const shouldMountTrigger = !document.querySelector(`[${triggerAttribute}]`) && records.some((record) => (
       (record.type === 'attributes' ? [record.target] : [...record.addedNodes]).some((node) => {
@@ -249,18 +246,16 @@ const accountPopover = (() => {
     return true;
   }
 
-  function observeMutations(root = document.body) {
-    if (!observer) return;
-    const nextRoot = root?.isConnected ? root : document.body;
-    if (nextRoot === observedRoot) return;
-    observer.disconnect();
-    observer.observe(nextRoot, {
+  function observeMutations() {
+    // Keep a stable root: Codex removes the entire menu portal on close.
+    // An observer attached inside that portal cannot see its own removal or
+    // the next opening, leaving Accounts dependent on native refresh polling.
+    observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['hidden', 'style', 'class', 'role'],
     });
-    observedRoot = nextRoot;
   }
 
   function mount() {
@@ -274,7 +269,6 @@ const accountPopover = (() => {
   function unmount() {
     observer?.disconnect();
     observer = undefined;
-    observedRoot = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();
     closePanel();
     releaseActionWaiters();
