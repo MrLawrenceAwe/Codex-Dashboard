@@ -1,5 +1,12 @@
 # Development and testing
 
+## Build toolchain
+
+GitHub Actions selects Xcode 26.3 explicitly on macOS 15 and runs the test suite
+followed by a release build. The runner's default Xcode 16.4 compiler crashes
+while compiling the application delegate, before tests can execute. Use Xcode
+26.3 or newer for development; the application's deployment target remains macOS 14.
+
 ## Preview
 
 Run `./DashboardPreview/generate.sh`, then open `DashboardPreview/index.html` in a
