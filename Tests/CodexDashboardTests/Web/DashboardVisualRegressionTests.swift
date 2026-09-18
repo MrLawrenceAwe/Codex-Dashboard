@@ -112,6 +112,9 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
         try await Task.sleep(for: .milliseconds(150))
         let configuration = WKSnapshotConfiguration()
         configuration.rect = CGRect(origin: .zero, size: scenario.size)
+        // Baselines use two pixels per point, regardless of the runner's display.
+        let displayScale = NSScreen.main?.backingScaleFactor ?? 1
+        configuration.snapshotWidth = NSNumber(value: scenario.size.width * 2 / displayScale)
         let image = try await webView.takeSnapshot(configuration: configuration)
         return try XCTUnwrap(image.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?.representation(using: .png, properties: [:]))
     }
