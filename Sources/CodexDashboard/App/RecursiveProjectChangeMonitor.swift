@@ -116,6 +116,7 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         var matches: Set<String> = []
         while true {
             matches.formUnion(projectPathsByObservedRoot[candidate] ?? [])
+            guard candidate != "/", !candidate.isEmpty else { return matches }
             let parent = URL(fileURLWithPath: candidate).deletingLastPathComponent().path
             guard parent != candidate else { return matches }
             candidate = parent
