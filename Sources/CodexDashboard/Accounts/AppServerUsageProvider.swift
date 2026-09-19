@@ -31,7 +31,7 @@ enum CodexAccountUsageError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .authenticationExpired:
-            return "Sign-in expired. Switch to this account to sign in again."
+            return "Sign-in expired. Select Sign in to authenticate this account again."
         case .malformedResponse:
             return "Codex returned invalid account usage data."
         case .server(let message):

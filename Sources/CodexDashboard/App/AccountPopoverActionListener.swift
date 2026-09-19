@@ -21,6 +21,8 @@ final class AccountPopoverActionListener {
                     try? await Task.sleep(for: Schedule.unavailableRetry(
                         active: RefreshScheduler.isUserActive
                     ))
+                } else if outcome == .timedOut {
+                    try? await Task.sleep(for: .milliseconds(250))
                 }
             }
         }

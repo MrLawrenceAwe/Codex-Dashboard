@@ -253,9 +253,8 @@ final class DashboardRenderer {
         guard let target = (await targets()).first else { return .unavailable }
         do {
             guard let serialized = try await devTools.evaluateString(
-                RendererScript.waitForAccountPopoverAction,
-                in: target,
-                timeout: .seconds(35)
+                RendererScript.takeNextAccountPopoverAction,
+                in: target
             ) else { return .unavailable }
             if serialized == RendererScript.accountPopoverUnavailable { return .unavailable }
             if serialized == "null" { return .timedOut }

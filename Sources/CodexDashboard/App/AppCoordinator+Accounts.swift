@@ -44,6 +44,10 @@ extension AppCoordinator {
 
     func refreshAccountStateAfterFileChange() async {
         accounts.refreshState()
+        if accounts.synchronizeActiveCredentialAfterFileChange() {
+            await refreshAccountUsage()
+            return
+        }
         await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()
     }
