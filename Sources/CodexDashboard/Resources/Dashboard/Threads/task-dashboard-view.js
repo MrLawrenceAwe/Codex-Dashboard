@@ -1,9 +1,47 @@
 const taskDashboardView = (() => {
   const renderedMarkup = new WeakMap();
 
+  function childKey(element) {
+    if (!(element instanceof Element)) return '';
+    if (element.matches('[data-dashboard-thread-row]')) {
+      return `thread:${element.dataset.dashboardThreadRow}`;
+    }
+    if (element.matches('[data-dashboard-project-group]')) {
+      return `project:${element.dataset.dashboardProjectGroup}`;
+    }
+    if (element.matches('[data-dashboard-git-project]')) {
+      return `git:${element.dataset.dashboardGitProject}`;
+    }
+    if (element.matches('[data-dashboard-muted-projects]')) return 'muted-projects';
+    if (element.matches('[data-dashboard-empty]')) return 'empty';
+    return '';
+  }
+
   function updateMarkup(element, markup) {
     if (renderedMarkup.get(element) === markup) return;
-    element.innerHTML = markup;
+    const template = document.createElement('template');
+    template.innerHTML = markup;
+    const nextChildren = [...template.content.children];
+    const currentChildren = [...element.children];
+    const currentByKey = new Map(currentChildren.map((child) => [childKey(child), child]));
+    const canPatch = nextChildren.every((child) => childKey(child))
+      && currentChildren.every((child) => childKey(child))
+      && currentByKey.size === currentChildren.length;
+    if (!canPatch) {
+      element.replaceChildren(template.content);
+    } else {
+      const retained = new Set();
+      nextChildren.forEach((nextChild) => {
+        const key = childKey(nextChild);
+        const currentChild = currentByKey.get(key);
+        const child = currentChild?.outerHTML === nextChild.outerHTML ? currentChild : nextChild;
+        retained.add(child);
+        element.append(child);
+      });
+      currentChildren.forEach((child) => {
+        if (!retained.has(child) && child.isConnected) child.remove();
+      });
+    }
     renderedMarkup.set(element, markup);
   }
 
@@ -96,7 +134,7 @@ const taskDashboardView = (() => {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
         : 'No tasks found';
-      updateMarkup(list, `<div class="dashboard-empty"><strong>${emptyMessage}</strong></div>`);
+      updateMarkup(list, `<div class="dashboard-empty" data-dashboard-empty><strong>${emptyMessage}</strong></div>`);
       return true;
     }
     updateMarkup(

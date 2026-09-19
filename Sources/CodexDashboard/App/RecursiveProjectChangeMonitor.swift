@@ -11,7 +11,7 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
     }
 
     private let projectPaths: Set<String>
-    private let projectPathsByObservedRoot: [String: Set<String>]
+    private let observedRoots: [(path: String, projectPaths: Set<String>)]
     private let action: @MainActor @Sendable (Set<String>) async -> Void
     private var stream: FSEventStreamRef?
 
@@ -25,7 +25,7 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
             pathsByObservedRoot[Self.standardizedPath(projectPath), default: []].insert(projectPath)
             pathsByObservedRoot[Self.canonicalPath(projectPath), default: []].insert(projectPath)
         }
-        projectPathsByObservedRoot = pathsByObservedRoot
+        observedRoots = pathsByObservedRoot.map { (path: $0.key, projectPaths: $0.value) }
         self.action = action
     }
 
@@ -63,9 +63,10 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
             }
             monitor.notifyChanges(at: paths)
         }
+        // Directory-level events identify the affected project without producing
+        // one callback entry for every generated file in a build or install.
         let flags = FSEventStreamCreateFlags(
-            kFSEventStreamCreateFlagFileEvents
-                | kFSEventStreamCreateFlagWatchRoot
+            kFSEventStreamCreateFlagWatchRoot
                 | kFSEventStreamCreateFlagUseCFTypes
         )
         guard let stream = FSEventStreamCreate(
@@ -95,8 +96,14 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
     private func notifyChanges(at changedPaths: [String]) {
         var affectedProjectPaths: Set<String> = []
         for changedPath in changedPaths {
-            affectedProjectPaths.formUnion(projectPaths(containing: Self.standardizedPath(changedPath)))
-            affectedProjectPaths.formUnion(projectPaths(containing: Self.canonicalPath(changedPath)))
+            // FSEvents normally returns canonical paths for watched roots. Project roots
+            // keep both canonical and standardized spellings, so matching path prefixes
+            // here avoids resolving symlinks and allocating every ancestor for every
+            // file event in a busy build tree.
+            let normalizedPath = Self.standardizedPath(changedPath)
+            for root in observedRoots where Self.contains(normalizedPath, in: root.path) {
+                affectedProjectPaths.formUnion(root.projectPaths)
+            }
         }
         guard !affectedProjectPaths.isEmpty else { return }
         let action = action
@@ -111,15 +118,8 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
-    private func projectPaths(containing changedPath: String) -> Set<String> {
-        var candidate = changedPath
-        var matches: Set<String> = []
-        while true {
-            matches.formUnion(projectPathsByObservedRoot[candidate] ?? [])
-            guard candidate != "/", !candidate.isEmpty else { return matches }
-            let parent = URL(fileURLWithPath: candidate).deletingLastPathComponent().path
-            guard parent != candidate else { return matches }
-            candidate = parent
-        }
+    private static func contains(_ changedPath: String, in rootPath: String) -> Bool {
+        changedPath == rootPath
+            || (rootPath == "/" ? changedPath.hasPrefix("/") : changedPath.hasPrefix(rootPath + "/"))
     }
 }

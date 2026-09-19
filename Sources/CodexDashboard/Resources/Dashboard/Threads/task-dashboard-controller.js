@@ -15,6 +15,7 @@ const pageState = createPageVisibilityController({
 });
 let viewNeedsRender = true;
 let commitOrPushError = '';
+let interruptedThreadIDs = new Set();
 const unreadState = createThreadUnreadState({ isOpen: pageState.isOpen, onChange: requestRender });
 const { isThreadUnread, isCompletionTickVisible } = unreadState;
 
@@ -31,26 +32,28 @@ function deriveViewState() {
 }
 
 function syncSidebarMarkers() {
-  const interruptedThreadIDs = new Set(
+  const nextInterruptedThreadIDs = new Set(
     threads
       .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
       .map((thread) => thread.id),
   );
-  codexUIContracts.threadRows().forEach((row) => {
-    const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
-    const threadID = sidebarID.startsWith('local:') ? sidebarID.slice('local:'.length) : '';
-    const shouldShow = interruptedThreadIDs.has(threadID);
+  interruptedThreadIDs.forEach((threadID) => {
+    if (nextInterruptedThreadIDs.has(threadID)) return;
+    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {
+      if (marker.dataset.codexSidebarInterrupted === threadID) marker.remove();
+    });
+  });
+  interruptedThreadIDs = nextInterruptedThreadIDs;
+  interruptedThreadIDs.forEach((threadID) => {
+    const row = codexUIContracts.threadRow(threadID);
+    if (!row) return;
     let marker = row.querySelector('[data-codex-sidebar-interrupted]');
-    if (!shouldShow) {
-      marker?.remove();
-      return;
-    }
     if (!marker) {
       const title = row.querySelector('[data-thread-title-trigger]');
       const markerHost = title?.parentElement;
       if (!markerHost) return;
       marker = document.createElement('span');
-      marker.setAttribute('data-codex-sidebar-interrupted', '');
+      marker.setAttribute('data-codex-sidebar-interrupted', threadID);
       marker.textContent = 'Interrupted';
       markerHost.insertBefore(marker, title);
     }
@@ -274,6 +277,7 @@ function destroy() {
   cancelScheduledRender();
   unreadState.destroy();
   document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
+  interruptedThreadIDs.clear();
   viewNeedsRender = true;
 }
 

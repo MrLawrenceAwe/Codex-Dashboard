@@ -27,7 +27,7 @@ const threadMarkup = (() => {
         : isCompleted
           ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
           : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
-    return `<div class="dashboard-thread-row${compact ? ' is-compact' : ''}">
+    return `<div class="dashboard-thread-row${compact ? ' is-compact' : ''}" data-dashboard-thread-row="${domUtils.escapeHTML(thread.id)}">
       <button type="button" class="dashboard-add-todo${isAddedToTodos ? ' is-added' : ''}" data-add-chat-to-todos="${domUtils.escapeHTML(thread.id)}" aria-label="${isAddedToTodos ? `${domUtils.escapeHTML(thread.title)} is in to-dos` : `Add ${domUtils.escapeHTML(thread.title)} to to-dos`}" title="${isAddedToTodos ? 'Already in to-dos' : 'Add chat to to-dos'}"${isAddedToTodos ? ' disabled' : ''}><span aria-hidden="true">${isAddedToTodos ? '✓' : '+'}</span><span>${isAddedToTodos ? 'Added' : 'To-do'}</span></button>
       <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${domUtils.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${domUtils.escapeHTML(thread.id)}" data-open-thread="${domUtils.escapeHTML(thread.id)}" aria-label="${domUtils.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">
@@ -95,6 +95,9 @@ const threadMarkup = (() => {
     isCompletionTickVisible,
     isChatInTodos = () => false,
   }) {
+    const allThreadsByProject = new Map(
+      groupThreadsByProject(allThreads).map((group) => [group.path, group.threads]),
+    );
     if (filterMode === 'recent') {
       return visibleThreads.map((item) => thread(item, {
         compact: true,
@@ -107,11 +110,9 @@ const threadMarkup = (() => {
     if (filterMode === 'changedProjects') {
       const projects = groupThreadsByProject(visibleThreads);
       const projectCard = ({ path: projectPath, name: projectName, threads: projectThreads }) => {
-        const selectableProjectThreads = allThreads.filter(
-          (item) => String(item.projectPath).trim() === projectPath,
-        );
+        const selectableProjectThreads = allThreadsByProject.get(projectPath) || [];
         return `
-        <article class="dashboard-git-project">
+        <article class="dashboard-git-project" data-dashboard-git-project="${domUtils.escapeHTML(projectPath)}">
           <div class="dashboard-git-project-copy">
             <span class="dashboard-project-icon">${dashboardIcons.render('project')}</span>
             <span class="dashboard-project-copy">
@@ -134,21 +135,19 @@ const threadMarkup = (() => {
       return `
         ${activeProjects.map(projectCard).join('')}
         ${mutedProjects.length ? `
-          <details class="dashboard-muted-projects">
+          <details class="dashboard-muted-projects" data-dashboard-muted-projects>
             <summary><span class="dashboard-muted-project-label">Muted</span><span class="dashboard-muted-project-count">${mutedProjects.length}</span></summary>
             <div class="dashboard-muted-project-list">${mutedProjects.map(projectCard).join('')}</div>
           </details>` : ''}`;
     }
     return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
-      const selectableProjectThreads = allThreads.filter(
-        (item) => String(item.projectPath).trim() === projectPath,
-      );
+      const selectableProjectThreads = allThreadsByProject.get(projectPath) || [];
       const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
       const isMuted = mutedProjectPaths.has(projectPath);
       return `
-      <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" aria-label="${domUtils.escapeHTML(project)} project">
+      <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" data-dashboard-project-group="${domUtils.escapeHTML(projectPath)}" aria-label="${domUtils.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
           <button type="button" class="dashboard-project-toggle" data-project-toggle="${domUtils.escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
             <span class="dashboard-project-title">
