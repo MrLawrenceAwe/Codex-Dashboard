@@ -3,6 +3,8 @@ const todoList = (() => {
   let availableTags = todoStore.loadTags(items);
   let projects = [];
   let projectDraft = null;
+  let projectChats = [];
+  let chatDraft = null;
   let projectObserver;
   let observedProjectSidebar;
   let filterMode = 'open';
@@ -36,7 +38,15 @@ const todoList = (() => {
       ? projectDraft.id : '';
     if (!selected) projectDraft = null;
     todoListView?.updateProjectOptions?.(projects, selected);
+    refreshChatOptions();
     updateFilterOptions();
+  }
+
+  function refreshChatOptions() {
+    if (destroyed) return;
+    projectChats = projectDraft ? taskDashboard.chatsForProject(projectDraft) : [];
+    if (!projectChats.some((chat) => chat.id === chatDraft?.id)) chatDraft = null;
+    todoListView?.updateChatOptions?.(projectChats, Boolean(projectDraft), chatDraft?.id || '');
   }
 
   function startProjectObserver() {
@@ -127,16 +137,31 @@ const todoList = (() => {
     return saved;
   }
 
-  async function add(title, body = '', image = null, tags = [], project = null) {
+  async function add(title, body = '', image = null, tags = [], project = null, chat = null) {
     const item = todoStore.create(title, body, image, tags);
     if (!item) return false;
     item.project = todoStore.normalizeProject(project);
+    item.chat = todoStore.normalizeChat(chat);
     const saved = await commitItems([item, ...items]);
     if (saved && !destroyed) {
       filterMode = 'open';
       render();
     }
     return saved;
+  }
+
+  async function addChat(thread) {
+    const chat = todoStore.normalizeChat(thread);
+    if (!chat) return false;
+    if (hasChat(chat.id)) return true;
+    const item = todoStore.create(chat.title);
+    if (!item) return false;
+    item.chat = chat;
+    return commitItems([item, ...items]);
+  }
+
+  function hasChat(chatID) {
+    return items.some((item) => !item.completed && item.chat?.id === chatID);
   }
 
   function updateItem(id, changes) {
@@ -189,11 +214,13 @@ const todoList = (() => {
         imageController.reset();
         tagController.reset();
         projectDraft = null;
+        chatDraft = null;
         todoListView.updateProjectOptions(projects);
+        refreshChatOptions();
         title.focus();
       };
       const saved = add(
-        title.value, body.value, imageDraft.image, tagController.draft(), projectDraft,
+        title.value, body.value, imageDraft.image, tagController.draft(), projectDraft, chatDraft,
       );
       void saved.then(finish);
     });
@@ -203,6 +230,11 @@ const todoList = (() => {
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
       projectDraft = projects.find((project) => project.id === projectInput.value) || null;
+      chatDraft = null;
+      refreshChatOptions();
+    });
+    page.querySelector('[data-todo-new-chat-picker]').addEventListener('change', (event) => {
+      chatDraft = projectChats.find((chat) => chat.id === event.target.value) || null;
     });
     tagController.bindDraft(page);
   }
@@ -280,6 +312,31 @@ const todoList = (() => {
     if (composer && !destroyed) await transfer();
   }
 
+  async function pasteTodoInChat(item) {
+    if (destroyed || !item?.chat) return;
+    pageState.close();
+    codexHost.navigateToThread(item.chat);
+    const selected = await domUtils.waitFor(
+      () => destroyed || codexUIContracts.isThreadSelected(item.chat.id),
+      { timeout: 5000, interval: 25 },
+    );
+    if (!selected || destroyed) return;
+    const composer = await domUtils.waitFor(
+      () => destroyed || codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+      { timeout: 3000, interval: 25 },
+    );
+    if (!composer || destroyed) return;
+    let image = item.image;
+    if (image && !image.dataURL) {
+      const [hydratedItem] = await todoStore.hydrate([item]);
+      image = hydratedItem?.image;
+    }
+    if (destroyed) return;
+    const content = [item.title, item.body].filter(Boolean).join('\n\n');
+    if (!composerAdapter.insert(content)) return;
+    if (image) composerAdapter.attachImage(image);
+  }
+
   function bindItemActions(page) {
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
       const previewButton = event.target.closest('[data-todo-image-preview]');
@@ -294,6 +351,13 @@ const todoList = (() => {
         const row = newChatButton.closest('[data-todo-id]');
         const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
         void openTodoInNewChat(item);
+        return;
+      }
+      const pasteInChatButton = event.target.closest('[data-todo-paste-in-chat]');
+      if (pasteInChatButton) {
+        const row = pasteInChatButton.closest('[data-todo-id]');
+        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
+        void pasteTodoInChat(item);
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
@@ -372,5 +436,8 @@ const todoList = (() => {
     mountPage,
     open,
     applyVisibility: pageState.applyVisibility,
+    addChat,
+    hasChat,
+    refreshChatOptions,
   };
 })();

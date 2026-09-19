@@ -24,19 +24,20 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (async () => {
           const store = window.__todoStoreForTests;
           const results = [];
-          for (const version of [1, 2, 3, 4]) {
+          for (const version of [1, 2, 3, 4, 5]) {
             localStorage.clear();
             const project = { id: 'project-a', name: 'Project A' };
             const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'test.png' };
             const item = { id: 'todo-a', title: 'Saved task', image, createdAt: 1, updatedAt: 2 };
             Object.assign(item, version < 4 ? { badges: ['Work'], projectBadge: project }
-              : { tags: ['Work'], projectTag: project });
+              : version === 4 ? { tags: ['Work'], projectTag: project }
+              : { tags: ['Work'], project });
             localStorage.setItem('codex-dashboard.todos', JSON.stringify({ version, items: [item] }));
             localStorage.setItem('codex-dashboard.todo-badges', JSON.stringify(['Personal']));
             const loaded = store.load();
             const tags = store.loadTags(loaded);
             const migrated = JSON.parse(localStorage.getItem('codex-dashboard.todos'));
-            results.push(migrated.version === 5 && loaded[0].project.id === 'project-a'
+            results.push(migrated.version === 6 && loaded[0].project.id === 'project-a'
               && loaded[0].tags[0] === 'Work' && loaded[0].image.dataURL === image.dataURL
               && loaded[0].createdAt === 1 && loaded[0].updatedAt === 2
               && tags.includes('Personal') && tags.includes('Work')
@@ -48,7 +49,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           return results;
         })()
         """) as? [Bool]
-        XCTAssertEqual(result, [true, true, true, true])
+        XCTAssertEqual(result, [true, true, true, true, true])
     }
 
     func testFailedMigrationWriteStillLoadsDataAndPreservesOriginalDocument() async throws {

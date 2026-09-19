@@ -72,6 +72,8 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-tag-composer .todo-tags { flex: 0 1 auto; }
 #codex-dashboard-todo-page .todo-tag-composer select { height: 20px; min-width: 110px; padding: 0 3px; border: 0; background: transparent; color: var(--todo-muted); font-size: 11px; }
 #codex-dashboard-todo-page .todo-tag-composer select option { background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-tag-composer select[hidden] { display: none; }
+#codex-dashboard-todo-page [data-todo-new-chat-picker] { max-width: 240px; }
 #codex-dashboard-todo-page .todo-add > button[type="submit"] { width: auto !important; min-width: 66px; height: 32px !important; margin: 0 6px 0 0; padding: 0 12px; border: 0; border-radius: 7px; background: var(--todo-text); color: var(--todo-bg); font-size: 12px; font-weight: 600; cursor: pointer; justify-self: end; }
 #codex-dashboard-todo-page .todo-add button:hover { background: color-mix(in srgb, var(--todo-text) 86%, var(--todo-muted)); }
 #codex-dashboard-todo-page .todo-storage-error { margin: 10px 0 0; padding: 8px 10px; border: 1px solid rgba(220, 90, 80, .25); border-radius: 7px; color: var(--todo-muted); font-size: 11px; }
@@ -115,6 +117,8 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-project-picker:hover,
 #codex-dashboard-todo-page .todo-project-picker:focus { background: var(--todo-active); }
 #codex-dashboard-todo-page .todo-project-picker option { background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-chat { display: flex; width: fit-content; max-width: calc(100% - 8px); align-items: center; gap: 4px; margin: 1px 4px 0; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--todo-green) 25%, var(--todo-line)); border-radius: 999px; color: var(--todo-green); font-size: 10px; }
+#codex-dashboard-todo-page .todo-chat span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-tags { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 4px 0; }
 #codex-dashboard-todo-page .todo-tag { display: inline-flex; min-width: 0; align-items: center; gap: 3px; padding: 2px 6px; border: 1px solid var(--todo-line); border-radius: 999px; background: var(--todo-surface); color: var(--todo-muted); font-size: 10px; line-height: 1.2; }
 #codex-dashboard-todo-page .todo-tag-picker { display: flex; align-items: center; gap: 5px; padding: 2px 4px 0; }
@@ -149,9 +153,9 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-dialogs .todo-tag-form button { padding: 0 9px; border: 0; border-radius: 6px; background: var(--todo-text); color: var(--todo-bg); font-size: 11px; font-weight: 600; cursor: pointer; }
 #codex-dashboard-todo-dialogs .todo-tag-dialog [data-todo-managed-tags] { min-height: 30px; margin-top: 12px; padding: 0; }
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 32px; height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
-#codex-dashboard-todo-page .todo-new-chat { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
-#codex-dashboard-todo-page .todo-item:hover .todo-new-chat, #codex-dashboard-todo-page .todo-item:focus-within .todo-new-chat, #codex-dashboard-todo-page .todo-new-chat:focus-visible { opacity: 1; }
-#codex-dashboard-todo-page .todo-new-chat:hover { background: var(--todo-active); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-chat-action { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
+#codex-dashboard-todo-page .todo-item:hover .todo-chat-action, #codex-dashboard-todo-page .todo-item:focus-within .todo-chat-action, #codex-dashboard-todo-page .todo-chat-action:focus-visible { opacity: 1; }
+#codex-dashboard-todo-page .todo-chat-action:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-item:hover .todo-delete,
 #codex-dashboard-todo-page .todo-item:focus-within .todo-delete,
 #codex-dashboard-todo-page .todo-delete:focus-visible,

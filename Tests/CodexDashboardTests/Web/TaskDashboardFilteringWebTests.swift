@@ -30,7 +30,7 @@ extension TaskDashboardWebTests {
                 initialCount,
                 loadMoreVisible,
                 expandedCount,
-                document.querySelector('[data-thread-list] .dashboard-thread:last-child')?.dataset.threadId,
+                document.querySelector('[data-thread-list] .dashboard-thread-row:last-child .dashboard-thread')?.dataset.threadId,
               ];
             })()
             """

@@ -13,11 +13,13 @@ const threadMarkup = (() => {
     showProject = false,
     isUnread = false,
     isCompletionTickVisible = () => false,
+    isChatInTodos = () => false,
     compact = false,
   } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open task: ${thread.title}`;
     const isCompleted = isCompletionTickVisible(thread);
     const isForcedHalt = thread.latestLifecycleEventKind === 'forcedHalt';
+    const isAddedToTodos = isChatInTodos(thread.id);
     const statusMarkup = thread.runState === 'running'
       ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`
       : isForcedHalt
@@ -25,7 +27,8 @@ const threadMarkup = (() => {
         : isCompleted
           ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
           : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
-    return `
+    return `<div class="dashboard-thread-row${compact ? ' is-compact' : ''}">
+      <button type="button" class="dashboard-add-todo${isAddedToTodos ? ' is-added' : ''}" data-add-chat-to-todos="${domUtils.escapeHTML(thread.id)}" aria-label="${isAddedToTodos ? `${domUtils.escapeHTML(thread.title)} is in to-dos` : `Add ${domUtils.escapeHTML(thread.title)} to to-dos`}" title="${isAddedToTodos ? 'Already in to-dos' : 'Add chat to to-dos'}"${isAddedToTodos ? ' disabled' : ''}><span aria-hidden="true">${isAddedToTodos ? '✓' : '+'}</span><span>${isAddedToTodos ? 'Added' : 'To-do'}</span></button>
       <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${domUtils.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${domUtils.escapeHTML(thread.id)}" data-open-thread="${domUtils.escapeHTML(thread.id)}" aria-label="${domUtils.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">
           <span class="dashboard-thread-title-row">
@@ -49,7 +52,8 @@ const threadMarkup = (() => {
         <span class="dashboard-thread-actions">
           ${statusMarkup}
         </span>
-      </button>`;
+      </button>
+    </div>`;
   }
 
   function groupThreadsByProject(threads) {
@@ -70,12 +74,26 @@ const threadMarkup = (() => {
       ${isMuted ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`}`;
   }
 
+  function renderProjectTodoPicker(projectThreads, isChatInTodos) {
+    return `<details class="dashboard-project-chat-picker">
+      <summary aria-label="Choose a chat from this project to add to to-dos" title="Add a project chat to to-dos"><span aria-hidden="true">+</span><span>To-do</span></summary>
+      <span class="dashboard-project-chat-menu" role="menu" aria-label="Project chats">
+        ${projectThreads.map((item) => {
+          const isAdded = isChatInTodos(item.id);
+          return `<button type="button" role="menuitem" data-add-chat-to-todos="${domUtils.escapeHTML(item.id)}"${isAdded ? ' disabled' : ''} title="${isAdded ? 'Already in to-dos' : 'Add chat to to-dos'}"><span class="dashboard-project-chat-title">${domUtils.escapeHTML(item.title)}</span><span class="dashboard-project-chat-state">${isAdded ? 'Added' : 'Add'}</span></button>`;
+        }).join('')}
+      </span>
+    </details>`;
+  }
+
   function list(visibleThreads, {
+    allThreads = visibleThreads,
     filterMode,
     collapsedProjectPaths,
     mutedProjectPaths,
     isUnread,
     isCompletionTickVisible,
+    isChatInTodos = () => false,
   }) {
     if (filterMode === 'recent') {
       return visibleThreads.map((item) => thread(item, {
@@ -83,11 +101,15 @@ const threadMarkup = (() => {
         showProject: true,
         isUnread: isUnread(item),
         isCompletionTickVisible,
+        isChatInTodos,
       })).join('');
     }
     if (filterMode === 'changedProjects') {
       const projects = groupThreadsByProject(visibleThreads);
       const projectCard = ({ path: projectPath, name: projectName, threads: projectThreads }) => {
+        const selectableProjectThreads = allThreads.filter(
+          (item) => String(item.projectPath).trim() === projectPath,
+        );
         return `
         <article class="dashboard-git-project">
           <div class="dashboard-git-project-copy">
@@ -99,6 +121,7 @@ const threadMarkup = (() => {
             <span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>
           </div>
           <span class="dashboard-project-summary">
+            ${renderProjectTodoPicker(selectableProjectThreads, isChatInTodos)}
             ${renderProjectActions(projectPath, projectThreads, mutedProjectPaths.has(projectPath))}
           </span>
         </article>`;
@@ -117,6 +140,9 @@ const threadMarkup = (() => {
           </details>` : ''}`;
     }
     return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
+      const selectableProjectThreads = allThreads.filter(
+        (item) => String(item.projectPath).trim() === projectPath,
+      );
       const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
@@ -138,10 +164,11 @@ const threadMarkup = (() => {
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'task' : 'tasks'}</span>
+            ${renderProjectTodoPicker(selectableProjectThreads, isChatInTodos)}
             ${renderProjectActions(projectPath, projectThreads, isMuted)}
           </span>
         </header>
-        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>
+        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible, isChatInTodos })).join('')}</div>
       </section>`;
     }).join('');
   }

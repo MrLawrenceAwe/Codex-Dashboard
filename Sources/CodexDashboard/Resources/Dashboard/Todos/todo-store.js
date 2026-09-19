@@ -4,8 +4,8 @@ const todoStore = (() => {
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 5;
-  const supportedVersions = new Set([1, 2, 3, 4, version]);
+  const version = 6;
+  const supportedVersions = new Set([1, 2, 3, 4, 5, version]);
   const maximumTags = 8;
   const maximumProjectNameLength = 40;
 
@@ -47,6 +47,12 @@ const todoStore = (() => {
     return id && name ? { id, name } : null;
   }
 
+  function normalizeChat(chat) {
+    const id = cleanText(chat?.id);
+    const title = cleanText(chat?.title).slice(0, 240);
+    return id && title ? { id, title } : null;
+  }
+
   function acceptedImageType(type) {
     return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type);
   }
@@ -63,6 +69,7 @@ const todoStore = (() => {
       completed: item?.completed === true,
       tags: normalizeTags(item?.tags),
       project: normalizeProject(item?.project),
+      chat: normalizeChat(item?.chat),
       image: normalizeImage(item?.image, true),
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -232,5 +239,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, save };
+  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save };
 })();
