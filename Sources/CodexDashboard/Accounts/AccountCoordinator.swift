@@ -257,7 +257,7 @@ final class AccountCoordinator: ObservableObject {
                     isActive: isActive,
                     usageLines: AccountUsageFormatter.lines(
                         for: usageStatus,
-                        staleLabel: isActive ? "Usage may be stale" : "Cached usage",
+                        staleTimestampPrefix: isActive ? "Usage may be stale · updated " : "Updated ",
                         includesAbsoluteDate: false
                     ),
                     isRefreshing: refreshingUsageAccountIDs.contains(account.id),
