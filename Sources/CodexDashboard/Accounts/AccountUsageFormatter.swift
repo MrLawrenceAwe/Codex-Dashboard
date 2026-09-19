@@ -4,7 +4,7 @@ enum AccountUsageFormatter {
     static func lines(
         for status: CodexAccountUsageStatus,
         now: Date = .now,
-        staleLabel: String = "Usage may be stale",
+        staleTimestampPrefix: String? = "Usage may be stale · updated ",
         includesAbsoluteDate: Bool = true,
         locale: Locale = .current,
         timeZone: TimeZone = .current
@@ -53,7 +53,9 @@ enum AccountUsageFormatter {
         case .available:
             if lines.isEmpty { lines.append("Usage details unavailable") }
         case .stale(let snapshot):
-            lines.append("\(staleLabel) · updated \(timeString(snapshot.fetchedAt))")
+            if let staleTimestampPrefix {
+                lines.append("\(staleTimestampPrefix)\(timeString(snapshot.fetchedAt))")
+            }
         case .unavailable:
             lines.append("Usage details unavailable")
         }

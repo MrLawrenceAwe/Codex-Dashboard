@@ -19,7 +19,7 @@ final class AccountUsageFormatterTests: XCTestCase {
         let lines = AccountUsageFormatter.lines(
             for: status,
             now: now,
-            staleLabel: "Usage may be stale",
+            staleTimestampPrefix: "Usage may be stale · updated ",
             includesAbsoluteDate: false,
             locale: Locale(identifier: "en_GB"),
             timeZone: TimeZone(secondsFromGMT: 0)!
@@ -79,7 +79,7 @@ final class AccountUsageFormatterTests: XCTestCase {
         XCTAssertTrue(lines.last?.hasPrefix("Usage may be stale · updated ") == true)
     }
 
-    func testInactiveAccountUsageIsClearlyMarkedAsCached() {
+    func testCachedAccountUsageUsesPlainUpdatedTimestamp() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let snapshot = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -92,12 +92,12 @@ final class AccountUsageFormatterTests: XCTestCase {
         let lines = AccountUsageFormatter.lines(
             for: .stale(snapshot),
             now: now,
-            staleLabel: "Cached usage"
+            staleTimestampPrefix: "Updated "
         )
 
         XCTAssertEqual(lines[0], "5-hour: 90% remaining")
         XCTAssertEqual(lines[1], "Weekly: 70% remaining")
-        XCTAssertTrue(lines[2].hasPrefix("Cached usage · updated "))
+        XCTAssertTrue(lines[2].hasPrefix("Updated "))
     }
 
     func testLoadingAndUnavailableAccountUsageHaveUsefulPlaceholders() {
