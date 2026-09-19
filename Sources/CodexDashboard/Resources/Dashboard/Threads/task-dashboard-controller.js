@@ -47,12 +47,12 @@ function syncSidebarMarkers() {
     }
     if (!marker) {
       const title = row.querySelector('[data-thread-title-trigger]');
-      const markerHost = title?.parentElement?.parentElement?.lastElementChild;
+      const markerHost = title?.parentElement;
       if (!markerHost) return;
       marker = document.createElement('span');
       marker.setAttribute('data-codex-sidebar-interrupted', '');
       marker.textContent = 'Interrupted';
-      markerHost.append(marker);
+      markerHost.insertBefore(marker, title);
     }
     marker.setAttribute('role', 'status');
     marker.setAttribute('aria-label', 'Interrupted because the usage limit was reached');

@@ -84,10 +84,6 @@ aside [data-codex-sidebar-interrupted] {
   white-space: nowrap;
 }
 
-aside [data-app-action-sidebar-thread-id]:is(:hover, :focus-within) [data-codex-sidebar-interrupted] {
-  display: none;
-}
-
 #codex-dashboard-page {
   position: fixed;
   z-index: 2147483644;
