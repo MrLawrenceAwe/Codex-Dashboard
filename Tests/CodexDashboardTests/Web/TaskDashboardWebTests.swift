@@ -61,6 +61,45 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(retained, true)
     }
 
+    func testChangedSnapshotRetainsUnaffectedThreadElements() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let initialPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "changed", title: "Before", recencyEpochMillis: 2),
+            .fixture(id: "stable", title: "Stable", recencyEpochMillis: 1),
+        ])
+        let updatedPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "changed", title: "After", recencyEpochMillis: 2),
+            .fixture(id: "stable", title: "Stable", recencyEpochMillis: 1),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(initialPayload)).threads);
+              window.__codexDashboard.open();
+              window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
+              window.__changedThreadElement = document.querySelector('[data-thread-id="changed"]');
+              window.__codexDashboard.applyThreads((\(updatedPayload)).threads);
+            })()
+            """
+        )
+
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-thread-id=\"changed\"] .dashboard-thread-heading').textContent === 'After'",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            [
+              window.__stableThreadElement === document.querySelector('[data-thread-id="stable"]'),
+              window.__changedThreadElement !== document.querySelector('[data-thread-id="changed"]'),
+              document.querySelector('[data-thread-id="changed"] .dashboard-thread-heading').textContent,
+            ]
+            """
+        ) as? [AnyHashable]
+
+        XCTAssertEqual(result, [true, true, "After"])
+    }
+
     func testOpenDashboardCoalescesSnapshotBurstToLatestTaskList() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let now = Int64(Date.now.timeIntervalSince1970 * 1_000)

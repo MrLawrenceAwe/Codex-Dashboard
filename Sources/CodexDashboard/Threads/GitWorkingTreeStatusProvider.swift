@@ -138,17 +138,34 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         timeout: TimeInterval
     ) async -> WorkingTreeStatus {
         do {
-            let result = try await Subprocess.run(
+            // Separate tracked and untracked checks. `git status --untracked-files=normal`
+            // recursively expands untracked directories, which is needlessly expensive
+            // for generated trees. `ls-files --directory` can stop at an untracked
+            // directory while preserving the dashboard's dirty/clean contract.
+            let tracked = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/git"),
                 arguments: [
                     "--no-optional-locks", "-C", path,
-                    "status", "--porcelain=v1", "--untracked-files=normal",
+                    "status", "--porcelain=v1", "--untracked-files=no", "--no-ahead-behind",
                     "--", ".", ":(exclude).DS_Store", ":(exclude)**/.DS_Store",
                 ],
                 timeout: timeout
             )
-            guard result.terminationStatus == 0 else { return .unavailable }
-            return result.standardOutput.isEmpty ? .clean : .hasChanges
+            guard tracked.terminationStatus == 0 else { return .unavailable }
+            guard tracked.standardOutput.isEmpty else { return .hasChanges }
+
+            let untracked = try await Subprocess.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                arguments: [
+                    "--no-optional-locks", "-C", path,
+                    "ls-files", "--others", "--exclude-standard", "--directory",
+                    "--no-empty-directory", "--", ".",
+                    ":(exclude).DS_Store", ":(exclude)**/.DS_Store",
+                ],
+                timeout: timeout
+            )
+            guard untracked.terminationStatus == 0 else { return .unavailable }
+            return untracked.standardOutput.isEmpty ? .clean : .hasChanges
         } catch {
             return .unavailable
         }
