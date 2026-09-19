@@ -7,18 +7,17 @@ const accountPopover = (() => {
   let outsidePointerHandler;
   let outsidePointerTimer;
   let escapeHandler;
-  let retainPanelAfterRefresh = false;
+  let retainPanelUntilActionCompletes = false;
   const actions = [];
   const actionWaiters = [];
 
   function queue(kind, accountID = null) {
     if (snapshot.isBusy || actions.length) return;
-    if (kind === 'updateUsage' || kind === 'refreshInactiveUsage') {
-      // Codex closes its profile menu for this click, which removes our trigger.
-      // The account panel is a separate overlay and must remain available while
-      // the requested usage refresh completes.
-      retainPanelAfterRefresh = true;
-    }
+    // Codex closes its profile menu for clicks inside our separate overlay,
+    // removing the trigger along with it. Keep the account panel mounted until
+    // native code publishes the action's resulting snapshot so failures (for
+    // example, an account switch blocked by an active task) remain visible.
+    retainPanelUntilActionCompletes = true;
     actions.push({ kind, accountID });
     renderPanel();
     resolveActionWaiters();
@@ -214,7 +213,7 @@ const accountPopover = (() => {
       ))
     ));
     if (triggerWasRemoved) {
-      if (!retainPanelAfterRefresh) closePanel();
+      if (!retainPanelUntilActionCompletes) closePanel();
     }
     const shouldMountTrigger = !document.querySelector(`[${triggerAttribute}]`) && records.some((record) => (
       (record.type === 'attributes' ? [record.target] : [...record.addedNodes]).some((node) => {
@@ -239,8 +238,8 @@ const accountPopover = (() => {
     const changed = candidateFingerprint !== snapshotFingerprint;
     snapshot = candidate;
     snapshotFingerprint = candidateFingerprint;
-    // The native refresh has completed once its resulting snapshot arrives.
-    retainPanelAfterRefresh = false;
+    // The native action has completed once its resulting snapshot arrives.
+    retainPanelUntilActionCompletes = false;
     mountTrigger();
     if (changed) renderPanel();
     return true;

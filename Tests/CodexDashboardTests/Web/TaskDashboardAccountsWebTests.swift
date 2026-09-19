@@ -276,6 +276,53 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(panelIsOpen, true)
     }
 
+    func testBlockedSwitchKeepsAccountPanelOpenToShowFailure() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div id="profile-portal">
+            <div role="menu">
+              <button><span>Settings</span></button>
+              <button>Log out</button>
+            </div>
+          </div>
+        </body></html>
+        """)
+
+        let result = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Personal', isActive: false, usageLines: [],
+            isRefreshing: false, errorMessage: null,
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        document.querySelector('[data-account-action="switch"]').click();
+        document.querySelector('#profile-portal').remove();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Personal', isActive: false, usageLines: [],
+            isRefreshing: false, errorMessage: null,
+          }],
+          activeAccountID: null,
+          statusMessage: 'Finish or cancel active Codex tasks before changing accounts.',
+          isBusy: false,
+        });
+        const panel = document.querySelector('#codex-accounts-panel');
+        return [retainedWhilePending, Boolean(panel), panel?.textContent ?? ''];
+        """, contentWorld: .page) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex tasks") == true)
+    }
+
     func testCommitNoticeRemainsAvailable() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let result = try await webView.evaluateJavaScript(
