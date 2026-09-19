@@ -9,6 +9,7 @@ enum CodexTestFixtures {
         finalResponseAtUnixSeconds: Int64,
         compactionAtUnixSeconds: Int64? = nil,
         finalResponseMessageSize: Int = 4,
+        taskCompletionErrorCode: String? = nil,
         testCase: XCTestCase
     ) throws -> URL {
         let rolloutURL = FileManager.default.temporaryDirectory
@@ -31,10 +32,14 @@ enum CodexTestFixtures {
             let eventTimestamp = timestampFormatter.string(
                 from: Date(timeIntervalSince1970: TimeInterval(finalResponseAtUnixSeconds + Int64(index + 1)))
             )
+            var payload: [String: Any] = ["type": event]
+            if event == "task_complete", let taskCompletionErrorCode {
+                payload["error"] = ["codex_error_info": taskCompletionErrorCode]
+            }
             let data = try JSONSerialization.data(withJSONObject: [
                 "timestamp": eventTimestamp,
                 "type": "event_msg",
-                "payload": ["type": event],
+                "payload": payload,
             ])
             return String(decoding: data, as: UTF8.self)
         }
@@ -90,6 +95,7 @@ enum CodexTestFixtures {
         runningFinalResponseAtUnixSeconds: Int64? = nil,
         runningCompactionAtUnixSeconds: Int64? = nil,
         runningFinalResponseMessageSize: Int = 4,
+        runningTaskCompletionErrorCode: String? = nil,
         testCase: XCTestCase
     ) throws -> URL {
         let runningRollout = try makeRollout(
@@ -97,6 +103,7 @@ enum CodexTestFixtures {
             finalResponseAtUnixSeconds: runningFinalResponseAtUnixSeconds ?? now - 300,
             compactionAtUnixSeconds: runningCompactionAtUnixSeconds,
             finalResponseMessageSize: runningFinalResponseMessageSize,
+            taskCompletionErrorCode: runningTaskCompletionErrorCode,
             testCase: testCase
         )
         let completedRollout = try makeRollout(

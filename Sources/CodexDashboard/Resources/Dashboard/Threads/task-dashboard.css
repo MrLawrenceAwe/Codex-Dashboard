@@ -175,6 +175,8 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
 #codex-dashboard-page .dashboard-run-spinner::before { width: 12px; height: 12px; box-sizing: border-box; content: ""; border: 1.5px solid color-mix(in srgb, var(--dashboard-green) 20%, transparent); border-top-color: currentColor; border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
 #codex-dashboard-page .dashboard-completed-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; color: var(--dashboard-green); }
 #codex-dashboard-page .dashboard-completed-status svg { width: 18px; height: 18px; stroke-width: 2; }
+#codex-dashboard-page .dashboard-forced-halt-status { display: inline-flex; min-height: 22px; align-items: center; gap: 5px; padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 30%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--dashboard-amber) 9%, transparent); color: var(--dashboard-amber); font-size: 10px; font-weight: 620; white-space: nowrap; }
+#codex-dashboard-page .dashboard-forced-halt-status svg { width: 13px; height: 13px; flex: 0 0 13px; stroke-width: 2; }
 #codex-dashboard-page .dashboard-open-affordance { display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--dashboard-dim); opacity: .58; transition: color 100ms ease, opacity 100ms ease; }
 #codex-dashboard-page .dashboard-thread:hover .dashboard-open-affordance, #codex-dashboard-page .dashboard-thread:focus-visible .dashboard-open-affordance { color: var(--dashboard-text); opacity: 1; }
 #codex-dashboard-page .dashboard-open-affordance svg { width: 15px; height: 15px; }

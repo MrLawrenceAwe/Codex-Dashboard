@@ -105,6 +105,34 @@ final class RolloutActivityReaderTests: XCTestCase {
         XCTAssertEqual(reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind, .aborted)
     }
 
+    func testUsageLimitCompletionIsAForcedHalt() throws {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let rolloutURL = try makeRollout(lines: [
+            #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_started"}}"#,
+            #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_complete","last_agent_message":null,"error":{"message":"You've hit your usage limit.","codex_error_info":"usage_limit_exceeded"}}}"#,
+        ])
+        var reader = RolloutActivityReader()
+
+        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
+        XCTAssertEqual(
+            reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind,
+            .forcedHalt
+        )
+    }
+
+    func testOtherFailedCompletionRemainsCompleted() throws {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let rolloutURL = try makeRollout(lines: [
+            #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"other_error"}}}"#,
+        ])
+        var reader = RolloutActivityReader()
+
+        XCTAssertEqual(
+            reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind,
+            .completed
+        )
+    }
+
     func testAppendedCompletionReusesCachedHistoryAndClearsRunningState() throws {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

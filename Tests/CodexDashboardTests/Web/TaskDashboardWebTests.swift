@@ -319,6 +319,40 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], [true, false, "Completed"])
     }
 
+    func testUsageLimitedThreadShowsPersistentForcedHaltMarker() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "usage-halted",
+                title: "Interrupted work",
+                isUnread: false,
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+            ),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              const row = document.querySelector('[data-thread-id="usage-halted"]');
+              const marker = row.querySelector('.dashboard-forced-halt-status');
+              return [
+                marker?.textContent.trim(),
+                marker?.getAttribute('aria-label'),
+                Boolean(row.querySelector('.dashboard-open-affordance')),
+                Boolean(row.querySelector('.dashboard-completed-status')),
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(
+            try XCTUnwrap(result) as? [AnyHashable],
+            ["Interrupted", "Interrupted because the usage limit was reached", false, false]
+        )
+    }
+
     func testCompletedTickExpiresOneMinuteAfterThreadIsRead() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let unreadPayload = try DashboardWebTestHarness.snapshotPayload(for: [

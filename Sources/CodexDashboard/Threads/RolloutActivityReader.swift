@@ -8,7 +8,16 @@ struct RolloutActivityReader {
 
     private struct Envelope: Decodable {
         struct Payload: Decodable {
+            struct Failure: Decodable {
+                let codexErrorInfo: String?
+
+                private enum CodingKeys: String, CodingKey {
+                    case codexErrorInfo = "codex_error_info"
+                }
+            }
+
             let type: String?
+            let error: Failure?
         }
 
         let timestamp: String?
@@ -87,6 +96,11 @@ struct RolloutActivityReader {
             event.timestamp >= codexLaunchDate
         else { return nil }
         return event
+    }
+
+    mutating func latestRecordedEvent(at path: String) -> ThreadLifecycleEvent? {
+        _ = load(at: path, codexLaunchDate: nil)
+        return cache[path]?.event
     }
 
     private func read(
@@ -203,7 +217,10 @@ struct RolloutActivityReader {
         let kind: ThreadLifecycleEventKind
         switch payloadType {
         case Self.startedEventType: kind = .started
-        case "task_complete": kind = .completed
+        case "task_complete":
+            kind = envelope.payload?.error?.codexErrorInfo == "usage_limit_exceeded"
+                ? .forcedHalt
+                : .completed
         case "turn_aborted": kind = .aborted
         default: return nil
         }
