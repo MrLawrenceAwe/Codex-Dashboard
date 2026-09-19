@@ -14,7 +14,7 @@ final class AppServerUsageProviderTests: XCTestCase {
         }
         XCTAssertEqual(
             error.localizedDescription,
-            "Sign-in expired. Switch to this account to sign in again."
+            "Sign-in expired. Select Sign in to authenticate this account again."
         )
         XCTAssertFalse(error.localizedDescription.contains("token_revoked"))
         XCTAssertFalse(error.localizedDescription.contains("401"))

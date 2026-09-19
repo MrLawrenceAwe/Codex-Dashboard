@@ -50,8 +50,79 @@ private struct InteractiveOnlyCredentialVault: AccountCredentialVault {
     }
 }
 
+private struct ExpiredAccountUsageProvider: AccountUsageProviding {
+    func usage() async throws -> CodexAccountUsage {
+        CodexAccountUsage(fiveHour: nil, weekly: nil)
+    }
+
+    func usage(using credential: Data) async throws -> SavedAccountUsageResult {
+        throw CodexAccountUsageError.authenticationExpired
+    }
+
+    func reset() async {}
+}
+
 @MainActor
 final class AccountCoordinatorTests: XCTestCase {
+    func testExpiredInactiveAccountRequiresSignInInsteadOfCredentialSwitch() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        let vault = CoordinatorMemoryCredentialVault()
+        let manager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("accounts.json"),
+            authenticationURL: auth,
+            vault: vault
+        )
+        try testAccountCredential(accountID: "expired", name: "Expired").write(to: auth)
+        let expired = try manager.saveCurrentAccount()
+        try testAccountCredential(accountID: "active", name: "Active").write(to: auth)
+        _ = try manager.saveCurrentAccount()
+        let coordinator = AccountCoordinator(
+            manager: manager,
+            usageProvider: ExpiredAccountUsageProvider()
+        )
+
+        _ = await coordinator.refreshInactiveAccountUsage(
+            expired.id,
+            interactionAllowed: true
+        )
+
+        let item = try XCTUnwrap(
+            coordinator.popoverSnapshot(isBusy: false).accounts.first { $0.id == expired.id }
+        )
+        XCTAssertTrue(item.requiresSignIn)
+        XCTAssertEqual(
+            item.errorMessage,
+            "Sign-in expired. Select Sign in to authenticate this account again."
+        )
+
+        var refreshedCredentialObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: testAccountCredential(accountID: "expired", name: "Expired")
+            ) as? [String: Any]
+        )
+        refreshedCredentialObject["last_refresh"] = "fresh"
+        let refreshedCredential = try JSONSerialization.data(
+            withJSONObject: refreshedCredentialObject
+        )
+        try refreshedCredential.write(to: auth)
+        coordinator.refreshState()
+
+        XCTAssertTrue(coordinator.synchronizeActiveCredentialAfterFileChange())
+        let refreshedItem = try XCTUnwrap(
+            coordinator.popoverSnapshot(isBusy: false).accounts.first { $0.id == expired.id }
+        )
+        XCTAssertFalse(refreshedItem.requiresSignIn)
+        XCTAssertNil(refreshedItem.errorMessage)
+        XCTAssertEqual(vault.credential(for: expired.id), refreshedCredential)
+        XCTAssertEqual(
+            coordinator.statusMessage,
+            "Signed in as Expired. Saved the refreshed credential securely in Keychain."
+        )
+    }
+
     func testInteractiveBatchRefreshCanReadProtectedAccountsAndPersistsOnce() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

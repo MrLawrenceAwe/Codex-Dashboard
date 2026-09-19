@@ -13,6 +13,7 @@ struct AccountPopoverItem: Codable, Equatable, Sendable {
     let isActive: Bool
     let usageLines: [String]
     let isRefreshing: Bool
+    let requiresSignIn: Bool
     let errorMessage: String?
 }
 

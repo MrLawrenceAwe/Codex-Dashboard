@@ -8,8 +8,8 @@ const accountPopover = (() => {
   let outsidePointerTimer;
   let escapeHandler;
   let retainPanelUntilActionCompletes = false;
+  let actionProgress = null;
   const actions = [];
-  const actionWaiters = [];
 
   function queue(kind, accountID = null) {
     if (snapshot.isBusy || actions.length) return;
@@ -19,36 +19,19 @@ const accountPopover = (() => {
     // example, an account switch blocked by an active task) remain visible.
     retainPanelUntilActionCompletes = true;
     actions.push({ kind, accountID });
+    actionProgress = kind === 'addAccount'
+      ? 'Sign-in request queued…'
+      : 'Account request queued…';
     renderPanel();
-    resolveActionWaiters();
   }
 
-  function resolveActionWaiters() {
-    while (actions.length && actionWaiters.length) {
-      const waiter = actionWaiters.shift();
-      clearTimeout(waiter.timer);
-      waiter.resolve(JSON.stringify(actions.shift()));
+  function takeNextAction() {
+    const action = actions.shift() ?? null;
+    if (action) {
+      actionProgress = 'Request received. Checking Codex state…';
+      renderPanel();
     }
-  }
-
-  function waitForAction(timeout = 30000) {
-    if (actions.length) return Promise.resolve(JSON.stringify(actions.shift()));
-    return new Promise((resolve) => {
-      const waiter = { resolve, timer: undefined };
-      waiter.timer = setTimeout(() => {
-        const index = actionWaiters.indexOf(waiter);
-        if (index >= 0) actionWaiters.splice(index, 1);
-        resolve('null');
-      }, timeout);
-      actionWaiters.push(waiter);
-    });
-  }
-
-  function releaseActionWaiters() {
-    actionWaiters.splice(0).forEach((waiter) => {
-      clearTimeout(waiter.timer);
-      waiter.resolve('null');
-    });
+    return JSON.stringify(action);
   }
 
   function accountMarkup(account) {
@@ -64,7 +47,7 @@ const accountPopover = (() => {
       <div class="codex-accounts-usage-list">${usage}</div>
       ${account.errorMessage ? `<div class="codex-accounts-error">${domUtils.escapeHTML(account.errorMessage)}</div>` : ''}
       <div class="codex-accounts-actions">
-        ${account.isActive ? '' : `<button class="is-primary" data-account-action="switch"${disabled}>Switch</button>`}
+        ${account.isActive ? '' : `<button class="is-primary" data-account-action="${account.requiresSignIn ? 'sign-in' : 'switch'}"${disabled}>${account.requiresSignIn ? 'Sign in' : 'Switch'}</button>`}
         <button data-account-action="update"${disabled}>${account.isRefreshing ? 'Updating…' : 'Refresh'}</button>
         <button class="is-danger" data-account-action="forget"${disabled}>Forget</button>
       </div>
@@ -81,6 +64,24 @@ const accountPopover = (() => {
     </div>`;
   }
 
+  function usesLightHostSurface(trigger) {
+    let element = trigger.closest('[role="menu"]') || trigger;
+    while (element) {
+      const match = getComputedStyle(element).backgroundColor.match(
+        /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/,
+      );
+      if (match && (match[4] === undefined || Number(match[4]) > 0)) {
+        const [red, green, blue] = match.slice(1, 4).map(Number);
+        // A menu surface is light when its perceived brightness is above the
+        // midpoint. Reading the rendered host avoids relying on private CSS
+        // class names that can change between Codex releases.
+        return (red * 0.2126 + green * 0.7152 + blue * 0.0722) > 128;
+      }
+      element = element.parentElement;
+    }
+    return !matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
   function renderPanel() {
     const panel = document.getElementById(panelID);
     if (!panel) return;
@@ -89,19 +90,35 @@ const accountPopover = (() => {
       <div class="codex-accounts-list">${snapshot.accounts.length
         ? snapshot.accounts.map(accountMarkup).join('')
         : '<div class="codex-accounts-empty">No saved accounts yet.</div>'}</div>
-      ${snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(snapshot.statusMessage)}</div>` : ''}
+      ${actionProgress || snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(actionProgress || snapshot.statusMessage)}</div>` : ''}
       <footer>
         <button data-account-global="save"${disabled}><span>✓</span>Save current account</button>
         <button data-account-global="add"${disabled}><span>＋</span>Add another account</button>
         ${snapshot.accounts.length > 1 ? `<button data-account-global="update-all"${disabled}><span>↻</span>Refresh other accounts</button>` : ''}
       </footer>`;
     panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);
-    panel.querySelectorAll('[data-account-action]').forEach((button) => button.addEventListener('click', () => {
-      const id = button.closest('[data-account-id]')?.dataset.accountId;
-      const action = button.dataset.accountAction;
-      if (action === 'forget' && !window.confirm('Forget this saved account?')) return;
-      queue(action === 'update' ? 'updateUsage' : action === 'switch' ? 'switchAccount' : 'forgetAccount', id);
-    }));
+    panel.querySelectorAll('[data-account-action]').forEach((button) => {
+      const handleAction = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.dataset.accountHandled === 'true') return;
+        const id = button.closest('[data-account-id]')?.dataset.accountId;
+        const action = button.dataset.accountAction;
+        if (action === 'forget' && !window.confirm('Forget this saved account?')) return;
+        button.dataset.accountHandled = 'true';
+        queue(action === 'update'
+          ? 'updateUsage'
+          : action === 'switch'
+            ? 'switchAccount'
+            : action === 'sign-in'
+              ? 'addAccount'
+              : 'forgetAccount', id);
+      };
+      // Queue on pointerdown before Codex's profile-menu dismissal can cancel
+      // the subsequent click. Keep click for keyboard activation.
+      button.addEventListener('pointerdown', handleAction);
+      button.addEventListener('click', handleAction);
+    });
     panel.querySelectorAll('[data-account-global]').forEach((button) => button.addEventListener('click', () => {
       const kinds = { save: 'saveCurrentAccount', add: 'addAccount', 'update-all': 'refreshInactiveUsage' };
       if (button.dataset.accountGlobal === 'add'
@@ -114,6 +131,7 @@ const accountPopover = (() => {
     closePanel();
     const panel = document.createElement('div');
     panel.id = panelID;
+    panel.classList.toggle('is-light', usesLightHostSurface(trigger));
     const rect = trigger.closest('[role="menu"]')?.getBoundingClientRect()
       || trigger.getBoundingClientRect();
     const inset = 12;
@@ -127,6 +145,11 @@ const accountPopover = (() => {
       Math.max(inset, innerWidth - width - inset),
     )}px`;
     panel.style.bottom = `${Math.max(12, innerHeight - rect.bottom)}px`;
+    // The panel lives outside Codex's profile-menu portal. Prevent the host's
+    // click-away handler from treating presses inside this overlay as outside
+    // profile-menu interactions and removing the controls before `click` fires.
+    panel.addEventListener('pointerdown', (event) => event.stopPropagation());
+    panel.addEventListener('mousedown', (event) => event.stopPropagation());
     document.body.append(panel);
     renderPanel();
     outsidePointerHandler = (event) => {
@@ -240,6 +263,7 @@ const accountPopover = (() => {
     snapshotFingerprint = candidateFingerprint;
     // The native action has completed once its resulting snapshot arrives.
     retainPanelUntilActionCompletes = false;
+    actionProgress = null;
     mountTrigger();
     if (changed) renderPanel();
     return true;
@@ -270,8 +294,7 @@ const accountPopover = (() => {
     observer = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();
     closePanel();
-    releaseActionWaiters();
   }
 
-  return { applySnapshot, waitForAction, mount, unmount };
+  return { applySnapshot, takeNextAction, mount, unmount };
 })();

@@ -50,7 +50,7 @@ extension TaskDashboardWebTests {
               document.querySelector('[data-account-save]') === null,
               document.querySelector('[data-account-add]') === null,
               document.querySelector('[data-account-notice]') === null,
-              typeof window.__codexDashboard.waitForAccountPopoverAction,
+              typeof window.__codexDashboard.takeNextAccountPopoverAction,
             ]
             """
         ) as? [Any]
@@ -112,23 +112,39 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
-        let pendingAction = Task { @MainActor in
-            try await webView.callAsyncJavaScript(
-                "return await window.__codexDashboard.waitForAccountPopoverAction();",
-                contentWorld: .page
-            ) as? String
-        }
-        try await Task.sleep(for: .milliseconds(50))
         _ = try await webView.evaluateJavaScript(
             "document.querySelector('[data-account-action=\"update\"]').click()"
         )
-        let serializedAction = try await pendingAction.value
+        let serializedAction = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.takeNextAccountPopoverAction()"
+        ) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: String.Encoding.utf8))
         let action = try XCTUnwrap(
             JSONSerialization.jsonObject(with: actionData) as? [String: Any]
         )
         XCTAssertEqual(action["kind"] as? String, "updateUsage")
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
+    }
+
+    func testAccountsPopoverMatchesTheRenderedHostSurface() async throws {
+        for (hostBackground, expectedPanelClass) in [("rgb(25, 25, 25)", false), ("rgb(250, 250, 250)", true)] {
+            let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+            <!doctype html><html><head><meta charset="utf-8"><style>
+              [role=menu] { background: \(hostBackground); }
+            </style></head><body>
+              <div role="menu"><button>Settings</button><button>Log out</button></div>
+            </body></html>
+            """)
+
+            let isLight = try await webView.evaluateJavaScript("""
+            (() => {
+              document.querySelector('[data-codex-accounts-trigger]').click();
+              return document.querySelector('#codex-accounts-panel').classList.contains('is-light');
+            })()
+            """) as? Bool
+
+            XCTAssertEqual(isLight, expectedPanelClass, "Host background: \(hostBackground)")
+        }
     }
 
     func testAccountsMountImmediatelyForDeeplyWrappedButtonMenu() async throws {
@@ -321,6 +337,83 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex tasks") == true)
+    }
+
+    func testExpiredAccountUsesSignInFlowInsteadOfSwitchingDeadCredential() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div role="menu">
+            <button><span>Settings</span></button>
+            <button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let label = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Expired', isActive: false, usageLines: [],
+            isRefreshing: false, requiresSignIn: true,
+            errorMessage: 'Sign-in expired.',
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        const button = document.querySelector('[data-account-action="sign-in"]');
+        const text = button.textContent;
+        button.click();
+        return text;
+        """, contentWorld: .page) as? String
+        let serializedAction = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.takeNextAccountPopoverAction()"
+        ) as? String
+        let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
+
+        XCTAssertEqual(label, "Sign in")
+        XCTAssertEqual(action["kind"] as? String, "addAccount")
+    }
+
+    func testAccountActionSurvivesHostProfileMenuPointerDismissal() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div role="menu">
+            <button><span>Settings</span></button>
+            <button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let serializedAction = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Expired', isActive: false, usageLines: [],
+            isRefreshing: false, requiresSignIn: true,
+            errorMessage: 'Sign-in expired.',
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        document.addEventListener('pointerdown', () => {
+          document.querySelector('#codex-accounts-panel')?.remove();
+        });
+        const button = document.querySelector('[data-account-action="sign-in"]');
+        button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        if (button.isConnected) button.click();
+        return window.__codexDashboard.takeNextAccountPopoverAction();
+        """, contentWorld: .page) as? String
+        let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
+
+        XCTAssertEqual(action["kind"] as? String, "addAccount")
     }
 
     func testCommitNoticeRemainsAvailable() async throws {

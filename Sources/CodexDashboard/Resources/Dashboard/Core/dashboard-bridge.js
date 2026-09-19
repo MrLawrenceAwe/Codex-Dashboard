@@ -7,7 +7,7 @@ window.__codexDashboard = {
   openTodos: dashboardNavigation.openTodos,
   applyThreads: taskDashboard.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
-  waitForAccountPopoverAction: accountPopover.waitForAction,
+  takeNextAccountPopoverAction: accountPopover.takeNextAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   exportPendingPromptLibrary: () => {
     const library = promptStore.pendingLibrary();

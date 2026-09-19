@@ -15,6 +15,7 @@ final class AccountCoordinator: ObservableObject {
     @Published private(set) var activeUsageStatus: CodexAccountUsageStatus = .unavailable
     @Published private(set) var refreshingUsageAccountIDs: Set<UUID> = []
     @Published private(set) var usageErrorsByAccountID: [UUID: String] = [:]
+    @Published private(set) var accountsRequiringSignIn: Set<UUID> = []
 
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
@@ -49,6 +50,7 @@ final class AccountCoordinator: ObservableObject {
                 return $0.lastUsedAt > $1.lastUsedAt
             }
             if savedAccounts != accounts { savedAccounts = accounts }
+            accountsRequiringSignIn.formIntersection(accounts.map(\.id))
             let identityChanged = activeCodexAccountID != identifier
             let savedAccountChanged = activeAccountID != document.activeAccountID
             activeCodexAccountID = identifier
@@ -70,11 +72,34 @@ final class AccountCoordinator: ObservableObject {
             let existingUsage = activeUsageStatus.snapshot
             let account = try manager.saveCurrentAccount()
             if let existingUsage { usageByAccountID[account.id] = existingUsage }
+            accountsRequiringSignIn.remove(account.id)
+            usageErrorsByAccountID[account.id] = nil
             refreshState()
             persistUsageCache(force: true)
             statusMessage = "Saved \(account.name) securely in Keychain."
             if let existingUsage { activeUsageStatus = .available(existingUsage) }
             return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func synchronizeActiveCredentialAfterFileChange() -> Bool {
+        do {
+            let account = try manager.saveCurrentAccount()
+            let completedReauthentication = accountsRequiringSignIn.contains(account.id)
+            accountsRequiringSignIn.remove(account.id)
+            usageErrorsByAccountID[account.id] = nil
+            refreshState()
+            persistUsageCache(force: true)
+            if completedReauthentication {
+                statusMessage = "Signed in as \(account.name). Saved the refreshed credential securely in Keychain."
+            }
+            return true
+        } catch CodexAccountError.noActiveCredential {
+            return false
         } catch {
             statusMessage = error.localizedDescription
             return false
@@ -88,6 +113,7 @@ final class AccountCoordinator: ObservableObject {
             usageByAccountID[accountID] = nil
             refreshingUsageAccountIDs.remove(accountID)
             usageErrorsByAccountID[accountID] = nil
+            accountsRequiringSignIn.remove(accountID)
             persistUsageCache(force: true)
             refreshState()
             if activeAccountID == nil { activeUsageStatus = .unavailable }
@@ -213,6 +239,7 @@ final class AccountCoordinator: ObservableObject {
                 fetchedAt: .now
             )
             usageErrorsByAccountID[accountID] = nil
+            accountsRequiringSignIn.remove(accountID)
             if persistsUsageCache { persistUsageCache(force: true) }
         } catch CodexAccountError.keychainAuthorizationRequired {
             return .authorizationRequired
@@ -222,6 +249,9 @@ final class AccountCoordinator: ObservableObject {
                   savedAccounts.contains(where: { $0.id == accountID })
             else { return .notRequired }
             usageErrorsByAccountID[accountID] = error.localizedDescription
+            if case CodexAccountUsageError.authenticationExpired = error {
+                accountsRequiringSignIn.insert(accountID)
+            }
             if reportsFailure,
                let account = savedAccounts.first(where: { $0.id == accountID }) {
                 statusMessage = "Could not update usage for \(account.name): \(error.localizedDescription)"
@@ -261,6 +291,7 @@ final class AccountCoordinator: ObservableObject {
                         includesAbsoluteDate: false
                     ),
                     isRefreshing: refreshingUsageAccountIDs.contains(account.id),
+                    requiresSignIn: accountsRequiringSignIn.contains(account.id),
                     errorMessage: usageErrorsByAccountID[account.id]
                 )
             },
