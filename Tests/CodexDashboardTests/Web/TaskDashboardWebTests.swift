@@ -360,7 +360,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               <aside role="navigation">
                 <button data-app-action-sidebar-thread-id="local:usage-halted">
                   <span data-row-content>
-                    <span><span data-thread-title-trigger>Interrupted work</span></span>
+                    <span><span data-thread-title-trigger><span data-thread-title>Interrupted work</span></span></span>
                     <span data-status-rail></span>
                   </span>
                 </button>
@@ -389,7 +389,10 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(haltedPayload)).threads);
               const marker = document.querySelector('[data-codex-sidebar-interrupted]');
               return [
-                Boolean(marker?.closest('[data-status-rail]')),
+                Boolean(marker?.parentElement?.querySelector('[data-thread-title-trigger]')),
+                marker?.nextElementSibling?.matches('[data-thread-title-trigger]') === true,
+                marker?.closest('[data-thread-title-trigger]') === null,
+                marker?.closest('[data-status-rail]') === null,
                 marker?.textContent,
                 marker?.getAttribute('aria-label'),
               ];
@@ -398,28 +401,15 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
         XCTAssertEqual(
             initial as? [AnyHashable],
-            [true, "Interrupted", "Interrupted because the usage limit was reached"]
+            [true, true, true, true, "Interrupted", "Interrupted because the usage limit was reached"]
         )
-
-        let interactionRule = try await webView.evaluateJavaScript(
-            """
-            [...document.styleSheets].some((sheet) =>
-              [...sheet.cssRules].some((rule) =>
-                rule.selectorText?.includes('[data-app-action-sidebar-thread-id]:is(:hover, :focus-within)')
-                  && rule.selectorText?.includes('[data-codex-sidebar-interrupted]')
-                  && rule.style.display === 'none'
-              )
-            )
-            """
-        ) as? Bool
-        XCTAssertEqual(interactionRule, true)
 
         _ = try await webView.evaluateJavaScript(
             """
             document.querySelector('[data-app-action-sidebar-thread-id]').outerHTML =
               '<button data-app-action-sidebar-thread-id="local:usage-halted">'
                 + '<span data-row-content>'
-                + '<span><span data-thread-title-trigger>Interrupted work</span></span>'
+                + '<span><span data-thread-title-trigger><span data-thread-title>Interrupted work</span></span></span>'
                 + '<span data-status-rail></span>'
                 + '</span>'
                 + '</button>';
