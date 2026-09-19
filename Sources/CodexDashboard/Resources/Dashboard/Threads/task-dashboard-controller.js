@@ -99,6 +99,7 @@ function renderDashboard() {
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
+    isChatInTodos: todoList.hasChat,
     state,
   });
   if (rendered) viewNeedsRender = false;
@@ -175,6 +176,27 @@ function mountTaskDashboardPage() {
       renderDashboard();
     },
     onListClick: (event) => {
+      const addChatToTodos = event.target.closest('[data-add-chat-to-todos]');
+      if (addChatToTodos) {
+        event.preventDefault();
+        event.stopPropagation();
+        const thread = unreadState.findThread(addChatToTodos.dataset.addChatToTodos);
+        if (!thread || addChatToTodos.disabled) return;
+        addChatToTodos.disabled = true;
+        void todoList.addChat(thread).then((saved) => {
+          if (!saved || !addChatToTodos.isConnected) {
+            addChatToTodos.disabled = false;
+            return;
+          }
+          addChatToTodos.classList.add('is-added');
+          addChatToTodos.querySelector('span:first-child').textContent = '✓';
+          addChatToTodos.querySelector('span:last-child').textContent = 'Added';
+          addChatToTodos.disabled = true;
+          addChatToTodos.setAttribute('aria-label', `${thread.title} added to to-dos`);
+          addChatToTodos.title = 'Added to to-dos';
+        });
+        return;
+      }
       const projectMute = event.target.closest('[data-project-mute]');
       if (projectMute) {
         event.preventDefault();
@@ -231,6 +253,7 @@ function closeDashboard() {
 
 function applyThreads(nextThreads) {
   threads = taskDashboardState.sortThreadsByRecency(nextThreads);
+  todoList.refreshChatOptions();
   syncSidebarMarkers();
   unreadState.applyThreads(threads);
   // A native refresh can update the catalog, unread state, and Git state in a
@@ -254,6 +277,14 @@ function destroy() {
   viewNeedsRender = true;
 }
 
+function chatsForProject(project) {
+  const projectName = String(project?.name || '').trim().toLocaleLowerCase();
+  if (!projectName) return [];
+  return threads.filter((thread) => (
+    String(thread.projectName || '').trim().toLocaleLowerCase() === projectName
+  )).map((thread) => ({ id: thread.id, title: thread.title }));
+}
+
 return {
   mountNavigation: mountTaskNavigationButton,
   mountPage: mountTaskDashboardPage,
@@ -267,6 +298,7 @@ return {
   close: closeDashboard,
   isOpen: pageState.isOpen,
   applyThreads,
+  chatsForProject,
   findThread: unreadState.findThread,
 };
 })();

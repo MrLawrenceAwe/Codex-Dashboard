@@ -22,6 +22,14 @@ const todoListView = (() => {
     return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(codexUIContracts.projects(), project?.id)}</select>`;
   }
 
+  function chatMarkup(chat) {
+    if (!chat) return '';
+    const title = domUtils.escapeHTML(chat.title);
+    return `<div class="todo-chat" aria-label="Tagged chat: ${title}" title="Tagged chat: ${title}">
+      <span aria-hidden="true">#</span><span>${title}</span>
+    </div>`;
+  }
+
   function tagOptions(tags, selectedTag = '') {
     return `<option value="">Choose a tag</option>${tags.map((tag) => (
       `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)}</option>`
@@ -37,6 +45,13 @@ const todoListView = (() => {
   function projectOptions(projects, selectedID = '') {
     return `<option value="">No project</option>${projects.map((project) => (
       `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
+    )).join('')}`;
+  }
+
+  function chatOptions(chats, selectedID = '') {
+    if (!chats.length) return '<option value="">No chats in this project</option>';
+    return `<option value="">No chat</option>${chats.map((chat) => (
+      `<option value="${domUtils.escapeHTML(chat.id)}"${chat.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(chat.title)}</option>`
     )).join('')}`;
   }
 
@@ -127,6 +142,7 @@ const todoListView = (() => {
           <textarea class="todo-title" data-todo-title aria-label="To-do title" maxlength="240" rows="1">${domUtils.escapeHTML(item.title)}</textarea>
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
           ${projectPickerMarkup(item.project)}
+          ${chatMarkup(item.chat)}
           ${tagMarkup(item.tags, !item.completed)}
           ${!item.completed ? tagPickerMarkup(availableTags) : ''}
           ${imageMarkup(item)}
@@ -134,7 +150,8 @@ const todoListView = (() => {
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
         </div>
-        ${!item.completed && item.project ? `<button type="button" class="todo-new-chat" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.project.name)}" title="Start a new chat">New chat</button>` : ''}
+        ${!item.completed && item.chat ? `<button type="button" class="todo-chat-action" data-todo-paste-in-chat aria-label="Paste this to-do in ${domUtils.escapeHTML(item.chat.title)}" title="Paste in tagged chat">Paste in chat</button>` : ''}
+        ${!item.completed && !item.chat && item.project ? `<button type="button" class="todo-chat-action" data-todo-new-chat aria-label="Start a new chat for ${domUtils.escapeHTML(item.project.name)}" title="Start a new chat">New chat</button>` : ''}
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>
@@ -165,6 +182,7 @@ const todoListView = (() => {
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
             <div class="todo-tag-composer">
               <select data-todo-new-project aria-label="Project">${projectOptions([])}</select>
+              <select data-todo-new-chat-picker aria-label="Chat for this to-do" title="Choose a chat from the selected project" hidden disabled><option value="">No chats in this project</option></select>
               <div class="todo-tags" data-todo-new-tags aria-label="New to-do tags"></div>
               <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
             </div>
@@ -266,6 +284,15 @@ const todoListView = (() => {
     });
   }
 
+  function updateChatOptions(chats, hasProject, selectedID = '') {
+    const select = document.querySelector('[data-todo-new-chat-picker]');
+    if (!select) return;
+    select.innerHTML = chatOptions(chats, selectedID);
+    select.hidden = !hasProject;
+    select.disabled = !hasProject || chats.length === 0;
+    select.value = selectedID && chats.some((chat) => chat.id === selectedID) ? selectedID : '';
+  }
+
   function updateFilterOptions(projects, tags, items, filters = {}) {
     const projectFilter = document.querySelector('[data-todo-project-filter]');
     const tagFilter = document.querySelector('[data-todo-tag-filter]');
@@ -287,5 +314,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateFilterOptions };
+  return { createPage, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateChatOptions, updateFilterOptions };
 })();

@@ -490,6 +490,76 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], ["dashboard"])
     }
 
+    func testSelectingAProjectOffersOnlyThatProjectsChats() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="dashboard"
+                  data-app-action-sidebar-project-label="Codex Dashboard"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="other"
+                  data-app-action-sidebar-project-label="Other Project"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "dashboard-new", title: "Newest dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 3),
+            .fixture(id: "dashboard-old", title: "Older dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 2),
+            .fixture(id: "other-chat", title: "Other project chat", projectName: "Other Project", projectPath: "/tmp/other", recencyEpochMillis: 1),
+        ])
+
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const project = form.querySelector('[data-todo-new-project]');
+              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              const initiallyHidden = chat.hidden;
+              project.value = 'dashboard';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const shownAfterProjectSelection = !chat.hidden;
+              const enabledAfterProjectSelection = !chat.disabled;
+              const choices = [...chat.options].map((option) => option.textContent);
+              chat.value = 'dashboard-old';
+              chat.dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Continue this work';
+              form.requestSubmit();
+              await window.__waitForTodoSaves?.();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [
+                initiallyHidden,
+                shownAfterProjectSelection,
+                enabledAfterProjectSelection,
+                choices,
+                stored.project.id,
+                stored.chat.id,
+                stored.chat.title,
+                Boolean(document.querySelector('[data-todo-paste-in-chat]')),
+                document.querySelector('[data-todo-new-chat]') === null,
+              ];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? [String], ["No chat", "Newest dashboard chat", "Older dashboard chat"])
+        XCTAssertEqual(values[4] as? String, "dashboard")
+        XCTAssertEqual(values[5] as? String, "dashboard-old")
+        XCTAssertEqual(values[6] as? String, "Older dashboard chat")
+        XCTAssertEqual(values[7] as? Bool, true)
+        XCTAssertEqual(values[8] as? Bool, true)
+    }
+
     func testNewChatTransfersTheTodoImageToTheComposer() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
@@ -1214,5 +1284,95 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         ) as? [Bool]
 
         XCTAssertEqual(result, [true, true, true, false, false])
+    }
+
+    func testChatCanBeAddedToTodosAndPastedBackIntoTaggedChat() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item" id="new-chat">New chat</button>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:linked-chat">Linked chat</button>
+              </aside>
+              <main>Conversation surface</main>
+              <script>
+                document.getElementById('new-chat').addEventListener('click', () => {
+                  window.__newChatCount = (window.__newChatCount || 0) + 1;
+                });
+                document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', (event) => {
+                  event.currentTarget.setAttribute('aria-current', 'page');
+                  if (!document.querySelector('textarea[placeholder="Do anything"]')) {
+                    const composer = document.createElement('textarea');
+                    composer.placeholder = 'Do anything';
+                    document.querySelector('main').append(composer);
+                  }
+                });
+              </script>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "linked-chat", title: "Finish linked work", runState: .running),
+            .fixture(id: "older-project-chat", title: "Older project chat", recencyEpochMillis: 1),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="running"]').click();
+              document.querySelector('.dashboard-project-chat-picker').open = true;
+              window.__projectChatChoiceCount = document.querySelectorAll('.dashboard-project-chat-picker [data-add-chat-to-todos]').length;
+              document.querySelector('.dashboard-project-chat-picker [data-add-chat-to-todos="linked-chat"]').click();
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "JSON.parse(localStorage.getItem('codex-dashboard.todos') || '{\"items\":[]}').items.length === 1",
+            in: webView
+        )
+
+        let taggedState = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              await window.__waitForTodoSaves?.();
+              window.__codexDashboard.openTodos();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [
+                stored.chat.id,
+                stored.chat.title,
+                document.querySelector('.todo-chat').textContent.trim(),
+                document.querySelector('[data-todo-paste-in-chat]').textContent.trim(),
+                document.querySelector('[data-todo-new-chat]') === null,
+                document.querySelector('[data-add-chat-to-todos]').disabled,
+                JSON.parse(localStorage.getItem('codex-dashboard.todos')).items.length,
+                window.__projectChatChoiceCount,
+              ];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat", true, true, 1, 2])
+
+        _ = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-todo-paste-in-chat]').click()"
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('textarea[placeholder=\"Do anything\"]')?.value === 'Finish linked work'",
+            in: webView
+        )
+        let pasteState = try await webView.evaluateJavaScript(
+            """
+            [
+              document.querySelector('[data-app-action-sidebar-thread-id]').getAttribute('aria-current'),
+              document.querySelector('textarea[placeholder="Do anything"]').value,
+              window.__newChatCount || 0,
+              document.documentElement.classList.contains('codex-todo-open'),
+            ]
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(pasteState, ["page", "Finish linked work", 0, false])
     }
 }
