@@ -66,16 +66,21 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     }
 
     func restartCodex() async throws -> [DevToolsTarget] {
-        try await codex.restart()
-        let deadline = ContinuousClock.now + .seconds(18)
-        while true {
-            let targets = await renderer.targets(forceRefresh: true)
-            if !targets.isEmpty { return targets }
-            guard ContinuousClock.now < deadline else {
-                throw DashboardError.rendererTimedOut
+        // A randomly chosen debugging port can be occupied after the old Codex
+        // process exits. Relaunch once with a newly selected port before giving
+        // up, rather than leaving the dashboard unavailable until a manual retry.
+        for attempt in 0..<2 {
+            try await codex.restart()
+            let deadline = ContinuousClock.now + .seconds(18)
+            while true {
+                let targets = await renderer.targets(forceRefresh: true)
+                if !targets.isEmpty { return targets }
+                guard ContinuousClock.now < deadline else { break }
+                try await Task.sleep(for: .milliseconds(350))
             }
-            try await Task.sleep(for: .milliseconds(350))
+            if attempt == 1 { throw DashboardError.rendererTimedOut }
         }
+        throw DashboardError.rendererTimedOut
     }
 
     func synchronizeDashboard(

@@ -47,6 +47,8 @@ actor AppServerUsageProvider: AccountUsageProviding {
     private let codexHomeURL: URL
     private let timeout: Duration
     private var session: CodexAppServerSession?
+    private var activeUsageTask: Task<CodexAccountUsage, Error>?
+    private var activeUsageTaskID: UUID?
 
     init(
         executableURL: URL = CodexConfiguration.codexExecutableURL,
@@ -59,7 +61,23 @@ actor AppServerUsageProvider: AccountUsageProviding {
     }
 
     func usage() async throws -> CodexAccountUsage {
-        try await fetchUsage()
+        // The app-server speaks a line-oriented protocol over one shared pipe. A
+        // second caller can enter this actor while the first is awaiting a
+        // response, so coalesce active-account reads before touching that pipe.
+        if let activeUsageTask {
+            return try await activeUsageTask.value
+        }
+        let taskID = UUID()
+        let task = Task { try await self.fetchUsage() }
+        activeUsageTask = task
+        activeUsageTaskID = taskID
+        defer {
+            if activeUsageTaskID == taskID {
+                activeUsageTask = nil
+                activeUsageTaskID = nil
+            }
+        }
+        return try await task.value
     }
 
     func usage(using credential: Data) async throws -> SavedAccountUsageResult {
@@ -67,6 +85,9 @@ actor AppServerUsageProvider: AccountUsageProviding {
     }
 
     func reset() {
+        activeUsageTask?.cancel()
+        activeUsageTask = nil
+        activeUsageTaskID = nil
         session?.terminate()
         session = nil
     }

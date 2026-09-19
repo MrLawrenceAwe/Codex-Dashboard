@@ -10,13 +10,28 @@ enum CodexConfiguration {
     // Reuse the port of an already-running Codex renderer so restarting only the
     // dashboard does not orphan its connection. New Codex launches still receive
     // a random high port because DevTools does not authenticate loopback clients.
-    static let devToolsPort = runningCodexDevToolsPort() ?? Int.random(in: 49_152...65_535)
+    private static let devToolsPortStorage = DevToolsPortStorage(
+        port: runningCodexDevToolsPort() ?? randomDevToolsPort()
+    )
 
-    static let launchArguments = [
-        "--remote-debugging-address=\(devToolsAddress)",
-        "--remote-debugging-port=\(devToolsPort)",
-        "--remote-allow-origins=http://localhost",
-    ]
+    static var devToolsPort: Int {
+        devToolsPortStorage.port
+    }
+
+    static var launchArguments: [String] {
+        [
+            "--remote-debugging-address=\(devToolsAddress)",
+            "--remote-debugging-port=\(devToolsPort)",
+            "--remote-allow-origins=http://localhost",
+        ]
+    }
+
+    // A port that worked for a prior Codex process is not necessarily free once
+    // that process has exited. Rotate it for each launch; the runtime retries a
+    // failed renderer startup once with another port.
+    static func selectFreshDevToolsPortForLaunch() {
+        devToolsPortStorage.selectFreshPort(using: randomDevToolsPort)
+    }
 
     static let codexDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".codex", isDirectory: true)
@@ -45,6 +60,14 @@ enum CodexConfiguration {
             .flatMap { (1...65_535).contains($0) ? $0 : nil }
     }
 
+    private static func randomDevToolsPort(excluding: Int? = nil) -> Int {
+        var port: Int
+        repeat {
+            port = Int.random(in: 49_152...65_535)
+        } while port == excluding
+        return port
+    }
+
     private static func runningCodexDevToolsPort() -> Int? {
         let applications = NSRunningApplication.runningApplications(
             withBundleIdentifier: bundleIdentifier
@@ -67,5 +90,24 @@ enum CodexConfiguration {
             return port
         }
         return nil
+    }
+}
+
+private final class DevToolsPortStorage: @unchecked Sendable {
+    private let lock = NSLock()
+    private var selectedPort: Int
+
+    init(port: Int) {
+        selectedPort = port
+    }
+
+    var port: Int {
+        lock.withLock { selectedPort }
+    }
+
+    func selectFreshPort(using generator: (Int?) -> Int) {
+        lock.withLock {
+            selectedPort = generator(selectedPort)
+        }
     }
 }

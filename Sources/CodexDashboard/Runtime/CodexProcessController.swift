@@ -72,6 +72,7 @@ final class CodexProcessController {
             throw DashboardError.codexQuitTimedOut
         }
 
+        CodexConfiguration.selectFreshDevToolsPortForLaunch()
         let launchConfiguration = NSWorkspace.OpenConfiguration()
         launchConfiguration.arguments = CodexConfiguration.launchArguments
         launchConfiguration.activates = true
