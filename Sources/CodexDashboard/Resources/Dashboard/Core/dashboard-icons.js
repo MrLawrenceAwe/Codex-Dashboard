@@ -11,6 +11,7 @@ const dashboardIcons = (() => {
       mute: '<path d="M4 4l16 16M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.6 10.6 0 0 1 21 12a12.7 12.7 0 0 1-3.1 4.2M6.2 6.2A12.8 12.8 0 0 0 3 12a10.7 10.7 0 0 0 6.1 6.9"/>',
       restore: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
       completed: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/>',
+      forcedHalt: '<path d="M8.5 3.5h7l5 5v7l-5 5h-7l-5-5v-7z"/><path d="M9.5 9v6M14.5 9v6"/>',
     };
     return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
   }

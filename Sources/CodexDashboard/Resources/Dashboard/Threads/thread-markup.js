@@ -17,11 +17,14 @@ const threadMarkup = (() => {
   } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open task: ${thread.title}`;
     const isCompleted = isCompletionTickVisible(thread);
+    const isForcedHalt = thread.latestLifecycleEventKind === 'forcedHalt';
     const statusMarkup = thread.runState === 'running'
       ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`
-      : isCompleted
-        ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
-        : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
+      : isForcedHalt
+        ? `<span class="dashboard-forced-halt-status" role="status" aria-label="Interrupted because the usage limit was reached" title="This task was interrupted because the usage limit was reached">${dashboardIcons.render('forcedHalt')}<span>Interrupted</span></span>`
+        : isCompleted
+          ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
+          : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
     return `
       <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${domUtils.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${domUtils.escapeHTML(thread.id)}" data-open-thread="${domUtils.escapeHTML(thread.id)}" aria-label="${domUtils.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">

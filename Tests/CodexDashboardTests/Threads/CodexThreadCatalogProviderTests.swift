@@ -78,6 +78,26 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads[1].recencyEpochMillis, (now - 600) * 1_000)
     }
 
+    func testForcedHaltMarkerSurvivesApplicationRestart() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            runningLifecycleEvents: ["task_started", "task_complete"],
+            runningTaskCompletionErrorCode: "usage_limit_exceeded",
+            testCase: self
+        )
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(
+            codexLaunchDate: Date(timeIntervalSince1970: TimeInterval(now + 60)),
+            requiredThreadIDs: []
+        )
+
+        let haltedThread = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
+        XCTAssertEqual(haltedThread.runState, .idle)
+        XCTAssertEqual(haltedThread.latestLifecycleEvent?.kind, .forcedHalt)
+    }
+
     func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(

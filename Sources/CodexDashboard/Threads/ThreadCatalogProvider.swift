@@ -124,23 +124,20 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             cachedLaunchMilliseconds = launchMilliseconds
             cachedStoredThreads = threads
         }
-        let activityPaths: Set<String> = Set(threads.lazy.compactMap { thread -> String? in
-            guard
-                let launchMilliseconds,
-                thread.recencyAtMilliseconds >= launchMilliseconds
-            else { return nil }
-            return thread.rolloutPath
-        })
+        let activityPaths = Set(threads.map(\.rolloutPath))
         rolloutActivityReader.retainCache(for: activityPaths)
         let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
-            let latestLifecycleEvent = activityPaths.contains(thread.rolloutPath)
-                ? rolloutActivityReader.latestEvent(
-                    at: thread.rolloutPath,
-                    codexLaunchDate: codexLaunchDate
-                )
+            let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
+            let isCurrentEvent = recordedEvent.map { event in
+                codexLaunchDate.map { event.timestamp >= $0 } ?? false
+            } ?? false
+            let latestLifecycleEvent = isCurrentEvent || recordedEvent?.kind == .forcedHalt
+                ? recordedEvent
                 : nil
-            let runState: ThreadRunState = latestLifecycleEvent?.kind == .started ? .running : .idle
+            let runState: ThreadRunState = isCurrentEvent && recordedEvent?.kind == .started
+                ? .running
+                : .idle
             return ThreadSummary(
                 id: thread.id,
                 title: thread.title,
