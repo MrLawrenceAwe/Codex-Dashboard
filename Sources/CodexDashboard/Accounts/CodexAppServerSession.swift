@@ -106,8 +106,8 @@ final class CodexAppServerSession: @unchecked Sendable {
                 else { continue }
                 guard (object["id"] as? NSNumber)?.intValue == id else { continue }
                 if let error = object["error"] as? [String: Any] {
-                    throw CodexAccountUsageError.server(
-                        error["message"] as? String ?? "Unknown app-server error"
+                    throw CodexAccountUsageError(
+                        serverMessage: error["message"] as? String ?? "Unknown app-server error"
                     )
                 }
                 guard object["result"] != nil else {

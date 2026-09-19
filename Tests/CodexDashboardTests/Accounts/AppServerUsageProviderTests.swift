@@ -4,6 +4,35 @@ import XCTest
 @testable import CodexDashboard
 
 final class AppServerUsageProviderTests: XCTestCase {
+    func testRevokedOAuthTokenHasAnActionableError() {
+        let rawMessage = #"failed to fetch codex rate limits: 401 Unauthorized; body={"error":{"message":"Encountered invalidated oauth token for user, failing request","code":"token_revoked"}}"#
+
+        let error = CodexAccountUsageError(serverMessage: rawMessage)
+
+        guard case .authenticationExpired = error else {
+            return XCTFail("Expected a revoked token to be classified as an expired sign-in")
+        }
+        XCTAssertEqual(
+            error.localizedDescription,
+            "Sign-in expired. Switch to this account to sign in again."
+        )
+        XCTAssertFalse(error.localizedDescription.contains("token_revoked"))
+        XCTAssertFalse(error.localizedDescription.contains("401"))
+    }
+
+    func testOtherAppServerErrorsKeepTheirMessage() {
+        let error = CodexAccountUsageError(serverMessage: "Service is warming up")
+
+        guard case .server(let message) = error else {
+            return XCTFail("Expected a regular server error")
+        }
+        XCTAssertEqual(message, "Service is warming up")
+        XCTAssertEqual(
+            error.localizedDescription,
+            "Codex could not read account usage: Service is warming up"
+        )
+    }
+
     func testReadsFiveHourAndWeeklyWindowsFromAppServerResponse() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "AppServerUsageProviderTests-\(UUID().uuidString)", isDirectory: true

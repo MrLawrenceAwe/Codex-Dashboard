@@ -67,6 +67,27 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
   transform: rotate(45deg);
 }
 
+aside [data-codex-sidebar-interrupted] {
+  display: inline-flex;
+  min-height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--app-color-decoration-modified, #b57b24) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-color-decoration-modified, #b57b24) 10%, transparent);
+  color: var(--app-color-decoration-modified, #9a671c);
+  font-size: 9px;
+  font-weight: 620;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+aside [data-app-action-sidebar-thread-id]:is(:hover, :focus-within) [data-codex-sidebar-interrupted] {
+  display: none;
+}
+
 #codex-dashboard-page {
   position: fixed;
   z-index: 2147483644;
