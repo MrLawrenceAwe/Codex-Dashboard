@@ -125,7 +125,10 @@ const dashboardLifecycle = (() => {
         sidebarProjectHighlights.mount();
         promptLauncher.scheduleSync();
       }
-      if (shouldSyncUnread && hooks.syncUnread()) hooks.requestRender();
+      if (shouldSyncUnread) {
+        hooks.syncSidebarMarkers();
+        if (hooks.syncUnread()) hooks.requestRender();
+      }
     });
   }
 
@@ -160,7 +163,10 @@ const dashboardLifecycle = (() => {
       if (target?.closest('[data-app-action-sidebar-thread-id]')) return true;
       return [...record.addedNodes, ...record.removedNodes].some(containsThreadRow);
     });
-    if (threadRowsChanged) scheduleRepair({ syncUnread: true });
+    if (threadRowsChanged) {
+      hooks.syncSidebarMarkers();
+      scheduleRepair({ syncUnread: true });
+    }
   }
 
   function handleComposerMutations() {

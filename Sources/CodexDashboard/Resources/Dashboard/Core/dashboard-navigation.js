@@ -47,6 +47,7 @@ const dashboardNavigation = (() => {
       openTodos,
       applyVisibility,
       requestRender: taskDashboard.requestRender,
+      syncSidebarMarkers: taskDashboard.syncSidebarMarkers,
       syncUnread: taskDashboard.syncUnread,
     });
     taskDashboard.startMonitoring();

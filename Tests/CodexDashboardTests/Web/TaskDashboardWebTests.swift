@@ -353,6 +353,95 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         )
     }
 
+    func testUsageLimitedThreadShowsInterruptedMarkerInNativeSidebar() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><body>
+              <aside role="navigation">
+                <button data-app-action-sidebar-thread-id="local:usage-halted">
+                  <span data-row-content>
+                    <span><span data-thread-title-trigger>Interrupted work</span></span>
+                    <span data-status-rail></span>
+                  </span>
+                </button>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let haltedPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "usage-halted",
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+            ),
+        ])
+        let runningPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "usage-halted",
+                runState: .running,
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .started, timestamp: .now)
+            ),
+        ])
+
+        let initial = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(haltedPayload)).threads);
+              const marker = document.querySelector('[data-codex-sidebar-interrupted]');
+              return [
+                Boolean(marker?.closest('[data-status-rail]')),
+                marker?.textContent,
+                marker?.getAttribute('aria-label'),
+              ];
+            })()
+            """
+        ) as? [Any]
+        XCTAssertEqual(
+            initial as? [AnyHashable],
+            [true, "Interrupted", "Interrupted because the usage limit was reached"]
+        )
+
+        let interactionRule = try await webView.evaluateJavaScript(
+            """
+            [...document.styleSheets].some((sheet) =>
+              [...sheet.cssRules].some((rule) =>
+                rule.selectorText?.includes('[data-app-action-sidebar-thread-id]:is(:hover, :focus-within)')
+                  && rule.selectorText?.includes('[data-codex-sidebar-interrupted]')
+                  && rule.style.display === 'none'
+              )
+            )
+            """
+        ) as? Bool
+        XCTAssertEqual(interactionRule, true)
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            document.querySelector('[data-app-action-sidebar-thread-id]').outerHTML =
+              '<button data-app-action-sidebar-thread-id="local:usage-halted">'
+                + '<span data-row-content>'
+                + '<span><span data-thread-title-trigger>Interrupted work</span></span>'
+                + '<span data-status-rail></span>'
+                + '</span>'
+                + '</button>';
+            true;
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-codex-sidebar-interrupted]'))",
+            in: webView
+        )
+
+        let removedAfterRestart = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(runningPayload)).threads);
+              return document.querySelector('[data-codex-sidebar-interrupted]') === null;
+            })()
+            """
+        ) as? Bool
+        XCTAssertEqual(removedAfterRestart, true)
+    }
+
     func testCompletedTickExpiresOneMinuteAfterThreadIsRead() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let unreadPayload = try DashboardWebTestHarness.snapshotPayload(for: [

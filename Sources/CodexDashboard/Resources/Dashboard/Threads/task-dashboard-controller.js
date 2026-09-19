@@ -30,6 +30,36 @@ function deriveViewState() {
   return taskDashboardState.summarizeActivity(threads, isThreadUnread, mutedProjectPaths);
 }
 
+function syncSidebarMarkers() {
+  const interruptedThreadIDs = new Set(
+    threads
+      .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
+      .map((thread) => thread.id),
+  );
+  codexUIContracts.threadRows().forEach((row) => {
+    const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
+    const threadID = sidebarID.startsWith('local:') ? sidebarID.slice('local:'.length) : '';
+    const shouldShow = interruptedThreadIDs.has(threadID);
+    let marker = row.querySelector('[data-codex-sidebar-interrupted]');
+    if (!shouldShow) {
+      marker?.remove();
+      return;
+    }
+    if (!marker) {
+      const title = row.querySelector('[data-thread-title-trigger]');
+      const markerHost = title?.parentElement?.parentElement?.lastElementChild;
+      if (!markerHost) return;
+      marker = document.createElement('span');
+      marker.setAttribute('data-codex-sidebar-interrupted', '');
+      marker.textContent = 'Interrupted';
+      markerHost.append(marker);
+    }
+    marker.setAttribute('role', 'status');
+    marker.setAttribute('aria-label', 'Interrupted because the usage limit was reached');
+    marker.setAttribute('title', 'This task was interrupted because the usage limit was reached');
+  });
+}
+
 function openThread(thread) {
   closeDashboard();
   codexHost.navigateToThread(thread);
@@ -201,6 +231,7 @@ function closeDashboard() {
 
 function applyThreads(nextThreads) {
   threads = taskDashboardState.sortThreadsByRecency(nextThreads);
+  syncSidebarMarkers();
   unreadState.applyThreads(threads);
   // A native refresh can update the catalog, unread state, and Git state in a
   // short burst. Keep the renderer responsive by applying only the latest
@@ -219,6 +250,7 @@ function destroy() {
   pageState.close();
   cancelScheduledRender();
   unreadState.destroy();
+  document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
   viewNeedsRender = true;
 }
 
@@ -228,6 +260,7 @@ return {
   applyVisibility: pageState.applyVisibility,
   startMonitoring: unreadState.startMonitoring,
   requestRender,
+  syncSidebarMarkers,
   syncUnread: unreadState.syncUnread,
   destroy,
   open: openDashboard,

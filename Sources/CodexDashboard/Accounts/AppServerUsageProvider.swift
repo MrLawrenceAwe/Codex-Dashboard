@@ -12,12 +12,26 @@ struct SavedAccountUsageResult: Equatable, Sendable {
 }
 
 enum CodexAccountUsageError: LocalizedError {
+    case authenticationExpired
     case malformedResponse
     case server(String)
     case unavailable
 
+    init(serverMessage: String) {
+        let normalizedMessage = serverMessage.lowercased()
+        if normalizedMessage.contains("token_revoked")
+            || normalizedMessage.contains("invalidated oauth token")
+        {
+            self = .authenticationExpired
+        } else {
+            self = .server(serverMessage)
+        }
+    }
+
     var errorDescription: String? {
         switch self {
+        case .authenticationExpired:
+            return "Sign-in expired. Switch to this account to sign in again."
         case .malformedResponse:
             return "Codex returned invalid account usage data."
         case .server(let message):
