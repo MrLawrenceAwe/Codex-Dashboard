@@ -5,6 +5,47 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testTaskDashboardDoesNotSurfaceTodoControls() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "changed-task",
+                title: "Changed task",
+                projectName: "Project A",
+                projectPath: "/tmp/project-a",
+                recencyEpochMillis: 2,
+                runState: .running,
+                workingTreeStatus: .hasChanges
+            ),
+            .fixture(
+                id: "idle-task",
+                title: "Idle task",
+                projectName: "Project B",
+                projectPath: "/tmp/project-b",
+                recencyEpochMillis: 1
+            ),
+        ])
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              const todoControls = () => document.querySelector(
+                '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
+              ) === null;
+              const filters = ['recent', 'running', 'unread', 'changedProjects'];
+              return filters.map((filter) => {
+                document.querySelector(`[data-filter="${filter}"]`).click();
+                return todoControls();
+              });
+            })()
+            """
+        ) as? [Bool]
+
+        XCTAssertEqual(result, [true, true, true, true])
+    }
+
     func testCompleteCatalogUsesClientPaging() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let threads = (0..<65).map { index in

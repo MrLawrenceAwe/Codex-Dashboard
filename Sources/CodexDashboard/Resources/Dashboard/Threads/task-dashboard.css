@@ -199,12 +199,6 @@ aside [data-codex-sidebar-interrupted] {
 #codex-dashboard-page .dashboard-meta span { display: inline-flex; align-items: center; gap: 5px; }
 #codex-dashboard-page .dashboard-meta span + span::before { width: 2px; height: 2px; margin-right: 1px; content: ""; border-radius: 50%; background: currentColor; }
 #codex-dashboard-page .dashboard-thread-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; transition: opacity 100ms ease; }
-#codex-dashboard-page .dashboard-add-todo { position: absolute; z-index: 2; top: 50%; right: 10px; display: inline-flex; min-height: 26px; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: var(--dashboard-bg); color: var(--dashboard-muted); font-size: 10px; cursor: pointer; opacity: 0; transform: translateY(-50%); transition: opacity 100ms ease, background 100ms ease, color 100ms ease; }
-#codex-dashboard-page .dashboard-thread-row:hover .dashboard-add-todo, #codex-dashboard-page .dashboard-thread-row:focus-within .dashboard-add-todo { opacity: 1; }
-#codex-dashboard-page .dashboard-thread-row:hover .dashboard-thread-actions, #codex-dashboard-page .dashboard-thread-row:focus-within .dashboard-thread-actions { opacity: 0; }
-#codex-dashboard-page .dashboard-add-todo:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
-#codex-dashboard-page .dashboard-add-todo.is-added { color: var(--dashboard-green); }
-#codex-dashboard-page .dashboard-add-todo:disabled { cursor: default; }
 #codex-dashboard-page .dashboard-run-spinner { position: relative; display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; border-radius: 50%; color: var(--dashboard-green); }
 #codex-dashboard-page .dashboard-run-spinner::before { width: 12px; height: 12px; box-sizing: border-box; content: ""; border: 1.5px solid color-mix(in srgb, var(--dashboard-green) 20%, transparent); border-top-color: currentColor; border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
 #codex-dashboard-page .dashboard-completed-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; color: var(--dashboard-green); }
@@ -242,8 +236,6 @@ aside [data-codex-sidebar-interrupted] {
   #codex-dashboard-page .dashboard-thread-details { align-items: flex-start; flex-direction: column; gap: 2px; }
   #codex-dashboard-page .dashboard-thread-preview { white-space: normal; }
   #codex-dashboard-page .dashboard-open-affordance { opacity: .72; }
-  #codex-dashboard-page .dashboard-add-todo { width: 26px; justify-content: center; padding-inline: 0; }
-  #codex-dashboard-page .dashboard-add-todo span:last-child { display: none; }
   #codex-dashboard-page .dashboard-git-changes span { display: none; }
   #codex-dashboard-page .dashboard-project-commit span, #codex-dashboard-page .dashboard-project-mute span { display: none; }
 }

@@ -102,7 +102,6 @@ function renderDashboard() {
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
-    isChatInTodos: todoList.hasChat,
     state,
   });
   if (rendered) viewNeedsRender = false;
@@ -179,27 +178,6 @@ function mountTaskDashboardPage() {
       renderDashboard();
     },
     onListClick: (event) => {
-      const addChatToTodos = event.target.closest('[data-add-chat-to-todos]');
-      if (addChatToTodos) {
-        event.preventDefault();
-        event.stopPropagation();
-        const thread = unreadState.findThread(addChatToTodos.dataset.addChatToTodos);
-        if (!thread || addChatToTodos.disabled) return;
-        addChatToTodos.disabled = true;
-        void todoList.addChat(thread).then((saved) => {
-          if (!saved || !addChatToTodos.isConnected) {
-            addChatToTodos.disabled = false;
-            return;
-          }
-          addChatToTodos.classList.add('is-added');
-          addChatToTodos.querySelector('span:first-child').textContent = '✓';
-          addChatToTodos.querySelector('span:last-child').textContent = 'Added';
-          addChatToTodos.disabled = true;
-          addChatToTodos.setAttribute('aria-label', `${thread.title} added to to-dos`);
-          addChatToTodos.title = 'Added to to-dos';
-        });
-        return;
-      }
       const projectMute = event.target.closest('[data-project-mute]');
       if (projectMute) {
         event.preventDefault();

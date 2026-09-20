@@ -86,7 +86,6 @@ const taskDashboardView = (() => {
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
-    isChatInTodos,
     state,
   }) {
     updateSidebarStatus(state);
@@ -140,13 +139,11 @@ const taskDashboardView = (() => {
     updateMarkup(
       list,
       threadMarkup.list(displayedThreads, {
-        allThreads: threads,
         filterMode,
         collapsedProjectPaths,
         mutedProjectPaths,
         isUnread: isThreadUnread,
         isCompletionTickVisible,
-        isChatInTodos,
       }),
     );
     return true;
