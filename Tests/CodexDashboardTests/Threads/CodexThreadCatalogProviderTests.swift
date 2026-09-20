@@ -86,6 +86,12 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             runningTaskCompletionErrorCode: "usage_limit_exceeded",
             testCase: self
         )
+        let alignRecencyWithHalt = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [stateDatabaseURL.path, "UPDATE threads SET recency_at_ms = \((now - 300) * 1_000) WHERE id = 'running';"],
+            timeout: 3
+        )
+        XCTAssertEqual(alignRecencyWithHalt.terminationStatus, 0)
         let catalog = try await CodexThreadCatalogProvider(
             stateDatabaseURL: stateDatabaseURL
         ).loadCatalog(
@@ -96,6 +102,32 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let haltedThread = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
         XCTAssertEqual(haltedThread.runState, .idle)
         XCTAssertEqual(haltedThread.latestLifecycleEvent?.kind, .forcedHalt)
+    }
+
+    func testForcedHaltMarkerClearsAfterThreadIsContinued() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            runningLifecycleEvents: ["task_started", "task_complete"],
+            runningTaskCompletionErrorCode: "usage_limit_exceeded",
+            testCase: self
+        )
+        let continuedThread = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [stateDatabaseURL.path, "UPDATE threads SET recency_at_ms = \((now + 60) * 1_000) WHERE id = 'running';"],
+            timeout: 3
+        )
+        XCTAssertEqual(continuedThread.terminationStatus, 0)
+
+        let catalog = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: stateDatabaseURL
+        ).loadCatalog(
+            codexLaunchDate: Date(timeIntervalSince1970: TimeInterval(now + 120)),
+            requiredThreadIDs: []
+        )
+
+        let continued = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
+        XCTAssertNil(continued.latestLifecycleEvent)
     }
 
     func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {

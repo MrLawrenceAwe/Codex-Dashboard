@@ -153,7 +153,13 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             let isCurrentEvent = recordedEvent.map { event in
                 codexLaunchDate.map { event.timestamp >= $0 } ?? false
             } ?? false
-            let latestLifecycleEvent = isCurrentEvent || recordedEvent?.kind == .forcedHalt
+            let forcedHaltWasContinued = recordedEvent.map { event in
+                guard event.kind == .forcedHalt else { return false }
+                return thread.recencyAtMilliseconds > Int64(event.timestamp.timeIntervalSince1970 * 1_000)
+            } ?? false
+            let latestLifecycleEvent = isCurrentEvent || (
+                recordedEvent?.kind == .forcedHalt && !forcedHaltWasContinued
+            )
                 ? recordedEvent
                 : nil
             let runState: ThreadRunState = isCurrentEvent && recordedEvent?.kind == .started
