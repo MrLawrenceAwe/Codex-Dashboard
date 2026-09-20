@@ -103,6 +103,13 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-check svg { width: 17px; height: 17px; }
 #codex-dashboard-todo-page .todo-check input:focus-visible + span { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-todo-page .todo-check input:checked + span { border-color: color-mix(in srgb, var(--todo-green) 70%, transparent); background: color-mix(in srgb, var(--todo-green) 12%, transparent); color: var(--todo-green); }
+#codex-dashboard-todo-page .todo-check:focus-within input:not(:checked) + span { border-color: color-mix(in srgb, var(--todo-green) 70%, transparent); background: color-mix(in srgb, var(--todo-green) 12%, transparent); color: var(--todo-green); }
+#codex-dashboard-todo-page .todo-check:focus-within input:not(:checked) + span svg { animation: todo-completion-tick 180ms ease-out; }
+@media (hover: hover) {
+  #codex-dashboard-todo-page .todo-check:hover input:not(:checked) + span { border-color: color-mix(in srgb, var(--todo-green) 70%, transparent); background: color-mix(in srgb, var(--todo-green) 12%, transparent); color: var(--todo-green); }
+  #codex-dashboard-todo-page .todo-check:hover input:not(:checked) + span svg { animation: todo-completion-tick 180ms ease-out; }
+}
+@keyframes todo-completion-tick { from { stroke-dasharray: 24; stroke-dashoffset: 24; } to { stroke-dasharray: 24; stroke-dashoffset: 0; } }
 #codex-dashboard-todo-page .todo-item-copy { display: grid; min-width: 0; gap: 3px; }
 #codex-dashboard-todo-page .todo-title { width: 100%; min-width: 0; min-height: 24px; max-height: 144px; padding: 2px 4px; border: 0; border-radius: 4px; overflow-y: auto; resize: none; background: transparent; color: var(--todo-text); font-size: 14px; font-weight: 550; line-height: 20px; }
 #codex-dashboard-todo-page .todo-title:hover,
@@ -190,4 +197,5 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 
 @media (prefers-reduced-motion: reduce) {
   #codex-dashboard-todo-page { transition: none; }
+  #codex-dashboard-todo-page .todo-check svg { animation: none; }
 }
