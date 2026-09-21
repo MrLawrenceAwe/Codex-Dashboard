@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 final class UsageNotificationPlannerTests: XCTestCase {
-    func testKeepsOnlyBankedExpiryRemindersWhileWeeklyUsageIsExhausted() {
+    func testKeepsWeeklyResetAndBankedExpiryRemindersWhileWeeklyUsageIsExhausted() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let weeklyReset = now.addingTimeInterval(96 * 60 * 60)
@@ -26,10 +26,23 @@ final class UsageNotificationPlannerTests: XCTestCase {
                 previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
                 previousDeadlines: [:], sentUpdates: [:], now: now
             )
-            XCTAssertEqual(plan.scheduled.count, 7)
-            XCTAssertTrue(plan.scheduled.allSatisfy { $0.identifier.contains("banked-reset-expiry") })
+            XCTAssertEqual(plan.scheduled.count, 14)
+            XCTAssertEqual(
+                plan.scheduled.filter { $0.identifier.contains("-weekly-") }.count,
+                7
+            )
+            XCTAssertEqual(
+                plan.scheduled.filter { $0.identifier.contains("banked-reset-expiry") }.count,
+                7
+            )
+            let weeklyReminder = plan.scheduled.first { $0.identifier.contains("-weekly-48h") }
+            XCTAssertTrue(
+                weeklyReminder.flatMap {
+                    UsageNotificationPlanner.refreshedContent(for: $0, using: current, now: now)
+                }?.body.contains("Weekly: 0% left") == true
+            )
             XCTAssertTrue(plan.immediate.isEmpty)
-            XCTAssertEqual(plan.unchangedDeadlines.count, 7)
+            XCTAssertEqual(plan.unchangedDeadlines.count, 14)
         }
     }
 
@@ -72,7 +85,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertEqual(notifications.count, 14)
         XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
         XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
-        XCTAssertTrue(notifications.allSatisfy { $0.body.filter { $0 == "\n" }.count == 1 })
+        XCTAssertTrue(notifications.allSatisfy { !$0.body.contains("\n") })
         XCTAssertEqual(
             Set(notifications.filter { $0.identifier.contains("weekly") }.map(\.title)),
             [
@@ -98,11 +111,113 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ]
         )
         XCTAssertTrue(notifications.contains {
-            $0.body.contains("Personal: 2 banked resets · next expires ")
+            $0.body.contains("Personal’s next banked reset expires ")
         })
         XCTAssertTrue(notifications.filter { $0.identifier.contains("weekly") }.allSatisfy {
             !$0.body.contains("resets at ") && !$0.body.contains("resets tomorrow at ")
         })
+    }
+
+    func testScheduledResetReminderDoesNotFreezeUsageSnapshotIntoBody() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let weeklyReset = now.addingTimeInterval(96 * 60 * 60)
+
+        func weeklyReminder(usedPercent: Int) -> ScheduledUsageNotification? {
+            let usage = CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: CodexUsageWindow(
+                        usedPercent: usedPercent,
+                        resetsAt: now.addingTimeInterval(5 * 60 * 60)
+                    ),
+                    weekly: CodexUsageWindow(usedPercent: usedPercent, resetsAt: weeklyReset),
+                    bankedResets: CodexBankedResetSummary(availableCount: 0, nextExpiration: nil)
+                ),
+                fetchedAt: now
+            )
+            return UsageNotificationPlanner.notifications(
+                for: [savedAccount],
+                usageByAccountID: [savedAccount.id: usage],
+                now: now
+            ).first { $0.identifier.contains("-weekly-48h") }
+        }
+
+        let earlySnapshot = weeklyReminder(usedPercent: 3)
+        let laterSnapshot = weeklyReminder(usedPercent: 83)
+
+        XCTAssertEqual(earlySnapshot?.body, laterSnapshot?.body)
+        XCTAssertFalse(earlySnapshot?.body.contains("%") == true)
+        XCTAssertTrue(earlySnapshot?.body.hasPrefix("Personal’s Weekly limit resets ") == true)
+    }
+
+    func testRefreshesScheduledReminderFromMatchingDeliveryTimeSnapshot() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let weeklyReset = now.addingTimeInterval(48 * 60 * 60)
+        let scheduledSnapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 3, resetsAt: now.addingTimeInterval(5 * 60 * 60)),
+                weekly: CodexUsageWindow(usedPercent: 3, resetsAt: weeklyReset)
+            ),
+            fetchedAt: now
+        )
+        let notification = try XCTUnwrap(
+            UsageNotificationPlanner.deliverableNotifications(
+                for: [savedAccount],
+                usageByAccountID: [savedAccount.id: scheduledSnapshot],
+                now: now
+            ).first { $0.identifier.contains("-weekly-48h") }
+        )
+        let deliverySnapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 40, resetsAt: now.addingTimeInterval(3 * 60 * 60)),
+                weekly: CodexUsageWindow(usedPercent: 83, resetsAt: weeklyReset),
+                bankedResets: CodexBankedResetSummary(availableCount: 1, nextExpiration: nil)
+            ),
+            fetchedAt: now.addingTimeInterval(60)
+        )
+
+        let refreshed = UsageNotificationPlanner.refreshedContent(
+            for: notification,
+            using: deliverySnapshot,
+            now: now.addingTimeInterval(60)
+        )
+
+        XCTAssertTrue(refreshed?.body.contains("Personal’s Weekly: 17% left") == true)
+        XCTAssertTrue(refreshed?.body.contains("⏱ 5-hour 60% · 📅 Weekly 17% · 🎟 Banked 1") == true)
+    }
+
+    func testRejectsDeliveryTimeSnapshotForChangedDeadline() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let scheduledReset = now.addingTimeInterval(48 * 60 * 60)
+        let notification = try XCTUnwrap(
+            UsageNotificationPlanner.deliverableNotifications(
+                for: [savedAccount],
+                usageByAccountID: [
+                    savedAccount.id: CodexAccountUsageSnapshot(
+                        usage: CodexAccountUsage(
+                            fiveHour: nil,
+                            weekly: CodexUsageWindow(usedPercent: 3, resetsAt: scheduledReset)
+                        ),
+                        fetchedAt: now
+                    ),
+                ],
+                now: now
+            ).first { $0.identifier.contains("-weekly-48h") }
+        )
+        let changed = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(
+                    usedPercent: 83,
+                    resetsAt: scheduledReset.addingTimeInterval(10 * 60)
+                )
+            ),
+            fetchedAt: now.addingTimeInterval(60)
+        )
+
+        XCTAssertNil(UsageNotificationPlanner.refreshedContent(for: notification, using: changed, now: now))
     }
 
     func testPlansOneDeadlineUpdateWhenTheWarningTimeHasPassed() {

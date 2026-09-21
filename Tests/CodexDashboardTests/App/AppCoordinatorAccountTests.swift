@@ -5,6 +5,38 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testScheduledNotificationRefreshReturnsNewActiveAccountSnapshot() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorNotificationRefreshTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try testAccountCredential(accountID: "account-lawrence", name: "Lawrence")
+            .write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let account = try accountManager.saveCurrentAccount()
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 40, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 83, resetsAt: nil)
+        )
+        let coordinator = makeAppCoordinator(
+            accountManager: accountManager,
+            accountUsageProvider: SequencedAccountUsageProvider(outcomes: [usage]),
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
+        )
+
+        let snapshot = await coordinator.refreshUsageForScheduledNotification(account.id)
+
+        XCTAssertEqual(snapshot?.usage, usage)
+        XCTAssertEqual(coordinator.accounts.usageByAccountID[account.id], snapshot)
+    }
+
     func testPopoverUsageRefreshPublishesOnce() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorPopoverRefreshTests-\(UUID().uuidString)")

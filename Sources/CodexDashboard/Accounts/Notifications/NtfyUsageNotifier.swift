@@ -5,6 +5,7 @@ protocol PhoneUsageNotifying: AnyObject {
     var isEnabled: Bool { get }
     var topic: String { get }
 
+    func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler)
     func setEnabled(_ enabled: Bool)
     func generateNewTopic()
     func updateNotifications(
@@ -19,6 +20,7 @@ final class NoopPhoneUsageNotifier: PhoneUsageNotifying {
     var isEnabled: Bool { false }
     var topic: String { "" }
 
+    func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler) {}
     func setEnabled(_ enabled: Bool) {}
     func generateNewTopic() {}
     func updateNotifications(
@@ -40,6 +42,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     private let publisher: any NtfyPublishing
     private let now: () -> Date
     private let retryDelay: (Int) -> Duration
+    private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
     private var retryAttemptsByIdentifier: [String: Int] = [:]
@@ -80,6 +83,10 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             return replacement
         }
         return savedTopic
+    }
+
+    func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler) {
+        deadlineUsageRefresh = handler
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -168,11 +175,24 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
 
     private func deliver(_ notification: ScheduledUsageNotification) async {
         guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+        var refreshed: ImmediateUsageNotification?
+        if let deadlineUsageRefresh,
+           let snapshot = await deadlineUsageRefresh(notification.accountID) {
+            guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+            guard let content = UsageNotificationPlanner.refreshedContent(
+                for: notification, using: snapshot, now: now()
+            ) else {
+                cancelTask(notification.identifier)
+                return
+            }
+            refreshed = content
+        }
+        guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
         do {
             try await publisher.publish(
                 topic: topic,
-                title: notification.title,
-                message: notification.body
+                title: refreshed?.title ?? notification.title,
+                message: refreshed?.body ?? notification.body
             )
             if notification.identifier.contains("-deadline-update-") {
                 history.saveDeadlines([notification], for: .known)

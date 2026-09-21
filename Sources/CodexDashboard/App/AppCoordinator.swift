@@ -121,6 +121,11 @@ final class AppCoordinator: ObservableObject {
     }
 
     func startMonitoring() {
+        let deadlineUsageRefresh: DeadlineUsageRefreshHandler = { [weak self] accountID in
+            await self?.refreshUsageForScheduledNotification(accountID)
+        }
+        accountUsageNotifier.setDeadlineUsageRefreshHandler(deadlineUsageRefresh)
+        phoneUsageNotifier.setDeadlineUsageRefreshHandler(deadlineUsageRefresh)
         compatibilityWasTriggeredByUpdate = compatibilityMonitor.updateWasDetected
         refreshScheduler.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },

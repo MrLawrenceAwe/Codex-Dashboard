@@ -57,18 +57,16 @@ enum UsageNotificationPlanner {
     ) -> [ScheduledUsageNotification] {
         accounts.flatMap { account -> [ScheduledUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let weeklyNotifications = hasWeeklyUsageRemaining(usage) ? limitNotifications(
+            let weeklyNotifications = limitNotifications(
                 for: account,
                 windowName: "Weekly",
                 window: usage.weekly,
                 leadTimes: extendedLeadTimes,
-                usageSummary: usageSummary(for: usage),
                 now: now
-            ) : []
+            )
             return weeklyNotifications + bankedResetExpiryNotifications(
                 for: account,
                 resets: usage.bankedResets,
-                usageSummary: usageSummary(for: usage),
                 now: now
             )
         }.sorted { $0.identifier < $1.identifier }
@@ -197,24 +195,24 @@ enum UsageNotificationPlanner {
         windowName: String,
         window: CodexUsageWindow?,
         leadTimes: [TimeInterval],
-        usageSummary: String,
         now: Date
     ) -> [ScheduledUsageNotification] {
         guard let window, let resetsAt = window.resetsAt else { return [] }
         guard resetsAt > now else { return [] }
-        let remainingPercent = max(0, min(100, 100 - window.usedPercent))
         return leadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
             let notificationDate = resetsAt.addingTimeInterval(-leadTime)
             let deadlineStyle = deadlineStyle(for: windowName)
             return ScheduledUsageNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
+                accountID: account.id,
+                accountName: account.name,
+                kind: .weeklyReset,
                 title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName): \(remainingPercent)% left · resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).\n\(usageSummary)",
+                body: "\(account.name)’s \(windowName) limit resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
                 deadlineUpdateTitle: "\(windowName) reset time changed",
                 deadlineDescription: "\(account.name)’s \(windowName) reset moved",
                 deadlineStyle: deadlineStyle,
-                usageSummary: usageSummary,
                 notificationDate: notificationDate,
                 deadlineDate: resetsAt
             )
@@ -284,7 +282,6 @@ enum UsageNotificationPlanner {
     private static func bankedResetExpiryNotifications(
         for account: SavedAccount,
         resets: CodexBankedResetSummary?,
-        usageSummary: String,
         now: Date
     ) -> [ScheduledUsageNotification] {
         guard let resets, resets.availableCount > 0, let expiration = resets.nextExpiration, expiration > now else {
@@ -292,19 +289,57 @@ enum UsageNotificationPlanner {
         }
         return extendedLeadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
-            let countDescription = resets.availableCount == 1 ? "1 banked reset" : "\(resets.availableCount) banked resets"
             return ScheduledUsageNotification(
                 identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
+                accountID: account.id,
+                accountName: account.name,
+                kind: .bankedResetExpiry,
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
-                body: "\(account.name): \(countDescription) · next expires \(formattedDeadline(expiration)).\n\(usageSummary)",
+                body: "\(account.name)’s next banked reset expires \(formattedDeadline(expiration)).",
                 deadlineUpdateTitle: "Banked reset expiry changed",
                 deadlineDescription: "\(account.name)’s next banked reset will now expire",
                 deadlineStyle: .fullDate,
-                usageSummary: usageSummary,
                 notificationDate: expiration.addingTimeInterval(-leadTime),
                 deadlineDate: expiration
             )
         }
+    }
+
+    static func refreshedContent(
+        for notification: ScheduledUsageNotification,
+        using snapshot: CodexAccountUsageSnapshot,
+        now: Date = .now
+    ) -> ImmediateUsageNotification? {
+        let usage = snapshot.usage
+        let body: String
+        switch notification.kind {
+        case .weeklyReset:
+            guard let weekly = usage.weekly,
+                  let resetsAt = weekly.resetsAt,
+                  !deadlinesDifferMeaningfully(resetsAt, notification.deadlineDate)
+            else { return nil }
+            let remaining = max(0, min(100, 100 - weekly.usedPercent))
+            body = "\(notification.accountName)’s Weekly: \(remaining)% left · resets "
+                + "\(formattedDeadline(resetsAt, style: .fullDate, relativeTo: now)).\n"
+                + usageSummary(for: usage)
+        case .bankedResetExpiry:
+            guard let resets = usage.bankedResets,
+                  resets.availableCount > 0,
+                  let expiration = resets.nextExpiration,
+                  !deadlinesDifferMeaningfully(expiration, notification.deadlineDate)
+            else { return nil }
+            let count = resets.availableCount == 1
+                ? "1 banked reset"
+                : "\(resets.availableCount) banked resets"
+            body = "\(notification.accountName): \(count) · next expires "
+                + "\(formattedDeadline(expiration)).\n"
+                + usageSummary(for: usage)
+        }
+        return ImmediateUsageNotification(
+            identifier: "\(notification.identifier)-fresh-\(Int(snapshot.fetchedAt.timeIntervalSince1970))",
+            title: notification.title,
+            body: body
+        )
     }
 
     private static func description(for leadTime: TimeInterval) -> String {
