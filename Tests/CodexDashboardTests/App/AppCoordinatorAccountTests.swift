@@ -37,6 +37,55 @@ extension AppCoordinatorTests {
         XCTAssertEqual(coordinator.accounts.usageByAccountID[account.id], snapshot)
     }
 
+    func testScheduledNotificationChannelsShareOneDeliveryTimeRefresh() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppCoordinatorSharedNotificationRefreshTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let authenticationURL = directory.appendingPathComponent(".codex/auth.json")
+        try FileManager.default.createDirectory(
+            at: authenticationURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try testAccountCredential(accountID: "account-oluwatoyin", name: "Oluwatoyin")
+            .write(to: authenticationURL)
+        let accountManager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("support/accounts.json"),
+            authenticationURL: authenticationURL,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        let account = try accountManager.saveCurrentAccount()
+        let provider = SuspendedAccountUsageProvider()
+        let coordinator = makeAppCoordinator(
+            accountManager: accountManager,
+            accountUsageProvider: provider,
+            runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: true) }
+        )
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 0, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 100, resetsAt: nil)
+        )
+
+        let desktop = Task { @MainActor in
+            await coordinator.refreshUsageForScheduledNotification(account.id)
+        }
+        try await waitUntil { await provider.count() == 1 }
+        let phone = Task { @MainActor in
+            await coordinator.refreshUsageForScheduledNotification(account.id)
+        }
+        await provider.resume(with: usage)
+
+        let desktopSnapshot = await desktop.value
+        let phoneSnapshot = await phone.value
+        XCTAssertEqual(desktopSnapshot, phoneSnapshot)
+        XCTAssertEqual(desktopSnapshot?.usage, usage)
+        let sharedRequestCount = await provider.count()
+        XCTAssertEqual(sharedRequestCount, 1)
+
+        let reused = await coordinator.refreshUsageForScheduledNotification(account.id)
+        XCTAssertEqual(reused, desktopSnapshot)
+        let reusedRequestCount = await provider.count()
+        XCTAssertEqual(reusedRequestCount, 1)
+    }
+
     func testPopoverUsageRefreshPublishesOnce() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorPopoverRefreshTests-\(UUID().uuidString)")

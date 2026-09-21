@@ -204,7 +204,7 @@ enum UsageNotificationPlanner {
             let notificationDate = resetsAt.addingTimeInterval(-leadTime)
             let deadlineStyle = deadlineStyle(for: windowName)
             return ScheduledUsageNotification(
-                identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
+                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 accountID: account.id,
                 accountName: account.name,
                 kind: .weeklyReset,
@@ -290,7 +290,7 @@ enum UsageNotificationPlanner {
         return extendedLeadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
             return ScheduledUsageNotification(
-                identifier: "codex-dashboard-account-deadline-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
+                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
                 accountID: account.id,
                 accountName: account.name,
                 kind: .bankedResetExpiry,
