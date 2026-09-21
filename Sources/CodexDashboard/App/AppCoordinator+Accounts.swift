@@ -209,6 +209,41 @@ extension AppCoordinator {
     func refreshUsageForScheduledNotification(
         _ accountID: UUID
     ) async -> CodexAccountUsageSnapshot? {
+        let currentDate = Date.now
+        if let cached = recentDeadlineUsageRefreshesByAccountID[accountID],
+           cached.expiresAt > currentDate {
+            if let latest = accounts.usageByAccountID[accountID],
+               latest.fetchedAt > cached.snapshot.fetchedAt {
+                recentDeadlineUsageRefreshesByAccountID[accountID] = DeadlineUsageRefreshCacheEntry(
+                    snapshot: latest,
+                    expiresAt: currentDate.addingTimeInterval(Self.deadlineUsageRefreshReuseInterval)
+                )
+                return latest
+            }
+            return cached.snapshot
+        }
+        if let task = deadlineUsageRefreshTasksByAccountID[accountID] {
+            return await task.value
+        }
+
+        let task = Task { @MainActor [weak self] in
+            await self?.performScheduledNotificationUsageRefresh(accountID)
+        }
+        deadlineUsageRefreshTasksByAccountID[accountID] = task
+        let snapshot = await task.value
+        deadlineUsageRefreshTasksByAccountID[accountID] = nil
+        if let snapshot {
+            recentDeadlineUsageRefreshesByAccountID[accountID] = DeadlineUsageRefreshCacheEntry(
+                snapshot: snapshot,
+                expiresAt: Date.now.addingTimeInterval(Self.deadlineUsageRefreshReuseInterval)
+            )
+        }
+        return snapshot
+    }
+
+    private func performScheduledNotificationUsageRefresh(
+        _ accountID: UUID
+    ) async -> CodexAccountUsageSnapshot? {
         let previousFetch = accounts.usageByAccountID[accountID]?.fetchedAt
         if accountID == accounts.activeAccountID {
             await accounts.refreshActiveUsage(

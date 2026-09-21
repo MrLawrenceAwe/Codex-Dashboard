@@ -24,7 +24,8 @@ struct NoopAccountUsageNotifier: AccountUsageNotifying {
 
 @MainActor
 final class AccountUsageNotifier: AccountUsageNotifying {
-    private static let identifierPrefix = "codex-dashboard-account-deadline-"
+    private static let identifierPrefix = "codex-dashboard-account-deadline-v2-"
+    private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: UNUserNotificationCenter
@@ -75,7 +76,7 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         let requests = requestsByIdentifier.values.sorted { $0.identifier < $1.identifier }
         let pendingRequests = await notificationCenter.pendingNotificationRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
-            request.identifier.hasPrefix(Self.identifierPrefix) ? request.identifier : nil
+            request.identifier.hasPrefix(Self.legacyIdentifierPrefix) ? request.identifier : nil
         }
         notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
 

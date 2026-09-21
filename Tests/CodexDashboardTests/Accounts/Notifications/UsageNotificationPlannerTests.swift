@@ -83,7 +83,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
 
         XCTAssertEqual(notifications.count, 14)
-        XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-") })
+        XCTAssertTrue(notifications.allSatisfy { $0.identifier.hasPrefix("codex-dashboard-account-deadline-v2-") })
         XCTAssertFalse(notifications.contains { $0.identifier.contains("-5-hour-") })
         XCTAssertTrue(notifications.allSatisfy { !$0.body.contains("\n") })
         XCTAssertEqual(

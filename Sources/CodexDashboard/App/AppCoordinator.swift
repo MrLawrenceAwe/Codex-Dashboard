@@ -6,6 +6,12 @@ import Foundation
 final class AppCoordinator: ObservableObject {
     static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
     private static let maximumLiveMonitoredProjectCount = 60
+    static let deadlineUsageRefreshReuseInterval: TimeInterval = 60
+
+    struct DeadlineUsageRefreshCacheEntry {
+        let snapshot: CodexAccountUsageSnapshot
+        let expiresAt: Date
+    }
 
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
@@ -49,6 +55,12 @@ final class AppCoordinator: ObservableObject {
     private var accountStateObserver: AnyCancellable?
     private var threadCompletionTracker = ThreadCompletionTracker()
     var didNotifyAboutDetectedUpdate = false
+    var deadlineUsageRefreshTasksByAccountID: [
+        UUID: Task<CodexAccountUsageSnapshot?, Never>
+    ] = [:]
+    var recentDeadlineUsageRefreshesByAccountID: [
+        UUID: DeadlineUsageRefreshCacheEntry
+    ] = [:]
 
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
