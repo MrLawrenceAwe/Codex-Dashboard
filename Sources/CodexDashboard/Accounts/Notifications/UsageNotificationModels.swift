@@ -5,14 +5,21 @@ enum UsageDeadlineStyle: Equatable, Sendable {
     case todayOrTomorrow
 }
 
+enum ScheduledUsageNotificationKind: Equatable, Sendable {
+    case weeklyReset
+    case bankedResetExpiry
+}
+
 struct ScheduledUsageNotification: Equatable, Sendable {
     let identifier: String
+    let accountID: UUID
+    let accountName: String
+    let kind: ScheduledUsageNotificationKind
     let title: String
     let body: String
     let deadlineUpdateTitle: String
     let deadlineDescription: String
     let deadlineStyle: UsageDeadlineStyle
-    let usageSummary: String
     let notificationDate: Date
     let deadlineDate: Date
 
@@ -23,15 +30,21 @@ struct ScheduledUsageNotification: Equatable, Sendable {
         return String(identifier[..<range.lowerBound])
     }
 
+    var isDeadlineUpdate: Bool {
+        identifier.contains("-deadline-update-")
+    }
+
     func deadlineUpdateNotification(at date: Date) -> ScheduledUsageNotification {
         ScheduledUsageNotification(
             identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
+            accountID: accountID,
+            accountName: accountName,
+            kind: kind,
             title: deadlineUpdateTitle,
-            body: "\(deadlineDescription): \(UsageNotificationPlanner.formattedDeadline(deadlineDate, style: deadlineStyle, relativeTo: date)).\n\(usageSummary)",
+            body: "\(deadlineDescription): \(UsageNotificationPlanner.formattedDeadline(deadlineDate, style: deadlineStyle, relativeTo: date)).",
             deadlineUpdateTitle: deadlineUpdateTitle,
             deadlineDescription: deadlineDescription,
             deadlineStyle: deadlineStyle,
-            usageSummary: usageSummary,
             notificationDate: date,
             deadlineDate: deadlineDate
         )
@@ -58,4 +71,3 @@ struct ImmediateUsageNotification: Equatable, Sendable {
     let title: String
     let body: String
 }
-

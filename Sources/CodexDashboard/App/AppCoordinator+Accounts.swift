@@ -206,6 +206,27 @@ extension AppCoordinator {
         return authorization
     }
 
+    func refreshUsageForScheduledNotification(
+        _ accountID: UUID
+    ) async -> CodexAccountUsageSnapshot? {
+        let previousFetch = accounts.usageByAccountID[accountID]?.fetchedAt
+        if accountID == accounts.activeAccountID {
+            await accounts.refreshActiveUsage(
+                codexIsRunning: dashboardRuntime?.codexIsRunning == true
+            )
+        } else {
+            _ = await accounts.refreshInactiveAccountUsage(
+                accountID,
+                reportsFailure: false,
+                interactionAllowed: false
+            )
+        }
+        guard let snapshot = accounts.usageByAccountID[accountID] else { return nil }
+        if let previousFetch, snapshot.fetchedAt <= previousFetch { return nil }
+        Task { [weak self] in await self?.publishAccountPopoverSnapshot() }
+        return snapshot
+    }
+
     private func updateAccountPresentation() async {
         await updateAccountUsageNotifications()
         await publishAccountPopoverSnapshot()

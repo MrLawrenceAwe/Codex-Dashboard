@@ -49,7 +49,7 @@ private actor FailSecondNtfyPublisher: NtfyPublishing {
 
 @MainActor
 final class NtfyUsageNotifierTests: XCTestCase {
-    func testCancelsFailedDeadlineRetryWhenWeeklyUsageBecomesExhausted() async throws {
+    func testKeepsFailedDeadlineRetryWhenWeeklyUsageBecomesExhausted() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
@@ -75,10 +75,10 @@ final class NtfyUsageNotifierTests: XCTestCase {
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: exhausted])
         try await Task.sleep(for: .milliseconds(150))
         let count = await publisher.messageCount()
-        XCTAssertEqual(count, 0)
+        XCTAssertEqual(count, 1)
     }
 
-    func testDeliversImminentResetWarningOnceWithAccountAndRemainingUsage() async throws {
+    func testDeliversDeadlineOnlyFallbackWhenFreshUsageIsUnavailable() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
@@ -117,7 +117,49 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.topic, notifier.topic)
-        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly: 82% left · resets ") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly limit resets ") == true)
+        XCTAssertFalse(messages.first?.body.contains("%") == true)
+    }
+
+    func testRefreshesUsageImmediatelyBeforeDeliveringScheduledWarning() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = RecordingNtfyPublisher()
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        let reset = now.addingTimeInterval(60 * 60 + 0.01)
+        let scheduled = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 18, resetsAt: reset)
+            ),
+            fetchedAt: now
+        )
+        let fresh = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 40, resetsAt: now.addingTimeInterval(3 * 60 * 60)),
+                weekly: CodexUsageWindow(usedPercent: 83, resetsAt: reset)
+            ),
+            fetchedAt: now.addingTimeInterval(1)
+        )
+        notifier.setDeadlineUsageRefreshHandler { requestedAccountID in
+            XCTAssertEqual(requestedAccountID, account.id)
+            return fresh
+        }
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: scheduled])
+        for _ in 0..<50 {
+            if await publisher.recordedMessages().count == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let messages = await publisher.recordedMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly: 17% left") == true)
+        XCTAssertFalse(messages.first?.body.contains("82%") == true)
     }
 
     func testDisabledNotifierDoesNotPublishDueReset() async throws {
