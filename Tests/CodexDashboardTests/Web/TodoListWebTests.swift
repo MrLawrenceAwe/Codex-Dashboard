@@ -490,6 +490,51 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], ["dashboard"])
     }
 
+    func testAddingTodoClearsProjectPickerBeforeNextTodo() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-a"
+                  data-app-action-sidebar-project-label="Project A"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          const project = form.querySelector('[data-todo-new-project]');
+          const title = form.querySelector('[data-todo-new-title]');
+          const submit = form.querySelector('button[type="submit"]');
+          project.value = 'project-a';
+          project.dispatchEvent(new Event('change', { bubbles: true }));
+          title.value = 'First item';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          for (let attempt = 0; submit.disabled && attempt < 100; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          const projectAfterFirstAdd = project.value;
+          title.value = 'Second item';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          const items = window.__todoStoreForTests.load();
+          return [projectAfterFirstAdd, items.map(item => item.title),
+            items.map(item => item.project?.id || '')];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "")
+        XCTAssertEqual(values[1] as? [String], ["Second item", "First item"])
+        XCTAssertEqual(values[2] as? [String], ["", "project-a"])
+    }
+
     func testSelectingAProjectOffersOnlyThatProjectsChats() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """

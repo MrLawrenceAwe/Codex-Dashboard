@@ -279,7 +279,7 @@ const todoListView = (() => {
       const itemID = select.closest('[data-todo-id]')?.dataset.todoId;
       const selectedProjectID = itemID
         ? select.value
-        : selectedID || select.value;
+        : selectedID;
       select.innerHTML = projectOptions(projects, selectedProjectID);
     });
   }
