@@ -62,6 +62,13 @@ const todoStore = (() => {
     const body = cleanText(item?.body);
     const id = cleanText(item?.id);
     if (!id || !title) return null;
+    const image = normalizeImage(item?.image, true);
+    if (image) {
+      // Existing documents used the to-do ID as the image key. New image data
+      // gets its own key so a failed document write cannot replace that image.
+      image.storageKey = cleanText(item.image.storageKey)
+        || (image.dataURL ? `${id}:${crypto.randomUUID()}` : id);
+    }
     return {
       id,
       title,
@@ -70,7 +77,7 @@ const todoStore = (() => {
       tags: normalizeTags(item?.tags),
       project: normalizeProject(item?.project),
       chat: normalizeChat(item?.chat),
-      image: normalizeImage(item?.image, true),
+      image,
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
     };
@@ -137,7 +144,8 @@ const todoStore = (() => {
 
   function save(items, tags) {
     // Every write, including image pruning, completes before the next snapshot starts.
-    const result = saveQueue.then(() => writeSnapshot(items, tags)).catch(() => false);
+    const snapshot = items.map(normalizeItem).filter(Boolean);
+    const result = saveQueue.then(() => writeSnapshot(snapshot, tags)).catch(() => false);
     saveQueue = result;
     return result;
   }
@@ -197,12 +205,13 @@ const todoStore = (() => {
   function persistImages(items) {
     return withImageStore('readwrite', (store) => {
       items.filter((item) => item.image?.dataURL)
-        .forEach((item) => store.put(item.image.dataURL, item.id));
+        .forEach((item) => store.put(item.image.dataURL, item.image.storageKey));
     });
   }
 
   function pruneImages(items) {
-    const imageIDs = new Set(items.filter((item) => item.image).map((item) => item.id));
+    const imageIDs = new Set(items.filter((item) => item.image)
+      .map((item) => item.image.storageKey));
     return withImageStore('readwrite', (store) => {
       const keys = store.getAllKeys();
       keys.addEventListener('success', () => {
@@ -217,7 +226,7 @@ const todoStore = (() => {
     return withImageStore('readonly', (store) => {
       const hydrated = new Map();
       pending.forEach((item) => {
-        const request = store.get(item.id);
+        const request = store.get(item.image.storageKey);
         request.addEventListener('success', () => hydrated.set(item.id, request.result || ''));
       });
       return hydrated;

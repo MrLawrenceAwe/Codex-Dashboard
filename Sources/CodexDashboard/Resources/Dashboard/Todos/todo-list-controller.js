@@ -150,20 +150,6 @@ const todoList = (() => {
     return saved;
   }
 
-  async function addChat(thread) {
-    const chat = todoStore.normalizeChat(thread);
-    if (!chat) return false;
-    if (hasChat(chat.id)) return true;
-    const item = todoStore.create(chat.title);
-    if (!item) return false;
-    item.chat = chat;
-    return commitItems([item, ...items]);
-  }
-
-  function hasChat(chatID) {
-    return items.some((item) => !item.completed && item.chat?.id === chatID);
-  }
-
   function updateItem(id, changes) {
     const nextItems = items.map((item) => item.id === id
       ? todoStore.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
@@ -436,8 +422,6 @@ const todoList = (() => {
     mountPage,
     open,
     applyVisibility: pageState.applyVisibility,
-    addChat,
-    hasChat,
     refreshChatOptions,
   };
 })();

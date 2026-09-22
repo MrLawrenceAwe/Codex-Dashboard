@@ -111,6 +111,34 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[5] as? [String], ["Work"])
     }
 
+    func testFailedImageReplacementPreservesDurableImage() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const oldImage = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'old.png' };
+          const newImage = { dataURL: 'data:image/png;base64,Yg==', type: 'image/png', size: 1, name: 'new.png' };
+          const item = store.create('Saved image', '', oldImage);
+          await store.save([item], []);
+          const replacement = store.normalizeItem({ ...item, image: newImage });
+          const storage = window.localStorage;
+          Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+            getItem: storage.getItem.bind(storage), removeItem: storage.removeItem.bind(storage),
+            setItem(key, value) {
+              if (key === 'codex-dashboard.todos') throw new Error('Full');
+              storage.setItem(key, value);
+            },
+          }});
+          const saved = await store.save([replacement], []);
+          Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
+          const [restored] = await store.hydrate(store.load());
+          return [saved, restored.image.dataURL, restored.image.name,
+            replacement.image.storageKey !== item.image.storageKey];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [false, "data:image/png;base64,aA==", "old.png", true])
+    }
+
     func testFailedImageRemovalPreservesDurableImage() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
