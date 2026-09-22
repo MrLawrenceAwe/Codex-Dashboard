@@ -216,4 +216,27 @@ final class AccountCoordinatorTests: XCTestCase {
         await coordinator.refreshActiveUsage(codexIsRunning: true)
         XCTAssertEqual(coordinator.activeUsageStatus.snapshot?.usage, usageA)
     }
+
+    func testForgettingActiveAccountDoesNotAutomaticallySaveItAgain() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        let manager = CodexAccountManager(
+            metadataURL: directory.appendingPathComponent("accounts.json"),
+            authenticationURL: auth,
+            vault: CoordinatorMemoryCredentialVault()
+        )
+        try testAccountCredential(accountID: "active", name: "Active").write(to: auth)
+        let account = try manager.saveCurrentAccount()
+        let coordinator = AccountCoordinator(manager: manager, usageProvider: StubAccountUsageProvider())
+
+        coordinator.deleteAccount(account.id)
+        XCTAssertFalse(coordinator.synchronizeActiveCredentialAfterFileChange())
+        XCTAssertTrue(try manager.loadDocument().accounts.isEmpty)
+        XCTAssertNil(coordinator.activeAccountID)
+
+        XCTAssertTrue(coordinator.saveCurrentAccount())
+        XCTAssertEqual(try manager.loadDocument().accounts.count, 1)
+    }
 }

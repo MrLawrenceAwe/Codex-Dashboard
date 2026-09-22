@@ -88,6 +88,10 @@ final class AccountCoordinator: ObservableObject {
     @discardableResult
     func synchronizeActiveCredentialAfterFileChange() -> Bool {
         do {
+            refreshState()
+            guard let activeCodexAccountID,
+                  savedAccounts.contains(where: { $0.accountIdentifier == activeCodexAccountID })
+            else { return false }
             let account = try manager.saveCurrentAccount()
             let completedReauthentication = accountsRequiringSignIn.contains(account.id)
             accountsRequiringSignIn.remove(account.id)
