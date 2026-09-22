@@ -560,6 +560,47 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[8] as? Bool, true)
     }
 
+    func testChatPickerDoesNotMixProjectsWithTheSameName() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="/tmp/one/shared"
+                  data-app-action-sidebar-project-label="shared"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="opaque-project"
+                  data-app-action-sidebar-project-label="shared"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", title: "First project", projectName: "shared", projectPath: "/tmp/one/shared"),
+            .fixture(id: "two", title: "Second project", projectName: "shared", projectPath: "/tmp/two/shared"),
+        ])
+        let choices = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openTodos();
+              const project = document.querySelector('[data-todo-new-project]');
+              const chat = document.querySelector('[data-todo-new-chat-picker]');
+              project.value = '/tmp/one/shared';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const exact = [...chat.options].map((option) => option.value);
+              project.value = 'opaque-project';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              return [exact, [...chat.options].map((option) => option.value), chat.disabled];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(choices)
+        XCTAssertEqual(values[0] as? [String], ["", "one"])
+        XCTAssertEqual(values[1] as? [String], [""])
+        XCTAssertEqual(values[2] as? Bool, true)
+    }
+
     func testNewChatTransfersTheTodoImageToTheComposer() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
@@ -1293,6 +1334,8 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               <aside role="navigation">
                 <button class="sidebar-item" id="new-chat">New chat</button>
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:linked-chat">Linked chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="/tmp/project"
+                  data-app-action-sidebar-project-label="Project"></div>
               </aside>
               <main>Conversation surface</main>
               <script>
@@ -1318,18 +1361,26 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             .fixture(id: "older-project-chat", title: "Older project chat", recencyEpochMillis: 1),
         ])
 
-        _ = try await webView.evaluateJavaScript(
+        let chatChoices = try await webView.evaluateJavaScript(
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
-              document.querySelector('[data-filter="running"]').click();
-              document.querySelector('.dashboard-project-chat-picker').open = true;
-              window.__projectChatChoiceCount = document.querySelectorAll('.dashboard-project-chat-picker [data-add-chat-to-todos]').length;
-              document.querySelector('.dashboard-project-chat-picker [data-add-chat-to-todos="linked-chat"]').click();
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const project = form.querySelector('[data-todo-new-project]');
+              project.value = '/tmp/project';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              const choices = [...chat.options].map((option) => option.value);
+              chat.value = 'linked-chat';
+              chat.dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Finish linked work';
+              form.requestSubmit();
+              return choices;
             })()
             """
-        )
+        ) as? [String]
+        XCTAssertEqual(chatChoices, ["", "linked-chat", "older-project-chat"])
         try await DashboardWebTestHarness.waitForJavaScript(
             "JSON.parse(localStorage.getItem('codex-dashboard.todos') || '{\"items\":[]}').items.length === 1",
             in: webView
@@ -1347,14 +1398,12 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 document.querySelector('.todo-chat').textContent.trim(),
                 document.querySelector('[data-todo-paste-in-chat]').textContent.trim(),
                 document.querySelector('[data-todo-new-chat]') === null,
-                document.querySelector('[data-add-chat-to-todos]').disabled,
                 JSON.parse(localStorage.getItem('codex-dashboard.todos')).items.length,
-                window.__projectChatChoiceCount,
               ];
             })()
             """
         ) as? [AnyHashable]
-        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat", true, true, 1, 2])
+        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat", true, 1])
 
         _ = try await webView.evaluateJavaScript(
             "document.querySelector('[data-todo-paste-in-chat]').click()"

@@ -260,11 +260,19 @@ function destroy() {
 }
 
 function chatsForProject(project) {
+  const projectID = String(project?.id || '').trim();
   const projectName = String(project?.name || '').trim().toLocaleLowerCase();
   if (!projectName) return [];
-  return threads.filter((thread) => (
+  const exactPathThreads = threads.filter((thread) => String(thread.projectPath).trim() === projectID);
+  if (exactPathThreads.length) {
+    return exactPathThreads.map((thread) => ({ id: thread.id, title: thread.title }));
+  }
+  const namedThreads = threads.filter((thread) => (
     String(thread.projectName || '').trim().toLocaleLowerCase() === projectName
-  )).map((thread) => ({ id: thread.id, title: thread.title }));
+  ));
+  const projectPaths = new Set(namedThreads.map((thread) => String(thread.projectPath).trim()));
+  const matchingThreads = projectPaths.size === 1 ? namedThreads : [];
+  return matchingThreads.map((thread) => ({ id: thread.id, title: thread.title }));
 }
 
 return {
