@@ -161,6 +161,7 @@ const todoListView = (() => {
   }
 
   function createPage() {
+    document.getElementById(dashboardElements.elementIDs.todoDialogHost)?.remove();
     const page = document.createElement('section');
     page.id = dashboardElements.elementIDs.todoPage;
     page.setAttribute('aria-label', 'To-do list');
@@ -220,7 +221,7 @@ const todoListView = (() => {
     titleInput.style.setProperty('min-width', '0', 'important');
     addButton.style.setProperty('width', 'auto', 'important');
     const dialogHost = document.createElement('div');
-    dialogHost.id = 'codex-dashboard-todo-dialogs';
+    dialogHost.id = dashboardElements.elementIDs.todoDialogHost;
     dialogHost.innerHTML = `
       <dialog class="todo-image-dialog" data-todo-image-dialog aria-label="Image preview">
         <button type="button" data-todo-image-dialog-close aria-label="Close image preview">&times;</button>
