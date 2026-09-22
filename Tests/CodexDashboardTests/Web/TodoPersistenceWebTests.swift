@@ -211,6 +211,54 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["Old pending draft", "Replacement draft", 0])
     }
+
+    func testTagDialogWorksAfterPageRepairAndDashboardReinjection() async throws {
+        let view = try await webView()
+        let injection = try InjectionBundle.load()
+        let repaired = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          document.getElementById('codex-dashboard-todo-page').remove();
+          window.__codexDashboard.ensureMounted();
+          document.querySelector('[data-todo-manage-tags]').click();
+          document.querySelector('[data-todo-tag-name]').value = 'After repair';
+          document.querySelector('[data-todo-tag-form]').requestSubmit();
+          await window.__waitForTodoSaves();
+          return [
+            document.querySelectorAll('#codex-dashboard-todo-dialogs').length,
+            JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
+          ];
+        })()
+        """) as? [Any]
+        XCTAssertEqual(repaired?[0] as? Int, 1)
+        XCTAssertEqual(repaired?[1] as? [String], ["After repair"])
+
+        let removed = try await view.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.destroy();
+          return document.querySelectorAll('#codex-dashboard-todo-dialogs').length;
+        })()
+        """) as? Int
+        XCTAssertEqual(removed, 0)
+
+        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        let reinjected = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          document.querySelector('[data-todo-manage-tags]').click();
+          document.querySelector('[data-todo-tag-name]').value = 'After reinjection';
+          document.querySelector('[data-todo-tag-form]').requestSubmit();
+          await window.__waitForTodoSaves();
+          return [
+            document.querySelectorAll('#codex-dashboard-todo-dialogs').length,
+            JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
+          ];
+        })()
+        """) as? [Any]
+        XCTAssertEqual(reinjected?[0] as? Int, 1)
+        XCTAssertEqual(reinjected?[1] as? [String], ["After repair", "After reinjection"])
+    }
+
     func testFailedTagRenameAndDeletionRestoreAssignmentsAndCatalog() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
