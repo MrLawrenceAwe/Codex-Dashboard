@@ -263,7 +263,10 @@ const todoList = (() => {
       } else if (event.target.matches('[data-todo-project]')) {
         const project = codexUIContracts.projects()
           .find((candidate) => candidate.id === event.target.value) || null;
-        void updateItem(row.dataset.todoId, { project });
+        const currentProjectID = items.find((item) => item.id === row.dataset.todoId)?.project?.id;
+        const changes = { project };
+        if (currentProjectID !== project?.id) changes.chat = null;
+        void updateItem(row.dataset.todoId, changes);
       } else if (event.target.matches('[data-todo-tag]')) {
         const item = items.find((candidate) => candidate.id === row.dataset.todoId);
         if (item && event.target.value) void updateItem(item.id, {

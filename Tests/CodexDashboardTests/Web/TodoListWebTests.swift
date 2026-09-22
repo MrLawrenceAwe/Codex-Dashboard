@@ -560,6 +560,63 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[8] as? Bool, true)
     }
 
+    func testChangingTodoProjectClearsItsPreviousChat() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="dashboard"
+                  data-app-action-sidebar-project-label="Codex Dashboard"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="other"
+                  data-app-action-sidebar-project-label="Other Project"></div>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "dashboard-chat", title: "Dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 1),
+        ])
+
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              const newProject = form.querySelector('[data-todo-new-project]');
+              newProject.value = 'dashboard';
+              newProject.dispatchEvent(new Event('change', { bubbles: true }));
+              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              chat.value = 'dashboard-chat';
+              chat.dispatchEvent(new Event('change', { bubbles: true }));
+              form.querySelector('[data-todo-new-title]').value = 'Move me';
+              form.requestSubmit();
+              await window.__waitForTodoSaves?.();
+              document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
+              const originalChat = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].chat.id;
+              const project = document.querySelector('[data-todo-project]');
+              project.value = 'other';
+              project.dispatchEvent(new Event('change', { bubbles: true }));
+              await window.__waitForTodoSaves?.();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
+              return [originalChat, stored.project.id, stored.chat, Boolean(document.querySelector('[data-todo-paste-in-chat]')), Boolean(document.querySelector('[data-todo-new-chat]'))];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "dashboard-chat")
+        XCTAssertEqual(values[1] as? String, "other")
+        XCTAssertTrue(values[2] is NSNull)
+        XCTAssertEqual(values[3] as? Bool, false)
+        XCTAssertEqual(values[4] as? Bool, true)
+    }
+
     func testChatPickerDoesNotMixProjectsWithTheSameName() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
