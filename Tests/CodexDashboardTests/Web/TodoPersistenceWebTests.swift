@@ -253,6 +253,49 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["Work", "Work", "Work", "Work", false])
     }
 
+    func testPendingAddDoesNotDuplicateItemOrEraseNextDraft() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const store = window.__todoStoreForTests;
+          const originalSave = store.save;
+          let releaseSave;
+          const gate = new Promise(resolve => { releaseSave = resolve; });
+          store.save = (...args) => gate.then(() => originalSave(...args));
+          const form = document.querySelector('[data-todo-form]');
+          const title = form.querySelector('[data-todo-new-title]');
+          const body = form.querySelector('[data-todo-new-body]');
+          const submit = form.querySelector('button[type="submit"]');
+          title.value = 'First item';
+          form.requestSubmit();
+          title.value = 'Second draft';
+          body.value = 'Keep these notes';
+          form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          const disabledWhileSaving = submit.disabled;
+          store.save = originalSave;
+          releaseSave();
+          for (let attempt = 0; submit.disabled && attempt < 100; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          const afterFirstSave = [store.load().length, title.value, body.value, submit.disabled];
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          for (let attempt = 0; submit.disabled && attempt < 100; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          return [disabledWhileSaving, afterFirstSave,
+            store.load().map(item => item.title), title.value, body.value];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? [AnyHashable], [1, "Second draft", "Keep these notes", false])
+        XCTAssertEqual(values[2] as? [String], ["Second draft", "First item"])
+        XCTAssertEqual(values[3] as? String, "")
+        XCTAssertEqual(values[4] as? String, "")
+    }
+
     func testDestroyAbortsPendingImageReaders() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""

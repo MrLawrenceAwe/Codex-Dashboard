@@ -176,8 +176,10 @@ const todoList = (() => {
   }
 
   function bindAddForm(page) {
+    let addPending = false;
     page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
       event.preventDefault();
+      if (addPending) return;
       const imageDraft = imageController.draft();
       if (imageDraft.status === 'invalid') {
         imageController.reset();
@@ -193,8 +195,26 @@ const todoList = (() => {
       imageController.showError();
       const title = page.querySelector('[data-todo-new-title]');
       const body = page.querySelector('[data-todo-new-body]');
+      const submit = page.querySelector('[data-todo-form] button[type="submit"]');
+      const submitted = {
+        title: title.value,
+        body: body.value,
+        imageDraft,
+        tags: tagController.draft(),
+        project: projectDraft,
+        chat: chatDraft,
+      };
+      addPending = true;
+      submit.disabled = true;
       const finish = (saved) => {
-        if (!saved || destroyed) return;
+        addPending = false;
+        if (destroyed) return;
+        submit.disabled = false;
+        if (!saved || title.value !== submitted.title || body.value !== submitted.body
+          || imageController.draft() !== submitted.imageDraft
+          || tagController.draft() !== submitted.tags
+          || projectDraft?.id !== submitted.project?.id
+          || chatDraft?.id !== submitted.chat?.id) return;
         title.value = '';
         body.value = '';
         imageController.reset();
@@ -206,9 +226,10 @@ const todoList = (() => {
         title.focus();
       };
       const saved = add(
-        title.value, body.value, imageDraft.image, tagController.draft(), projectDraft, chatDraft,
+        submitted.title, submitted.body, imageDraft.image,
+        submitted.tags, submitted.project, submitted.chat,
       );
-      void saved.then(finish);
+      void saved.then(finish, () => finish(false));
     });
   }
 
