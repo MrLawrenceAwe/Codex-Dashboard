@@ -66,6 +66,67 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertEqual(plan.immediate.first?.title, "Codex limit reset")
     }
 
+    func testAlertsWhenBankedResetsAreAddedEvenWithNoWeeklyUsage() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let account = account(named: "Personal")
+        let expiration = now.addingTimeInterval(24 * 60 * 60)
+        let previous = CodexAccountUsage(
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 100, resetsAt: expiration),
+            bankedResets: CodexBankedResetSummary(availableCount: 1, nextExpiration: expiration)
+        )
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: previous.weekly,
+                bankedResets: CodexBankedResetSummary(availableCount: 3, nextExpiration: expiration)
+            ),
+            fetchedAt: now
+        )
+        let plan = UsageNotificationPlanner.plan(
+            for: [account], usageByAccountID: [account.id: current],
+            previousObservations: [account.id: UsageObservation(usage: previous)],
+            previousDeadlines: [:], sentUpdates: [:], now: now
+        )
+
+        XCTAssertEqual(plan.immediate.count, 1)
+        XCTAssertEqual(plan.immediate.first?.title, "2 banked Codex resets added")
+        XCTAssertTrue(plan.immediate.first?.body.contains("Personal: 3 banked resets available · next expires ") == true)
+        XCTAssertTrue(plan.immediate.first?.identifier.contains(account.id.uuidString.lowercased()) == true)
+    }
+
+    func testBankedResetAlertRequiresAKnownIncrease() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let account = account(named: "Personal")
+        func snapshot(_ count: Int) -> CodexAccountUsageSnapshot {
+            CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: nil, weekly: nil,
+                    bankedResets: CodexBankedResetSummary(availableCount: count, nextExpiration: nil)
+                ),
+                fetchedAt: now
+            )
+        }
+        let current = snapshot(2)
+        let previous = UsageObservation(usage: snapshot(3).usage)
+
+        XCTAssertTrue(UsageNotificationPlanner.bankedResetNotifications(
+            for: [account], usageByAccountID: [account.id: current], previousObservations: [:]
+        ).isEmpty)
+        XCTAssertTrue(UsageNotificationPlanner.bankedResetNotifications(
+            for: [account], usageByAccountID: [account.id: current],
+            previousObservations: [account.id: previous]
+        ).isEmpty)
+        XCTAssertTrue(UsageNotificationPlanner.bankedResetNotifications(
+            for: [account], usageByAccountID: [account.id: snapshot(3)],
+            previousObservations: [account.id: previous]
+        ).isEmpty)
+        XCTAssertEqual(UsageNotificationPlanner.bankedResetNotifications(
+            for: [account], usageByAccountID: [account.id: current],
+            previousObservations: [account.id: UsageObservation(usage: snapshot(1).usage)]
+        ).first?.title, "Banked Codex reset added")
+    }
+
     func testPlansWeeklyAndBankedExpiryWarningsAtEveryRequestedLeadTime() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let account = account(named: "Personal")

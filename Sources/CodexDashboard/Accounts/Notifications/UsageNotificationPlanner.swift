@@ -27,7 +27,10 @@ enum UsageNotificationPlanner {
         let updateSources = Set(updates.map(\.sourceIdentifier))
         return Plan(
             scheduled: all.filter { $0.notificationDate > now } + updates,
-            immediate: resetNotifications(
+            immediate: bankedResetNotifications(
+                for: accounts, usageByAccountID: usageByAccountID,
+                previousObservations: previousObservations
+            ) + resetNotifications(
                 for: accounts, usageByAccountID: usageByAccountID,
                 previousObservations: previousObservations, now: now
             ) + usageThresholdNotifications(
@@ -140,6 +143,31 @@ enum UsageNotificationPlanner {
                     now: now
                 ),
             ].compactMap { $0 }
+        }.sorted { $0.identifier < $1.identifier }
+    }
+
+    static func bankedResetNotifications(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        previousObservations: [UUID: UsageObservation]
+    ) -> [ImmediateUsageNotification] {
+        accounts.compactMap { account in
+            guard let snapshot = usageByAccountID[account.id],
+                  let current = snapshot.usage.bankedResets,
+                  let previous = previousObservations[account.id]?.bankedResets,
+                  current.availableCount > previous.availableCount
+            else { return nil }
+
+            let added = current.availableCount - previous.availableCount
+            let total = current.availableCount
+            let expiration = current.nextExpiration.map {
+                " · next expires \(formattedDeadline($0))"
+            } ?? ""
+            return ImmediateUsageNotification(
+                identifier: "codex-dashboard-account-banked-resets-added-\(account.id.uuidString.lowercased())-\(Int(snapshot.fetchedAt.timeIntervalSince1970))-\(total)",
+                title: added == 1 ? "Banked Codex reset added" : "\(added) banked Codex resets added",
+                body: "\(account.name): \(total) banked \(total == 1 ? "reset" : "resets") available\(expiration)."
+            )
         }.sorted { $0.identifier < $1.identifier }
     }
 

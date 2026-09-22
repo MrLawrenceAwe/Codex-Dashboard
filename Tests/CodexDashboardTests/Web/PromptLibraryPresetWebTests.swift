@@ -57,14 +57,19 @@ extension PromptLibraryWebTests {
     }
 
     func testPromptPresetUsesAssociatedSpeedFlyout() async throws {
-        try await checkPresetApplication(speedFlyout: true)
+        try await checkPresetApplication(speedFlyout: true, model: "gpt-6-sol", label: "GPT-6 Sol")
     }
 
     func testLockedModelDoesNotOpenAccessOptionsOrInsertPrompt() async throws {
         try await checkPresetApplication(speedFlyout: false, locked: true)
     }
 
-    private func checkPresetApplication(speedFlyout: Bool, locked: Bool = false) async throws {
+    private func checkPresetApplication(
+        speedFlyout: Bool,
+        locked: Bool = false,
+        model: String = "gpt-6-luna",
+        label: String = "GPT-6 Luna"
+    ) async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
@@ -119,13 +124,13 @@ extension PromptLibraryWebTests {
                 viewToggle.textContent = 'Select model';
                 viewToggle.addEventListener('click', () => showView('advanced'));
                 compact.append(viewToggle);
-                ['GPT-6 Astra', 'GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna'].forEach((label) => {
+                ['GPT-6 Astra', 'GPT-6 Sol', 'GPT-6 Luna', 'GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna'].forEach((label) => {
                   const option = document.createElement('div');
                   option.setAttribute('role', 'menuitemradio');
                   const name = document.createElement('span');
                   name.textContent = label;
                   option.append(name, ' Model description');
-                  if (\(locked) && label === 'GPT-5.6 Luna') {
+                  if (\(locked) && label === 'GPT-6 Luna') {
                     const description = document.createElement('span');
                     description.id = 'locked-model-description';
                     description.textContent = 'Locked, opens access options';
@@ -203,10 +208,10 @@ extension PromptLibraryWebTests {
                 hasPresetChecked: document.querySelector('[name="hasPreset"]').checked,
                 presetFieldsDisabled: document.querySelector('[data-prompt-preset-fields]').disabled,
               };
-              document.querySelector('[name="name"]').value = 'Luna fast review';
+              document.querySelector('[name="name"]').value = 'Fast review';
               document.querySelector('[name="content"]').value = 'Review this change';
               document.querySelector('[name="hasPreset"]').click();
-              document.querySelector('[name="presetModel"]').value = 'gpt-5.6-luna';
+              document.querySelector('[name="presetModel"]').value = '\(model)';
               document.querySelector('[name="presetReasoningEffort"]').value = 'light';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
@@ -267,14 +272,14 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(presetDefaults["presetFieldsDisabled"] as? Bool, true)
         XCTAssertEqual(
             values["preset"] as? [String: String],
-            ["model": "gpt-5.6-luna", "reasoningEffort": "light", "speed": "fast"]
+            ["model": model, "reasoningEffort": "light", "speed": "fast"]
         )
-        XCTAssertEqual(values["summary"] as? [String], ["GPT-5.6 Luna", "Light", "Fast"])
+        XCTAssertEqual(values["summary"] as? [String], [label, "Light", "Fast"])
         XCTAssertEqual(values["usesPresetByDefault"] as? Bool, false)
         XCTAssertEqual(values["usesPresetAfterToggle"] as? Bool, true)
         XCTAssertEqual(
             values["applied"] as? [String],
-            ["Model:GPT-5.6 Luna", "Effort:Light", "Speed:Fast"]
+            ["Model:\(label)", "Effort:Light", "Speed:Fast"]
         )
         XCTAssertEqual(values["promptDialogStates"] as? [Bool], [false, false, false])
         XCTAssertEqual(values["triggerDialogStates"] as? [Bool], [false])

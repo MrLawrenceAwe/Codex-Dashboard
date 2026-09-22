@@ -262,6 +262,36 @@ final class NtfyUsageNotifierTests: XCTestCase {
         XCTAssertTrue(messages.first?.body.contains("\n⏱ 5-hour 90% · 📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
+    func testDeliversNewBankedResetOnceAndKeepsPhoneHistoryAcrossRelaunch() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = RecordingNtfyPublisher()
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+        )
+        func snapshot(_ count: Int) -> CodexAccountUsageSnapshot {
+            CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: nil,
+                    weekly: CodexUsageWindow(usedPercent: 100, resetsAt: now.addingTimeInterval(5 * 24 * 60 * 60)),
+                    bankedResets: CodexBankedResetSummary(availableCount: count, nextExpiration: nil)
+                ),
+                fetchedAt: now
+            )
+        }
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(1)])
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(2)])
+        let reopened = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        await reopened.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(2)])
+
+        let messages = await publisher.recordedMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages.first?.title, "Banked Codex reset added")
+        XCTAssertEqual(messages.first?.body, "Personal: 2 banked resets available.")
+    }
+
     func testRetriesARevisedDeadlineAfterPhoneDeliveryFails() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()

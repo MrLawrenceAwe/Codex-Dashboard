@@ -5,6 +5,20 @@ import XCTest
 
 @MainActor
 final class UsageNotificationHistoryTests: XCTestCase {
+    func testDecodesEarlierObservationsWithoutBankedResetData() throws {
+        struct EarlierObservation: Encodable {
+            let fiveHour: UsageObservation.Window?
+            let weekly: UsageObservation.Window?
+        }
+        let accountID = UUID()
+        let data = try JSONEncoder().encode([
+            accountID: EarlierObservation(fiveHour: nil, weekly: nil)
+        ])
+        let observations = try JSONDecoder().decode([UUID: UsageObservation].self, from: data)
+        XCTAssertNotNil(observations[accountID])
+        XCTAssertNil(observations[accountID]?.bankedResets)
+    }
+
     func testExistingHistoryIsRetainedAndChannelsRemainIndependent() throws {
         let suite = "UsageNotificationHistoryTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
