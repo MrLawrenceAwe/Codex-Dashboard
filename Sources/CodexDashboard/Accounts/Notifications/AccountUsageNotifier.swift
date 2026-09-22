@@ -4,6 +4,54 @@ import UserNotifications
 typealias DeadlineUsageRefreshHandler = @MainActor @Sendable (UUID) async -> CodexAccountUsageSnapshot?
 
 @MainActor
+protocol DesktopNotificationCenter: AnyObject {
+    func pendingRequests() async -> [UNNotificationRequest]
+    func removePendingRequests(withIdentifiers identifiers: [String])
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String])
+    func add(_ request: UNNotificationRequest) async throws
+    func isAuthorized() async -> Bool
+}
+
+@MainActor
+final class SystemDesktopNotificationCenter: DesktopNotificationCenter {
+    private let center: UNUserNotificationCenter
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    func pendingRequests() async -> [UNNotificationRequest] {
+        await center.pendingNotificationRequests()
+    }
+
+    func removePendingRequests(withIdentifiers identifiers: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+    }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        try await center.add(request)
+    }
+
+    func isAuthorized() async -> Bool {
+        let settings = await center.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined:
+            return (try? await center.requestAuthorization(options: [.alert, .sound])) == true
+        case .denied:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+}
+
+@MainActor
 protocol AccountUsageNotifying {
     func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler)
     func updateNotifications(
@@ -24,21 +72,23 @@ struct NoopAccountUsageNotifier: AccountUsageNotifying {
 
 @MainActor
 final class AccountUsageNotifier: AccountUsageNotifying {
-    private static let identifierPrefix = "codex-dashboard-account-deadline-v2-"
     private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
+    private static let deliveredImmediateNotificationsKey = "accountDeliveredImmediateNotifications"
     private static let fallbackDelay: TimeInterval = 30
 
-    private let notificationCenter: UNUserNotificationCenter
+    private let notificationCenter: any DesktopNotificationCenter
     private let history: UsageNotificationHistory
+    private let userDefaults: UserDefaults
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var liveNotificationsByIdentifier: [String: ScheduledUsageNotification] = [:]
 
     init(
-        notificationCenter: UNUserNotificationCenter = .current(),
+        notificationCenter: any DesktopNotificationCenter = SystemDesktopNotificationCenter(),
         userDefaults: UserDefaults = .standard
     ) {
         self.notificationCenter = notificationCenter
+        self.userDefaults = userDefaults
         history = UsageNotificationHistory(userDefaults: userDefaults, channel: .desktop)
     }
 
@@ -74,16 +124,18 @@ final class AccountUsageNotifier: AccountUsageNotifying {
             requestsByIdentifier[notification.identifier] = notification
         }
         let requests = requestsByIdentifier.values.sorted { $0.identifier < $1.identifier }
-        let pendingRequests = await notificationCenter.pendingNotificationRequests()
+        let pendingRequests = await notificationCenter.pendingRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
             request.identifier.hasPrefix(Self.legacyIdentifierPrefix) ? request.identifier : nil
         }
-        notificationCenter.removePendingNotificationRequests(withIdentifiers: existingIdentifiers)
+        notificationCenter.removePendingRequests(withIdentifiers: existingIdentifiers)
 
         let immediateNotifications = plan.immediate
-        guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationsAreAuthorized() else {
+        guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationCenter.isAuthorized() else {
             cancelAllLiveTasks()
-            history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+            if immediateNotifications.isEmpty {
+                history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+            }
             return
         }
         reconcileLiveDeliveries(requests.filter { !$0.isDeadlineUpdate }, now: currentDate)
@@ -118,20 +170,33 @@ final class AccountUsageNotifier: AccountUsageNotifying {
                 // immediate revised-deadline alert that macOS rejected.
             }
         }
-        for notification in immediateNotifications {
+        var deliveredImmediateIdentifiers = Set(
+            userDefaults.stringArray(forKey: Self.deliveredImmediateNotificationsKey) ?? []
+        )
+        var immediateDeliveryFailed = false
+        for notification in immediateNotifications where !deliveredImmediateIdentifiers.contains(notification.identifier) {
             let content = UNMutableNotificationContent()
             content.title = notification.title
             content.body = notification.body
             content.sound = .default
-            try? await notificationCenter.add(
-                UNNotificationRequest(
+            do {
+                try await notificationCenter.add(UNNotificationRequest(
                     identifier: notification.identifier,
                     content: content,
                     trigger: nil
+                ))
+                deliveredImmediateIdentifiers.insert(notification.identifier)
+                userDefaults.set(
+                    Array(deliveredImmediateIdentifiers),
+                    forKey: Self.deliveredImmediateNotificationsKey
                 )
-            )
+            } catch {
+                immediateDeliveryFailed = true
+            }
         }
-        history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+        if !immediateDeliveryFailed {
+            history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)
+        }
     }
 
     private func reconcileLiveDeliveries(
@@ -167,7 +232,7 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         guard let refreshed = UsageNotificationPlanner.refreshedContent(
             for: notification, using: snapshot, now: .now
         ) else {
-            notificationCenter.removePendingNotificationRequests(withIdentifiers: [notification.identifier])
+            notificationCenter.removePendingRequests(withIdentifiers: [notification.identifier])
             cancelLiveTask(notification.identifier)
             return
         }
@@ -183,7 +248,7 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         } catch {
             return
         }
-        notificationCenter.removePendingNotificationRequests(withIdentifiers: [notification.identifier])
+        notificationCenter.removePendingRequests(withIdentifiers: [notification.identifier])
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [notification.identifier])
         cancelLiveTask(notification.identifier)
     }
@@ -199,20 +264,4 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         liveTasksByIdentifier = [:]
         liveNotificationsByIdentifier = [:]
     }
-
-    private func notificationsAreAuthorized() async -> Bool {
-        let settings = await notificationCenter.notificationSettings()
-        switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return true
-        case .notDetermined:
-            return (try? await notificationCenter.requestAuthorization(options: [.alert, .sound])) == true
-        case .denied:
-            return false
-        @unknown default:
-            return false
-        }
-    }
-
-
 }
