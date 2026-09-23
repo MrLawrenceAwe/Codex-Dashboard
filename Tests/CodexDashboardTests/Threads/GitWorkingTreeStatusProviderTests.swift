@@ -3,6 +3,34 @@ import XCTest
 @testable import CodexDashboard
 
 final class GitWorkingTreeStatusProviderTests: XCTestCase {
+    private actor OrderedStatusLoader {
+        private var callCount = 0
+        private var firstCall: CheckedContinuation<WorkingTreeStatus, Never>?
+        private var firstCallStarted: CheckedContinuation<Void, Never>?
+
+        func load() async -> WorkingTreeStatus {
+            callCount += 1
+            if callCount == 1 {
+                firstCallStarted?.resume()
+                firstCallStarted = nil
+                return await withCheckedContinuation { firstCall = $0 }
+            }
+            return .clean
+        }
+
+        func waitForFirstCall() async {
+            if callCount > 0 { return }
+            await withCheckedContinuation { firstCallStarted = $0 }
+        }
+
+        func releaseFirstCall() {
+            firstCall?.resume(returning: .hasChanges)
+            firstCall = nil
+        }
+
+        func calls() -> Int { callCount }
+    }
+
     func testDefaultStatusCacheAvoidsRepeatedPeriodicGitScans() {
         XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 60)
     }
@@ -27,6 +55,37 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
 
         XCTAssertEqual(changed[projectURL.path], .hasChanges)
         XCTAssertEqual(clean[projectURL.path], .clean)
+    }
+
+    func testOlderRefreshCannotOverwriteNewerCachedStatus() async throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
+        _ = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", projectURL.path, "init", "--quiet"],
+            timeout: 3
+        )
+
+        let loader = OrderedStatusLoader()
+        let provider = GitWorkingTreeStatusProvider(statusLoader: { _, _ in
+            await loader.load()
+        })
+        let olderRefresh = Task {
+            await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
+        }
+        await loader.waitForFirstCall()
+        let newer = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
+        await loader.releaseFirstCall()
+        let older = await olderRefresh.value
+        let cached = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
+
+        XCTAssertEqual(newer[projectURL.path], .clean)
+        XCTAssertEqual(older[projectURL.path], .clean)
+        XCTAssertEqual(cached[projectURL.path], .clean)
+        let callCount = await loader.calls()
+        XCTAssertEqual(callCount, 2)
     }
 
     func testReportsUncommittedChanges() async throws {
