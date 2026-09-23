@@ -151,14 +151,47 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-dialogs .todo-tag-dialog::backdrop { background: rgba(0, 0, 0, .72); }
 #codex-dashboard-todo-dialogs .todo-image-dialog img { display: block; max-width: 100%; max-height: calc(100vh - 96px); margin: auto; object-fit: contain; }
 #codex-dashboard-todo-dialogs .todo-image-dialog button { position: absolute; top: 7px; right: 9px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 20px; cursor: pointer; }
-#codex-dashboard-todo-dialogs .todo-tag-dialog { width: min(420px, calc(100vw - 48px)); padding: 16px; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-bg); color: var(--todo-text); }
-#codex-dashboard-todo-dialogs .todo-tag-dialog-header { display: flex; align-items: center; justify-content: space-between; }
-#codex-dashboard-todo-dialogs .todo-tag-dialog-header strong { font-size: 16px; }
-#codex-dashboard-todo-dialogs .todo-tag-dialog-header button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: var(--todo-active); color: var(--todo-text); font-size: 19px; cursor: pointer; }
-#codex-dashboard-todo-dialogs .todo-tag-form { display: flex; gap: 8px; margin-top: 16px; }
-#codex-dashboard-todo-dialogs .todo-tag-form input { min-width: 0; flex: 1; padding: 7px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-text); font-size: 12px; }
-#codex-dashboard-todo-dialogs .todo-tag-form button { padding: 0 9px; border: 0; border-radius: 6px; background: var(--todo-text); color: var(--todo-bg); font-size: 11px; font-weight: 600; cursor: pointer; }
-#codex-dashboard-todo-dialogs .todo-tag-dialog [data-todo-managed-tags] { min-height: 30px; margin-top: 12px; padding: 0; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog { width: min(500px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 32px)); overflow-y: auto; padding: 24px; border: 1px solid var(--todo-line-strong); border-radius: 16px; background: var(--todo-bg); color: var(--todo-text); box-shadow: 0 20px 60px rgba(0, 0, 0, .2); }
+#codex-dashboard-todo-dialogs .todo-tag-dialog * { box-sizing: border-box; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog button,
+#codex-dashboard-todo-dialogs .todo-tag-dialog input { font: inherit; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog button:focus-visible,
+#codex-dashboard-todo-dialogs .todo-tag-dialog input:focus-visible { outline: 2px solid var(--app-color-border-focus, var(--todo-text)); outline-offset: 2px; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-header h2 { margin: 0; font-size: 19px; font-weight: 650; line-height: 1.3; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-header p { margin: 5px 0 0; color: var(--todo-muted); font-size: 12px; line-height: 1.45; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-header button { display: grid; width: 30px; height: 30px; flex: 0 0 auto; padding: 0; border: 0; border-radius: 7px; background: var(--todo-active); color: var(--todo-muted); font-size: 22px; line-height: 1; cursor: pointer; place-items: center; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-header button:hover { color: var(--todo-text); }
+#codex-dashboard-todo-dialogs .todo-tag-form { display: grid; gap: 8px; margin-top: 24px; }
+#codex-dashboard-todo-dialogs .todo-tag-form label { color: var(--todo-text); font-size: 12px; font-weight: 600; }
+#codex-dashboard-todo-dialogs .todo-tag-form-fields { display: flex; gap: 8px; }
+#codex-dashboard-todo-dialogs .todo-tag-form input { min-width: 0; min-height: 38px; flex: 1; padding: 8px 11px; border: 1px solid var(--todo-line-strong); border-radius: 8px; background: var(--todo-surface); color: var(--todo-text); font-size: 13px; }
+#codex-dashboard-todo-dialogs .todo-tag-form input::placeholder { color: var(--todo-muted); }
+#codex-dashboard-todo-dialogs .todo-tag-form button { min-height: 38px; padding: 0 13px; border: 0; border-radius: 8px; background: var(--todo-text); color: var(--todo-bg); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-tag-form button:hover { opacity: .85; }
+#codex-dashboard-todo-dialogs .todo-tag-form .todo-tag-cancel { border: 1px solid var(--todo-line-strong); background: var(--todo-surface); color: var(--todo-muted); }
+#codex-dashboard-todo-dialogs .todo-tag-form .todo-tag-cancel[hidden] { display: none; }
+#codex-dashboard-todo-dialogs .todo-tag-list-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; padding-bottom: 9px; border-bottom: 1px solid var(--todo-line); }
+#codex-dashboard-todo-dialogs .todo-tag-list-heading strong { font-size: 12px; font-weight: 600; }
+#codex-dashboard-todo-dialogs .todo-tag-list-heading span { color: var(--todo-muted); font-size: 11px; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog [data-todo-managed-tags] { display: grid; margin: 0; padding: 0; }
+#codex-dashboard-todo-dialogs .todo-managed-tag { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--todo-line); }
+#codex-dashboard-todo-dialogs .todo-managed-tag-details { display: grid; min-width: 0; gap: 3px; }
+#codex-dashboard-todo-dialogs .todo-managed-tag-name { overflow-wrap: anywhere; font-size: 13px; font-weight: 550; line-height: 1.4; }
+#codex-dashboard-todo-dialogs .todo-managed-tag-usage { color: var(--todo-muted); font-size: 11px; }
+#codex-dashboard-todo-dialogs .todo-managed-tag-actions { display: flex; flex: 0 0 auto; gap: 4px; }
+#codex-dashboard-todo-dialogs .todo-managed-tag-actions button { min-height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--todo-muted); font-size: 11px; cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-managed-tag-actions button:hover { background: var(--todo-active); color: var(--todo-text); }
+#codex-dashboard-todo-dialogs .todo-managed-tag-actions [data-todo-managed-tag-remove]:hover { color: #c65353; }
+#codex-dashboard-todo-dialogs .todo-tag-empty { margin: 0; padding: 24px 8px; color: var(--todo-muted); font-size: 12px; text-align: center; }
+#codex-dashboard-todo-dialogs .todo-tag-dialog-note { margin: 14px 0 0; color: var(--todo-muted); font-size: 11px; line-height: 1.4; }
+@media (max-width: 420px) {
+  #codex-dashboard-todo-dialogs .todo-tag-dialog { padding: 18px; }
+  #codex-dashboard-todo-dialogs .todo-tag-form-fields { flex-wrap: wrap; }
+  #codex-dashboard-todo-dialogs .todo-tag-form input { flex-basis: 100%; }
+  #codex-dashboard-todo-dialogs .todo-managed-tag { align-items: flex-start; flex-direction: column; gap: 6px; }
+  #codex-dashboard-todo-dialogs .todo-managed-tag-actions { margin-left: -8px; }
+}
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 32px; height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
 #codex-dashboard-todo-page .todo-chat-action { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-item:hover .todo-chat-action, #codex-dashboard-todo-page .todo-item:focus-within .todo-chat-action, #codex-dashboard-todo-page .todo-chat-action:focus-visible { opacity: 1; }

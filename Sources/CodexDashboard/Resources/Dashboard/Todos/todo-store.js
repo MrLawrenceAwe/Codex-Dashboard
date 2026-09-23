@@ -267,5 +267,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save, writeProtectionReason };
+  return { create, hydrate, load, loadTags, maximumTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save, writeProtectionReason };
 })();

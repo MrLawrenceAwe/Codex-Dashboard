@@ -11,11 +11,29 @@ const todoListView = (() => {
       </div>`;
   }
 
-  function tagMarkup(tags, editable = false, deletable = false) {
+  function tagMarkup(tags, editable = false) {
     if (!tags.length) return '';
     return `<div class="todo-tags" aria-label="To-do tags">${tags.map((tag) => `
-      <span class="todo-tag">${domUtils.escapeHTML(tag)}${editable ? `<button type="button" data-todo-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Remove tag ${domUtils.escapeHTML(tag)}" title="Remove tag ${domUtils.escapeHTML(tag)}">&times;</button>` : ''}${deletable ? `<button type="button" data-todo-managed-tag-edit="${domUtils.escapeHTML(tag)}" aria-label="Rename tag ${domUtils.escapeHTML(tag)}" title="Rename tag">&#9998;</button><button type="button" data-todo-managed-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Delete tag ${domUtils.escapeHTML(tag)} from all to-dos" title="Delete tag from all to-dos">&times;</button>` : ''}</span>
+      <span class="todo-tag">${domUtils.escapeHTML(tag)}${editable ? `<button type="button" data-todo-tag-remove="${domUtils.escapeHTML(tag)}" aria-label="Remove tag ${domUtils.escapeHTML(tag)}" title="Remove tag ${domUtils.escapeHTML(tag)}">&times;</button>` : ''}</span>
     `).join('')}</div>`;
+  }
+
+  function managedTagMarkup(tags, items) {
+    if (!tags.length) return '<p class="todo-tag-empty">No tags yet. Create one to organise your to-dos.</p>';
+    return tags.map((tag) => {
+      const name = domUtils.escapeHTML(tag);
+      const count = items.filter((item) => item.tags?.includes(tag)).length;
+      return `<div class="todo-managed-tag">
+        <div class="todo-managed-tag-details">
+          <span class="todo-managed-tag-name" title="${name}">${name}</span>
+          <span class="todo-managed-tag-usage">${count} ${count === 1 ? 'to-do' : 'to-dos'}</span>
+        </div>
+        <div class="todo-managed-tag-actions">
+          <button type="button" data-todo-managed-tag-edit="${name}" aria-label="Rename tag ${name}">Rename</button>
+          <button type="button" data-todo-managed-tag-remove="${name}" aria-label="Delete tag ${name} from all to-dos">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
   }
 
   function projectPickerMarkup(project) {
@@ -244,12 +262,21 @@ const todoListView = (() => {
         <img alt="">
       </dialog>
       <dialog class="todo-tag-dialog" data-todo-tag-dialog aria-label="Manage tags">
-        <header class="todo-tag-dialog-header"><strong>Tags</strong><button type="button" data-todo-tag-dialog-close aria-label="Close tags">&times;</button></header>
+        <header class="todo-tag-dialog-header">
+          <div><h2>Manage tags</h2><p>Create and organise tags for your to-dos.</p></div>
+          <button type="button" data-todo-tag-dialog-close aria-label="Close tags">&times;</button>
+        </header>
         <form data-todo-tag-form class="todo-tag-form">
-          <input data-todo-tag-name aria-label="Tag name" placeholder="New tag name" autocomplete="off">
-          <button type="submit">Create tag</button>
+          <label for="todo-managed-tag-name">Tag name</label>
+          <div class="todo-tag-form-fields">
+            <input id="todo-managed-tag-name" data-todo-tag-name aria-label="Tag name" placeholder="Enter a tag name" autocomplete="off">
+            <button type="submit">Create tag</button>
+            <button type="button" class="todo-tag-cancel" data-todo-tag-cancel hidden>Cancel</button>
+          </div>
         </form>
+        <div class="todo-tag-list-heading"><strong>Your tags</strong><span data-todo-tag-count></span></div>
         <div class="todo-tags" data-todo-managed-tags aria-label="Available tags"></div>
+        <p class="todo-tag-dialog-note">Deleting a tag removes it from every to-do.</p>
       </dialog>`;
     document.body.append(dialogHost);
     const imageDialog = dialogHost.querySelector('[data-todo-image-dialog]');
@@ -317,9 +344,12 @@ const todoListView = (() => {
     if (tagFilter) tagFilter.innerHTML = filterTagOptions(tags, items, filters.tag || '');
   }
 
-  function updateManagedTags(tags) {
+  function updateManagedTags(tags, items = []) {
     const container = document.querySelector('[data-todo-managed-tags]');
-    if (container) container.innerHTML = tagMarkup(tags, false, true);
+    if (!container) return;
+    container.innerHTML = managedTagMarkup(tags, items);
+    const count = document.querySelector('[data-todo-tag-count]');
+    if (count) count.textContent = `${tags.length} of ${todoStore.maximumTags}`;
   }
 
   function showImage(image) {

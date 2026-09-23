@@ -442,6 +442,51 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? Bool, true)
     }
 
+    func testTagDialogShowsManagedRowsAndCanCancelRename() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              window.__codexDashboard.openTodos();
+              document.querySelector('[data-todo-manage-tags]').click();
+              const dialog = document.querySelector('[data-todo-tag-dialog]');
+              const empty = dialog.querySelector('.todo-tag-empty')?.textContent.includes('No tags yet');
+              dialog.querySelector('[data-todo-tag-name]').value = 'A long tag name that should stay readable';
+              dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+              await window.__waitForTodoSaves?.();
+              const row = dialog.querySelector('.todo-managed-tag');
+              const details = [row.querySelector('.todo-managed-tag-name').textContent.trim(),
+                row.querySelector('.todo-managed-tag-usage').textContent.trim(),
+                dialog.querySelector('[data-todo-tag-count]').textContent.trim()];
+              row.querySelector('[data-todo-managed-tag-edit]').click();
+              const renaming = dialog.querySelector('[data-todo-tag-cancel]').hidden === false;
+              dialog.querySelector('[data-todo-tag-cancel]').click();
+              return [empty, ...details, renaming,
+                dialog.querySelector('[data-todo-tag-name]').value,
+                dialog.querySelector('[data-todo-tag-form] button[type="submit"]').textContent];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? String, "A long tag name that should stay readable")
+        XCTAssertEqual(values[2] as? String, "0 to-dos")
+        XCTAssertEqual(values[3] as? String, "1 of 8")
+        XCTAssertEqual(values[4] as? Bool, true)
+        XCTAssertEqual(values[5] as? String, "")
+        XCTAssertEqual(values[6] as? String, "Create tag")
+    }
+
     func testProjectsComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """

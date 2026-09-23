@@ -1,4 +1,4 @@
-function createTodoTagController({ isDestroyed, getAvailableTags, commitChange }) {
+function createTodoTagController({ isDestroyed, getAvailableTags, getItems, commitChange }) {
   let draft = [];
 
   function reset() {
@@ -52,7 +52,7 @@ function createTodoTagController({ isDestroyed, getAvailableTags, commitChange }
       if (!dialog) {
         dialog = todoListView.ensureDialogHost().querySelector('[data-todo-tag-dialog]');
         bindDialog(dialog);
-        todoListView.updateManagedTags(getAvailableTags());
+        todoListView.updateManagedTags(getAvailableTags(), getItems());
       }
       if (!dialog.open) dialog.showModal();
     });
@@ -60,17 +60,23 @@ function createTodoTagController({ isDestroyed, getAvailableTags, commitChange }
   }
 
   function bindDialog(dialog) {
-    const close = () => { if (dialog.open) dialog.close(); };
-    dialog.querySelector('[data-todo-tag-dialog-close]').addEventListener('click', close);
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
     const input = dialog.querySelector('[data-todo-tag-name]');
     const submit = dialog.querySelector('[data-todo-tag-form] button[type="submit"]');
+    const cancel = dialog.querySelector('[data-todo-tag-cancel]');
+    const label = dialog.querySelector('.todo-tag-form label');
     const resetForm = () => {
       input.value = '';
       delete input.dataset.todoTagRename;
       input.setAttribute('aria-label', 'Tag name');
+      label.textContent = 'Tag name';
       submit.textContent = 'Create tag';
+      cancel.hidden = true;
     };
+    const close = () => { if (dialog.open) dialog.close(); };
+    dialog.querySelector('[data-todo-tag-dialog-close]').addEventListener('click', close);
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
+    dialog.addEventListener('close', resetForm);
+    cancel.addEventListener('click', () => { resetForm(); input.focus(); });
     dialog.querySelector('[data-todo-tag-form]').addEventListener('submit', (event) => {
       event.preventDefault();
       const oldTag = input.dataset.todoTagRename;
@@ -93,7 +99,9 @@ function createTodoTagController({ isDestroyed, getAvailableTags, commitChange }
         input.value = editButton.dataset.todoManagedTagEdit;
         input.dataset.todoTagRename = editButton.dataset.todoManagedTagEdit;
         input.setAttribute('aria-label', `Rename tag ${editButton.dataset.todoManagedTagEdit}`);
+        label.textContent = 'Rename tag';
         submit.textContent = 'Save tag';
+        cancel.hidden = false;
         input.focus();
         input.select();
         return;
