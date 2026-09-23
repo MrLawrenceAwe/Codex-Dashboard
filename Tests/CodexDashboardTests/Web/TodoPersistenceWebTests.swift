@@ -24,7 +24,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (async () => {
           const store = window.__todoStoreForTests;
           const results = [];
-          for (const version of [1, 2, 3, 4, 5, 6]) {
+          for (const version of [1, 2, 3, 4, 5, 6, 7]) {
             localStorage.clear();
             const project = { id: 'project-a', name: 'Project A' };
             const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'test.png' };
@@ -38,7 +38,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             const loaded = store.load();
             const tags = store.loadTags(loaded);
             const migrated = JSON.parse(localStorage.getItem('codex-dashboard.todos'));
-            results.push(migrated.version === 7 && loaded[0].project.id === 'project-a'
+            results.push(migrated.version === 8 && loaded[0].project.id === 'project-a'
               && loaded[0].tags[0] === 'Work' && loaded[0].image.dataURL === image.dataURL
               && loaded[0].createdAt === 1 && loaded[0].updatedAt === 2
               && tags.includes('Personal') && tags.includes('Work')
@@ -52,7 +52,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           return results;
         })()
         """) as? [Bool]
-        XCTAssertEqual(result, [true, true, true, true, true, true])
+        XCTAssertEqual(result, [true, true, true, true, true, true, true])
     }
 
     func testFailedMigrationWriteStillLoadsDataAndPreservesOriginalDocument() async throws {
@@ -82,7 +82,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const storage = window.localStorage;
           const results = [];
           for (const original of [
-            JSON.stringify({ version: 8, items: [{ id: 'future', title: 'Keep me' }] }),
+            JSON.stringify({ version: 9, items: [{ id: 'future', title: 'Keep me' }] }),
             '{invalid json',
           ]) {
             storage.setItem('codex-dashboard.todos', original);
@@ -105,7 +105,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (() => {
           window.__codexDashboard.destroy();
           localStorage.setItem('codex-dashboard.todos', JSON.stringify({
-            version: 8, items: [{ id: 'future', title: 'Keep me' }],
+            version: 9, items: [{ id: 'future', title: 'Keep me' }],
           }));
           return true;
         })()

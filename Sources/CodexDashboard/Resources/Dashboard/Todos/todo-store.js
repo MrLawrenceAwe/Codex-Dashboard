@@ -4,8 +4,8 @@ const todoStore = (() => {
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 7;
-  const supportedVersions = new Set([1, 2, 3, 4, 5, 6, version]);
+  const version = 8;
+  const supportedVersions = new Set([1, 2, 3, 4, 5, 6, 7, version]);
   const maximumTags = 8;
   const maximumProjectNameLength = 40;
 
@@ -77,6 +77,7 @@ const todoStore = (() => {
       tags: normalizeTags(item?.tags),
       project: normalizeProject(item?.project),
       thread: normalizeThread(item?.thread),
+      preset: promptLibraryContract.normalizePreset(item?.preset) || null,
       image,
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
