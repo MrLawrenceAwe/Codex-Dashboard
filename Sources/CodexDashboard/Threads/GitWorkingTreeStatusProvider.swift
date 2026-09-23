@@ -29,14 +29,20 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     private let subprocessTimeout: TimeInterval
     private let cacheLifetime: TimeInterval
+    private let statusLoader: @Sendable (String, TimeInterval) async -> WorkingTreeStatus
     private var statusByProjectPath: [String: CachedStatus] = [:]
+    private var refreshGenerationByProjectPath: [String: UInt64] = [:]
 
     init(
         subprocessTimeout: TimeInterval = 3,
-        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime
+        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime,
+        statusLoader: @escaping @Sendable (String, TimeInterval) async -> WorkingTreeStatus = {
+            await GitWorkingTreeStatusProvider.status(atProjectPath: $0, timeout: $1)
+        }
     ) {
         self.subprocessTimeout = subprocessTimeout
         self.cacheLifetime = cacheLifetime
+        self.statusLoader = statusLoader
     }
 
     func loadStatuses(
@@ -60,8 +66,15 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             guard let cached = statusByProjectPath[path] else { return true }
             return now.timeIntervalSince(cached.loadedAt) >= cacheLifetime
         }
+        var requestGenerations: [String: UInt64] = [:]
+        for path in staleProjectPaths {
+            let generation = (refreshGenerationByProjectPath[path] ?? 0) &+ 1
+            refreshGenerationByProjectPath[path] = generation
+            requestGenerations[path] = generation
+        }
+        let statusLoader = statusLoader
         let refreshed = await Self.concurrentMap(staleProjectPaths) { path in
-            (path, await Self.status(atProjectPath: path, timeout: timeout))
+            (path, await statusLoader(path, timeout))
         }
         var statusesByProjectPath: [String: WorkingTreeStatus] = [:]
         for path in repositoryProjectPaths {
@@ -71,8 +84,12 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             statusesByProjectPath[path] = cached.value
         }
         for (path, status) in refreshed {
-            statusByProjectPath[path] = CachedStatus(value: status, loadedAt: now)
-            statusesByProjectPath[path] = status
+            if refreshGenerationByProjectPath[path] == requestGenerations[path] {
+                statusByProjectPath[path] = CachedStatus(value: status, loadedAt: Date())
+                statusesByProjectPath[path] = status
+            } else {
+                statusesByProjectPath[path] = statusByProjectPath[path]?.value ?? status
+            }
         }
 
         return Dictionary(uniqueKeysWithValues: projectPaths.map { path in
