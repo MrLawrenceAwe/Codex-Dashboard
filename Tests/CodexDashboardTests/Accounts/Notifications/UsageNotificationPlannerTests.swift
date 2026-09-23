@@ -562,6 +562,27 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertTrue(alerts.first?.body.contains("Personal’s Weekly reset: 1% left") == true)
     }
 
+    func testDoesNotCallAShortDeadlineExtensionAReset() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let previous = UsageObservation(usage: CodexAccountUsage(
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(-30))
+        ))
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(30 * 60))
+            ),
+            fetchedAt: now
+        )
+
+        XCTAssertTrue(UsageNotificationPlanner.resetNotifications(
+            for: [savedAccount], usageByAccountID: [savedAccount.id: current],
+            previousObservations: [savedAccount.id: previous], now: now
+        ).isEmpty)
+    }
+
     func testPlansEachUsageThresholdOncePerWindow() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")

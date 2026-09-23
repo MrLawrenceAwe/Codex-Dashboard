@@ -281,8 +281,14 @@ enum UsageNotificationPlanner {
         let currentAllowance = max(0, min(100, 100 - current.usedPercent))
         let nextResetDescription = formattedDeadline(nextReset, style: deadlineStyle(for: windowName), relativeTo: now)
         let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(previousReset.timeIntervalSinceReferenceDate))"
+        // Usage can rise quickly after a real reset. A full new window is still
+        // evidence of a reset, while a revised deadline alone is not.
+        let windowDuration: TimeInterval = windowName == "5-hour" ? 5 * oneHour : 7 * 24 * oneHour
+        let observedNewWindow = abs(nextReset.timeIntervalSince(previousReset) - windowDuration)
+            <= resetTimeCorrectionTolerance
+        guard previous.usedPercent > current.usedPercent || (previousReset <= now && observedNewWindow)
+        else { return nil }
         if previousReset > now {
-            guard previous.usedPercent > current.usedPercent else { return nil }
             return ImmediateUsageNotification(
                 identifier: identifier,
                 title: "Codex limit reset early",

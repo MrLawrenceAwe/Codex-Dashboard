@@ -9,6 +9,7 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
     var authorized = true
     var failedImmediateTitle: String?
     var immediateTitles: [String] = []
+    var scheduledRequests: [UNNotificationRequest] = []
 
     func pendingRequests() async -> [UNNotificationRequest] { [] }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
@@ -16,7 +17,10 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
     func requestAuthorizationIfNeeded() async -> Bool { authorized }
 
     func add(_ request: UNNotificationRequest) async throws {
-        guard request.trigger == nil else { return }
+        guard request.trigger == nil else {
+            scheduledRequests.append(request)
+            return
+        }
         if request.content.title == failedImmediateTitle {
             failedImmediateTitle = nil
             throw URLError(.cannotConnectToHost)
@@ -63,6 +67,28 @@ private final class SuspendedDesktopNotificationCenter: DesktopNotificationCente
 
 @MainActor
 final class DesktopUsageNotifierTests: XCTestCase {
+    func testScheduledFallbackDoesNotClaimAnUnverifiedResetTime() async throws {
+        let now = Date.now
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, accountIdentifier: nil)
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(
+                usedPercent: 20, resetsAt: now.addingTimeInterval(2 * 60 * 60)
+            )),
+            fetchedAt: now
+        )
+        let center = RecordingDesktopNotificationCenter()
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: try makeDefaults())
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+
+        XCTAssertFalse(center.scheduledRequests.isEmpty)
+        XCTAssertTrue(center.scheduledRequests.allSatisfy { $0.content.title == "Check Codex usage" })
+        XCTAssertTrue(center.scheduledRequests.allSatisfy {
+            $0.content.body.contains("was last recorded as")
+        })
+    }
+
     func testOverlappingUpdatesDeliverImmediateAlertsOnce() async throws {
         let (account, previous, current) = makeThresholdSnapshots()
         let defaults = try makeDefaults()

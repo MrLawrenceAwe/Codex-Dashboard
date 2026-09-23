@@ -152,8 +152,13 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         reconcileLiveDeliveries(requests.filter { !$0.isDeadlineUpdate }, now: currentDate)
         for notification in requests {
             let content = UNMutableNotificationContent()
-            content.title = notification.title
-            content.body = notification.body
+            if notification.isDeadlineUpdate {
+                content.title = notification.title
+                content.body = notification.body
+            } else {
+                content.title = "Check Codex usage"
+                content.body = "\(notification.accountName)’s usage deadline was last recorded as \(UsageNotificationPlanner.formattedDeadline(notification.deadlineDate)). Open Codex Dashboard for current usage."
+            }
             content.sound = .default
             let trigger = UNCalendarNotificationTrigger(
                 dateMatching: Calendar.current.dateComponents(

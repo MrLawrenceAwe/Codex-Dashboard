@@ -190,24 +190,27 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
 
     private func deliver(_ notification: ScheduledUsageNotification) async {
         guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
-        var refreshed: ImmediateUsageNotification?
-        if let deadlineUsageRefresh,
-           let snapshot = await deadlineUsageRefresh(notification.accountID) {
-            guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
-            guard let content = UsageNotificationPlanner.refreshedContent(
-                for: notification, using: snapshot, now: now()
-            ) else {
-                cancelTask(notification.identifier)
-                return
+        guard let deadlineUsageRefresh,
+              let snapshot = await deadlineUsageRefresh(notification.accountID)
+        else {
+            if isEnabled, scheduledByIdentifier[notification.identifier] == notification {
+                scheduleRetry(for: notification)
             }
-            refreshed = content
+            return
+        }
+        guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+        guard let refreshed = UsageNotificationPlanner.refreshedContent(
+            for: notification, using: snapshot, now: now()
+        ) else {
+            cancelTask(notification.identifier)
+            return
         }
         guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
         do {
             try await publisher.publish(
                 topic: topic,
-                title: refreshed?.title ?? notification.title,
-                message: refreshed?.body ?? notification.body
+                title: refreshed.title,
+                message: refreshed.body
             )
             if notification.identifier.contains("-deadline-update-") {
                 history.saveDeadlines([notification], for: .known)

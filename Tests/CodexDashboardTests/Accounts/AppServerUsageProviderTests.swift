@@ -4,6 +4,14 @@ import XCTest
 @testable import CodexDashboard
 
 final class AppServerUsageProviderTests: XCTestCase {
+    func testKnownWindowDurationDoesNotBecomeTheOtherLimit() {
+        let weekly = RateLimitWindow(usedPercent: 70, windowDurationMins: 10_080, resetsAt: 2_000)
+        let usage = RateLimitSnapshot(primary: weekly, secondary: nil).accountUsage(bankedResets: nil)
+
+        XCTAssertNil(usage.fiveHour)
+        XCTAssertEqual(usage.weekly?.usedPercent, 70)
+    }
+
     func testRevokedOAuthTokenHasAnActionableError() {
         let rawMessage = #"failed to fetch codex rate limits: 401 Unauthorized; body={"error":{"message":"Encountered invalidated oauth token for user, failing request","code":"token_revoked"}}"#
 
