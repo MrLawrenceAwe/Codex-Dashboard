@@ -26,7 +26,6 @@ enum ThreadCatalogError: LocalizedError {
 
 actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     static let defaultLoadedThreadLimit = 500
-    private static let steadyStateLifecycleProbeLimit = 20
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
         "model", "rollout_path", "archived", "recency_at_ms",
@@ -61,7 +60,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private var cachedLaunchMilliseconds: Int64?
     private var cachedRequiredThreadIDs: Set<String>?
     private var cachedStoredThreads: [StoredThread]?
-    private var cachedSummariesByThreadID: [String: ThreadSummary] = [:]
     private let subprocessTimeout: TimeInterval
 
     init(
@@ -113,10 +111,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         ORDER BY recency_at_ms DESC
         """
         let databaseSignature = try signature(for: stateDatabaseURL)
-        let launchContextChanged = launchMilliseconds != cachedLaunchMilliseconds
-        let previousStoredThreadsByID = Dictionary(
-            uniqueKeysWithValues: (cachedStoredThreads ?? []).map { ($0.id, $0) }
-        )
         let threads: [StoredThread]
         if databaseSignature == cachedDatabaseSignature,
            requiredThreadIDs == cachedRequiredThreadIDs,
@@ -132,22 +126,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         }
         let activityPaths = Set(threads.map(\.rolloutPath))
         rolloutActivityReader.retainCache(for: activityPaths)
-        var nextSummariesByThreadID: [String: ThreadSummary] = [:]
-        nextSummariesByThreadID.reserveCapacity(threads.count)
-        let threadSummaries = threads.enumerated().map { index, thread in
-            let cachedSummary = cachedSummariesByThreadID[thread.id]
-            let isCurrentLaunchThread = launchMilliseconds.map {
-                thread.recencyAtMilliseconds >= $0
-            } ?? false
-            let shouldInspectRollout = launchContextChanged
-                || index < Self.steadyStateLifecycleProbeLimit
-                || isCurrentLaunchThread
-                || cachedSummary?.runState == .running
-                || previousStoredThreadsByID[thread.id] != thread
-            if !shouldInspectRollout, let cachedSummary {
-                nextSummariesByThreadID[thread.id] = cachedSummary
-                return cachedSummary
-            }
+        // Any loaded task can be resumed or hit a usage limit without a database
+        // write. The reader checks file signatures and only parses changed rollouts.
+        let threadSummaries = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
             let isCurrentEvent = recordedEvent.map { event in
@@ -178,7 +159,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 latestLifecycleEvent: latestLifecycleEvent,
                 workingTreeStatus: .notRepository
             )
-            nextSummariesByThreadID[thread.id] = summary
             return summary
         }.sorted { left, right in
             if left.recencyEpochMillis == right.recencyEpochMillis {
@@ -186,7 +166,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             }
             return left.recencyEpochMillis > right.recencyEpochMillis
         }
-        cachedSummariesByThreadID = nextSummariesByThreadID
         return ThreadCatalog(
             threads: threadSummaries,
             totalThreadCount: threads.first?.totalCount ?? 0
