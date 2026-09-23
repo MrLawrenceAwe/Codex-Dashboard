@@ -60,14 +60,29 @@ enum UsageNotificationPlanner {
     ) -> [ScheduledUsageNotification] {
         accounts.flatMap { account -> [ScheduledUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let weeklyNotifications = limitNotifications(
-                for: account,
-                windowName: "Weekly",
-                window: usage.weekly,
-                leadTimes: extendedLeadTimes,
-                now: now
-            )
-            return weeklyNotifications + bankedResetExpiryNotifications(
+            let limitReminders: [ScheduledUsageNotification]
+            if hasWeeklyUsageRemaining(usage) {
+                let fiveHourReminders = hasFiveHourUsageRemaining(usage)
+                    ? limitNotifications(
+                        for: account,
+                        windowName: "5-hour",
+                        kind: .fiveHourReset,
+                        window: usage.fiveHour,
+                        leadTimes: [oneHour],
+                        now: now
+                    ) : []
+                limitReminders = fiveHourReminders + limitNotifications(
+                    for: account,
+                    windowName: "Weekly",
+                    kind: .weeklyReset,
+                    window: usage.weekly,
+                    leadTimes: extendedLeadTimes,
+                    now: now
+                )
+            } else {
+                limitReminders = []
+            }
+            return limitReminders + bankedResetExpiryNotifications(
                 for: account,
                 resets: usage.bankedResets,
                 now: now
@@ -221,6 +236,7 @@ enum UsageNotificationPlanner {
     private static func limitNotifications(
         for account: SavedAccount,
         windowName: String,
+        kind: ScheduledUsageNotificationKind,
         window: CodexUsageWindow?,
         leadTimes: [TimeInterval],
         now: Date
@@ -235,7 +251,7 @@ enum UsageNotificationPlanner {
                 identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
                 accountID: account.id,
                 accountName: account.name,
-                kind: .weeklyReset,
+                kind: kind,
                 title: "Codex limit resets in \(leadTimeDescription)",
                 body: "\(account.name)’s \(windowName) limit resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
                 deadlineUpdateTitle: "\(windowName) reset time changed",
@@ -341,8 +357,18 @@ enum UsageNotificationPlanner {
         let usage = snapshot.usage
         let body: String
         switch notification.kind {
+        case .fiveHourReset:
+            guard hasWeeklyUsageRemaining(usage), hasFiveHourUsageRemaining(usage),
+                  let fiveHour = usage.fiveHour,
+                  let resetsAt = fiveHour.resetsAt,
+                  !deadlinesDifferMeaningfully(resetsAt, notification.deadlineDate)
+            else { return nil }
+            let remaining = max(0, min(100, 100 - fiveHour.usedPercent))
+            body = "\(notification.accountName)’s 5-hour: \(remaining)% left · resets "
+                + "\(formattedDeadline(resetsAt, style: .todayOrTomorrow, relativeTo: now)).\n"
+                + usageSummary(for: usage)
         case .weeklyReset:
-            guard let weekly = usage.weekly,
+            guard hasWeeklyUsageRemaining(usage), let weekly = usage.weekly,
                   let resetsAt = weekly.resetsAt,
                   !deadlinesDifferMeaningfully(resetsAt, notification.deadlineDate)
             else { return nil }

@@ -46,6 +46,8 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
     private var retryAttemptsByIdentifier: [String: Int] = [:]
+    private var updateInProgress = false
+    private var updateWaiters: [CheckedContinuation<Void, Never>] = []
 
     private static let maximumDeliveryAttempts = 6
 
@@ -102,6 +104,15 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
+        while updateInProgress {
+            await withCheckedContinuation { updateWaiters.append($0) }
+        }
+        updateInProgress = true
+        defer {
+            updateInProgress = false
+            updateWaiters.forEach { $0.resume() }
+            updateWaiters.removeAll()
+        }
         guard isEnabled else {
             cancelAllTasks()
             return
@@ -117,13 +128,17 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         )
         history.saveDeadlines(plan.unchangedDeadlines, for: .known)
         let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
-        let eligibleSources = Set((plan.unchangedDeadlines + plan.scheduled).map(\.sourceIdentifier))
+        let eligibleDeadlines = (plan.unchangedDeadlines + plan.scheduled)
+            .reduce(into: [String: Date]()) { result, notification in
+                result[notification.sourceIdentifier] = notification.deadlineDate
+            }
 
         for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
-            // A due alert that failed to reach ntfy is no longer in the planner's
-            // future schedule. Keep its bounded retry alive instead of dropping it.
-            if retryAttemptsByIdentifier[identifier] == nil ||
-                scheduledByIdentifier[identifier].map({ !eligibleSources.contains($0.sourceIdentifier) }) == true {
+            // A due alert stays eligible while it is being delivered or retried.
+            // Cancel it if its reset deadline changed or the alert became ineligible.
+            if scheduledByIdentifier[identifier].map({
+                eligibleDeadlines[$0.sourceIdentifier] != $0.deadlineDate
+            }) != false {
                 cancelTask(identifier)
             }
         }
