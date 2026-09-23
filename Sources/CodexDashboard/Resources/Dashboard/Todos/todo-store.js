@@ -77,7 +77,7 @@ const todoStore = (() => {
       tags: normalizeTags(item?.tags),
       project: normalizeProject(item?.project),
       thread: normalizeThread(item?.thread),
-      preset: promptLibraryContract.normalizePreset(item?.preset) || null,
+      preset: composerPresets.normalize(item?.preset) || null,
       image,
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),

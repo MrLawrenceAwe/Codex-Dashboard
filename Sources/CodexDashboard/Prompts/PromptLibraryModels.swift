@@ -3,23 +3,11 @@ import Foundation
 enum PromptLibrarySchema {
     static let currentVersion = 3
     static let defaultSection = "General"
-    static let defaultModel = "gpt-6-astra"
-    static let defaultReasoningEffort = "medium"
-    static let defaultSpeed = "standard"
-    static let reasoningEfforts = ["light", "medium", "high", "xhigh", "max", "ultra"]
-    static let speeds = ["standard", "fast"]
 
     static var javascriptDeclaration: String {
         let schema: [String: Any] = [
             "version": currentVersion,
             "defaultSection": defaultSection,
-            "defaults": [
-                "model": defaultModel,
-                "reasoningEffort": defaultReasoningEffort,
-                "speed": defaultSpeed,
-            ],
-            "reasoningEfforts": reasoningEfforts,
-            "speeds": speeds,
         ]
         let data = try! JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])
         return "const PROMPT_LIBRARY_SCHEMA = Object.freeze(\(String(decoding: data, as: UTF8.self)));"
@@ -70,8 +58,8 @@ struct SavedPromptScope: Codable, Equatable, Sendable {
 }
 
 struct SavedPromptPreset: Codable, Equatable, Sendable {
-    private static let reasoningEffortValues = Set(PromptLibrarySchema.reasoningEfforts)
-    private static let speedValues = Set(PromptLibrarySchema.speeds)
+    private static let reasoningEffortValues = Set(ComposerPresetSchema.reasoningEfforts)
+    private static let speedValues = Set(ComposerPresetSchema.speeds)
 
     let model: String?
     let reasoningEffort: String?

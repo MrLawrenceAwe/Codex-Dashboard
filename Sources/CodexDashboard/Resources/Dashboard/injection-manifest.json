@@ -8,8 +8,8 @@
     "Core/codex-ui-contracts",
     "Core/codex-host",
     "Core/dashboard-navigation-button",
+    "Composer/composer-presets",
     "Prompts/prompt-library-contract",
-    "Prompts/preset-options",
     "Prompts/prompt-store",
     "Composer/composer-model-picker",
     "Composer/composer-adapter",
@@ -29,6 +29,7 @@
     "Todos/todo-list-view",
     "Todos/todo-image-controller",
     "Todos/todo-tag-controller",
+    "Todos/todo-composer-actions",
     "Todos/todo-list-controller",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
@@ -50,6 +51,8 @@
       "Core/codex-ui-contracts"
     ],
     "promptLibrary": [
+      "Core/dom-utils",
+      "Composer/composer-presets",
       "Prompts/prompt-library-contract"
     ]
   }

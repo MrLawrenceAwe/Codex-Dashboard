@@ -5,7 +5,6 @@ const promptStore = (() => {
 
   const {
     normalizePrompts,
-    normalizePreset,
     normalizeScope,
     normalizeSection,
     normalizeSections,
@@ -78,7 +77,6 @@ const promptStore = (() => {
     ),
 
     normalizeSection,
-    normalizePreset,
     normalizeScope,
 
     resolveSection(section) {

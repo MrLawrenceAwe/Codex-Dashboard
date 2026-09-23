@@ -1,24 +1,4 @@
 const promptLibraryView = (() => {
-  function selectOptions(options, selectedValue) {
-    const availableOptions = options.some(([value]) => value === selectedValue) || !selectedValue
-      ? options
-      : [[selectedValue, `Saved model · ${selectedValue}`], ...options];
-    return availableOptions.map(([value, label]) => (
-      `<option value="${domUtils.escapeHTML(value)}"${value === selectedValue ? ' selected' : ''}>${domUtils.escapeHTML(label)}</option>`
-    )).join('');
-  }
-
-  function presetSummary(preset) {
-    if (!preset) return [];
-    return [
-      presetOptions.models.find(([value]) => value === preset.model)?.[1]
-        || (preset.model ? `Saved model · ${preset.model}` : undefined),
-      presetOptions.reasoningEfforts.find(([value]) => value === preset.reasoningEffort)?.[1],
-      presetOptions.speeds.find(([value]) => value === preset.speed)?.[1],
-    ].filter(Boolean);
-  }
-
-
   function promptMatchesScope(prompt, scope) {
     return promptLibraryContract.scopeKey(prompt.scope) === promptLibraryContract.scopeKey(scope);
   }
@@ -69,9 +49,9 @@ const promptLibraryView = (() => {
         <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a model preset</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
           <legend>Model preset</legend>
-          <label>Model<select name="presetModel">${selectOptions(presetOptions.models, prompt?.preset?.model || promptLibraryContract.defaults.model)}</select></label>
-          <label>Effort<select name="presetReasoningEffort">${selectOptions(presetOptions.reasoningEfforts, prompt?.preset?.reasoningEffort || promptLibraryContract.defaults.reasoningEffort)}</select></label>
-          <label>Speed<select name="presetSpeed">${selectOptions(presetOptions.speeds, prompt?.preset?.speed || promptLibraryContract.defaults.speed)}</select></label>
+          <label>Model<select name="presetModel">${composerPresets.selectOptions(composerPresets.models, prompt?.preset?.model || composerPresets.defaults.model)}</select></label>
+          <label>Effort<select name="presetReasoningEffort">${composerPresets.selectOptions(composerPresets.reasoningEfforts, prompt?.preset?.reasoningEffort || composerPresets.defaults.reasoningEffort)}</select></label>
+          <label>Speed<select name="presetSpeed">${composerPresets.selectOptions(composerPresets.speeds, prompt?.preset?.speed || composerPresets.defaults.speed)}</select></label>
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${domUtils.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">
@@ -84,7 +64,7 @@ const promptLibraryView = (() => {
   }
   const query = searchTerm.trim().toLowerCase();
   const matchingPrompts = query ? promptStore.prompts.filter((prompt) => (
-    `${prompt.name} ${prompt.section} ${prompt.content} ${presetSummary(prompt.preset).join(' ')}`
+    `${prompt.name} ${prompt.section} ${prompt.content} ${composerPresets.summary(prompt.preset).join(' ')}`
       .toLowerCase().includes(query)
   )) : promptStore.prompts;
   const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
@@ -94,7 +74,7 @@ const promptLibraryView = (() => {
         <button type="button" class="dashboard-prompt-use" data-prompt-use="${domUtils.escapeHTML(prompt.id)}">
           <strong>${domUtils.escapeHTML(prompt.name)}</strong>
           <span>${domUtils.escapeHTML(prompt.content)}</span>
-          ${presetSummary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${presetSummary(prompt.preset).map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
+          ${composerPresets.summary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${composerPresets.summary(prompt.preset).map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
         </button>
         <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use model preset</label>
       </div>

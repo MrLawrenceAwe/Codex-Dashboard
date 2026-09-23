@@ -45,6 +45,38 @@ struct UsageNotificationHistory {
         userDefaults.set(values, forKey: key(for: kind))
     }
 
+    private var immediateIdentifiersKey: String {
+        channel == .desktop
+            ? "accountDeliveredImmediateNotifications"
+            : "ntfyDeliveredImmediateAccountNotifications"
+    }
+
+    func deliveredImmediateIdentifiers() -> Set<String> {
+        Set(userDefaults.stringArray(forKey: immediateIdentifiersKey) ?? [])
+    }
+
+    func recordImmediateDelivery(_ identifier: String) {
+        var identifiers = deliveredImmediateIdentifiers()
+        identifiers.insert(identifier)
+        userDefaults.set(Array(identifiers), forKey: immediateIdentifiersKey)
+    }
+
+    private static let phoneDeliveredDeadlinesKey = "ntfyDeliveredAccountResets"
+
+    func deliveredDeadline(for identifier: String) -> Date? {
+        guard channel == .phone,
+              let timestamp = userDefaults.dictionary(forKey: Self.phoneDeliveredDeadlinesKey)?[identifier]
+                as? Double else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    func recordDeadlineDelivery(_ notification: ScheduledUsageNotification) {
+        guard channel == .phone else { return }
+        var delivered = userDefaults.dictionary(forKey: Self.phoneDeliveredDeadlinesKey) ?? [:]
+        delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
+        userDefaults.set(delivered, forKey: Self.phoneDeliveredDeadlinesKey)
+    }
+
     func observations() -> [UUID: UsageObservation] {
         guard let data = userDefaults.data(forKey: observationsKey) else { return [:] }
         return (try? JSONDecoder().decode([UUID: UsageObservation].self, from: data)) ?? [:]

@@ -7,6 +7,12 @@ import XCTest
 @MainActor
 enum DashboardWebTestHarness {
     private static var activeWebViews: [WKWebView] = []
+    static let basicTodoHTML = """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+          <main>Conversation surface</main>
+        </body></html>
+        """
 
     static func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
