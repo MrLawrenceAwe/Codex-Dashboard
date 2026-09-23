@@ -33,6 +33,31 @@ private struct FailingUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
+private actor SequencedUnreadIDProvider: UnreadThreadIDProviding {
+    private var continuations: [Int: CheckedContinuation<Set<String>, Never>] = [:]
+    private var nextRequestID = 0
+    private let suspendInitial: Bool
+
+    init(suspendInitial: Bool = false) {
+        self.suspendInitial = suspendInitial
+    }
+
+    func loadUnreadThreadIDs() async -> Set<String> {
+        let requestID = nextRequestID
+        nextRequestID += 1
+        if requestID == 0 && !suspendInitial { return [] }
+        return await withCheckedContinuation { continuation in
+            continuations[requestID] = continuation
+        }
+    }
+
+    func pendingRequestCount() -> Int { continuations.count }
+
+    func resume(requestID: Int, unreadThreadIDs: Set<String>) {
+        continuations.removeValue(forKey: requestID)?.resume(returning: unreadThreadIDs)
+    }
+}
+
 private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     private var continuations: [Int: CheckedContinuation<[String: WorkingTreeStatus], Never>] = [:]
     private var nextRequestID = 0
@@ -190,5 +215,56 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         XCTAssertNotNil(snapshot.unreadStateWarning)
         XCTAssertNotNil(refresh.warning)
         XCTAssertNil(refresh.unreadThreadIDs)
+    }
+
+    func testOlderUnreadRefreshCannotOverwriteNewerResult() async throws {
+        let unreadProvider = SequencedUnreadIDProvider()
+        let service = ThreadSnapshotService(
+            catalogProvider: CountingCatalogProvider(),
+            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: unreadProvider
+        )
+        _ = try await service.loadSnapshot(codexLaunchDate: nil)
+
+        let older = Task { await service.updateUnreadState() }
+        while await unreadProvider.pendingRequestCount() < 1 { await Task.yield() }
+        let newer = Task { await service.updateUnreadState() }
+        while await unreadProvider.pendingRequestCount() < 2 { await Task.yield() }
+
+        await unreadProvider.resume(requestID: 2, unreadThreadIDs: ["newer"])
+        let newerResult = await newer.value
+        XCTAssertEqual(newerResult.unreadThreadIDs, ["newer"])
+        await unreadProvider.resume(requestID: 1, unreadThreadIDs: ["older"])
+        let olderResult = await older.value
+        XCTAssertNil(olderResult.unreadThreadIDs)
+
+        let unchanged = Task { await service.updateUnreadState() }
+        while await unreadProvider.pendingRequestCount() < 1 { await Task.yield() }
+        // A subsequent read of the same current state must not publish another change.
+        await unreadProvider.resume(requestID: 3, unreadThreadIDs: ["newer"])
+        let unchangedResult = await unchanged.value
+        XCTAssertNil(unchangedResult.unreadThreadIDs)
+    }
+
+    func testInitialSnapshotDoesNotOverwriteNewerUnreadRefresh() async throws {
+        let unreadProvider = SequencedUnreadIDProvider(suspendInitial: true)
+        let service = ThreadSnapshotService(
+            catalogProvider: CountingCatalogProvider(),
+            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: unreadProvider
+        )
+
+        let snapshotTask = Task { try await service.loadSnapshot(codexLaunchDate: nil) }
+        while await unreadProvider.pendingRequestCount() < 1 { await Task.yield() }
+        let refreshTask = Task { await service.updateUnreadState() }
+        while await unreadProvider.pendingRequestCount() < 2 { await Task.yield() }
+
+        let unreadID = ThreadSummary.fixture().id
+        await unreadProvider.resume(requestID: 1, unreadThreadIDs: [unreadID])
+        let refresh = await refreshTask.value
+        XCTAssertEqual(refresh.unreadThreadIDs, [unreadID])
+        await unreadProvider.resume(requestID: 0, unreadThreadIDs: [])
+        let snapshot = try await snapshotTask.value
+        XCTAssertTrue(snapshot.catalog.threads[0].isUnread)
     }
 }

@@ -78,14 +78,10 @@ async function openCommitOrPushForProject(projectPath) {
     renderDashboard();
     return;
   }
-  if (!await codexHost.canOpenCommitOrPush()) {
-    commitOrPushError = 'Commit or push is not available in this Codex version. Open a project task and use its Git controls instead.';
-    renderDashboard();
-    return;
-  }
   closeDashboard();
-  if (await codexHost.openCommitOrPush(thread)) return;
-  commitOrPushError = 'The project task opened, but Codex could not start Commit or push.';
+  const result = await codexHost.openCommitOrPush(thread);
+  if (result.opened) return;
+  commitOrPushError = result.reason;
   dashboardNavigation.openTasks();
   renderDashboard();
 }

@@ -151,48 +151,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Mute change alerts"])
     }
 
-    func testUnavailableCommitActionDoesNotNavigateAwayFromDashboard() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html:
-            """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """,
-        )
-        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(projectPath: "/tmp/changed", workingTreeStatus: .hasChanges),
-        ])
-
-        _ = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
-              document.querySelector('[data-filter="changedProjects"]').click();
-              document.querySelector('[data-project-commit]').click();
-            })()
-            """
-        )
-        try await Task.sleep(for: .milliseconds(100))
-        let state = try await webView.evaluateJavaScript(
-            """
-            [
-              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
-              document.querySelector('[data-commit-notice]').textContent,
-            ]
-            """
-        ) as? [Any]
-
-        let values = try XCTUnwrap(state)
-        XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(
-            values[1] as? String,
-            "Commit or push is not available in this Codex version. Open a project task and use its Git controls instead."
-        )
-    }
-
-    func testCommitFailureAfterThreadNavigationIsRenderedImmediately() async throws {
+    func testMissingGitActionsReportsSpecificFailure() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -200,14 +159,11 @@ extension TaskDashboardWebTests {
                 <button class="sidebar-item">New chat</button>
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
               </aside>
-              <main>
-                <button type="button" data-slot="thread-summary-panel-item-button">Commit or push</button>
-              </main>
+              <main>Conversation surface</main>
               <script>
                 const row = document.querySelector('[data-app-action-sidebar-thread-id]');
                 row.addEventListener('click', () => {
                   row.setAttribute('aria-current', 'page');
-                  document.querySelector('[data-slot="thread-summary-panel-item-button"]')?.remove();
                 });
               </script>
             </body></html>
@@ -231,7 +187,7 @@ extension TaskDashboardWebTests {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(250))
+        try await Task.sleep(for: .milliseconds(5500))
         let state = try await webView.evaluateJavaScript(
             """
             [
@@ -244,11 +200,11 @@ extension TaskDashboardWebTests {
 
         XCTAssertEqual(
             try XCTUnwrap(state) as? [AnyHashable],
-            [true, false, "The project task opened, but Codex could not start Commit or push."]
+            [true, false, "Codex did not show Git actions for the project task."]
         )
     }
 
-    func testProjectCommitActionUsesCodexNativeGitControls() async throws {
+    func testProjectCommitActionUsesCodexGitActionsMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -259,13 +215,12 @@ extension TaskDashboardWebTests {
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:running-thread">Running thread</button>
               </aside>
               <main>
-                <button type="button" aria-label="Toggle side panel">Side panel</button>
+                <button type="button" aria-label="Git actions">Git</button>
                 <div id="composer-host"><textarea placeholder="Do anything"></textarea></div>
               </main>
               <script>
                 document.documentElement.dataset.selectedThread = '';
-                document.documentElement.dataset.sidePanelCount = '0';
-                document.documentElement.dataset.commitCount = '0';
+                document.documentElement.dataset.gitMenuCount = '0';
                 const activeThreadProps = { conversationId: 'initial-thread' };
                 document.getElementById('composer-host').__reactFiber$test = {
                   memoizedProps: activeThreadProps,
@@ -285,28 +240,14 @@ extension TaskDashboardWebTests {
                     document.documentElement.dataset.selectedThread = row.dataset.appActionSidebarThreadId;
                   });
                 });
-                document.querySelector('[aria-label="Toggle side panel"]').addEventListener('click', () => {
-                  document.documentElement.dataset.sidePanelCount = String(
-                    Number(document.documentElement.dataset.sidePanelCount) + 1
+                document.querySelector('[aria-label="Git actions"]').addEventListener('pointerdown', () => {
+                  document.documentElement.dataset.gitMenuCount = String(
+                    Number(document.documentElement.dataset.gitMenuCount) + 1
                   );
-                  const environment = document.createElement('button');
-                  environment.type = 'button';
-                  environment.textContent = 'Environment';
-                  environment.setAttribute('aria-expanded', 'false');
-                  environment.addEventListener('click', () => {
-                    environment.setAttribute('aria-expanded', 'true');
-                    const commit = document.createElement('button');
-                    commit.type = 'button';
-                    commit.dataset.slot = 'thread-summary-panel-item-button';
-                    commit.textContent = 'Commit or push';
-                    commit.addEventListener('click', () => {
-                      document.documentElement.dataset.commitCount = String(
-                        Number(document.documentElement.dataset.commitCount) + 1
-                      );
-                    });
-                    document.body.append(commit);
-                  });
-                  document.body.append(environment);
+                  const menu = document.createElement('div');
+                  menu.setAttribute('role', 'menu');
+                  menu.innerHTML = '<div role="menuitem">Commit</div><div role="menuitem">Push</div>';
+                  document.body.append(menu);
                 });
               </script>
             </body></html>
@@ -363,8 +304,8 @@ extension TaskDashboardWebTests {
             """
             [
               document.documentElement.dataset.selectedThread,
-              document.documentElement.dataset.sidePanelCount,
-              document.documentElement.dataset.commitCount,
+              document.documentElement.dataset.gitMenuCount,
+              [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent),
               document.getElementById('codex-dashboard-page').classList.contains('is-open'),
             ]
             """
@@ -376,8 +317,64 @@ extension TaskDashboardWebTests {
         let values = try XCTUnwrap(handoff)
         XCTAssertEqual(values[0] as? String, "local:off-sidebar-idle-thread")
         XCTAssertEqual(values[1] as? String, "1")
-        XCTAssertEqual(values[2] as? String, "1")
+        XCTAssertEqual(values[2] as? [String], ["Commit", "Push"])
         XCTAssertEqual(values[3] as? Bool, false)
+    }
+
+    func testProjectCommitWaitsForGitActionsMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
+              </aside>
+              <main id="task-surface"></main>
+              <script>
+                document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', (event) => {
+                  event.currentTarget.setAttribute('aria-current', 'page');
+                  setTimeout(() => {
+                    const menu = document.createElement('button');
+                    menu.setAttribute('aria-label', 'Git actions');
+                    menu.addEventListener('pointerdown', () => {
+                      setTimeout(() => {
+                        const actions = document.createElement('div');
+                        actions.setAttribute('role', 'menu');
+                        actions.innerHTML = '<div role="menuitem" aria-disabled="true">Commit</div><div role="menuitem">Push</div>';
+                        document.body.append(actions);
+                      }, 150);
+                    });
+                    document.getElementById('task-surface').append(menu);
+                  }, 250);
+                });
+              </script>
+            </body></html>
+            """,
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "idle-thread", projectPath: "/tmp/changed", workingTreeStatus: .hasChanges),
+        ])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              document.querySelector('[data-project-commit]').click();
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(700))
+        let state = try await webView.evaluateJavaScript(
+            """
+            [
+              Boolean(document.querySelector('[role="menu"]')),
+              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+            ]
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], [true, false])
     }
 
     func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {
