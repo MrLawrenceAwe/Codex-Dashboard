@@ -29,13 +29,15 @@ save queue. Item and tag mutations share optimistic rendering and rollback. Imag
 writes finish before metadata is committed; obsolete images are pruned after a
 successful commit. `todo-image-controller.js` owns image validation, draft state, and
 reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
-controller coordinates these with persistence. Both new-task and linked-task actions
-share `insertTodoIntoComposer`; image formats are validated through the store’s
+controller coordinates these with persistence. To-dos can save a model, effort, and
+speed preset; both new-task and linked-task actions apply it before inserting content
+through `insertTodoIntoComposer`. Image formats are validated through the store’s
 `isAcceptedImageType`, and `loadImages` retrieves deferred image data. Teardown disconnects project
 observation, aborts image readers, and prevents pending callbacks from changing a
 replacement UI.
 
-To-do schema version 7 uses `project` and `thread` for a linked task. Loading migrates
+To-do schema version 8 adds the optional `preset` to items. Version 7 introduced
+`project` and `thread` for a linked task. Loading migrates
 older `projectTag` and `projectBadge` fields, and the version 6 `chat` field. Preference
 loading migrates `collapsedProjects` to `collapsedProjectPaths`, and both
 `ignoredProjectPaths` and `mutedProjectPaths` to `hiddenChangeIndicatorPaths`. Successful

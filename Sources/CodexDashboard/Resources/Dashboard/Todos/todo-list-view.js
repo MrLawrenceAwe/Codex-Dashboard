@@ -48,6 +48,40 @@ const todoListView = (() => {
     </div>`;
   }
 
+  function presetSelect(options, selected, attribute) {
+    const choices = selected && !options.some(([value]) => value === selected)
+      ? [[selected, `Saved model · ${selected}`], ...options] : options;
+    return `<select ${attribute}>${choices.map(([value, label]) => (
+      `<option value="${domUtils.escapeHTML(value)}"${value === selected ? ' selected' : ''}>${domUtils.escapeHTML(label)}</option>`
+    )).join('')}</select>`;
+  }
+
+  function presetFields(preset, scope) {
+    const defaults = promptLibraryContract.defaults;
+    return `<div class="todo-preset-fields" data-todo-${scope}-preset-fields${preset ? '' : ' hidden'}>
+      <label>Model${presetSelect(presetOptions.models, preset?.model || defaults.model, `data-todo-${scope}-preset-model`)}</label>
+      <label>Effort${presetSelect(presetOptions.reasoningEfforts, preset?.reasoningEffort || defaults.reasoningEffort, `data-todo-${scope}-preset-effort`)}</label>
+      <label>Speed${presetSelect(presetOptions.speeds, preset?.speed || defaults.speed, `data-todo-${scope}-preset-speed`)}</label>
+    </div>`;
+  }
+
+  function presetSummary(preset) {
+    if (!preset) return 'Model preset';
+    return [
+      preset.model && (presetOptions.label(presetOptions.models, preset.model) || `Saved model · ${preset.model}`),
+      presetOptions.label(presetOptions.reasoningEfforts, preset.reasoningEffort),
+      presetOptions.label(presetOptions.speeds, preset.speed),
+    ].filter(Boolean).join(' · ');
+  }
+
+  function itemPresetMarkup(item) {
+    return `<details class="todo-preset" data-todo-preset-details>
+      <summary>${domUtils.escapeHTML(presetSummary(item.preset))}</summary>
+      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Use model preset</label>
+      ${presetFields(item.preset, 'item')}
+    </details>`;
+  }
+
   function tagOptions(tags, selectedTag = '') {
     return `<option value="">Choose a tag</option>${tags.map((tag) => (
       `<option value="${domUtils.escapeHTML(tag)}"${tag === selectedTag ? ' selected' : ''}>${domUtils.escapeHTML(tag)}</option>`
@@ -161,6 +195,7 @@ const todoListView = (() => {
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
           ${projectPickerMarkup(item.project)}
           ${threadMarkup(item.thread)}
+          ${itemPresetMarkup(item)}
           ${tagMarkup(item.tags, !item.completed)}
           ${!item.completed ? tagPickerMarkup(availableTags) : ''}
           ${imageMarkup(item)}
@@ -205,11 +240,16 @@ const todoListView = (() => {
               <div class="todo-tags" data-todo-new-tags aria-label="New to-do tags"></div>
               <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
             </div>
+            <div class="todo-new-preset">
+              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Use model preset</label>
+              ${presetFields(null, 'new')}
+            </div>
           </div>
           <button type="submit"><span aria-hidden="true">+</span> Add</button>
         </form>
         <p class="todo-image-paste-status" data-todo-new-image-status hidden></p>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
+        <p class="todo-storage-error" data-todo-composer-error role="alert" hidden>Could not apply this to-do’s model preset. The to-do was not inserted.</p>
         <p class="todo-storage-error" data-todo-image-error role="alert" hidden></p>
         <div class="todo-toolbar">
           <div class="todo-filters" aria-label="Filter to-dos">

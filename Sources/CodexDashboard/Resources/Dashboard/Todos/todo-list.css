@@ -73,6 +73,17 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-tag-composer select { height: 20px; min-width: 110px; padding: 0 3px; border: 0; background: transparent; color: var(--todo-muted); font-size: 11px; }
 #codex-dashboard-todo-page .todo-tag-composer select option { background: var(--todo-bg); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-tag-composer select[hidden] { display: none; }
+#codex-dashboard-todo-page .todo-new-preset { padding: 2px 14px 0; }
+#codex-dashboard-todo-page .todo-preset { width: fit-content; max-width: 100%; margin: 2px 4px; color: var(--todo-muted); font-size: 11px; }
+#codex-dashboard-todo-page .todo-preset summary { cursor: pointer; }
+#codex-dashboard-todo-page .todo-preset summary:hover { color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-preset-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--todo-muted); font-size: 11px; cursor: pointer; }
+#codex-dashboard-todo-page .todo-preset-toggle input { width: auto !important; height: auto !important; margin: 0; }
+#codex-dashboard-todo-page .todo-preset-fields { display: flex; flex-wrap: wrap; gap: 7px; padding: 5px 0; }
+#codex-dashboard-todo-page .todo-preset-fields[hidden] { display: none; }
+#codex-dashboard-todo-page .todo-preset-fields label { display: grid; gap: 2px; color: var(--todo-dim); font-size: 10px; }
+#codex-dashboard-todo-page .todo-preset-fields select { max-width: 160px; height: 24px; padding: 0 5px; border: 1px solid var(--todo-line); border-radius: 5px; background: var(--todo-surface); color: var(--todo-text); font-size: 11px; }
+#codex-dashboard-todo-page .todo-preset-fields option { background: var(--todo-bg); color: var(--todo-text); }
 #codex-dashboard-todo-page [data-todo-new-thread-picker] { max-width: 240px; }
 #codex-dashboard-todo-page .todo-add > button[type="submit"] { width: auto !important; min-width: 66px; height: 32px !important; margin: 0 6px 0 0; padding: 0 12px; border: 0; border-radius: 7px; background: var(--todo-text); color: var(--todo-bg); font-size: 12px; font-weight: 600; cursor: pointer; justify-self: end; }
 #codex-dashboard-todo-page .todo-add button:hover { background: color-mix(in srgb, var(--todo-text) 86%, var(--todo-muted)); }

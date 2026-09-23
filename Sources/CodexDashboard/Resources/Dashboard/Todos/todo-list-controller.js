@@ -13,6 +13,7 @@ function createTodoList({ threadReferencesForProject }) {
   let destroyed = false;
   let savedItems = items;
   let savedTags = availableTags;
+  let openPresetID = null;
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton,
@@ -98,6 +99,11 @@ function createTodoList({ threadReferencesForProject }) {
       project: projectFilter,
       tag: tagFilter,
     });
+    if (openPresetID) {
+      const row = [...document.querySelectorAll('[data-todo-id]')]
+        .find((candidate) => candidate.dataset.todoId === openPresetID);
+      row?.querySelector('[data-todo-preset-details]')?.setAttribute('open', '');
+    }
   }
 
   function loadItemImages() {
@@ -138,11 +144,12 @@ function createTodoList({ threadReferencesForProject }) {
     return saved;
   }
 
-  async function add(title, body = '', image = null, tags = [], project = null, thread = null) {
+  async function add(title, body = '', image = null, tags = [], project = null, thread = null, preset = null) {
     const item = todoStore.create(title, body, image, tags);
     if (!item) return false;
     item.project = todoStore.normalizeProject(project);
     item.thread = todoStore.normalizeThread(thread);
+    item.preset = promptLibraryContract.normalizePreset(preset) || null;
     const saved = await commitItems([item, ...items]);
     if (saved && !destroyed) {
       filterMode = 'open';
@@ -204,6 +211,7 @@ function createTodoList({ threadReferencesForProject }) {
         tags: tagController.draft(),
         project: projectDraft,
         thread: threadDraft,
+        preset: draftPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]')),
       };
       addPending = true;
       submit.disabled = true;
@@ -215,13 +223,16 @@ function createTodoList({ threadReferencesForProject }) {
           || imageController.draft() !== submitted.imageDraft
           || tagController.draft() !== submitted.tags
           || projectDraft?.id !== submitted.project?.id
-          || threadDraft?.id !== submitted.thread?.id) return;
+          || threadDraft?.id !== submitted.thread?.id
+          || JSON.stringify(draftPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]'))) !== JSON.stringify(submitted.preset)) return;
         title.value = '';
         body.value = '';
         imageController.reset();
         tagController.reset();
         projectDraft = null;
         threadDraft = null;
+        page.querySelector('[data-todo-new-preset-enabled]').checked = false;
+        page.querySelector('[data-todo-new-preset-fields]').hidden = true;
         todoListView.updateProjectOptions(projects);
         refreshThreadOptions();
         title.focus();
@@ -229,12 +240,25 @@ function createTodoList({ threadReferencesForProject }) {
       const saved = add(
         submitted.title, submitted.body, imageDraft.image,
         submitted.tags, submitted.project, submitted.thread,
+        submitted.preset,
       );
       void saved.then(finish, () => finish(false));
     });
   }
 
+  function draftPreset(toggle, fields) {
+    if (!toggle.checked) return null;
+    return promptLibraryContract.normalizePreset({
+      model: fields.querySelector('[data-todo-new-preset-model], [data-todo-item-preset-model]').value,
+      reasoningEffort: fields.querySelector('[data-todo-new-preset-effort], [data-todo-item-preset-effort]').value,
+      speed: fields.querySelector('[data-todo-new-preset-speed], [data-todo-item-preset-speed]').value,
+    }) || null;
+  }
+
   function bindDraftAssignments(page) {
+    page.querySelector('[data-todo-new-preset-enabled]').addEventListener('change', (event) => {
+      page.querySelector('[data-todo-new-preset-fields]').hidden = !event.target.checked;
+    });
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
       projectDraft = projects.find((project) => project.id === projectInput.value) || null;
@@ -268,6 +292,12 @@ function createTodoList({ threadReferencesForProject }) {
   }
 
   function bindItemEditing(page) {
+    page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
+      if (event.target.matches('[data-todo-preset-details] > summary')) {
+        openPresetID = event.target.closest('[data-todo-preset-details]').open
+          ? null : event.target.closest('[data-todo-id]').dataset.todoId;
+      }
+    });
     page.querySelector('[data-todo-list]').addEventListener('input', (event) => {
       if (event.target.matches('[data-todo-title]')) todoListView.sizeTitle(event.target);
     });
@@ -289,6 +319,13 @@ function createTodoList({ threadReferencesForProject }) {
         const changes = { project };
         if (currentProjectID !== project?.id) changes.thread = null;
         void updateItem(row.dataset.todoId, changes);
+      } else if (event.target.matches('[data-todo-preset-enabled], [data-todo-item-preset-model], [data-todo-item-preset-effort], [data-todo-item-preset-speed]')) {
+        const preset = draftPreset(
+          row.querySelector('[data-todo-preset-enabled]'),
+          row.querySelector('[data-todo-item-preset-fields]'),
+        );
+        openPresetID = row.dataset.todoId;
+        void updateItem(row.dataset.todoId, { preset });
       } else if (event.target.matches('[data-todo-tag]')) {
         const item = items.find((candidate) => candidate.id === row.dataset.todoId);
         if (item && event.target.value) void updateItem(item.id, {
@@ -302,6 +339,22 @@ function createTodoList({ threadReferencesForProject }) {
     if (destroyed) return false;
     const [loadedItem] = await todoStore.loadImages([item]);
     if (destroyed) return false;
+    if (item.preset) {
+      const composer = await domUtils.waitFor(
+        () => destroyed || codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
+        { timeout: 3000, interval: 25 },
+      );
+      if (!composer || destroyed || !await composerModelPicker.applyPreset(item.preset)) {
+        if (!destroyed) {
+          pageState.open();
+          const notice = document.querySelector('[data-todo-composer-error]');
+          if (notice) notice.hidden = false;
+        }
+        return false;
+      }
+    }
+    const notice = document.querySelector('[data-todo-composer-error]');
+    if (notice) notice.hidden = true;
     const content = [item.title, item.body].filter(Boolean).join('\n\n');
     const image = loadedItem?.image;
     let inserted = false;
