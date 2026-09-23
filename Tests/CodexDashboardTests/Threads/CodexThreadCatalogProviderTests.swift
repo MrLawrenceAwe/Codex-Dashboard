@@ -130,6 +130,47 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertNil(continued.latestLifecycleEvent)
     }
 
+    func testOlderTaskShowsUsageLimitWithoutDatabaseChangeOrRestart() async throws {
+        let now = Int64(Date().timeIntervalSince1970)
+        let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
+            now: now,
+            additionalThreadCount: 25,
+            testCase: self
+        )
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: stateDatabaseURL)
+        let launchDate = Date(timeIntervalSince1970: TimeInterval(now - 3_600))
+        let initial = try await provider.loadCatalog(
+            codexLaunchDate: launchDate,
+            requiredThreadIDs: []
+        )
+        XCTAssertNil(initial.threads.first { $0.id == "idle" }?.latestLifecycleEvent)
+
+        let pathResult = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: ["-readonly", stateDatabaseURL.path, "SELECT rollout_path FROM threads WHERE id = 'idle';"],
+            timeout: 3
+        )
+        XCTAssertEqual(pathResult.terminationStatus, 0)
+        let path = String(decoding: pathResult.standardOutput, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        try handle.seekToEnd()
+        let timestamp = ISO8601DateFormatter().string(
+            from: Date(timeIntervalSince1970: TimeInterval(now))
+        )
+        try handle.write(contentsOf: Data(
+            #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}}"#.utf8
+        ))
+        try handle.write(contentsOf: Data("\n".utf8))
+        try handle.close()
+
+        let refreshed = try await provider.loadCatalog(
+            codexLaunchDate: launchDate,
+            requiredThreadIDs: []
+        )
+        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.latestLifecycleEvent?.kind, .forcedHalt)
+    }
+
     func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
