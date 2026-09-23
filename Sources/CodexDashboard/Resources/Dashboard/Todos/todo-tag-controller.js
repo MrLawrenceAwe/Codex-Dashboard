@@ -46,11 +46,21 @@ function createTodoTagController({ isDestroyed, getAvailableTags, commitChange }
   }
 
   function bindManagement(page) {
-    const dialog = document.querySelector('[data-todo-tag-dialog]');
-    const close = () => { if (dialog.open) dialog.close(); };
-    page.querySelector('[data-todo-manage-tags]').addEventListener('click', () => {
+    const button = page.querySelector('[data-todo-manage-tags]');
+    button.addEventListener('click', () => {
+      let dialog = document.querySelector('[data-todo-tag-dialog]');
+      if (!dialog) {
+        dialog = todoListView.ensureDialogHost().querySelector('[data-todo-tag-dialog]');
+        bindDialog(dialog);
+        todoListView.updateManagedTags(getAvailableTags());
+      }
       if (!dialog.open) dialog.showModal();
     });
+    bindDialog(document.querySelector('[data-todo-tag-dialog]'));
+  }
+
+  function bindDialog(dialog) {
+    const close = () => { if (dialog.open) dialog.close(); };
     dialog.querySelector('[data-todo-tag-dialog-close]').addEventListener('click', close);
     dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
     const input = dialog.querySelector('[data-todo-tag-name]');
