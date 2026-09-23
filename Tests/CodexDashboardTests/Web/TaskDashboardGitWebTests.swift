@@ -247,6 +247,10 @@ extension TaskDashboardWebTests {
                   const menu = document.createElement('div');
                   menu.setAttribute('role', 'menu');
                   menu.innerHTML = '<div role="menuitem">Commit</div><div role="menuitem">Push</div>';
+                  menu.firstElementChild.addEventListener('click', () => {
+                    document.documentElement.dataset.commitOpened = 'true';
+                    menu.remove();
+                  });
                   document.body.append(menu);
                 });
               </script>
@@ -305,7 +309,7 @@ extension TaskDashboardWebTests {
             [
               document.documentElement.dataset.selectedThread,
               document.documentElement.dataset.gitMenuCount,
-              [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent),
+              document.documentElement.dataset.commitOpened,
               document.getElementById('codex-dashboard-page').classList.contains('is-open'),
             ]
             """
@@ -317,7 +321,7 @@ extension TaskDashboardWebTests {
         let values = try XCTUnwrap(handoff)
         XCTAssertEqual(values[0] as? String, "local:off-sidebar-idle-thread")
         XCTAssertEqual(values[1] as? String, "1")
-        XCTAssertEqual(values[2] as? [String], ["Commit", "Push"])
+        XCTAssertEqual(values[2] as? String, "true")
         XCTAssertEqual(values[3] as? Bool, false)
     }
 
@@ -340,7 +344,14 @@ extension TaskDashboardWebTests {
                         const actions = document.createElement('div');
                         actions.setAttribute('role', 'menu');
                         actions.innerHTML = '<div role="menuitem" aria-disabled="true">Commit</div><div role="menuitem">Push</div>';
+                        const commit = actions.firstElementChild;
+                        commit.addEventListener('click', () => {
+                          document.documentElement.dataset.commitOpened = commit.getAttribute('aria-disabled') === 'true'
+                            ? 'clicked-while-disabled' : 'true';
+                          actions.remove();
+                        });
                         document.body.append(actions);
+                        setTimeout(() => commit.setAttribute('aria-disabled', 'false'), 150);
                       }, 150);
                     });
                     document.getElementById('task-surface').append(menu);
@@ -364,17 +375,17 @@ extension TaskDashboardWebTests {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(700))
+        try await Task.sleep(for: .milliseconds(1500))
         let state = try await webView.evaluateJavaScript(
             """
             [
-              Boolean(document.querySelector('[role="menu"]')),
+              document.documentElement.dataset.commitOpened,
               document.getElementById('codex-dashboard-page').classList.contains('is-open'),
             ]
             """
         ) as? [Any]
 
-        XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], [true, false])
+        XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], ["true", false])
     }
 
     func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {

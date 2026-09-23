@@ -83,6 +83,9 @@ const codexHost = {
 
     const menu = await waitFor(() => codexUIContracts.gitActionsMenu());
     if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
+    const commit = await waitFor(() => codexUIContracts.gitCommitMenuItem(menu));
+    if (!commit) return { opened: false, reason: 'Commit is unavailable in Codex’s Git actions menu.' };
+    commit.click();
     return { opened: true };
   },
 };

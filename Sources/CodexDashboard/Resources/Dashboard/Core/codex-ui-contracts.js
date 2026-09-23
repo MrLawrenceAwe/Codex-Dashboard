@@ -308,6 +308,15 @@ const codexUIContracts = (() => {
     return [...document.querySelectorAll('[role="menu"]')].find(isVisible) || null;
   }
 
+  function gitCommitMenuItem(menu) {
+    return [...menu.querySelectorAll('[role="menuitem"]')].find((item) => (
+      isVisible(item)
+        && !item.disabled
+        && item.getAttribute('aria-disabled') !== 'true'
+        && item.textContent.trim() === 'Commit'
+    )) || null;
+  }
+
   return {
     sidebar,
     navigation,
@@ -330,5 +339,6 @@ const codexUIContracts = (() => {
     probeModelPickerControls,
     gitActionsButton,
     gitActionsMenu,
+    gitCommitMenuItem,
   };
 })();
