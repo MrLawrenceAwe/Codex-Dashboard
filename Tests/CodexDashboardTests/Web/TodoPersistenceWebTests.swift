@@ -71,6 +71,56 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["p", "Work", true])
     }
 
+    func testUnsupportedAndUnreadableTodoDocumentsAreNeverOverwritten() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const storage = window.localStorage;
+          const results = [];
+          for (const original of [
+            JSON.stringify({ version: 7, items: [{ id: 'future', title: 'Keep me' }] }),
+            '{invalid json',
+          ]) {
+            storage.setItem('codex-dashboard.todos', original);
+            const loaded = store.load();
+            const reason = store.writeProtectionReason();
+            const saved = await store.save([store.create('Replacement')], []);
+            results.push(loaded.length === 0 && Boolean(reason) && !saved
+              && storage.getItem('codex-dashboard.todos') === original);
+          }
+          return results;
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, true])
+    }
+
+    func testNewerTodoDocumentShowsReadOnlyMessage() async throws {
+        let view = try await webView()
+        let injection = try InjectionBundle.load()
+        let result = try await view.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.destroy();
+          localStorage.setItem('codex-dashboard.todos', JSON.stringify({
+            version: 7, items: [{ id: 'future', title: 'Keep me' }],
+          }));
+          return true;
+        })()
+        """) as? Bool
+        XCTAssertEqual(result, true)
+        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        let state = try await view.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.openTodos();
+          const notice = document.querySelector('[data-todo-storage-error]');
+          return [!notice.hidden, notice.textContent.includes('newer dashboard version'),
+            document.querySelector('[data-todo-new-title]').disabled,
+            document.querySelector('[data-todo-form] button[type="submit"]').disabled];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(state, [true, true, true, true])
+    }
+
     func testQueuedImageAndTextSavesKeepOrderAndRecoverAfterFailure() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""

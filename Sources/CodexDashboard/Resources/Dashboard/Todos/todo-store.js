@@ -91,6 +91,23 @@ const todoStore = (() => {
     return item;
   }
 
+  function writeProtectionReason() {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === null) return null;
+      const document = JSON.parse(stored);
+      if (Number.isInteger(document?.version) && document.version > version) {
+        return 'These to-dos were saved by a newer dashboard version. Update the dashboard to edit them.';
+      }
+      if (!supportedVersions.has(document?.version) || !Array.isArray(document.items)) {
+        return 'The saved to-do data could not be read. Restore it before editing to-dos.';
+      }
+      return null;
+    } catch (_) {
+      return 'The saved to-do data could not be read. Restore it before editing to-dos.';
+    }
+  }
+
   function load() {
     try {
       const document = JSON.parse(localStorage.getItem(storageKey));
@@ -116,7 +133,7 @@ const todoStore = (() => {
         ...(Array.isArray(savedTags) ? savedTags : []),
         ...items.flatMap((item) => item.tags || []),
       ]);
-      if (legacy !== null) {
+      if (legacy !== null && !writeProtectionReason()) {
         try {
           localStorage.setItem(tagsStorageKey, JSON.stringify(tags));
           localStorage.removeItem(legacyTagsStorageKey);
@@ -151,6 +168,7 @@ const todoStore = (() => {
   }
 
   async function writeSnapshot(items, tags) {
+    if (writeProtectionReason()) return false;
     let includesImageData = false;
     try {
       await persistImages(items);
@@ -160,6 +178,7 @@ const todoStore = (() => {
     }
     const previousTags = localStorage.getItem(tagsStorageKey);
     try {
+      if (writeProtectionReason()) return false;
       localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
       localStorage.setItem(storageKey, documentData(items, includesImageData));
       await pruneImages(items).catch(() => {});
@@ -248,5 +267,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save };
+  return { create, hydrate, load, loadTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save, writeProtectionReason };
 })();

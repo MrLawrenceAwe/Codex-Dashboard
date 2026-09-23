@@ -418,6 +418,14 @@ const todoList = (() => {
     startProjectObserver();
     pageState.applyVisibility();
     render();
+    const writeProtectionReason = todoStore.writeProtectionReason();
+    if (writeProtectionReason) {
+      const notice = page.querySelector('[data-todo-storage-error]');
+      notice.textContent = writeProtectionReason;
+      notice.hidden = false;
+      page.querySelectorAll('[data-todo-form] input, [data-todo-form] textarea, [data-todo-form] select, [data-todo-form] button, [data-todo-manage-tags]')
+        .forEach((control) => { control.disabled = true; });
+    }
     hydrateImages();
     return true;
   }
