@@ -67,37 +67,22 @@ const codexHost = {
     }));
   },
 
-  async canOpenCommitOrPush() {
-    return Boolean(codexUIContracts.commitOrPushButton() || codexUIContracts.sidePanelToggle());
-  },
-
   async openCommitOrPush(thread) {
-    const waitFor = (value, timeout = 3000) => domUtils.waitFor(value, { timeout });
+    const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
 
     this.navigateToThread(thread);
     const selected = await waitFor(() => codexUIContracts.isThreadSelected(thread.id), 5000);
-    if (!selected) return false;
-    await domUtils.delay(100);
+    if (!selected) return { opened: false, reason: 'Codex did not select the project task.' };
 
-    let commitButton = codexUIContracts.commitOrPushButton();
-    if (!commitButton) {
-      const sidePanelToggle = codexUIContracts.sidePanelToggle();
-      if (!sidePanelToggle) return false;
-      sidePanelToggle.click();
+    const gitActions = await waitFor(() => codexUIContracts.gitActionsButton());
+    if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project task.' };
+    gitActions.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, button: 0, pointerType: 'mouse',
+    }));
+    gitActions.click();
 
-      const panelControl = await waitFor(() => (
-        codexUIContracts.commitOrPushButton() || codexUIContracts.environmentToggle()
-      ));
-      if (!panelControl) return false;
-
-      commitButton = codexUIContracts.commitOrPushButton();
-      if (!commitButton) {
-        if (panelControl.getAttribute('aria-expanded') !== 'true') panelControl.click();
-        commitButton = await waitFor(() => codexUIContracts.commitOrPushButton());
-      }
-    }
-    if (!commitButton) return false;
-    commitButton.click();
-    return true;
+    const menu = await waitFor(() => codexUIContracts.gitActionsMenu());
+    if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
+    return { opened: true };
   },
 };

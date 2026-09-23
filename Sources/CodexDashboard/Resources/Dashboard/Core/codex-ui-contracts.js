@@ -295,26 +295,17 @@ const codexUIContracts = (() => {
     }
   }
 
-  function sidePanelToggle() {
-    return [...document.querySelectorAll('button[aria-label="Toggle side panel"]')]
-      .filter(isVisible)
-      .sort((left, right) => right.getBoundingClientRect().left - left.getBoundingClientRect().left)[0]
-      || null;
-  }
-
-  function environmentToggle() {
-    return [...document.querySelectorAll('button[aria-expanded]')].find((button) => (
-      isVisible(button) && button.textContent.trim() === 'Environment'
+  function gitActionsButton() {
+    return [...document.querySelectorAll('button[aria-label], button[title]')].find((button) => (
+      isVisible(button)
+        && !button.disabled
+        && (button.getAttribute('aria-label') === 'Git actions'
+          || button.getAttribute('title') === 'Git actions')
     )) || null;
   }
 
-  function commitOrPushButton() {
-    return [...document.querySelectorAll('button[data-slot="thread-summary-panel-item-button"]')]
-      .find((button) => (
-        isVisible(button)
-          && !button.disabled
-          && button.textContent.trim() === 'Commit or push'
-      )) || null;
+  function gitActionsMenu() {
+    return [...document.querySelectorAll('[role="menu"]')].find(isVisible) || null;
   }
 
   return {
@@ -337,8 +328,7 @@ const codexUIContracts = (() => {
     intelligenceTrigger,
     modelPicker,
     probeModelPickerControls,
-    sidePanelToggle,
-    environmentToggle,
-    commitOrPushButton,
+    gitActionsButton,
+    gitActionsMenu,
   };
 })();

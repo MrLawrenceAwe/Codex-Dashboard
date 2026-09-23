@@ -18,6 +18,7 @@ actor ThreadSnapshotService {
     private var unreadThreadIDs: Set<String> = []
     private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
+    private var unreadRefreshGeneration: UInt64 = 0
     private var workingTreeGenerationByPath: [String: UInt64] = [:]
 
     init(
@@ -32,11 +33,18 @@ actor ThreadSnapshotService {
 
     func loadSnapshot(codexLaunchDate: Date?) async throws -> ThreadSnapshotResult {
         if !hasLoadedSnapshot {
+            unreadRefreshGeneration &+= 1
+            let generation = unreadRefreshGeneration
             do {
-                unreadThreadIDs = try await unreadThreadIDProvider.loadUnreadThreadIDs()
-                unreadStateWarning = nil
+                let latestUnreadIDs = try await unreadThreadIDProvider.loadUnreadThreadIDs()
+                if generation == unreadRefreshGeneration {
+                    unreadThreadIDs = latestUnreadIDs
+                    unreadStateWarning = nil
+                }
             } catch {
-                unreadStateWarning = Self.warning(for: error)
+                if generation == unreadRefreshGeneration {
+                    unreadStateWarning = Self.warning(for: error)
+                }
             }
         }
         let catalog = try await catalogProvider.loadCatalog(
@@ -59,14 +67,22 @@ actor ThreadSnapshotService {
     }
 
     func updateUnreadState() async -> UnreadStateUpdate {
+        unreadRefreshGeneration &+= 1
+        let generation = unreadRefreshGeneration
         let latestUnreadIDs: Set<String>
         do {
             latestUnreadIDs = try await unreadThreadIDProvider.loadUnreadThreadIDs()
-            unreadStateWarning = nil
         } catch {
+            guard generation == unreadRefreshGeneration else {
+                return UnreadStateUpdate(unreadThreadIDs: nil, warning: unreadStateWarning)
+            }
             unreadStateWarning = Self.warning(for: error)
             return UnreadStateUpdate(unreadThreadIDs: nil, warning: unreadStateWarning)
         }
+        guard generation == unreadRefreshGeneration else {
+            return UnreadStateUpdate(unreadThreadIDs: nil, warning: unreadStateWarning)
+        }
+        unreadStateWarning = nil
         guard latestUnreadIDs != unreadThreadIDs else {
             return UnreadStateUpdate(unreadThreadIDs: nil, warning: nil)
         }
