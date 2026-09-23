@@ -26,6 +26,7 @@ const todoList = (() => {
   const tagController = createTodoTagController({
     isDestroyed: () => destroyed,
     getAvailableTags: () => availableTags,
+    getItems: () => items,
     commitChange: (nextTags, transformTag) => commitItems(items.map((item) => ({
       ...item, tags: item.tags.map(transformTag).filter(Boolean),
     })), nextTags),
@@ -63,7 +64,7 @@ const todoList = (() => {
   function renderTags() {
     if (destroyed) return;
     todoListView.updateTagOptions(availableTags);
-    todoListView.updateManagedTags(availableTags);
+    todoListView.updateManagedTags(availableTags, items);
     updateFilterOptions();
   }
 
