@@ -304,8 +304,10 @@ const codexUIContracts = (() => {
     )) || null;
   }
 
-  function gitActionsMenu() {
-    return [...document.querySelectorAll('[role="menu"]')].find(isVisible) || null;
+  function gitActionsMenu(trigger) {
+    const menuID = trigger.getAttribute('aria-controls');
+    const menu = menuID ? document.getElementById(menuID) : null;
+    return menu?.getAttribute('role') === 'menu' && isVisible(menu) ? menu : null;
   }
 
   function gitCommitMenuItem(menu) {

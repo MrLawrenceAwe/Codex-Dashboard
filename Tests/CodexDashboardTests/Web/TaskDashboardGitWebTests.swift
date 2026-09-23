@@ -241,10 +241,12 @@ extension TaskDashboardWebTests {
                   });
                 });
                 document.querySelector('[aria-label="Git actions"]').addEventListener('pointerdown', () => {
+                  document.querySelector('[aria-label="Git actions"]').setAttribute('aria-controls', 'git-menu');
                   document.documentElement.dataset.gitMenuCount = String(
                     Number(document.documentElement.dataset.gitMenuCount) + 1
                   );
                   const menu = document.createElement('div');
+                  menu.id = 'git-menu';
                   menu.setAttribute('role', 'menu');
                   menu.innerHTML = '<div role="menuitem">Commit</div><div role="menuitem">Push</div>';
                   menu.firstElementChild.addEventListener('click', () => {
@@ -333,15 +335,18 @@ extension TaskDashboardWebTests {
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
               </aside>
               <main id="task-surface"></main>
+              <div role="menu"><div role="menuitem">Unrelated action</div></div>
               <script>
                 document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', (event) => {
                   event.currentTarget.setAttribute('aria-current', 'page');
                   setTimeout(() => {
                     const menu = document.createElement('button');
                     menu.setAttribute('aria-label', 'Git actions');
+                    menu.setAttribute('aria-controls', 'git-menu');
                     menu.addEventListener('pointerdown', () => {
                       setTimeout(() => {
                         const actions = document.createElement('div');
+                        actions.id = 'git-menu';
                         actions.setAttribute('role', 'menu');
                         actions.innerHTML = '<div role="menuitem" aria-disabled="true">Commit</div><div role="menuitem">Push</div>';
                         const commit = actions.firstElementChild;
@@ -351,7 +356,15 @@ extension TaskDashboardWebTests {
                           actions.remove();
                         });
                         document.body.append(actions);
-                        setTimeout(() => commit.setAttribute('aria-disabled', 'false'), 150);
+                        setTimeout(() => {
+                          const replacement = actions.cloneNode(true);
+                          replacement.firstElementChild.setAttribute('aria-disabled', 'false');
+                          replacement.firstElementChild.addEventListener('click', () => {
+                            document.documentElement.dataset.commitOpened = 'true';
+                            replacement.remove();
+                          });
+                          actions.replaceWith(replacement);
+                        }, 150);
                       }, 150);
                     });
                     document.getElementById('task-surface').append(menu);

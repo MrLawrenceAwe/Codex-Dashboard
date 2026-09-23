@@ -71,19 +71,29 @@ const codexHost = {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
 
     this.navigateToThread(thread);
-    const selected = await waitFor(() => codexUIContracts.isThreadSelected(thread.id), 5000);
+    const selected = await waitFor(() => {
+      const composerThreadID = codexUIContracts.activeComposerThreadID();
+      return composerThreadID
+        ? composerThreadID === thread.id
+        : codexUIContracts.isThreadSelected(thread.id);
+    });
     if (!selected) return { opened: false, reason: 'Codex did not select the project task.' };
 
     const gitActions = await waitFor(() => codexUIContracts.gitActionsButton());
     if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project task.' };
-    gitActions.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true, button: 0, pointerType: 'mouse',
-    }));
-    gitActions.click();
+    if (gitActions.getAttribute('aria-expanded') !== 'true') {
+      gitActions.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, button: 0, pointerType: 'mouse',
+      }));
+      gitActions.click();
+    }
 
-    const menu = await waitFor(() => codexUIContracts.gitActionsMenu());
+    const menu = await waitFor(() => codexUIContracts.gitActionsMenu(gitActions));
     if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
-    const commit = await waitFor(() => codexUIContracts.gitCommitMenuItem(menu));
+    const commit = await waitFor(() => {
+      const currentMenu = codexUIContracts.gitActionsMenu(gitActions);
+      return currentMenu && codexUIContracts.gitCommitMenuItem(currentMenu);
+    });
     if (!commit) return { opened: false, reason: 'Commit is unavailable in Codex’s Git actions menu.' };
     commit.click();
     return { opened: true };
