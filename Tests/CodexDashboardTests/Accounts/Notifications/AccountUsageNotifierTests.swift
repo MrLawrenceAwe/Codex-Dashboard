@@ -26,7 +26,81 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
 }
 
 @MainActor
+private final class SuspendedDesktopNotificationCenter: DesktopNotificationCenter {
+    private var started: CheckedContinuation<Void, Never>?
+    private var releaseFirstAdd: CheckedContinuation<Void, Never>?
+    private(set) var immediateTitles: [String] = []
+    private(set) var immediateAttempts = 0
+
+    func pendingRequests() async -> [UNNotificationRequest] { [] }
+    func removePendingRequests(withIdentifiers identifiers: [String]) {}
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {}
+    func isAuthorized() async -> Bool { true }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        guard request.trigger == nil else { return }
+        immediateAttempts += 1
+        if immediateAttempts == 1 {
+            await withCheckedContinuation { continuation in
+                releaseFirstAdd = continuation
+                started?.resume()
+                started = nil
+            }
+        }
+        immediateTitles.append(request.content.title)
+    }
+
+    func waitForFirstAdd() async {
+        if immediateAttempts > 0 { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func release() {
+        releaseFirstAdd?.resume()
+        releaseFirstAdd = nil
+    }
+}
+
+@MainActor
 final class AccountUsageNotifierTests: XCTestCase {
+    func testOverlappingUpdatesDeliverImmediateAlertsOnce() async throws {
+        let (account, previous, current) = makeThresholdSnapshots()
+        let defaults = try makeDefaults()
+        let history = UsageNotificationHistory(userDefaults: defaults, channel: .desktop)
+        history.saveObservations(for: [account], usageByAccountID: [account.id: previous])
+        let intermediate = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(
+                    usedPercent: 60,
+                    resetsAt: current.usage.weekly?.resetsAt
+                )
+            ),
+            fetchedAt: current.fetchedAt.addingTimeInterval(-1)
+        )
+        let center = SuspendedDesktopNotificationCenter()
+        let notifier = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+
+        let first = Task { await notifier.updateNotifications(
+            for: [account], usageByAccountID: [account.id: intermediate]
+        ) }
+        await center.waitForFirstAdd()
+        let second = Task { await notifier.updateNotifications(
+            for: [account], usageByAccountID: [account.id: current]
+        ) }
+        await Task.yield()
+        XCTAssertEqual(center.immediateAttempts, 1)
+        center.release()
+        await first.value
+        await second.value
+
+        XCTAssertEqual(center.immediateTitles, [
+            "Codex Weekly: less than 50% remaining",
+            "Codex Weekly: less than 20% remaining",
+        ])
+        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: current.usage))
+    }
+
     func testRetriesOnlyFailedImmediateAlertsBeforeSavingObservation() async throws {
         let (account, previous, current) = makeThresholdSnapshots()
         let defaults = try makeDefaults()

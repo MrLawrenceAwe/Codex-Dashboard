@@ -82,6 +82,8 @@ final class AccountUsageNotifier: AccountUsageNotifying {
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var liveNotificationsByIdentifier: [String: ScheduledUsageNotification] = [:]
+    private var updateInProgress = false
+    private var updateWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
         notificationCenter: any DesktopNotificationCenter = SystemDesktopNotificationCenter(),
@@ -104,6 +106,15 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
+        while updateInProgress {
+            await withCheckedContinuation { updateWaiters.append($0) }
+        }
+        updateInProgress = true
+        defer {
+            updateInProgress = false
+            updateWaiters.forEach { $0.resume() }
+            updateWaiters.removeAll()
+        }
         let currentDate = Date.now
         let plan = UsageNotificationPlanner.plan(
             for: accounts,
