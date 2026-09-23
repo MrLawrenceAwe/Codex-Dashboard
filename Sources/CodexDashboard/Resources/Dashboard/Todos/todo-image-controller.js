@@ -1,10 +1,9 @@
 function createTodoImageController({ isDestroyed, getItems, updateItem }) {
-  const acceptedTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
   const maximumBytes = 2 * 1024 * 1024;
   const readers = new Set();
   let draft;
 
-  function showError(message = '') {
+  function setError(message = '') {
     if (isDestroyed()) return;
     const notice = document.querySelector('[data-todo-image-error]');
     if (!notice) return;
@@ -14,7 +13,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
 
   function reset() {
     draft = { status: 'empty', image: null, submitWhenReady: false };
-    todoListView?.updateImageDraft?.(null);
+    todoListView.updateImageDraft(null);
     const status = document.querySelector('[data-todo-new-image-status]');
     if (status) {
       status.hidden = true;
@@ -23,16 +22,16 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
   }
 
   function validationError(file) {
-    if (!acceptedTypes.has(file?.type)) return 'Choose a JPEG, PNG, GIF, or WebP image.';
+    if (!todoStore.isAcceptedImageType(file?.type)) return 'Choose a JPEG, PNG, GIF, or WebP image.';
     if (file.size > maximumBytes) return 'Images must be 2 MB or smaller.';
     return '';
   }
 
   function read(file, onLoad, onError = () => {}) {
-    showError();
+    setError();
     const error = validationError(file);
     if (error) {
-      showError(error);
+      setError(error);
       return false;
     }
     const reader = new FileReader();
@@ -47,7 +46,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
         size: file.size,
       });
       if (!image) {
-        showError('Codex could not read that image.');
+        setError('Codex could not read that image.');
         onError();
         return;
       }
@@ -55,7 +54,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
     });
     reader.addEventListener('error', () => {
       if (isDestroyed()) return;
-      showError('Codex could not read that image.');
+      setError('Codex could not read that image.');
       onError();
     });
     reader.readAsDataURL(file);
@@ -93,7 +92,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
       if (error) {
         reset();
         draft.status = 'invalid';
-        showError(error);
+        setError(error);
         return;
       }
       reset();
@@ -122,7 +121,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
     });
     page.querySelector('[data-todo-new-image-remove]').addEventListener('click', () => {
       reset();
-      showError();
+      setError();
       page.querySelector('[data-todo-new-title]').focus();
     });
     page.querySelector('[data-todo-new-image-open]').addEventListener('click', () => {
@@ -136,5 +135,5 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
   }
 
   reset();
-  return { bind, destroy, draft: () => draft, reset, showError };
+  return { bind, destroy, draft: () => draft, reset, setError };
 }

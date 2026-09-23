@@ -203,7 +203,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-filter="running"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
-              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.mutedProjectPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
+              return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.hiddenChangeIndicatorPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
               } catch (error) {
                 return JSON.stringify({ error: String(error), stack: error?.stack || '' });
               }
@@ -245,10 +245,10 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const stored = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
-          return [stored.filterMode, stored.mutedProjectPaths[0], Object.hasOwn(stored, 'ignoredProjectPaths')];
+          return [stored.filterMode, stored.hiddenChangeIndicatorPaths[0], Object.hasOwn(stored, 'ignoredProjectPaths'), Object.hasOwn(stored, 'mutedProjectPaths')];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["unread", "/tmp/current", false])
+        XCTAssertEqual(result, ["unread", "/tmp/current", false, false])
     }
 
     func testNavigationShowsUncommittedChangesIndicatorForChangedProjects() async throws {

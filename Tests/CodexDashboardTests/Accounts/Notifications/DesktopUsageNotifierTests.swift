@@ -13,7 +13,7 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
     func pendingRequests() async -> [UNNotificationRequest] { [] }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
     func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {}
-    func isAuthorized() async -> Bool { authorized }
+    func requestAuthorizationIfNeeded() async -> Bool { authorized }
 
     func add(_ request: UNNotificationRequest) async throws {
         guard request.trigger == nil else { return }
@@ -35,7 +35,7 @@ private final class SuspendedDesktopNotificationCenter: DesktopNotificationCente
     func pendingRequests() async -> [UNNotificationRequest] { [] }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
     func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {}
-    func isAuthorized() async -> Bool { true }
+    func requestAuthorizationIfNeeded() async -> Bool { true }
 
     func add(_ request: UNNotificationRequest) async throws {
         guard request.trigger == nil else { return }
@@ -62,7 +62,7 @@ private final class SuspendedDesktopNotificationCenter: DesktopNotificationCente
 }
 
 @MainActor
-final class AccountUsageNotifierTests: XCTestCase {
+final class DesktopUsageNotifierTests: XCTestCase {
     func testOverlappingUpdatesDeliverImmediateAlertsOnce() async throws {
         let (account, previous, current) = makeThresholdSnapshots()
         let defaults = try makeDefaults()
@@ -79,7 +79,7 @@ final class AccountUsageNotifierTests: XCTestCase {
             fetchedAt: current.fetchedAt.addingTimeInterval(-1)
         )
         let center = SuspendedDesktopNotificationCenter()
-        let notifier = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
 
         let first = Task { await notifier.updateNotifications(
             for: [account], usageByAccountID: [account.id: intermediate]
@@ -108,18 +108,18 @@ final class AccountUsageNotifierTests: XCTestCase {
         history.saveObservations(for: [account], usageByAccountID: [account.id: previous])
         let center = RecordingDesktopNotificationCenter()
         center.failedImmediateTitle = "Codex Weekly: less than 20% remaining"
-        let notifier = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 1)
         XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: previous.usage))
 
-        let retryAfterRestart = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        let retryAfterRestart = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
         await retryAfterRestart.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 2)
         XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: current.usage))
 
-        let reopened = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        let reopened = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
         await reopened.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 2)
     }
@@ -131,7 +131,7 @@ final class AccountUsageNotifierTests: XCTestCase {
         history.saveObservations(for: [account], usageByAccountID: [account.id: previous])
         let center = RecordingDesktopNotificationCenter()
         center.authorized = false
-        let notifier = AccountUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertTrue(center.immediateTitles.isEmpty)
@@ -170,7 +170,7 @@ final class AccountUsageNotifierTests: XCTestCase {
     }
 
     private func makeDefaults() throws -> UserDefaults {
-        let suite = "AccountUsageNotifierTests-\(UUID().uuidString)"
+        let suite = "DesktopUsageNotifierTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         return defaults

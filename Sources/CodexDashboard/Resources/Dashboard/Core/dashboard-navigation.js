@@ -1,6 +1,16 @@
-const promptLibrary = createPromptLibrary({ findThread: taskDashboard.findThread });
+const threadCatalog = createThreadCatalog();
+const taskDashboard = createTaskDashboard({ catalog: threadCatalog });
+const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject });
+const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
 
 const dashboardNavigation = (() => {
+  function applyThreads(nextThreads) {
+    const threads = threadCatalog.applyThreads(nextThreads);
+    taskDashboard.applyThreads(threads);
+    todoList.refreshThreadOptions();
+    return true;
+  }
+
   function openTasks() {
     todoList.close();
     taskDashboard.open();
@@ -58,8 +68,9 @@ const dashboardNavigation = (() => {
     taskDashboard.destroy();
     todoList.destroy();
     dashboardLifecycle.destroy();
+    threadCatalog.clear();
     delete window.__codexDashboard;
   }
 
-  return { ensureMounted, destroy, openTasks, openTodos, isOpen };
+  return { applyThreads, ensureMounted, destroy, openTasks, openTodos, isOpen };
 })();

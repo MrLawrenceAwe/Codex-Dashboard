@@ -362,6 +362,7 @@ final class StubDashboardRuntime: DashboardRuntime {
             webSocketURL: "ws://127.0.0.1/main"
         )]
     }
+    func preferNativePromptLibraryOnNextSynchronization() {}
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1
@@ -378,7 +379,7 @@ final class StubDashboardRuntime: DashboardRuntime {
         lastSynchronizedSnapshot = snapshot
         if let synchronizationError { throw synchronizationError }
     }
-    func disableTaskDashboard() async throws -> TaskDashboardDisableOutcome { .codexClosed }
+    func disableIntegration() async throws -> DashboardDisableOutcome { .codexClosed }
     func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
@@ -412,7 +413,7 @@ extension XCTestCase {
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = RecordingCompatibilityIssueNotifier(),
-        accountUsageNotifier: any AccountUsageNotifying = NoopAccountUsageNotifier(),
+        desktopUsageNotifier: any DesktopUsageNotifying = NoopDesktopUsageNotifier(),
         phoneUsageNotifier: any PhoneUsageNotifying = NoopPhoneUsageNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = { _ in StubDashboardRuntime() }
     ) -> AppCoordinator {
@@ -438,7 +439,7 @@ extension XCTestCase {
             accountUsageProvider: accountUsageProvider,
             accountUsageCacheStore: accountUsageCacheStore,
             compatibilityIssueNotifier: compatibilityIssueNotifier,
-            accountUsageNotifier: accountUsageNotifier,
+            desktopUsageNotifier: desktopUsageNotifier,
             phoneUsageNotifier: phoneUsageNotifier,
             runtimeFactory: runtimeFactory
         )

@@ -1,5 +1,4 @@
-function createThreadUnreadState({ isOpen, onChange }) {
-  let threadsByID = new Map();
+function createThreadPresentationState({ findThread, isOpen, onChange }) {
   let unreadThreadIDs = new Set();
   const sidebarUnreadOverrides = new Map();
   const observedSidebarReadStates = new Map();
@@ -18,10 +17,10 @@ function createThreadUnreadState({ isOpen, onChange }) {
   function syncUnreadFromSidebar(nextUnreadThreadIDs = new Set(unreadThreadIDs)) {
     const readStates = codexHost.threadReadStates();
     observedSidebarReadStates.forEach((_, id) => {
-      if (!readStates.has(id) || !threadsByID.has(id)) observedSidebarReadStates.delete(id);
+      if (!readStates.has(id) || !findThread(id)) observedSidebarReadStates.delete(id);
     });
     readStates.forEach((isUnread, id) => {
-      const thread = threadsByID.get(id);
+      const thread = findThread(id);
       if (!thread) return;
       const isNewObservation = observedSidebarReadStates.get(id) !== isUnread;
       observedSidebarReadStates.set(id, isUnread);
@@ -43,7 +42,7 @@ function createThreadUnreadState({ isOpen, onChange }) {
     unreadThreadIDs.forEach((threadID) => {
       if (nextUnreadThreadIDs.has(threadID)) return;
       changed = true;
-      const thread = threadsByID.get(threadID);
+      const thread = findThread(threadID);
       if (thread?.latestLifecycleEventKind === 'completed') {
         completedTickExpiryByThreadID.set(threadID, Date.now() + completedTickDuration);
       }
@@ -113,9 +112,8 @@ function createThreadUnreadState({ isOpen, onChange }) {
     const nextUnreadThreadIDs = new Set(
       threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
     );
-    threadsByID = new Map(threads.map((thread) => [thread.id, thread]));
     sidebarUnreadOverrides.forEach((override, id) => {
-      const thread = threadsByID.get(id);
+      const thread = findThread(id);
       // Retain live observations through persistence lag, but release them when
       // acknowledged, removed, or superseded by activity in a subsequent turn.
       if (!thread || override.isUnread === (thread.isUnread === true)
@@ -127,7 +125,7 @@ function createThreadUnreadState({ isOpen, onChange }) {
       else nextUnreadThreadIDs.delete(id);
     });
     completedTickExpiryByThreadID.forEach((_, threadID) => {
-      if (!threadsByID.has(threadID)) completedTickExpiryByThreadID.delete(threadID);
+      if (!findThread(threadID)) completedTickExpiryByThreadID.delete(threadID);
     });
     syncUnreadFromSidebar(nextUnreadThreadIDs);
     scheduleUnreadSync(1500);
@@ -150,7 +148,6 @@ function createThreadUnreadState({ isOpen, onChange }) {
     sidebarUnreadOverrides.clear();
     observedSidebarReadStates.clear();
     unreadThreadIDs.clear();
-    threadsByID.clear();
     unreadMonitoringStarted = false;
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   }
@@ -158,7 +155,6 @@ function createThreadUnreadState({ isOpen, onChange }) {
   return {
     applyThreads,
     destroy,
-    findThread: (id) => threadsByID.get(id),
     isThreadUnread,
     isCompletionTickVisible,
     scheduleUnreadSync,

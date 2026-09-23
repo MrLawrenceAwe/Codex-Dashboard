@@ -4,8 +4,8 @@ const todoStore = (() => {
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
   const imageDatabaseName = 'codex-dashboard.todo-images';
   const imageStoreName = 'images';
-  const version = 6;
-  const supportedVersions = new Set([1, 2, 3, 4, 5, version]);
+  const version = 7;
+  const supportedVersions = new Set([1, 2, 3, 4, 5, 6, version]);
   const maximumTags = 8;
   const maximumProjectNameLength = 40;
 
@@ -29,10 +29,10 @@ const todoStore = (() => {
   function normalizeImage(image, allowDeferredData = false) {
     if (!image || typeof image !== 'object') return null;
     const dataURL = cleanText(image.dataURL);
-    const match = dataURL.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,[a-z0-9+/=\s]+$/i);
+    const match = dataURL.match(/^data:([^;,]+);base64,[a-z0-9+/=\s]+$/i);
     if (!match && !allowDeferredData) return null;
     const type = match?.[1]?.toLowerCase() || cleanText(image.type).toLowerCase();
-    if (!acceptedImageType(type)) return null;
+    if (!isAcceptedImageType(type)) return null;
     return {
       dataURL,
       name: cleanText(image.name) || 'Attached image',
@@ -47,13 +47,13 @@ const todoStore = (() => {
     return id && name ? { id, name } : null;
   }
 
-  function normalizeChat(chat) {
-    const id = cleanText(chat?.id);
-    const title = cleanText(chat?.title).slice(0, 240);
+  function normalizeThread(thread) {
+    const id = cleanText(thread?.id);
+    const title = cleanText(thread?.title).slice(0, 240);
     return id && title ? { id, title } : null;
   }
 
-  function acceptedImageType(type) {
+  function isAcceptedImageType(type) {
     return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type);
   }
 
@@ -76,7 +76,7 @@ const todoStore = (() => {
       completed: item?.completed === true,
       tags: normalizeTags(item?.tags),
       project: normalizeProject(item?.project),
-      chat: normalizeChat(item?.chat),
+      thread: normalizeThread(item?.thread),
       image,
       createdAt: Number(item?.createdAt) || Date.now(),
       updatedAt: Number(item?.updatedAt) || Number(item?.createdAt) || Date.now(),
@@ -84,6 +84,7 @@ const todoStore = (() => {
   }
 
   function migrateItem(item, sourceVersion) {
+    if (sourceVersion < 7) item = { ...item, thread: item?.chat };
     if (sourceVersion < 4) {
       return { ...item, tags: item?.badges, project: item?.projectBadge };
     }
@@ -239,7 +240,7 @@ const todoStore = (() => {
     });
   }
 
-  function hydrate(items) {
+  function loadImages(items) {
     const pending = items.filter((item) => item.image && !item.image.dataURL);
     if (!pending.length) return Promise.resolve(items);
     return withImageStore('readonly', (store) => {
@@ -267,5 +268,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, hydrate, load, loadTags, maximumTags, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeChat, save, writeProtectionReason };
+  return { create, loadImages, load, loadTags, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
 })();

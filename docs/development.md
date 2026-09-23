@@ -15,7 +15,7 @@ ignored `injection.js` is built by the production `InjectionBundle` loader, incl
 the Swift-defined prompt schema; preview fixtures use the current thread contract.
 Generation exits before starting the menu-bar application.
 
-Shared page visibility, navigation-button construction, and icons live in `Core`. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation, completion ticks, polling, and the snapshot thread-ID index. The prompt controller receives an
+Shared page visibility, navigation-button construction, and icons live in `Core`. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-presentation-state.js` owns unread reconciliation, completion ticks, and polling. `Threads/thread-catalog.js` owns sorting, project matching, and the thread-ID index; dashboard, to-do, and prompt controllers receive its lookup operations during startup. The bridge applies each snapshot to the catalog before refreshing the pages. The prompt controller receives an
 explicit thread lookup for composer context. Native import/export and renderer
 persistence share the prompt store constructed by the application coordinator.
 
@@ -29,18 +29,31 @@ save queue. Item and tag mutations share optimistic rendering and rollback. Imag
 writes finish before metadata is committed; obsolete images are pruned after a
 successful commit. `todo-image-controller.js` owns image validation, draft state, and
 reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
-controller coordinates these with persistence. Teardown disconnects project
+controller coordinates these with persistence. Both new-task and linked-task actions
+share `insertTodoIntoComposer`; image formats are validated through the store’s
+`isAcceptedImageType`, and `loadImages` retrieves deferred image data. Teardown disconnects project
 observation, aborts image readers, and prevents pending callbacks from changing a
 replacement UI.
 
-To-do schema version 5 uses `project`; older `projectTag` and `projectBadge` values
-are migrated when loading. Preference loading migrates `collapsedProjects` to
-`collapsedProjectPaths` and `ignoredProjectPaths` to `mutedProjectPaths`. Successful
+To-do schema version 7 uses `project` and `thread` for a linked task. Loading migrates
+older `projectTag` and `projectBadge` fields, and the version 6 `chat` field. Preference
+loading migrates `collapsedProjects` to `collapsedProjectPaths`, and both
+`ignoredProjectPaths` and `mutedProjectPaths` to `hiddenChangeIndicatorPaths`. Successful
 migrations write only current fields; failed migration writes leave stored data intact.
 Keep old field names confined to migration code and legacy fixtures.
 
 Run `swift test` for the complete native and WebKit test suite. Web tests await to-do
 save completion instead of assuming that persistence finishes during a DOM event.
+
+## Code organisation
+
+Application filesystem watchers, refresh scheduling, and activity monitors live in
+`App/Monitoring`; diagnostics presentation lives in `App/Diagnostics`. Tests mirror
+these folders. `NotificationUsageRefresher` owns request coalescing, freshness checks,
+and the short-lived cache shared by desktop and phone notification delivery.
+Required runtime and DevTools operations have explicit implementations; test doubles
+provide their own stub behaviour. The DevTools convenience overload supplies a real
+four-second timeout to the required timed operation.
 
 ## Visual baselines
 

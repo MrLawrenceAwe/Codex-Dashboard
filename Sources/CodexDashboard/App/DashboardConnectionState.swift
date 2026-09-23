@@ -42,7 +42,7 @@ enum DashboardConnectionState: Equatable {
 struct DashboardActionPresentation: Equatable {
     static let openTitle = "Open Task Dashboard"
     static let restartTitle = "Restart & Enable"
-    static let disableTitle = "Disable Task Dashboard"
+    static let disableTitle = "Disable dashboard integration"
 
     let canOpen: Bool
     let canRestart: Bool

@@ -8,11 +8,13 @@ const taskDashboardState = (() => {
       const current = localStorage.getItem(preferencesKey);
       const legacy = current === null ? localStorage.getItem(legacyPreferencesKey) : null;
       stored = JSON.parse(current || legacy || '{}');
-      const hasLegacyMutedPaths = Object.hasOwn(stored, 'ignoredProjectPaths');
-      if (hasLegacyMutedPaths) {
-        if (!Object.hasOwn(stored, 'mutedProjectPaths')) {
-          stored.mutedProjectPaths = stored.ignoredProjectPaths;
+      const hasLegacyIndicatorPaths = Object.hasOwn(stored, 'ignoredProjectPaths')
+        || Object.hasOwn(stored, 'mutedProjectPaths');
+      if (hasLegacyIndicatorPaths) {
+        if (!Object.hasOwn(stored, 'hiddenChangeIndicatorPaths')) {
+          stored.hiddenChangeIndicatorPaths = stored.mutedProjectPaths ?? stored.ignoredProjectPaths;
         }
+        delete stored.mutedProjectPaths;
         delete stored.ignoredProjectPaths;
       }
       const hasLegacyCollapsedPaths = Object.hasOwn(stored, 'collapsedProjects');
@@ -22,7 +24,7 @@ const taskDashboardState = (() => {
         }
         delete stored.collapsedProjects;
       }
-      if (legacy !== null || hasLegacyMutedPaths || hasLegacyCollapsedPaths) {
+      if (legacy !== null || hasLegacyIndicatorPaths || hasLegacyCollapsedPaths) {
         localStorage.setItem(preferencesKey, JSON.stringify(stored));
         if (legacy !== null) localStorage.removeItem(legacyPreferencesKey);
       }
@@ -32,24 +34,24 @@ const taskDashboardState = (() => {
         ? stored.filterMode : 'recent',
       collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
         ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
-      mutedProjectPaths: new Set(Array.isArray(stored.mutedProjectPaths)
-        ? stored.mutedProjectPaths.filter((value) => typeof value === 'string') : []),
+      hiddenChangeIndicatorPaths: new Set(Array.isArray(stored.hiddenChangeIndicatorPaths)
+        ? stored.hiddenChangeIndicatorPaths.filter((value) => typeof value === 'string') : []),
     };
   }
 
-  function savePreferences({ filterMode, collapsedProjectPaths, mutedProjectPaths }) {
+  function savePreferences({ filterMode, collapsedProjectPaths, hiddenChangeIndicatorPaths }) {
     try {
       localStorage.setItem(preferencesKey, JSON.stringify({
         filterMode,
         collapsedProjectPaths: [...collapsedProjectPaths],
-        mutedProjectPaths: [...mutedProjectPaths],
+        hiddenChangeIndicatorPaths: [...hiddenChangeIndicatorPaths],
       }));
     } catch (_) {}
   }
 
-  function summarizeActivity(threads, isThreadUnread, mutedProjectPaths) {
+  function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
-    const unmutedChangedProjectPaths = new Set();
+    const indicatedChangedProjectPaths = new Set();
     const allChangedProjectPaths = new Set();
     let unreadCount = 0;
 
@@ -59,10 +61,10 @@ const taskDashboardState = (() => {
       if (thread.workingTreeStatus === 'hasChanges') {
         const projectPath = String(thread.projectPath).trim();
         allChangedProjectPaths.add(projectPath);
-        if (!mutedProjectPaths.has(projectPath)) unmutedChangedProjectPaths.add(projectPath);
+        if (!hiddenChangeIndicatorPaths.has(projectPath)) indicatedChangedProjectPaths.add(projectPath);
       }
     });
-    return { runningCount, unreadCount, unmutedChangedProjectPaths, allChangedProjectPaths };
+    return { runningCount, unreadCount, indicatedChangedProjectPaths, allChangedProjectPaths };
   }
 
   function filter({
@@ -81,13 +83,6 @@ const taskDashboardState = (() => {
     });
   }
 
-  function sortThreadsByRecency(threads) {
-    if (!Array.isArray(threads)) return [];
-    return [...threads].sort((left, right) => {
-      const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
-      return recencyDifference || String(left.id).localeCompare(String(right.id));
-    });
-  }
 
-  return { summarizeActivity, filter, loadPreferences, sortThreadsByRecency, savePreferences };
+  return { summarizeActivity, filter, loadPreferences, savePreferences };
 })();

@@ -63,18 +63,18 @@ const threadMarkup = (() => {
     return [...groups.values()];
   }
 
-  function renderProjectActions(projectPath, projectThreads, isMuted) {
+  function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
     if (!projectThreads.some((thread) => thread.workingTreeStatus === 'hasChanges')) return '';
     const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
     return `
-      <button type="button" class="dashboard-project-mute" data-project-mute="${domUtils.escapeHTML(projectPath)}" title="${isMuted ? 'Unmute change notifications for this project' : 'Mute change notifications for this project'}">${dashboardIcons.render(isMuted ? 'restore' : 'mute')}<span>${isMuted ? 'Unmute change alerts' : 'Mute change alerts'}</span></button>
-      ${isMuted ? '' : `<button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`}`;
+      <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
+      <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`;
   }
 
   function list(visibleThreads, {
     filterMode,
     collapsedProjectPaths,
-    mutedProjectPaths,
+    hiddenChangeIndicatorPaths,
     isUnread,
     isCompletionTickVisible,
   }) {
@@ -100,28 +100,28 @@ const threadMarkup = (() => {
             <span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>
           </div>
           <span class="dashboard-project-summary">
-            ${renderProjectActions(projectPath, projectThreads, mutedProjectPaths.has(projectPath))}
+            ${renderProjectActions(projectPath, projectThreads, hiddenChangeIndicatorPaths.has(projectPath))}
           </span>
         </article>`;
       };
-      const activeProjects = [];
-      const mutedProjects = [];
+      const projectsWithVisibleIndicators = [];
+      const projectsWithHiddenIndicators = [];
       projects.forEach((project) => {
-        (mutedProjectPaths.has(project.path) ? mutedProjects : activeProjects).push(project);
+        (hiddenChangeIndicatorPaths.has(project.path) ? projectsWithHiddenIndicators : projectsWithVisibleIndicators).push(project);
       });
       return `
-        ${activeProjects.map(projectCard).join('')}
-        ${mutedProjects.length ? `
-          <details class="dashboard-muted-projects" data-dashboard-muted-projects>
-            <summary><span class="dashboard-muted-project-label">Muted</span><span class="dashboard-muted-project-count">${mutedProjects.length}</span></summary>
-            <div class="dashboard-muted-project-list">${mutedProjects.map(projectCard).join('')}</div>
+        ${projectsWithVisibleIndicators.map(projectCard).join('')}
+        ${projectsWithHiddenIndicators.length ? `
+          <details class="dashboard-hidden-indicators" data-dashboard-hidden-indicators>
+            <summary><span class="dashboard-hidden-indicators-label">Indicators hidden</span><span class="dashboard-hidden-indicators-count">${projectsWithHiddenIndicators.length}</span></summary>
+            <div class="dashboard-hidden-indicators-list">${projectsWithHiddenIndicators.map(projectCard).join('')}</div>
           </details>` : ''}`;
     }
     return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
-      const isMuted = mutedProjectPaths.has(projectPath);
+      const indicatorsHidden = hiddenChangeIndicatorPaths.has(projectPath);
       return `
       <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" data-dashboard-project-group="${domUtils.escapeHTML(projectPath)}" aria-label="${domUtils.escapeHTML(project)} project">
         <header class="dashboard-project-heading">
@@ -133,13 +133,13 @@ const threadMarkup = (() => {
                 <span class="dashboard-project-name">${domUtils.escapeHTML(project)}</span>
                 <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
               </span>
-              ${hasChanges && !isMuted ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>` : ''}
-              ${hasChanges && isMuted ? '<span class="dashboard-project-muted" title="Change notifications are muted for this project">Muted</span>' : ''}
+              ${hasChanges && !indicatorsHidden ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>` : ''}
+              ${hasChanges && indicatorsHidden ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>' : ''}
             </span>
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'task' : 'tasks'}</span>
-            ${renderProjectActions(projectPath, projectThreads, isMuted)}
+            ${renderProjectActions(projectPath, projectThreads, indicatorsHidden)}
           </span>
         </header>
         <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>

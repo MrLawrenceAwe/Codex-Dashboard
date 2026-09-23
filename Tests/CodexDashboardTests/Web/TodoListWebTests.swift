@@ -487,7 +487,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? String, "Create tag")
     }
 
-    func testProjectsComeFromCodexAndCanStartANewChatWithTheTodo() async throws {
+    func testProjectsComeFromCodexAndCanStartANewTaskWithTheTodo() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -529,7 +529,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 composer.placeholder = 'Do anything';
                 document.body.append(composer);
               });
-              document.querySelector('[data-todo-new-chat]').click();
+              document.querySelector('[data-todo-new-thread]').click();
               await window.__waitForTodoSaves?.();
             })()
             """
@@ -605,7 +605,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? [String], ["", "project-a"])
     }
 
-    func testSelectingAProjectOffersOnlyThatProjectsChats() async throws {
+    func testSelectingAProjectOffersOnlyThatProjectsTasks() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -635,7 +635,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               const project = form.querySelector('[data-todo-new-project]');
-              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              const chat = form.querySelector('[data-todo-new-thread-picker]');
               const initiallyHidden = chat.hidden;
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
@@ -654,10 +654,10 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 enabledAfterProjectSelection,
                 choices,
                 stored.project.id,
-                stored.chat.id,
-                stored.chat.title,
-                Boolean(document.querySelector('[data-todo-paste-in-chat]')),
-                document.querySelector('[data-todo-new-chat]') === null,
+                stored.thread.id,
+                stored.thread.title,
+                Boolean(document.querySelector('[data-todo-paste-in-thread]')),
+                document.querySelector('[data-todo-new-thread]') === null,
               ];
             })()
             """
@@ -667,7 +667,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Bool, true)
-        XCTAssertEqual(values[3] as? [String], ["No chat", "Newest dashboard chat", "Older dashboard chat"])
+        XCTAssertEqual(values[3] as? [String], ["No linked task", "Newest dashboard chat", "Older dashboard chat"])
         XCTAssertEqual(values[4] as? String, "dashboard")
         XCTAssertEqual(values[5] as? String, "dashboard-old")
         XCTAssertEqual(values[6] as? String, "Older dashboard chat")
@@ -675,7 +675,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[8] as? Bool, true)
     }
 
-    func testChangingTodoProjectClearsItsPreviousChat() async throws {
+    func testChangingTodoProjectClearsItsPreviousTask() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -705,7 +705,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const newProject = form.querySelector('[data-todo-new-project]');
               newProject.value = 'dashboard';
               newProject.dispatchEvent(new Event('change', { bubbles: true }));
-              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              const chat = form.querySelector('[data-todo-new-thread-picker]');
               chat.value = 'dashboard-chat';
               chat.dispatchEvent(new Event('change', { bubbles: true }));
               form.querySelector('[data-todo-new-title]').value = 'Move me';
@@ -713,13 +713,13 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               await window.__waitForTodoSaves?.();
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
               await window.__waitForTodoSaves?.();
-              const originalChat = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].chat.id;
+              const originalChat = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].thread.id;
               const project = document.querySelector('[data-todo-project]');
               project.value = 'other';
               project.dispatchEvent(new Event('change', { bubbles: true }));
               await window.__waitForTodoSaves?.();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
-              return [originalChat, stored.project.id, stored.chat, Boolean(document.querySelector('[data-todo-paste-in-chat]')), Boolean(document.querySelector('[data-todo-new-chat]'))];
+              return [originalChat, stored.project.id, stored.thread, Boolean(document.querySelector('[data-todo-paste-in-thread]')), Boolean(document.querySelector('[data-todo-new-thread]'))];
             })()
             """
         ) as? [Any]
@@ -732,7 +732,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? Bool, true)
     }
 
-    func testChatPickerDoesNotMixProjectsWithTheSameName() async throws {
+    func testTaskPickerDoesNotMixProjectsWithTheSameName() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -757,7 +757,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openTodos();
               const project = document.querySelector('[data-todo-new-project]');
-              const chat = document.querySelector('[data-todo-new-chat-picker]');
+              const chat = document.querySelector('[data-todo-new-thread-picker]');
               project.value = '/tmp/one/shared';
               project.dispatchEvent(new Event('change', { bubbles: true }));
               const exact = [...chat.options].map((option) => option.value);
@@ -773,7 +773,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? Bool, true)
     }
 
-    func testNewChatTransfersTheTodoImageToTheComposer() async throws {
+    func testNewTaskTransfersTheTodoImageToTheComposer() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -814,7 +814,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
             "document.querySelector('[data-todo-form]').requestSubmit()"
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-todo-new-chat]') !== null",
+            "document.querySelector('[data-todo-new-thread]') !== null",
             in: webView
         )
         _ = try await webView.evaluateAsyncJavaScript(
@@ -831,7 +831,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
                 });
                 document.body.append(composer);
               });
-              document.querySelector('[data-todo-new-chat]').click();
+              document.querySelector('[data-todo-new-thread]').click();
               await window.__waitForTodoSaves?.();
             })()
             """
@@ -877,12 +877,12 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               project.dispatchEvent(new Event('change', { bubbles: true }));
               await window.__waitForTodoSaves?.();
               const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
-              const newChatVisible = Boolean(document.querySelector('[data-todo-new-chat]'));
+              const newChatVisible = Boolean(document.querySelector('[data-todo-new-thread]'));
               document.querySelector('[data-todo-project]').value = '';
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
               await window.__waitForTodoSaves?.();
               const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
-              return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-chat]'))];
+              return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-thread]'))];
             })()
             """
         ) as? [Any]
@@ -1499,7 +1499,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, true, true, false, false])
     }
 
-    func testChatCanBeAddedToTodosAndPastedBackIntoTaggedChat() async throws {
+    func testTaskCanBeAddedToTodosAndPastedBackIntoLinkedTask() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -1542,7 +1542,7 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               const project = form.querySelector('[data-todo-new-project]');
               project.value = '/tmp/project';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              const chat = form.querySelector('[data-todo-new-chat-picker]');
+              const chat = form.querySelector('[data-todo-new-thread-picker]');
               const choices = [...chat.options].map((option) => option.value);
               chat.value = 'linked-chat';
               chat.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1565,20 +1565,20 @@ final class TodoListWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [
-                stored.chat.id,
-                stored.chat.title,
-                document.querySelector('.todo-chat').textContent.trim(),
-                document.querySelector('[data-todo-paste-in-chat]').textContent.trim(),
-                document.querySelector('[data-todo-new-chat]') === null,
+                stored.thread.id,
+                stored.thread.title,
+                document.querySelector('.todo-thread').textContent.trim(),
+                document.querySelector('[data-todo-paste-in-thread]').textContent.trim(),
+                document.querySelector('[data-todo-new-thread]') === null,
                 JSON.parse(localStorage.getItem('codex-dashboard.todos')).items.length,
               ];
             })()
             """
         ) as? [AnyHashable]
-        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat", true, 1])
+        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste into task", true, 1])
 
         _ = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-todo-paste-in-chat]').click()"
+            "document.querySelector('[data-todo-paste-in-thread]').click()"
         )
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('textarea[placeholder=\"Do anything\"]')?.value === 'Finish linked work'",

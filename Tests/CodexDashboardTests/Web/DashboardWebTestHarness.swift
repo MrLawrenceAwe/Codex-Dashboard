@@ -47,7 +47,7 @@ enum DashboardWebTestHarness {
 
     // Observe the real persistence promises without exposing a test API in production.
     static func trackedTodoInjection(_ injection: InjectionBundle) -> String {
-        injection.mountExpression.replacingOccurrences(of: "const todoList = (() => {", with: """
+        injection.mountExpression.replacingOccurrences(of: "function createTodoList({ threadReferencesForProject }) {", with: """
         window.__todoStoreForTests = todoStore;
         const pendingTodoSaves = new Set();
         const saveTodoSnapshot = todoStore.save;
@@ -61,7 +61,7 @@ enum DashboardWebTestHarness {
           while (pendingTodoSaves.size) await Promise.all([...pendingTodoSaves]);
           await Promise.resolve();
         };
-        const todoList = (() => {
+        function createTodoList({ threadReferencesForProject }) {
         """)
     }
 

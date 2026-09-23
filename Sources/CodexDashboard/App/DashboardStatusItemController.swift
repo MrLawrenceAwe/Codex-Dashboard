@@ -84,7 +84,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
         let disable = actionItem(
             DashboardActionPresentation.disableTitle,
-            action: #selector(disableTaskDashboard)
+            action: #selector(disableIntegration)
         )
         disable.isEnabled = actions.canDisable
         menu.addItem(disable)
@@ -163,8 +163,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         Task { await coordinator.restartCodexAndEnableDashboard() }
     }
 
-    @objc private func disableTaskDashboard() {
-        Task { await coordinator.disableTaskDashboard() }
+    @objc private func disableIntegration() {
+        Task { await coordinator.disableIntegration() }
     }
 
     @objc private func checkCompatibility() {
