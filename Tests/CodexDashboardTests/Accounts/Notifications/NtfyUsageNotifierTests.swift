@@ -47,9 +47,134 @@ private actor FailSecondNtfyPublisher: NtfyPublishing {
     func recordedTitles() -> [String] { titles }
 }
 
+private actor SuspendedNtfyPublisher: NtfyPublishing {
+    private var attemptStarted: CheckedContinuation<Void, Never>?
+    private var releaseAttempt: CheckedContinuation<Void, Never>?
+    private var attempts = 0
+    private var messages: [String] = []
+
+    func publish(topic: String, title: String, message: String) async {
+        attempts += 1
+        if attempts == 1 {
+            await withCheckedContinuation { continuation in
+                releaseAttempt = continuation
+                attemptStarted?.resume()
+                attemptStarted = nil
+            }
+        }
+        messages.append(title)
+    }
+
+    func waitForFirstAttempt() async {
+        if attempts > 0 { return }
+        await withCheckedContinuation { attemptStarted = $0 }
+    }
+
+    func release() {
+        releaseAttempt?.resume()
+        releaseAttempt = nil
+    }
+
+    func attemptCount() -> Int { attempts }
+    func messageCount() -> Int { messages.count }
+}
+
+@MainActor
+private final class SuspendedUsageRefresh {
+    private var started: CheckedContinuation<Void, Never>?
+    private var pending: CheckedContinuation<CodexAccountUsageSnapshot?, Never>?
+
+    func fetch() async -> CodexAccountUsageSnapshot? {
+        await withCheckedContinuation { continuation in
+            pending = continuation
+            started?.resume()
+            started = nil
+        }
+    }
+
+    func waitUntilStarted() async {
+        if pending != nil { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func finish(with snapshot: CodexAccountUsageSnapshot) {
+        pending?.resume(returning: snapshot)
+        pending = nil
+    }
+}
+
 @MainActor
 final class NtfyUsageNotifierTests: XCTestCase {
-    func testKeepsFailedDeadlineRetryWhenWeeklyUsageBecomesExhausted() async throws {
+    func testDueReminderSurvivesRefreshWhileFreshUsageIsPending() async throws {
+        var currentDate = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = RecordingNtfyPublisher()
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { currentDate })
+        let refresh = SuspendedUsageRefresh()
+        let account = SavedAccount(
+            id: UUID(), name: "Personal", createdAt: currentDate, lastUsedAt: currentDate,
+            accountIdentifier: nil
+        )
+        let usage = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(
+                    usedPercent: 20, resetsAt: currentDate.addingTimeInterval(60 * 60 + 0.01)
+                )
+            ),
+            fetchedAt: currentDate
+        )
+        notifier.setDeadlineUsageRefreshHandler { _ in await refresh.fetch() }
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
+        await refresh.waitUntilStarted()
+        currentDate.addTimeInterval(1)
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
+        refresh.finish(with: usage)
+        for _ in 0..<50 {
+            if await publisher.recordedMessages().count == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let deliveredCount = await publisher.recordedMessages().count
+        XCTAssertEqual(deliveredCount, 1)
+    }
+
+    func testOverlappingUpdatesSendImmediateAlertOnlyOnce() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
+        let publisher = SuspendedNtfyPublisher()
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, accountIdentifier: nil)
+        let reset = now.addingTimeInterval(5 * 60 * 60)
+        let previous = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: reset), weekly: nil
+            ), fetchedAt: now.addingTimeInterval(-30)
+        )
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 60, resetsAt: reset), weekly: nil
+            ), fetchedAt: now
+        )
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: previous])
+        let first = Task { await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current]) }
+        await publisher.waitForFirstAttempt()
+        let second = Task { await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current]) }
+        try await Task.sleep(for: .milliseconds(20))
+        let attemptsBeforeRelease = await publisher.attemptCount()
+        XCTAssertEqual(attemptsBeforeRelease, 1)
+        await publisher.release()
+        await first.value
+        await second.value
+        let deliveredCount = await publisher.messageCount()
+        XCTAssertEqual(deliveredCount, 1)
+    }
+
+    func testCancelsFailedLimitRetryWhenWeeklyUsageBecomesExhausted() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
@@ -75,7 +200,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: exhausted])
         try await Task.sleep(for: .milliseconds(150))
         let count = await publisher.messageCount()
-        XCTAssertEqual(count, 1)
+        XCTAssertEqual(count, 0)
     }
 
     func testDeliversDeadlineOnlyFallbackWhenFreshUsageIsUnavailable() async throws {

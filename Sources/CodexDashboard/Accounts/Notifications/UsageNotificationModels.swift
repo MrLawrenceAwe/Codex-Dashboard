@@ -6,6 +6,7 @@ enum UsageDeadlineStyle: Equatable, Sendable {
 }
 
 enum ScheduledUsageNotificationKind: Equatable, Sendable {
+    case fiveHourReset
     case weeklyReset
     case bankedResetExpiry
 }
