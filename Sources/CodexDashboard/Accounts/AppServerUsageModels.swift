@@ -21,9 +21,9 @@ struct RateLimitSnapshot: Decodable {
         let windows = [primary, secondary].compactMap { $0 }
         return CodexAccountUsage(
             fiveHour: windows.first { $0.windowDurationMins == 300 }?.usageWindow
-                ?? primary?.usageWindow,
+                ?? (primary?.windowDurationMins == nil ? primary?.usageWindow : nil),
             weekly: windows.first { $0.windowDurationMins == 10_080 }?.usageWindow
-                ?? secondary?.usageWindow,
+                ?? (secondary?.windowDurationMins == nil ? secondary?.usageWindow : nil),
             bankedResets: bankedResets
         )
     }

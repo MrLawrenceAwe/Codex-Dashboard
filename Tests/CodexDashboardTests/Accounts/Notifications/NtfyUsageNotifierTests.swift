@@ -203,7 +203,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         XCTAssertEqual(count, 0)
     }
 
-    func testDeliversDeadlineOnlyFallbackWhenFreshUsageIsUnavailable() async throws {
+    func testRetriesUnavailableFreshUsageBeforeSendingReminder() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
@@ -211,7 +211,8 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let notifier = NtfyUsageNotifier(
             userDefaults: defaults,
             publisher: publisher,
-            now: { now }
+            now: { now },
+            retryDelay: { _ in .milliseconds(100) }
         )
         let account = SavedAccount(
             id: UUID(),
@@ -230,8 +231,16 @@ final class NtfyUsageNotifierTests: XCTestCase {
             ),
             fetchedAt: now
         )
+        var refreshAttempts = 0
+        notifier.setDeadlineUsageRefreshHandler { _ in
+            refreshAttempts += 1
+            return refreshAttempts == 1 ? nil : usage
+        }
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
+        try await Task.sleep(for: .milliseconds(30))
+        let beforeRetry = await publisher.recordedMessages()
+        XCTAssertTrue(beforeRetry.isEmpty)
         for _ in 0..<50 {
             if await publisher.recordedMessages().count == 1 { break }
             try? await Task.sleep(for: .milliseconds(10))
@@ -242,8 +251,8 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let messages = await publisher.recordedMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages.first?.topic, notifier.topic)
-        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly limit resets ") == true)
-        XCTAssertFalse(messages.first?.body.contains("%") == true)
+        XCTAssertTrue(messages.first?.body.contains("Personal’s Weekly: 82% left") == true)
+        XCTAssertEqual(refreshAttempts, 2)
     }
 
     func testRefreshesUsageImmediatelyBeforeDeliveringScheduledWarning() async throws {
@@ -444,6 +453,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             ),
             fetchedAt: now
         )
+        notifier.setDeadlineUsageRefreshHandler { _ in revisedUsage }
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: initialUsage])
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: revisedUsage])
@@ -480,6 +490,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             ),
             fetchedAt: now
         )
+        notifier.setDeadlineUsageRefreshHandler { _ in usage }
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: usage])
         try await Task.sleep(for: .milliseconds(20))
