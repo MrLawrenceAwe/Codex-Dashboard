@@ -4,7 +4,7 @@
 - Single-instance startup arbitration prevents older controllers from overwriting the active dashboard.
 - Loopback-only Chromium DevTools connection managed by `LocalCodexDashboardRuntime` and `DashboardRenderer`.
 - Versioned dashboard resources under `Sources/CodexDashboard/Resources/Dashboard`, grouped into `Core`, `Accounts`, `Composer`, `Threads`, `Todos`, `Sidebar`, and `Prompts`.
-- The injection manifest is the source of truth for both runtime resources and compatibility contract bundles. Prompt-library schema values are defined once in Swift and injected into the renderer contract. The injection version hashes the assembled payload, including that schema.
+- The injection manifest is the source of truth for both runtime resources and compatibility contract bundles. Prompt-library and shared composer-preset schema values are defined once in Swift and injected into the renderer contract. The injection version hashes the assembled payload, including that schema.
 - A read-only compatibility check reports storage, rollout-event, renderer, sidebar, unread-state, composer, and composer-control contract drift after Codex updates.
 - Swift source is grouped by application coordination, accounts, compatibility checks, prompt persistence, thread data, renderer runtime, and shared support concerns; tests mirror those boundaries and are split by behaviour.
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
@@ -43,6 +43,6 @@ injection maintenance.
 Notification models, pure planning, delivery, and history persistence live in
 `Sources/CodexDashboard/Accounts/Notifications`. `UsageNotificationPlanner` builds a
 single plan for each observation time. `DesktopUsageNotifier` and `NtfyUsageNotifier`
-retain independent histories through `UsageNotificationHistory`; successful delivery
+retain independent histories through `UsageNotificationHistory`, including immediate and phone deadline delivery records; successful delivery
 on one channel never acknowledges delivery on the other. Existing durable keys are
 preserved so refactoring cannot resend alerts or discard phone settings.

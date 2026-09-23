@@ -73,12 +73,10 @@ struct NoopDesktopUsageNotifier: DesktopUsageNotifying {
 @MainActor
 final class DesktopUsageNotifier: DesktopUsageNotifying {
     private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
-    private static let deliveredImmediateNotificationsKey = "accountDeliveredImmediateNotifications"
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: any DesktopNotificationCenter
     private let history: UsageNotificationHistory
-    private let userDefaults: UserDefaults
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var liveNotificationsByIdentifier: [String: ScheduledUsageNotification] = [:]
@@ -90,7 +88,6 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         userDefaults: UserDefaults = .standard
     ) {
         self.notificationCenter = notificationCenter
-        self.userDefaults = userDefaults
         history = UsageNotificationHistory(userDefaults: userDefaults, channel: .desktop)
     }
 
@@ -186,9 +183,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
                 // immediate revised-deadline alert that macOS rejected.
             }
         }
-        var deliveredImmediateIdentifiers = Set(
-            userDefaults.stringArray(forKey: Self.deliveredImmediateNotificationsKey) ?? []
-        )
+        var deliveredImmediateIdentifiers = history.deliveredImmediateIdentifiers()
         var immediateDeliveryFailed = false
         for notification in immediateNotifications where !deliveredImmediateIdentifiers.contains(notification.identifier) {
             let content = UNMutableNotificationContent()
@@ -202,10 +197,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
                     trigger: nil
                 ))
                 deliveredImmediateIdentifiers.insert(notification.identifier)
-                userDefaults.set(
-                    Array(deliveredImmediateIdentifiers),
-                    forKey: Self.deliveredImmediateNotificationsKey
-                )
+                history.recordImmediateDelivery(notification.identifier)
             } catch {
                 immediateDeliveryFailed = true
             }

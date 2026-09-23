@@ -37,7 +37,7 @@ struct InjectionBundle: Sendable {
         return try assemble(
             script: script,
             stylesheet: stylesheet,
-            schemaDeclaration: PromptLibrarySchema.javascriptDeclaration
+            schemaDeclaration: ComposerPresetSchema.javascriptDeclaration + "\n" + PromptLibrarySchema.javascriptDeclaration
         )
     }
 
@@ -71,7 +71,8 @@ struct InjectionBundle: Sendable {
     }
 
     static func loadPromptLibraryContractSource(bundle: Bundle? = nil) throws -> String {
-        PromptLibrarySchema.javascriptDeclaration + "\n" + (try loadContract(
+        ComposerPresetSchema.javascriptDeclaration + "\n"
+            + PromptLibrarySchema.javascriptDeclaration + "\n" + (try loadContract(
             named: "promptLibrary",
             bundle: bundle
         ))

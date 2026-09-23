@@ -120,7 +120,7 @@ const composerModelPicker = (() => {
       return item.getAttribute('aria-expanded') === 'true' && isAvailable(controlled) ? controlled : null;
     });
     if (!submenu) return false;
-    const label = presetOptions.label(presetOptions.speeds, speed);
+    const label = composerPresets.label(composerPresets.speeds, speed);
     const option = [...submenu.querySelectorAll('[role^="menuitem"]')]
       .find((candidate) => isAvailable(candidate) && matchesLabel(candidate, label));
     if (!option) return false;
@@ -131,7 +131,7 @@ const composerModelPicker = (() => {
 
   async function applyPreset(preset) {
     if (!preset) return true;
-    const modelLabel = presetOptions.label(presetOptions.models, preset.model);
+    const modelLabel = composerPresets.label(composerPresets.models, preset.model);
     if (preset.model && !modelLabel) return false;
     const selections = [
       [selectModel, modelLabel],

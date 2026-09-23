@@ -34,8 +34,6 @@ final class NoopPhoneUsageNotifier: PhoneUsageNotifying {
 final class NtfyUsageNotifier: PhoneUsageNotifying {
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
-    private static let deliveredResetsKey = "ntfyDeliveredAccountResets"
-    private static let deliveredImmediateNotificationsKey = "ntfyDeliveredImmediateAccountNotifications"
 
     private let history: UsageNotificationHistory
     private let userDefaults: UserDefaults
@@ -143,7 +141,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             }
         }
         for notification in plan.scheduled {
-            if deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
+            if history.deliveredDeadline(for: notification.identifier) == notification.deadlineDate {
                 cancelTask(notification.identifier)
                 continue
             }
@@ -166,12 +164,12 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             }
         }
         let immediateNotifications = plan.immediate.filter {
-            !deliveredImmediateNotificationIdentifiers().contains($0.identifier)
+            !history.deliveredImmediateIdentifiers().contains($0.identifier)
         }
         for notification in immediateNotifications {
             do {
                 try await publisher.publish(topic: topic, title: notification.title, message: notification.body)
-                recordDeliveredImmediateNotification(notification.identifier)
+                history.recordImmediateDelivery(notification.identifier)
             } catch {
                 // Leave the previous observation in place so a later refresh can retry.
                 return
@@ -216,33 +214,11 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
                 history.saveDeadlines([notification], for: .known)
                 history.saveDeadlines([notification], for: .updates)
             }
-            recordDelivered(notification)
+            history.recordDeadlineDelivery(notification)
             cancelTask(notification.identifier)
         } catch {
             scheduleRetry(for: notification)
         }
-    }
-
-    private func deliveredDeadline(for identifier: String) -> Date? {
-        guard let timestamp = userDefaults.dictionary(forKey: Self.deliveredResetsKey)?[identifier]
-            as? Double else { return nil }
-        return Date(timeIntervalSince1970: timestamp)
-    }
-
-    private func recordDelivered(_ notification: ScheduledUsageNotification) {
-        var delivered = userDefaults.dictionary(forKey: Self.deliveredResetsKey) ?? [:]
-        delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
-        userDefaults.set(delivered, forKey: Self.deliveredResetsKey)
-    }
-
-    private func deliveredImmediateNotificationIdentifiers() -> Set<String> {
-        Set(userDefaults.stringArray(forKey: Self.deliveredImmediateNotificationsKey) ?? [])
-    }
-
-    private func recordDeliveredImmediateNotification(_ identifier: String) {
-        var identifiers = deliveredImmediateNotificationIdentifiers()
-        identifiers.insert(identifier)
-        userDefaults.set(Array(identifiers), forKey: Self.deliveredImmediateNotificationsKey)
     }
 
     private func cancelTask(_ identifier: String) {

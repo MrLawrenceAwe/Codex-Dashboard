@@ -1,7 +1,4 @@
 const promptLibraryContract = (() => {
-  const reasoningEffortValues = new Set(PROMPT_LIBRARY_SCHEMA.reasoningEfforts);
-  const speedValues = new Set(PROMPT_LIBRARY_SCHEMA.speeds);
-
   function normalizeSection(value) {
     return String(value || '').trim() || PROMPT_LIBRARY_SCHEMA.defaultSection;
   }
@@ -41,24 +38,8 @@ const promptLibraryContract = (() => {
       && prompt.content.length > 0
       && (prompt.section === undefined || typeof prompt.section === 'string')
       && isValidScope(prompt.scope)
-      && (prompt.preset === undefined || isValidPreset(prompt.preset))
+      && (prompt.preset === undefined || composerPresets.isValid(prompt.preset))
       && (prompt.usePreset === undefined || typeof prompt.usePreset === 'boolean');
-  }
-
-  function isValidPreset(preset) {
-    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) return false;
-    return (preset.model === undefined || (typeof preset.model === 'string' && Boolean(preset.model.trim())))
-      && (preset.reasoningEffort === undefined || reasoningEffortValues.has(preset.reasoningEffort))
-      && (preset.speed === undefined || speedValues.has(preset.speed));
-  }
-
-  function normalizePreset(preset) {
-    if (!isValidPreset(preset)) return undefined;
-    const normalized = {};
-    if (preset.model) normalized.model = preset.model;
-    if (preset.reasoningEffort) normalized.reasoningEffort = preset.reasoningEffort;
-    if (preset.speed) normalized.speed = preset.speed;
-    return Object.keys(normalized).length ? normalized : undefined;
   }
 
   function hasValidContents(library) {
@@ -78,7 +59,7 @@ const promptLibraryContract = (() => {
     if (!Array.isArray(storedPrompts)) return [];
     return storedPrompts.filter(isValidPrompt).map((prompt) => {
       const { preset: storedPreset, usePreset: storedUsePreset, ...storedPrompt } = prompt;
-      const preset = normalizePreset(storedPreset);
+      const preset = composerPresets.normalize(storedPreset);
       return {
         ...storedPrompt,
         section: normalizeSection(prompt.section),
@@ -101,10 +82,8 @@ const promptLibraryContract = (() => {
 
   return {
     defaultSection: PROMPT_LIBRARY_SCHEMA.defaultSection,
-    defaults: PROMPT_LIBRARY_SCHEMA.defaults,
     isValidLibrary,
     normalizePrompts,
-    normalizePreset,
     normalizeScope,
     scopeKey,
     normalizeSection,

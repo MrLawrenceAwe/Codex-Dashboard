@@ -24,6 +24,10 @@ function createTodoList({ threadReferencesForProject }) {
     getItems: () => items,
     updateItem,
   });
+  const composerActions = createTodoComposerActions({
+    isDestroyed: () => destroyed,
+    pageState,
+  });
   const tagController = createTodoTagController({
     isDestroyed: () => destroyed,
     getAvailableTags: () => availableTags,
@@ -149,7 +153,7 @@ function createTodoList({ threadReferencesForProject }) {
     if (!item) return false;
     item.project = todoStore.normalizeProject(project);
     item.thread = todoStore.normalizeThread(thread);
-    item.preset = promptLibraryContract.normalizePreset(preset) || null;
+    item.preset = composerPresets.normalize(preset) || null;
     const saved = await commitItems([item, ...items]);
     if (saved && !destroyed) {
       filterMode = 'open';
@@ -248,7 +252,7 @@ function createTodoList({ threadReferencesForProject }) {
 
   function draftPreset(toggle, fields) {
     if (!toggle.checked) return null;
-    return promptLibraryContract.normalizePreset({
+    return composerPresets.normalize({
       model: fields.querySelector('[data-todo-new-preset-model], [data-todo-item-preset-model]').value,
       reasoningEffort: fields.querySelector('[data-todo-new-preset-effort], [data-todo-item-preset-effort]').value,
       speed: fields.querySelector('[data-todo-new-preset-speed], [data-todo-item-preset-speed]').value,
@@ -335,92 +339,32 @@ function createTodoList({ threadReferencesForProject }) {
     });
   }
 
-  async function insertTodoIntoComposer(item) {
-    if (destroyed) return false;
-    const [loadedItem] = await todoStore.loadImages([item]);
-    if (destroyed) return false;
-    if (item.preset) {
-      const composer = await domUtils.waitFor(
-        () => destroyed || codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
-        { timeout: 3000, interval: 25 },
-      );
-      if (!composer || destroyed || !await composerModelPicker.applyPreset(item.preset)) {
-        if (!destroyed) {
-          pageState.open();
-          const notice = document.querySelector('[data-todo-composer-error]');
-          if (notice) notice.hidden = false;
-        }
-        return false;
-      }
-    }
-    const notice = document.querySelector('[data-todo-composer-error]');
-    if (notice) notice.hidden = true;
-    const content = [item.title, item.body].filter(Boolean).join('\n\n');
-    const image = loadedItem?.image;
-    let inserted = false;
-    const transfer = () => {
-      if (destroyed) return false;
-      if (!inserted) inserted = composerAdapter.insert(content);
-      return inserted && (!image || composerAdapter.attachImage(image));
-    };
-    if (transfer()) return true;
-    const composer = await domUtils.waitFor(
-      () => destroyed || codexUIContracts.composer(dashboardElements.elementIDs.promptDialog),
-      { timeout: 3000, interval: 25 },
-    );
-    return Boolean(composer && !destroyed && transfer());
-  }
-
-  async function openTodoInNewThread(item) {
-    if (destroyed || !item?.project || !await codexHost.newChat(item.project.id) || destroyed) return;
-    pageState.close();
-    await insertTodoIntoComposer(item);
-  }
-
-  async function pasteTodoInThread(item) {
-    if (destroyed || !item?.thread) return;
-    pageState.close();
-    codexHost.navigateToThread(item.thread);
-    const selected = await domUtils.waitFor(
-      () => destroyed || codexUIContracts.isThreadSelected(item.thread.id),
-      { timeout: 5000, interval: 25 },
-    );
-    if (selected && !destroyed) await insertTodoIntoComposer(item);
-  }
-
   function bindItemActions(page) {
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
+      const row = event.target.closest('[data-todo-id]');
+      const item = row && items.find((candidate) => candidate.id === row.dataset.todoId);
       const previewButton = event.target.closest('[data-todo-image-preview]');
       if (previewButton) {
-        const row = previewButton.closest('[data-todo-id]');
-        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
         if (item?.image) todoListView.showImage(item.image);
         return;
       }
       const newThreadButton = event.target.closest('[data-todo-new-thread]');
       if (newThreadButton) {
-        const row = newThreadButton.closest('[data-todo-id]');
-        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        void openTodoInNewThread(item);
+        void composerActions.openTodoInNewThread(item);
         return;
       }
       const pasteInThreadButton = event.target.closest('[data-todo-paste-in-thread]');
       if (pasteInThreadButton) {
-        const row = pasteInThreadButton.closest('[data-todo-id]');
-        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
-        void pasteTodoInThread(item);
+        void composerActions.pasteTodoInThread(item);
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
       if (removeImageButton) {
-        const row = removeImageButton.closest('[data-todo-id]');
         if (row) void updateItem(row.dataset.todoId, { image: null });
         return;
       }
       const removeTagButton = event.target.closest('[data-todo-tag-remove]');
       if (removeTagButton) {
-        const row = removeTagButton.closest('[data-todo-id]');
-        const item = items.find((candidate) => candidate.id === row?.dataset.todoId);
         if (item) void updateItem(item.id, {
           tags: item.tags.filter((tag) => tag !== removeTagButton.dataset.todoTagRemove),
         });
@@ -428,7 +372,6 @@ function createTodoList({ threadReferencesForProject }) {
       }
       const button = event.target.closest('[data-todo-delete]');
       if (!button) return;
-      const row = button.closest('[data-todo-id]');
       if (!row) return;
       if (!button.dataset.todoDeleteConfirm) {
         button.dataset.todoDeleteConfirm = row.dataset.todoId;

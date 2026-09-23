@@ -22,7 +22,7 @@ persistence share the prompt store constructed by the application coordinator.
 Internal Codex data uses `Thread` terminology; UI copy uses **Task**. Renderer
 snapshots use `RendererThread`; native completion detection uses `ThreadCompletionTracker`.
 Shared visibility application lives in `Core/page-visibility-controller.js`.
-Composer text/image insertion and model-picker interaction live in `Composer/`.
+Composer text/image insertion, model-picker interaction, and shared preset validation and rendering live in `Composer/`. To-do composer transfer lives in `Todos/todo-composer-actions.js`.
 
 `Todos/todo-store.js` owns normalisation, migration, and a serial `Promise<boolean>`
 save queue. Item and tag mutations share optimistic rendering and rollback. Image
@@ -45,7 +45,7 @@ migrations write only current fields; failed migration writes leave stored data 
 Keep old field names confined to migration code and legacy fixtures.
 
 Run `swift test` for the complete native and WebKit test suite. Web tests await to-do
-save completion instead of assuming that persistence finishes during a DOM event.
+save completion instead of assuming that persistence finishes during a DOM event. To-do web tests are split by presets, tags, projects, images, storage failures, and navigation.
 
 ## Code organisation
 
