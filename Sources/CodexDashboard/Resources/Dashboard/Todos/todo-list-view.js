@@ -220,6 +220,22 @@ const todoListView = (() => {
     titleInput.style.setProperty('max-width', 'none', 'important');
     titleInput.style.setProperty('min-width', '0', 'important');
     addButton.style.setProperty('width', 'auto', 'important');
+    ensureDialogHost();
+    return page;
+  }
+
+  function updateTopInset(page) {
+    let zoom = 1;
+    for (let ancestor = page.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      const value = Number.parseFloat(getComputedStyle(ancestor).zoom);
+      if (Number.isFinite(value) && value > 0) zoom *= value;
+    }
+    page.style.setProperty('--todo-top-inset', `${56 / zoom}px`);
+  }
+
+  function ensureDialogHost() {
+    const existing = document.getElementById(dashboardElements.elementIDs.todoDialogHost);
+    if (existing) return existing;
     const dialogHost = document.createElement('div');
     dialogHost.id = dashboardElements.elementIDs.todoDialogHost;
     dialogHost.innerHTML = `
@@ -241,7 +257,7 @@ const todoListView = (() => {
     imageDialog.addEventListener('click', (event) => {
       if (event.target === imageDialog) imageDialog.close();
     });
-    return page;
+    return dialogHost;
   }
 
   function updateImageDraft(image) {
@@ -315,5 +331,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateChatOptions, updateFilterOptions };
+  return { createPage, ensureDialogHost, updateTopInset, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateChatOptions, updateFilterOptions };
 })();

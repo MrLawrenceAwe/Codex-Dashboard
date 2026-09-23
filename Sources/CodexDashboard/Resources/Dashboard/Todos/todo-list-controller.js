@@ -401,7 +401,11 @@ const todoList = (() => {
   }
 
   function mountPage() {
-    if (document.getElementById(dashboardElements.elementIDs.todoPage)) return true;
+    const existingPage = document.getElementById(dashboardElements.elementIDs.todoPage);
+    if (existingPage) {
+      todoListView.updateTopInset(existingPage);
+      return true;
+    }
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
@@ -413,6 +417,7 @@ const todoList = (() => {
     bindItemEditing(page);
     bindItemActions(page);
     pageHost.append(page);
+    todoListView.updateTopInset(page);
     renderTags();
     refreshProjects();
     startProjectObserver();
@@ -432,6 +437,8 @@ const todoList = (() => {
 
   function open() {
     if (!document.getElementById(dashboardElements.elementIDs.todoPage)) mountPage();
+    const page = document.getElementById(dashboardElements.elementIDs.todoPage);
+    if (page) todoListView.updateTopInset(page);
     refreshProjects();
     startProjectObserver();
     if (pageState.open()) render();

@@ -309,6 +309,31 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(reinjected?[1] as? [String], ["After repair", "After reinjection"])
     }
 
+    func testTagsButtonRepairsRemovedDialogHostWithoutLosingDraft() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const title = document.querySelector('[data-todo-new-title]');
+          title.value = 'Unsubmitted draft';
+          document.getElementById('codex-dashboard-todo-dialogs').remove();
+          document.querySelector('[data-todo-manage-tags]').click();
+          const dialog = document.querySelector('[data-todo-tag-dialog]');
+          const opened = dialog?.open === true;
+          dialog.querySelector('[data-todo-tag-name]').value = 'Restored tag';
+          dialog.querySelector('[data-todo-tag-form]').requestSubmit();
+          await window.__waitForTodoSaves();
+          return [opened, title.value,
+            document.querySelectorAll('#codex-dashboard-todo-dialogs').length,
+            JSON.parse(localStorage.getItem('codex-dashboard.todo-tags'))];
+        })()
+        """) as? [Any]
+        XCTAssertEqual(result?[0] as? Bool, true)
+        XCTAssertEqual(result?[1] as? String, "Unsubmitted draft")
+        XCTAssertEqual(result?[2] as? Int, 1)
+        XCTAssertEqual(result?[3] as? [String], ["Restored tag"])
+    }
+
     func testFailedTagRenameAndDeletionRestoreAssignmentsAndCatalog() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""

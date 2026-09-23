@@ -5,6 +5,31 @@ import XCTest
 
 @MainActor
 final class TodoListWebTests: SerializedDashboardWebTestCase {
+    func testTagsButtonClearsTitlebarAtReducedHostZoom() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const page = document.getElementById('codex-dashboard-todo-page');
+          page.parentElement.style.zoom = '0.5';
+          window.__codexDashboard.openTodos();
+          const button = page.querySelector('[data-todo-manage-tags]');
+          return [button.getBoundingClientRect().top >= 50,
+            page.style.getPropertyValue('--todo-top-inset')];
+        })()
+        """) as? [Any]
+        XCTAssertEqual(result?[0] as? Bool, true)
+        XCTAssertEqual(result?[1] as? String, "112px")
+    }
+
     func testPageSelectionRemainsExclusiveAcrossRemountAndReinjection() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let result = try await webView.evaluateAsyncJavaScript("""
