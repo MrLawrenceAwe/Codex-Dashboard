@@ -12,7 +12,7 @@ const taskDashboardView = (() => {
     if (element.matches('[data-dashboard-git-project]')) {
       return `git:${element.dataset.dashboardGitProject}`;
     }
-    if (element.matches('[data-dashboard-muted-projects]')) return 'muted-projects';
+    if (element.matches('[data-dashboard-hidden-indicators]')) return 'hidden-indicators';
     if (element.matches('[data-dashboard-empty]')) return 'empty';
     return '';
   }
@@ -45,7 +45,7 @@ const taskDashboardView = (() => {
     renderedMarkup.set(element, markup);
   }
 
-  function updateSidebarStatus({ unreadCount, runningCount, unmutedChangedProjectPaths }) {
+  function updateSidebarStatus({ unreadCount, runningCount, indicatedChangedProjectPaths }) {
     const unreadBadge = document.querySelector('[data-navigation-count]');
     if (unreadBadge) {
       unreadBadge.textContent = String(unreadCount);
@@ -66,8 +66,8 @@ const taskDashboardView = (() => {
     }
     const changes = document.querySelector('[data-navigation-changes]');
     if (changes) {
-      const changedProjectCount = unmutedChangedProjectPaths.size;
-      const changedProjectNames = [...unmutedChangedProjectPaths]
+      const changedProjectCount = indicatedChangedProjectPaths.size;
+      const changedProjectNames = [...indicatedChangedProjectPaths]
         .map((path) => path.split('/').filter(Boolean).at(-1) || path)
         .slice(0, 3);
       const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
@@ -82,7 +82,7 @@ const taskDashboardView = (() => {
     filterMode,
     visibleThreadLimit,
     collapsedProjectPaths,
-    mutedProjectPaths,
+    hiddenChangeIndicatorPaths,
     commitOrPushError,
     isThreadUnread,
     isCompletionTickVisible,
@@ -104,7 +104,7 @@ const taskDashboardView = (() => {
     const filterCounts = {
       running: state.runningCount,
       unread: state.unreadCount,
-      changedProjects: state.unmutedChangedProjectPaths.size,
+      changedProjects: state.indicatedChangedProjectPaths.size,
     };
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
@@ -141,7 +141,7 @@ const taskDashboardView = (() => {
       threadMarkup.list(displayedThreads, {
         filterMode,
         collapsedProjectPaths,
-        mutedProjectPaths,
+        hiddenChangeIndicatorPaths,
         isUnread: isThreadUnread,
         isCompletionTickVisible,
       }),

@@ -9,7 +9,7 @@ protocol DesktopNotificationCenter: AnyObject {
     func removePendingRequests(withIdentifiers identifiers: [String])
     func removeDeliveredNotifications(withIdentifiers identifiers: [String])
     func add(_ request: UNNotificationRequest) async throws
-    func isAuthorized() async -> Bool
+    func requestAuthorizationIfNeeded() async -> Bool
 }
 
 @MainActor
@@ -36,7 +36,7 @@ final class SystemDesktopNotificationCenter: DesktopNotificationCenter {
         try await center.add(request)
     }
 
-    func isAuthorized() async -> Bool {
+    func requestAuthorizationIfNeeded() async -> Bool {
         let settings = await center.notificationSettings()
         switch settings.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
@@ -52,7 +52,7 @@ final class SystemDesktopNotificationCenter: DesktopNotificationCenter {
 }
 
 @MainActor
-protocol AccountUsageNotifying {
+protocol DesktopUsageNotifying {
     func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler)
     func updateNotifications(
         for accounts: [SavedAccount],
@@ -61,7 +61,7 @@ protocol AccountUsageNotifying {
 }
 
 @MainActor
-struct NoopAccountUsageNotifier: AccountUsageNotifying {
+struct NoopDesktopUsageNotifier: DesktopUsageNotifying {
     func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler) {}
 
     func updateNotifications(
@@ -71,7 +71,7 @@ struct NoopAccountUsageNotifier: AccountUsageNotifying {
 }
 
 @MainActor
-final class AccountUsageNotifier: AccountUsageNotifying {
+final class DesktopUsageNotifier: DesktopUsageNotifying {
     private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
     private static let deliveredImmediateNotificationsKey = "accountDeliveredImmediateNotifications"
     private static let fallbackDelay: TimeInterval = 30
@@ -142,7 +142,7 @@ final class AccountUsageNotifier: AccountUsageNotifying {
         notificationCenter.removePendingRequests(withIdentifiers: existingIdentifiers)
 
         let immediateNotifications = plan.immediate
-        guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationCenter.isAuthorized() else {
+        guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationCenter.requestAuthorizationIfNeeded() else {
             cancelAllLiveTasks()
             if immediateNotifications.isEmpty {
                 history.saveObservations(for: accounts, usageByAccountID: usageByAccountID)

@@ -3,6 +3,8 @@ import XCTest
 @testable import CodexDashboard
 
 actor StubRendererDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private let rendererTargets: [DevToolsTarget]
     private var evaluationResult = false
     private var evaluatedExpressions: [String] = []
@@ -30,6 +32,8 @@ actor StubRendererDevTools: DevToolsServing {
 }
 
 actor SuspendedMountDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private let target: DevToolsTarget
     private var mountContinuation: CheckedContinuation<Void, Never>?
     private var evaluatedExpressions: [String] = []
@@ -67,6 +71,8 @@ actor SuspendedMountDevTools: DevToolsServing {
 }
 
 actor OrderedSnapshotDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private let target: DevToolsTarget
     private var oldSnapshotContinuation: CheckedContinuation<Void, Never>?
     private var completedSnapshots: [String] = []
@@ -109,6 +115,8 @@ actor OrderedSnapshotDevTools: DevToolsServing {
 }
 
 actor RendererPollingDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private let target: DevToolsTarget
     private var targetRequestCount = 0
     private var booleanEvaluationCount = 0
@@ -133,6 +141,8 @@ actor RendererPollingDevTools: DevToolsServing {
 }
 
 actor EmptyRendererPollingDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private var targetRequestCount = 0
 
     func mainRendererTargets() -> [DevToolsTarget] {
@@ -146,6 +156,8 @@ actor EmptyRendererPollingDevTools: DevToolsServing {
 }
 
 actor FailingRendererDevTools: DevToolsServing {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { nil }
+
     private let staleTarget: DevToolsTarget
     private let freshTarget: DevToolsTarget
     private var targetRequestCount = 0
@@ -187,7 +199,7 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
         return true
     }
 
-    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
         stringExpressions.append(expression)
         if expression.contains("exportPendingPromptLibrary") { return pendingLibrary }
         return exportedLibrary
@@ -228,7 +240,7 @@ actor MultiTargetPromptLibraryRendererDevTools: DevToolsServing {
         return true
     }
 
-    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
         if expression.contains("exportPendingPromptLibrary") {
             return pendingLibraryByTargetID[target.id] ?? nil
         }
@@ -253,7 +265,7 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
 
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
 
-    func evaluateString(_ expression: String, in target: DevToolsTarget) -> String? {
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
         action
     }
 }

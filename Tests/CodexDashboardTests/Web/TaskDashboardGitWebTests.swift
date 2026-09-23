@@ -99,7 +99,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[1] as? Bool, true)
     }
 
-    func testMutedProjectIsRemovedFromChangeIndicatorsAndCanBeUnmuted() async throws {
+    func testHiddenChangeIndicatorsKeepGitActionsAvailableAndCanBeRestored() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -122,23 +122,23 @@ extension TaskDashboardWebTests {
               const before = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-mute]').textContent.trim(),
+                document.querySelector('[data-project-indicators]').textContent.trim(),
               ];
-              document.querySelector('[data-project-mute]').click();
+              document.querySelector('[data-project-indicators]').click();
               const muted = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-mute]').textContent.trim(),
-                document.querySelector('.dashboard-muted-projects')?.open,
-                document.querySelector('.dashboard-muted-projects summary')?.textContent.trim(),
+                document.querySelector('[data-project-indicators]').textContent.trim(),
+                document.querySelector('.dashboard-hidden-indicators')?.open,
+                document.querySelector('.dashboard-hidden-indicators summary')?.textContent.trim(),
               ];
-              document.querySelector('[data-project-mute]').click();
+              document.querySelector('[data-project-indicators]').click();
               const restored = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
-                document.querySelector('[data-project-mute]').textContent.trim(),
+                document.querySelector('[data-project-indicators]').textContent.trim(),
               ];
               return [before, muted, restored];
             })()
@@ -146,9 +146,9 @@ extension TaskDashboardWebTests {
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Mute change alerts"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 0, "Unmute change alerts", false, "Muted1"])
-        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Mute change alerts"])
+        XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Hide change indicators"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 1, "Show change indicators", false, "Indicators hidden1"])
+        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Hide change indicators"])
     }
 
     func testMissingGitActionsReportsSpecificFailure() async throws {

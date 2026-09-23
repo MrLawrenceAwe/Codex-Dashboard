@@ -24,11 +24,12 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (async () => {
           const store = window.__todoStoreForTests;
           const results = [];
-          for (const version of [1, 2, 3, 4, 5]) {
+          for (const version of [1, 2, 3, 4, 5, 6]) {
             localStorage.clear();
             const project = { id: 'project-a', name: 'Project A' };
             const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'test.png' };
             const item = { id: 'todo-a', title: 'Saved task', image, createdAt: 1, updatedAt: 2 };
+            if (version === 6) item.chat = { id: 'linked', title: 'Linked task' };
             Object.assign(item, version < 4 ? { badges: ['Work'], projectBadge: project }
               : version === 4 ? { tags: ['Work'], projectTag: project }
               : { tags: ['Work'], project });
@@ -37,19 +38,21 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             const loaded = store.load();
             const tags = store.loadTags(loaded);
             const migrated = JSON.parse(localStorage.getItem('codex-dashboard.todos'));
-            results.push(migrated.version === 6 && loaded[0].project.id === 'project-a'
+            results.push(migrated.version === 7 && loaded[0].project.id === 'project-a'
               && loaded[0].tags[0] === 'Work' && loaded[0].image.dataURL === image.dataURL
               && loaded[0].createdAt === 1 && loaded[0].updatedAt === 2
               && tags.includes('Personal') && tags.includes('Work')
               && localStorage.getItem('codex-dashboard.todo-badges') === null
               && !Object.hasOwn(migrated.items[0], 'projectTag')
               && !Object.hasOwn(migrated.items[0], 'projectBadge')
-              && !Object.hasOwn(migrated.items[0], 'badges'));
+              && !Object.hasOwn(migrated.items[0], 'badges')
+              && !Object.hasOwn(migrated.items[0], 'chat')
+              && (version !== 6 || migrated.items[0].thread.id === 'linked'));
           }
           return results;
         })()
         """) as? [Bool]
-        XCTAssertEqual(result, [true, true, true, true, true])
+        XCTAssertEqual(result, [true, true, true, true, true, true])
     }
 
     func testFailedMigrationWriteStillLoadsDataAndPreservesOriginalDocument() async throws {
@@ -79,7 +82,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const storage = window.localStorage;
           const results = [];
           for (const original of [
-            JSON.stringify({ version: 7, items: [{ id: 'future', title: 'Keep me' }] }),
+            JSON.stringify({ version: 8, items: [{ id: 'future', title: 'Keep me' }] }),
             '{invalid json',
           ]) {
             storage.setItem('codex-dashboard.todos', original);
@@ -102,7 +105,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (() => {
           window.__codexDashboard.destroy();
           localStorage.setItem('codex-dashboard.todos', JSON.stringify({
-            version: 7, items: [{ id: 'future', title: 'Keep me' }],
+            version: 8, items: [{ id: 'future', title: 'Keep me' }],
           }));
           return true;
         })()
@@ -146,7 +149,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const last = store.save([{ ...item, title: 'Latest edit' }], ['Work']);
           const results = await Promise.all([first, failed, last]);
           const saved = store.load();
-          const hydrated = await store.hydrate(saved);
+          const hydrated = await store.loadImages(saved);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
           return [first instanceof Promise && failed instanceof Promise && last instanceof Promise,
             results, writes, saved[0].title, hydrated[0].image.dataURL, store.loadTags(saved)];
@@ -181,7 +184,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           }});
           const saved = await store.save([replacement], []);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
-          const [restored] = await store.hydrate(store.load());
+          const [restored] = await store.loadImages(store.load());
           return [saved, restored.image.dataURL, restored.image.name,
             replacement.image.storageKey !== item.image.storageKey];
         })()
@@ -207,7 +210,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           }});
           const saved = await store.save([{ ...item, image: null }], []);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
-          const [restored] = await store.hydrate(store.load());
+          const [restored] = await store.loadImages(store.load());
           return [saved, restored.image.dataURL];
         })()
         """) as? [AnyHashable]

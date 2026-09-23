@@ -6,13 +6,6 @@ import Foundation
 final class AppCoordinator: ObservableObject {
     static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
     private static let maximumLiveMonitoredProjectCount = 60
-    static let deadlineUsageRefreshReuseInterval: TimeInterval = 60
-
-    struct DeadlineUsageRefreshCacheEntry {
-        let snapshot: CodexAccountUsageSnapshot
-        let expiresAt: Date
-    }
-
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
     @Published var connectionNotice: String?
@@ -42,8 +35,9 @@ final class AppCoordinator: ObservableObject {
     let typingActivityDetector: any TypingActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
+    let notificationUsageRefresher: NotificationUsageRefresher
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
-    let accountUsageNotifier: any AccountUsageNotifying
+    let desktopUsageNotifier: any DesktopUsageNotifying
     let phoneUsageNotifier: any PhoneUsageNotifying
     let synchronizationGate = SynchronizationGate()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
@@ -55,13 +49,6 @@ final class AppCoordinator: ObservableObject {
     private var accountStateObserver: AnyCancellable?
     private var threadCompletionTracker = ThreadCompletionTracker()
     var didNotifyAboutDetectedUpdate = false
-    var deadlineUsageRefreshTasksByAccountID: [
-        UUID: Task<CodexAccountUsageSnapshot?, Never>
-    ] = [:]
-    var recentDeadlineUsageRefreshesByAccountID: [
-        UUID: DeadlineUsageRefreshCacheEntry
-    ] = [:]
-
     var statusPresentation: (title: String, detail: String) {
         connectionState.presentation(
             hasError: connectionError != nil,
@@ -92,7 +79,7 @@ final class AppCoordinator: ObservableObject {
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
         accountUsageCacheStore: (any UsageCaching)? = nil,
         compatibilityIssueNotifier: any CompatibilityIssueNotifying = NoopCompatibilityIssueNotifier(),
-        accountUsageNotifier: any AccountUsageNotifying = NoopAccountUsageNotifier(),
+        desktopUsageNotifier: any DesktopUsageNotifying = NoopDesktopUsageNotifier(),
         phoneUsageNotifier: any PhoneUsageNotifying = NoopPhoneUsageNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
             try LocalCodexDashboardRuntime(promptLibraryStore: $0)
@@ -108,13 +95,14 @@ final class AppCoordinator: ObservableObject {
         self.typingActivityDetector = typingActivityDetector
         self.promptLibraryStore = promptLibraryStore
         self.compatibilityIssueNotifier = compatibilityIssueNotifier
-        self.accountUsageNotifier = accountUsageNotifier
+        self.desktopUsageNotifier = desktopUsageNotifier
         self.phoneUsageNotifier = phoneUsageNotifier
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,
             usageCacheStore: accountUsageCacheStore
         )
+        notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
         foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
         refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
         compatibilityMonitor = CompatibilityMonitor(
@@ -136,7 +124,7 @@ final class AppCoordinator: ObservableObject {
         let deadlineUsageRefresh: DeadlineUsageRefreshHandler = { [weak self] accountID in
             await self?.refreshUsageForScheduledNotification(accountID)
         }
-        accountUsageNotifier.setDeadlineUsageRefreshHandler(deadlineUsageRefresh)
+        desktopUsageNotifier.setDeadlineUsageRefreshHandler(deadlineUsageRefresh)
         phoneUsageNotifier.setDeadlineUsageRefreshHandler(deadlineUsageRefresh)
         compatibilityWasTriggeredByUpdate = compatibilityMonitor.updateWasDetected
         refreshScheduler.start(
@@ -250,7 +238,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func disableTaskDashboard() async {
+    func disableIntegration() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
         isPerformingAction = true
         refreshGeneration += 1
@@ -258,7 +246,7 @@ final class AppCoordinator: ObservableObject {
         await cancelSynchronization()
 
         do {
-            switch try await dashboardRuntime.disableTaskDashboard() {
+            switch try await dashboardRuntime.disableIntegration() {
             case .codexClosed:
                 connectionState = .codexClosed
             case .rendererAvailable:

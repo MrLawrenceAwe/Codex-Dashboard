@@ -5,7 +5,7 @@ import SwiftUI
 final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
     let coordinator = AppCoordinator(
         compatibilityIssueNotifier: CompatibilityIssueNotifier(),
-        accountUsageNotifier: AccountUsageNotifier(),
+        desktopUsageNotifier: DesktopUsageNotifier(),
         phoneUsageNotifier: NtfyUsageNotifier()
     )
     let launchAtLogin = LaunchAtLoginController()

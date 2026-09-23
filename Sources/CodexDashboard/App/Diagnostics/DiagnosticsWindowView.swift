@@ -176,7 +176,7 @@ struct DiagnosticsWindowView: View {
 
                 if coordinator.connectionState.rendererIsAvailable {
                     Button(DashboardActionPresentation.disableTitle) {
-                        Task { await coordinator.disableTaskDashboard() }
+                        Task { await coordinator.disableIntegration() }
                     }
                     .disabled(!actions.canDisable)
                 }

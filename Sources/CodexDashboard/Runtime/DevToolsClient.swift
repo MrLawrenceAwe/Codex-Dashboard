@@ -34,7 +34,6 @@ struct DevToolsTarget: Decodable, Identifiable, Sendable {
 protocol DevToolsServing: Sendable {
     func mainRendererTargets() async -> [DevToolsTarget]
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool
-    func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String?
     func evaluateString(
         _ expression: String,
         in target: DevToolsTarget,
@@ -43,14 +42,8 @@ protocol DevToolsServing: Sendable {
 }
 
 extension DevToolsServing {
-    func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? { nil }
-
-    func evaluateString(
-        _ expression: String,
-        in target: DevToolsTarget,
-        timeout: Duration
-    ) async throws -> String? {
-        try await evaluateString(expression, in: target)
+    func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? {
+        try await evaluateString(expression, in: target, timeout: .seconds(4))
     }
 }
 
@@ -293,13 +286,6 @@ actor DevToolsClient: DevToolsServing {
                 in: target
             )
         }
-    }
-
-    func evaluateString(
-        _ expression: String,
-        in target: DevToolsTarget
-    ) async throws -> String? {
-        try await evaluateString(expression, in: target, timeout: .seconds(4))
     }
 
     func evaluateString(
