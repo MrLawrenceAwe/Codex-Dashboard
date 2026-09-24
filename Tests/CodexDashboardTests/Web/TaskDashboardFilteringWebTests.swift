@@ -34,7 +34,7 @@ extension TaskDashboardWebTests {
               const todoControls = () => document.querySelector(
                 '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
               ) === null;
-              const filters = ['recent', 'running', 'unread', 'changedProjects'];
+              const filters = ['recent', 'unread', 'changedProjects'];
               return filters.map((filter) => {
                 document.querySelector(`[data-filter="${filter}"]`).click();
                 return todoControls();
@@ -43,7 +43,7 @@ extension TaskDashboardWebTests {
             """
         ) as? [Bool]
 
-        XCTAssertEqual(result, [true, true, true, true])
+        XCTAssertEqual(result, [true, true, true])
     }
 
     func testCompleteCatalogUsesClientPaging() async throws {
@@ -52,8 +52,7 @@ extension TaskDashboardWebTests {
             ThreadSummary.fixture(
                 id: "thread-\(index)",
                 title: "Thread \(index)",
-                recencyEpochMillis: Int64(65 - index),
-                runState: .running
+                recencyEpochMillis: Int64(65 - index)
             )
         }
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -62,7 +61,6 @@ extension TaskDashboardWebTests {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
-              document.querySelector('[data-filter="running"]').click();
               const initialCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
               const loadMoreVisible = !document.querySelector('[data-load-more]').hidden;
               document.querySelector('[data-load-more]').click();
@@ -83,7 +81,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[3] as? String, "thread-19")
     }
 
-    func testRunningFilterShowsOnlyRunningThreads() async throws {
+    func testRecentsShowsRunningThreadsFirstWithoutDuplicatingThem() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -140,15 +138,16 @@ extension TaskDashboardWebTests {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
-              document.querySelector('[data-filter="running"]').click();
               return [
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter="running"]').classList.contains('is-active'),
-                document.querySelector('[data-filter="running"]').textContent.trim(),
-                document.querySelector('[data-filter-count="running"]').textContent,
+                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="running"]') === null,
+                [...document.querySelectorAll('[data-dashboard-section]')]
+                  .map((section) => [section.dataset.dashboardSection,
+                    [...section.querySelectorAll('.dashboard-thread')].map((thread) => thread.dataset.threadId)]),
               ];
             })()
             """
@@ -158,11 +157,50 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[1] as? String, "3 running tasks")
         XCTAssertEqual(
             values[2] as? [String],
-            ["project-a-running-one", "project-a-running-two", "project-b-running"]
+            ["project-a-running-one", "project-a-running-two", "project-b-running", "project-a-idle"]
         )
         XCTAssertEqual(values[3] as? Bool, true)
-        XCTAssertEqual(values[4] as? String, "Running 3")
-        XCTAssertEqual(values[5] as? String, "3")
+        XCTAssertEqual(values[4] as? Bool, true)
+        let sections = try XCTUnwrap(values[5] as? [[Any]])
+        XCTAssertEqual(sections[0][0] as? String, "running")
+        XCTAssertEqual(sections[0][1] as? [String], ["project-a-running-one", "project-a-running-two", "project-b-running"])
+        XCTAssertEqual(sections[1][0] as? String, "recent")
+        XCTAssertEqual(sections[1][1] as? [String], ["project-a-idle"])
+    }
+
+    func testRecentsKeepsOlderRunningTasksVisibleWhilePagingIdleTasks() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let threads = (0..<12).map { index in
+            ThreadSummary.fixture(id: "idle-\(index)", recencyEpochMillis: Int64(100 - index))
+        } + [ThreadSummary.fixture(id: "older-running", recencyEpochMillis: 1, runState: .running)]
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                .map((thread) => thread.dataset.threadId);
+              const canLoadMore = !document.querySelector('[data-load-more]').hidden;
+              document.querySelector('[data-load-more]').click();
+              const expandedIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
+                .map((thread) => thread.dataset.threadId);
+              return [initialIDs, canLoadMore, expandedIDs,
+                document.querySelector('[data-load-more]').hidden];
+            })()
+            """
+        ) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        let initialIDs = try XCTUnwrap(values[0] as? [String])
+        XCTAssertEqual(initialIDs.first, "older-running")
+        XCTAssertEqual(initialIDs.count, 11)
+        XCTAssertEqual(values[1] as? Bool, true)
+        let expandedIDs = try XCTUnwrap(values[2] as? [String])
+        XCTAssertEqual(expandedIDs.count, 13)
+        XCTAssertEqual(expandedIDs.filter { $0 == "older-running" }.count, 1)
+        XCTAssertEqual(values[3] as? Bool, true)
     }
 
     func testRecentFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {

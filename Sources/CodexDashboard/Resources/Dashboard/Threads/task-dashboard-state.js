@@ -30,7 +30,7 @@ const taskDashboardState = (() => {
       }
     } catch (_) {}
     return {
-      filterMode: ['recent', 'running', 'unread', 'changedProjects'].includes(stored.filterMode)
+      filterMode: ['recent', 'unread', 'changedProjects'].includes(stored.filterMode)
         ? stored.filterMode : 'recent',
       collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
         ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
@@ -75,7 +75,6 @@ const taskDashboardState = (() => {
   }) {
     return threads.filter((thread) => {
       const matchesFilter = filterMode === 'recent'
-        || (filterMode === 'running' && thread.runState === 'running')
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));
