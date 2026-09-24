@@ -12,6 +12,10 @@ const taskDashboardView = (() => {
     if (element.matches('[data-dashboard-git-project]')) {
       return `git:${element.dataset.dashboardGitProject}`;
     }
+    if (element.matches('[data-dashboard-section]')) {
+      return `section:${element.dataset.dashboardSection}`;
+    }
+    if (element.matches('[data-dashboard-section-heading]')) return 'section-heading';
     if (element.matches('[data-dashboard-hidden-indicators]')) return 'hidden-indicators';
     if (element.matches('[data-dashboard-empty]')) return 'empty';
     return '';
@@ -34,7 +38,11 @@ const taskDashboardView = (() => {
       nextChildren.forEach((nextChild) => {
         const key = childKey(nextChild);
         const currentChild = currentByKey.get(key);
-        const child = currentChild?.outerHTML === nextChild.outerHTML ? currentChild : nextChild;
+        let child = currentChild?.outerHTML === nextChild.outerHTML ? currentChild : nextChild;
+        if (currentChild && child === nextChild && key.startsWith('section:')) {
+          updateMarkup(currentChild, nextChild.innerHTML);
+          child = currentChild;
+        }
         retained.add(child);
         element.append(child);
       });
@@ -102,7 +110,6 @@ const taskDashboardView = (() => {
       button.setAttribute('aria-pressed', String(isActive));
     });
     const filterCounts = {
-      running: state.runningCount,
       unread: state.unreadCount,
       changedProjects: state.indicatedChangedProjectPaths.size,
     };
@@ -119,14 +126,22 @@ const taskDashboardView = (() => {
       ? [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))]
       : null;
     const displayedChangedProjectPaths = changedProjectPaths?.slice(0, visibleThreadLimit);
+    const recentThreads = filterMode === 'recent'
+      ? visibleThreads.filter((thread) => thread.runState !== 'running')
+      : null;
     const displayedThreads = changedProjectPaths
       ? visibleThreads.filter((thread) => displayedChangedProjectPaths
         .includes(String(thread.projectPath).trim()))
-      : visibleThreads.slice(0, visibleThreadLimit);
+      : filterMode === 'recent'
+        ? [...visibleThreads.filter((thread) => thread.runState === 'running'),
+          ...recentThreads.slice(0, visibleThreadLimit)]
+        : visibleThreads.slice(0, visibleThreadLimit);
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = changedProjectPaths
       ? visibleThreadLimit >= changedProjectPaths.length
-      : displayedThreads.length >= visibleThreads.length;
+      : filterMode === 'recent'
+        ? visibleThreadLimit >= recentThreads.length
+        : displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
     list.classList.toggle('is-compact', filterMode === 'recent');
     if (!visibleThreads.length) {

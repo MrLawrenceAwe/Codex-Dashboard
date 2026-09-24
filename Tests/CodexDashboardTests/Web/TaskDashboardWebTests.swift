@@ -200,7 +200,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
-              document.querySelector('[data-filter="running"]').click();
+              document.querySelector('[data-filter="recent"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
               return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.hiddenChangeIndicatorPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
@@ -215,7 +215,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
         XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? String, "running")
+        XCTAssertEqual(values[1] as? String, "recent")
         XCTAssertEqual(values[2] as? Bool, false)
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")

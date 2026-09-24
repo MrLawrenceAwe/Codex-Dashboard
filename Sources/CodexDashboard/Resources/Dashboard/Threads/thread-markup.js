@@ -79,12 +79,22 @@ const threadMarkup = (() => {
     isCompletionTickVisible,
   }) {
     if (filterMode === 'recent') {
-      return visibleThreads.map((item) => thread(item, {
+      const renderRows = (items) => items.map((item) => thread(item, {
         compact: true,
         showProject: true,
         isUnread: isUnread(item),
         isCompletionTickVisible,
       })).join('');
+      const running = visibleThreads.filter((item) => item.runState === 'running');
+      if (!running.length) return renderRows(visibleThreads);
+      const recent = visibleThreads.filter((item) => item.runState !== 'running');
+      return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running tasks">
+        <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
+        ${renderRows(running)}
+      </section>${recent.length ? `<section class="dashboard-task-section" data-dashboard-section="recent" aria-label="Recent tasks">
+        <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Recents</h2>
+        ${renderRows(recent)}
+      </section>` : ''}`;
     }
     if (filterMode === 'changedProjects') {
       const projects = groupThreadsByProject(visibleThreads);
