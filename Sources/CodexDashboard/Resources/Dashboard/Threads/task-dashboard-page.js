@@ -16,7 +16,7 @@ const taskDashboardPage = (() => {
             <div class="dashboard-toolbar-group dashboard-filter-group">
               <span class="dashboard-control-label">Show</span>
               <div class="dashboard-filters" aria-label="Filter tasks">
-                <button type="button" data-filter="recent" class="is-active">Recents</button>
+                <button type="button" data-filter="recent" class="is-active">Home</button>
                 <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
                 <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
               </div>

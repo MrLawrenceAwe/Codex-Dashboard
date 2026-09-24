@@ -144,6 +144,7 @@ const taskDashboardView = (() => {
         : displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
     list.classList.toggle('is-compact', filterMode === 'recent');
+    list.classList.toggle('has-sections', filterMode === 'recent' && state.runningCount > 0);
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
