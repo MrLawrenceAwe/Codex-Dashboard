@@ -217,6 +217,9 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-empty { display: grid; min-height: 280px; padding: 32px 16px; place-items: center; align-content: center; gap: 6px; color: var(--todo-dim); font-size: 12px; text-align: center; }
 #codex-dashboard-todo-page .todo-empty strong { color: var(--todo-muted); font-size: 16px; font-weight: 580; }
 
+[data-todo-preset-warning] { position: fixed; z-index: 10000; top: 64px; right: 24px; max-width: min(380px, calc(100vw - 48px)); padding: 12px 16px; border: 1px solid #d6a057; border-radius: 8px; background: #fff8e8; color: #5a3b10; box-shadow: 0 8px 24px #0002; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
+@media (prefers-color-scheme: dark) { [data-todo-preset-warning] { border-color: #8a6531; background: #33291b; color: #ffe0ad; } }
+
 #codex-dashboard-todo-page .todo-add:focus-within { border-color: var(--todo-muted); box-shadow: 0 0 0 3px var(--todo-hover); }
 #codex-dashboard-todo-page .todo-add input:focus-visible,
 #codex-dashboard-todo-page .todo-add textarea:focus-visible { outline: none; }

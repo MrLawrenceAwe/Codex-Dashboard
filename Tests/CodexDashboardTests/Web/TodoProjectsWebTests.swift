@@ -14,7 +14,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
                 <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="dashboard"
                   data-app-action-sidebar-project-label="Codex Dashboard"></div>
               </aside>
-              <main>Conversation surface</main>
+              <main>Conversation surface<textarea id="old-composer" placeholder="Do anything"></textarea></main>
             </body></html>
             """,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
@@ -43,9 +43,14 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               });
               document.getElementById('new-chat').addEventListener('click', () => {
                 window.__todoNewChatOpened = (window.__todoNewChatOpened || 0) + 1;
-                const composer = document.createElement('textarea');
-                composer.placeholder = 'Do anything';
-                document.body.append(composer);
+                window.__oldTodoComposer = document.getElementById('old-composer');
+                setTimeout(() => {
+                  window.__oldTodoComposer.remove();
+                  const composer = document.createElement('textarea');
+                  composer.id = 'new-composer';
+                  composer.placeholder = 'Do anything';
+                  document.body.append(composer);
+                }, 200);
               });
               document.querySelector('[data-todo-new-thread]').click();
               await window.__waitForTodoSaves?.();
@@ -53,7 +58,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('textarea[placeholder=\"Do anything\"]') !== null",
+            "document.getElementById('new-composer')?.value === 'Ship project tags\\n\\nInclude the new chat action.'",
             in: webView
         )
         let result = try await webView.evaluateAsyncJavaScript(
@@ -63,8 +68,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               window.__todoProjectID,
               document.querySelector('[data-todo-project]').selectedOptions[0].textContent,
               window.__todoNewChatOpened,
-              document.querySelector('textarea[placeholder="Do anything"]').value,
+              document.getElementById('new-composer').value,
               window.__todoSelectedProjects,
+              window.__oldTodoComposer.value,
             ]
             """
         ) as? [Any]
@@ -76,6 +82,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[3] as? Int, 1)
         XCTAssertEqual(values[4] as? String, "Ship project tags\n\nInclude the new chat action.")
         XCTAssertEqual(values[5] as? [String], ["dashboard"])
+        XCTAssertEqual(values[6] as? String, "")
     }
 
     func testAddingTodoClearsProjectPickerBeforeNextTodo() async throws {

@@ -51,7 +51,7 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[7] as? Bool, false)
     }
 
-    func testTodoIsNotInsertedWhenItsModelPresetCannotBeApplied() async throws {
+    func testNewTaskKeepsTodoDraftVisibleWhenItsModelPresetCannotBeApplied() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><body>
@@ -84,10 +84,14 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
           document.querySelector('[data-todo-new-thread]').click();
           await new Promise((resolve) => setTimeout(resolve, 1600));
           return [document.querySelector('textarea[placeholder="Do anything"]').value,
-            !document.querySelector('[data-todo-composer-error]').hidden,
+            document.querySelector('[data-todo-preset-warning]')?.textContent,
             document.documentElement.classList.contains('codex-todo-open')];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["", true, true])
+        XCTAssertEqual(result, [
+            "Keep this draft",
+            "Could not apply this to-do’s model preset. Check the model, effort, and speed before sending.",
+            false,
+        ])
     }
 }
