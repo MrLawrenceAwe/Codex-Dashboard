@@ -7,10 +7,10 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
     notice.dataset.todoPresetWarning = '';
     notice.setAttribute('role', 'alert');
     notice.textContent = message;
-    (composer.closest('form') || composer.parentElement).append(notice);
+    (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, previousComposer = null } = {}) {
+  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForNavigation = false } = {}) {
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
     const [loadedItem] = await todoStore.loadImages([item]);
@@ -21,8 +21,13 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
       () => {
         if (isDestroyed()) return null;
         const current = activeComposer();
-        if (!current || current === previousComposer) return null;
-        if (!previousComposer) return current;
+        if (!current) {
+          observedComposer = null;
+          return null;
+        }
+        if (!waitForNavigation) return current;
+        // Codex can reuse the new-task editor when the project stays the same.
+        // Wait for a stable editor, whether navigation reused or replaced it.
         if (current !== observedComposer) {
           observedComposer = current;
           observedAt = performance.now();
@@ -33,9 +38,13 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
     );
     if (!composer || isDestroyed()) {
       if (!isDestroyed()) {
-        pageState.open();
-        const notice = document.querySelector('[data-todo-composer-error]');
-        if (notice) notice.hidden = false;
+        if (keepDraftOnPresetFailure) {
+          showComposerWarning(activeComposer(), 'Could not find the new task editor. Return to To-dos and try again.');
+        } else {
+          pageState.open();
+          const notice = document.querySelector('[data-todo-composer-error]');
+          if (notice) notice.hidden = false;
+        }
       }
       return false;
     }
@@ -101,10 +110,9 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
   }
 
   async function openTodoInNewThread(item) {
-    const previousComposer = activeComposer();
     if (isDestroyed() || !item?.project || !await codexHost.newChat(item.project.id) || isDestroyed()) return;
     pageState.close();
-    await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, previousComposer });
+    await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, waitForNavigation: true });
   }
 
   async function pasteTodoInThread(item) {

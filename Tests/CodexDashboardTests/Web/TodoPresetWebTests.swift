@@ -82,7 +82,10 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
             document.body.append(composer);
           });
           document.querySelector('[data-todo-new-thread]').click();
-          await new Promise((resolve) => setTimeout(resolve, 1600));
+          const deadline = Date.now() + 5000;
+          while (!document.querySelector('[data-todo-preset-warning]') && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
           return [document.querySelector('textarea[placeholder="Do anything"]').value,
             document.querySelector('[data-todo-preset-warning]')?.textContent,
             document.documentElement.classList.contains('codex-todo-open')];
