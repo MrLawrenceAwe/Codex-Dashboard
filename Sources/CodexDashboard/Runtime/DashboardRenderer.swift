@@ -250,21 +250,25 @@ final class DashboardRenderer {
     }
 
     func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
-        guard let target = (await targets()).first else { return .unavailable }
-        do {
-            guard let serialized = try await devTools.evaluateString(
-                RendererScript.takeNextAccountPopoverAction,
-                in: target
-            ) else { return .unavailable }
-            if serialized == RendererScript.accountPopoverUnavailable { return .unavailable }
-            if serialized == "null" { return .timedOut }
-            guard let data = serialized.data(using: .utf8),
-                  let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
-            else { return .unavailable }
-            return .action(action)
-        } catch {
-            return .unavailable
+        var foundAvailableRenderer = false
+        for target in await targets() {
+            do {
+                guard let serialized = try await devTools.evaluateString(
+                    RendererScript.takeNextAccountPopoverAction,
+                    in: target
+                ), serialized != RendererScript.accountPopoverUnavailable else { continue }
+                foundAvailableRenderer = true
+                if serialized == "null" { continue }
+                guard let data = serialized.data(using: .utf8),
+                      let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+                else { continue }
+                return .action(action)
+            } catch {
+                // A closed or unavailable window must not starve the other windows.
+                continue
+            }
         }
+        return foundAvailableRenderer ? .timedOut : .unavailable
     }
 
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {

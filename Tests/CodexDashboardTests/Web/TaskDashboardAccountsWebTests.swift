@@ -416,6 +416,27 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(action["kind"] as? String, "addAccount")
     }
 
+    func testIdenticalSnapshotClearsCompletedAccountProgress() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          document.querySelector('[data-account-global="save"]').click();
+          window.__codexDashboard.takeNextAccountPopoverAction();
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          return [document.querySelector('.codex-accounts-status') === null,
+                  document.querySelector('[data-account-global="save"]').disabled];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, false])
+    }
+
     func testCommitNoticeRemainsAvailable() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let result = try await webView.evaluateJavaScript(
