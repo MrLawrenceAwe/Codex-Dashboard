@@ -83,6 +83,30 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? String, "Ship project tags\n\nInclude the new chat action.")
         XCTAssertEqual(values[5] as? [String], ["dashboard"])
         XCTAssertEqual(values[6] as? String, "")
+
+        // Starting another task in the same project can reuse the editor node.
+        _ = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const original = document.getElementById('new-chat');
+          const newChat = original.cloneNode(true);
+          original.replaceWith(newChat);
+          window.__reusedTodoComposer = document.getElementById('new-composer');
+          newChat.addEventListener('click', () => {
+            window.__reusedTodoComposer.value = '';
+          });
+          window.__codexDashboard.openTodos();
+          document.querySelector('[data-todo-new-thread]').click();
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.getElementById('new-composer')?.value === 'Ship project tags\\n\\nInclude the new chat action.'",
+            in: webView
+        )
+        let reusedEditorState = try await webView.evaluateAsyncJavaScript("""
+        [document.getElementById('new-composer') === window.__reusedTodoComposer,
+         document.documentElement.classList.contains('codex-todo-open')]
+        """) as? [Bool]
+        XCTAssertEqual(reusedEditorState, [true, false])
     }
 
     func testAddingTodoClearsProjectPickerBeforeNextTodo() async throws {
