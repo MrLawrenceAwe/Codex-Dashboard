@@ -259,13 +259,14 @@ const accountPopover = (() => {
     const candidate = next || snapshot;
     const candidateFingerprint = JSON.stringify(candidate);
     const changed = candidateFingerprint !== snapshotFingerprint;
+    const hadActionProgress = actionProgress !== null;
     snapshot = candidate;
     snapshotFingerprint = candidateFingerprint;
     // The native action has completed once its resulting snapshot arrives.
     retainPanelUntilActionCompletes = false;
     actionProgress = null;
     mountTrigger();
-    if (changed) renderPanel();
+    if (changed || hadActionProgress) renderPanel();
     return true;
   }
 

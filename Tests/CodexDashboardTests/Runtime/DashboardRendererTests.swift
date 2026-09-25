@@ -253,20 +253,25 @@ actor MultiTargetPromptLibraryRendererDevTools: DevToolsServing {
 }
 
 actor AccountPopoverRendererDevTools: DevToolsServing {
-    private let target: DevToolsTarget
-    private let action: String?
+    private let targets: [DevToolsTarget]
+    private let actions: [String: String]
 
     init(target: DevToolsTarget, action: String?) {
-        self.target = target
-        self.action = action
+        self.targets = [target]
+        self.actions = action.map { [target.id: $0] } ?? [:]
     }
 
-    func mainRendererTargets() -> [DevToolsTarget] { [target] }
+    init(targets: [DevToolsTarget], actions: [String: String]) {
+        self.targets = targets
+        self.actions = actions
+    }
+
+    func mainRendererTargets() -> [DevToolsTarget] { targets }
 
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
 
     func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
-        action
+        actions[target.id]
     }
 }
 
@@ -329,6 +334,24 @@ final class DashboardRendererTests: XCTestCase {
             result,
             .action(AccountPopoverAction(kind: .updateUsage, accountID: accountID))
         )
+    }
+
+    func testAccountActionIsConsumedFromSecondWindow() async throws {
+        let targets = ["first", "second"].map {
+            DevToolsTarget(id: $0, type: "page", url: "app://-/index.html",
+                           webSocketURL: "ws://127.0.0.1/\($0)")
+        }
+        for firstResult in ["null", RendererScript.accountPopoverUnavailable, "invalid"] {
+            let renderer = try DashboardRenderer(
+                devTools: AccountPopoverRendererDevTools(targets: targets, actions: [
+                    "first": firstResult,
+                    "second": "{\"kind\":\"saveCurrentAccount\"}",
+                ]),
+                injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
+            )
+            let result = await renderer.waitForAccountPopoverAction()
+            XCTAssertEqual(result, .action(AccountPopoverAction(kind: .saveCurrentAccount, accountID: nil)))
+        }
     }
 
     func testAccountPopoverWaitDistinguishesTimeoutFromUnavailableRenderer() async throws {
