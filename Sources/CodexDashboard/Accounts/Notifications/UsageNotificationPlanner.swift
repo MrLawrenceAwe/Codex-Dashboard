@@ -252,8 +252,8 @@ enum UsageNotificationPlanner {
                 accountID: account.id,
                 accountName: account.name,
                 kind: kind,
-                title: "Codex limit resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName) limit resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
+                title: "Codex \(windowName.lowercased()) usage resets in \(leadTimeDescription)",
+                body: "\(account.name)’s \(windowName) usage resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
                 deadlineUpdateTitle: "\(windowName) reset time changed",
                 deadlineDescription: "\(account.name)’s \(windowName) reset moved",
                 deadlineStyle: deadlineStyle,
@@ -291,13 +291,13 @@ enum UsageNotificationPlanner {
         if previousReset > now {
             return ImmediateUsageNotification(
                 identifier: identifier,
-                title: windowName == "Weekly" ? "Codex weekly usage reset early" : "Codex limit reset early",
+                title: "Codex \(windowName.lowercased()) usage reset early",
                 body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(nextResetDescription).\n\(usageSummary)"
             )
         }
         return ImmediateUsageNotification(
             identifier: identifier,
-            title: "Codex limit reset",
+            title: "Codex \(windowName.lowercased()) usage reset",
             body: "\(account.name)’s \(windowName) reset: \(currentAllowance)% left · next \(nextResetDescription).\n\(usageSummary)"
         )
     }
