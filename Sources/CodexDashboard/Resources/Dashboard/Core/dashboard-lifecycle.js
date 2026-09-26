@@ -97,7 +97,12 @@ const dashboardLifecycle = (() => {
     const sidebar = codexHost.sidebar();
     if (sidebarObserver && sidebar !== observedMutationSidebar) {
       sidebarObserver.disconnect();
-      if (sidebar) sidebarObserver.observe(sidebar, { childList: true, subtree: true });
+      if (sidebar) sidebarObserver.observe(sidebar, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-app-action-sidebar-thread-id', 'data-thread-title-trigger'],
+      });
       observedMutationSidebar = sidebar;
     }
     const root = composerRoot();
@@ -159,6 +164,7 @@ const dashboardLifecycle = (() => {
 
   function handleSidebarMutations(records) {
     const threadRowsChanged = records.some((record) => {
+      if (record.type === 'attributes') return true;
       const target = record.target instanceof Element ? record.target : record.target?.parentElement;
       if (target?.closest('[data-app-action-sidebar-thread-id]')) return true;
       return [...record.addedNodes, ...record.removedNodes].some(containsThreadRow);
@@ -195,6 +201,9 @@ const dashboardLifecycle = (() => {
       document.head.append(style);
     }
     mountPagesAndNavigation();
+    // Reconcile markers on health checks too, including after host DOM repairs
+    // when the catalog itself has not changed.
+    hooks.syncSidebarMarkers();
     syncContentInset();
     sidebarProjectHighlights.start();
     promptLibrary.mount();

@@ -15,7 +15,6 @@ function createTaskDashboard({ catalog }) {
   });
   let viewNeedsRender = true;
   let commitOrPushError = '';
-  let interruptedThreadIDs = new Set();
   const presentationState = createThreadPresentationState({ findThread: catalog.findThread, isOpen: pageState.isOpen, onChange: requestRender });
   const { isThreadUnread, isCompletionTickVisible } = presentationState;
 
@@ -37,14 +36,14 @@ function createTaskDashboard({ catalog }) {
         .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
         .map((thread) => thread.id),
     );
-    interruptedThreadIDs.forEach((threadID) => {
-      if (nextInterruptedThreadIDs.has(threadID)) return;
-      document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {
-        if (marker.dataset.codexSidebarInterrupted === threadID) marker.remove();
-      });
+    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {
+      const threadID = marker.dataset.codexSidebarInterrupted;
+      const row = codexUIContracts.threadRow(threadID);
+      const title = row?.querySelector('[data-thread-title-trigger]');
+      if (!nextInterruptedThreadIDs.has(threadID) || !row?.contains(marker)
+          || marker.parentElement !== title?.parentElement) marker.remove();
     });
-    interruptedThreadIDs = nextInterruptedThreadIDs;
-    interruptedThreadIDs.forEach((threadID) => {
+    nextInterruptedThreadIDs.forEach((threadID) => {
       const row = codexUIContracts.threadRow(threadID);
       if (!row) return;
       let marker = row.querySelector('[data-codex-sidebar-interrupted]');
@@ -250,7 +249,6 @@ function createTaskDashboard({ catalog }) {
     cancelScheduledRender();
     presentationState.destroy();
     document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
-    interruptedThreadIDs.clear();
     viewNeedsRender = true;
   }
 

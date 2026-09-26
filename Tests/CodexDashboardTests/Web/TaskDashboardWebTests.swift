@@ -471,6 +471,54 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(removedAfterRestart, true)
     }
 
+    func testInterruptedMarkerTracksReusedSidebarRowWithoutAnotherSnapshot() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html:
+            """
+            <!doctype html><html><body>
+              <aside role="navigation">
+                <button data-app-action-sidebar-thread-id="local:pending">
+                  <span><span data-thread-title-trigger>Review project for bugs</span></span>
+                </button>
+              </aside>
+              <main>Conversation surface</main>
+            </body></html>
+            """
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(
+                id: "usage-halted",
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+            ),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.applyThreads((\(payload)).threads)"
+        )
+        // Hydrating a row's identity does not insert or remove any child nodes.
+        _ = try await webView.evaluateJavaScript(
+            """
+            document.querySelector('[data-app-action-sidebar-thread-id]')
+              .setAttribute('data-app-action-sidebar-thread-id', 'local:usage-halted');
+            true;
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "Boolean(document.querySelector('[data-codex-sidebar-interrupted]'))",
+            in: webView
+        )
+        // A reused row must not carry the previous task's status.
+        _ = try await webView.evaluateJavaScript(
+            """
+            document.querySelector('[data-app-action-sidebar-thread-id]')
+              .setAttribute('data-app-action-sidebar-thread-id', 'local:other-task');
+            true;
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-codex-sidebar-interrupted]') === null",
+            in: webView
+        )
+    }
+
     func testCompletedTickExpiresOneMinuteAfterThreadIsRead() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let unreadPayload = try DashboardWebTestHarness.snapshotPayload(for: [
