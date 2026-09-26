@@ -55,6 +55,10 @@ if (( RELAUNCH )) && [[ -d "$INSTALLED_APP" ]]; then
     pgrep -f '/Codex Dashboard.app/Contents/MacOS/CodexDashboard' >/dev/null || break
     sleep 0.1
   done
+  if pgrep -f '/Codex Dashboard.app/Contents/MacOS/CodexDashboard' >/dev/null; then
+    echo "Codex Dashboard did not quit; the installed app was not replaced." >&2
+    exit 1
+  fi
 fi
 ditto "$APP_BUNDLE" "$STAGED_APP"
 codesign --verify --deep --strict "$STAGED_APP"
