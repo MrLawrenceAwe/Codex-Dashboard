@@ -41,7 +41,7 @@ enum AccountUsageFormatter {
                         locale: locale,
                         timeZone: timeZone
                     )
-                    title += " · next expires \(deadline)"
+                    title += " · expires \(deadline)"
                 }
                 lines.append(title)
             }
