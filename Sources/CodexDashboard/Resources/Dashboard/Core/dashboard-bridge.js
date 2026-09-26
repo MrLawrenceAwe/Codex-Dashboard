@@ -1,9 +1,13 @@
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
+  reviewRequest: reviewHost.request,
+  pendingReviewAction: reviewLoopPage.pendingAction,
+  applyReviewLoop: reviewLoopPage.apply,
   ensureMounted: dashboardNavigation.ensureMounted,
   destroy: dashboardNavigation.destroy,
   open: dashboardNavigation.openTasks,
   isOpen: dashboardNavigation.isOpen,
+  openReviews: dashboardNavigation.openReviews,
   openTodos: dashboardNavigation.openTodos,
   applyThreads: dashboardNavigation.applyThreads,
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,

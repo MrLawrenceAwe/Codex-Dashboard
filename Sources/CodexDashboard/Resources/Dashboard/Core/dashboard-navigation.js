@@ -13,38 +13,50 @@ const dashboardNavigation = (() => {
 
   function openTasks() {
     todoList.close();
+    reviewLoopPage.close();
     taskDashboard.open();
   }
 
   function openTodos() {
     taskDashboard.close();
+    reviewLoopPage.close();
     todoList.open();
+  }
+
+  function openReviews() {
+    taskDashboard.close();
+    todoList.close();
+    reviewLoopPage.open();
   }
 
   function close() {
     taskDashboard.close();
     todoList.close();
+    reviewLoopPage.close();
   }
 
   function isOpen() {
-    return taskDashboard.isOpen() || todoList.isOpen();
+    return taskDashboard.isOpen() || todoList.isOpen() || reviewLoopPage.isOpen();
   }
 
   function mountNavigation() {
     const tasksMounted = taskDashboard.mountNavigation();
     const todosMounted = todoList.mountNavigation();
-    return tasksMounted && todosMounted;
+    const reviewsMounted = reviewLoopPage.mountNavigation();
+    return tasksMounted && todosMounted && reviewsMounted;
   }
 
   function mountPages() {
     const tasksMounted = taskDashboard.mountPage();
     const todosMounted = todoList.mountPage();
-    return tasksMounted && todosMounted;
+    const reviewsMounted = reviewLoopPage.mount();
+    return tasksMounted && todosMounted && reviewsMounted;
   }
 
   function applyVisibility() {
     taskDashboard.applyVisibility();
     todoList.applyVisibility();
+    reviewLoopPage.applyVisibility();
   }
 
   function ensureMounted() {
@@ -55,6 +67,7 @@ const dashboardNavigation = (() => {
       mountPage: mountPages,
       openTasks,
       openTodos,
+      openReviews,
       applyVisibility,
       requestRender: taskDashboard.requestRender,
       syncSidebarMarkers: taskDashboard.syncSidebarMarkers,
@@ -65,6 +78,8 @@ const dashboardNavigation = (() => {
   }
 
   function destroy() {
+    reviewLoopPage.close();
+    reviewHost.destroy();
     taskDashboard.destroy();
     todoList.destroy();
     dashboardLifecycle.destroy();
@@ -72,5 +87,5 @@ const dashboardNavigation = (() => {
     delete window.__codexDashboard;
   }
 
-  return { applyThreads, ensureMounted, destroy, openTasks, openTodos, isOpen };
+  return { applyThreads, ensureMounted, destroy, openTasks, openTodos, openReviews, isOpen, close };
 })();

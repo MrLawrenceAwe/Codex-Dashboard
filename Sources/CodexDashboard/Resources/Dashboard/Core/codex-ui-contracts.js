@@ -212,7 +212,7 @@ const codexUIContracts = (() => {
   function composer(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     return composerSelectors.flatMap((selector) => [...document.querySelectorAll(selector)])
       .find((element) => (
-        !element.closest(`#${promptDialogID}, #${dashboardElements.elementIDs.todoPage}`)
+        !element.closest(`#${promptDialogID}, #${dashboardElements.elementIDs.todoPage}, #${dashboardElements.elementIDs.reviewPage}`)
           && element.getClientRects().length > 0
       ));
   }

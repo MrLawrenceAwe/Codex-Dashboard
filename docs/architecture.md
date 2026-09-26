@@ -46,3 +46,40 @@ single plan for each observation time. `DesktopUsageNotifier` and `NtfyUsageNoti
 retain independent histories through `UsageNotificationHistory`, including immediate and phone deadline delivery records; successful delivery
 on one channel never acknowledges delivery on the other. Existing durable keys are
 preserved so refactoring cannot resend alerts or discard phone settings.
+
+## Review loops
+
+The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
+single-folder project, a priority limit (**P0**, **P1+**, **P2+**, or **P3+**), optional
+review instructions, a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P2+ includes P0,
+P1, and P2. Each review starts in a new chat on the same branch and checkout.
+
+The reviewer returns a structured findings report. The selected priority limit
+also constrains the report schema. If no qualifying issues are found, the loop
+stops without sending a fix request. Otherwise the same chat receives exactly
+**Address and commit**, **Address both and commit**, or **Address all and commit**,
+according to the number of qualifying findings. The workflow does not request
+tests or require a test result. A structured fix report identifies the commit.
+Dashboard independently verifies a clean working tree, unchanged branch,
+matching HEAD, and ancestry from the round's starting commit before scheduling
+the next fresh review. A round limit is a backstop, not a successful review.
+The absence of reported findings is the reviewer's assessment, not proof that
+all bugs have been eliminated.
+
+`Reviews/ReviewLoopCoordinator` owns the state machine; `ReviewLoopDriver` uses
+the desktop renderer's existing local app-server connection and reads Git state
+through argument-based subprocess calls. It uses the saved model selection for every review and fix turn, or configured Codex defaults, and
+does not override permission settings. The bridge polls through the native
+renderer synchronization loop and reads bounded turn/item pages. The renderer
+panel only queues controls and displays snapshots; it does not own execution.
+
+State is atomically persisted to `~/Library/Application Support/Codex Dashboard/review-loop.json`.
+Intent is saved before each task or follow-up launch. Unknown launches are never
+resent automatically. Relaunching Dashboard pauses unfinished loops; Resume
+reconciles known tasks first. Malformed reports, failed/interrupted turns, approval
+requests, dirty checkouts, or unexpected changes stop progression with an
+explanation. Pause lets the current review/fix round finish. Stop prevents new
+work without interrupting an already-running chat. Keep both Codex and Dashboard
+running; the feature is limited to one loop at a time. Avoid other edits in the
+selected checkout while a loop is active. The desktop bridge is unofficial and
+may require maintenance after Codex updates.

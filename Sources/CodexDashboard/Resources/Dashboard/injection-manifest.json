@@ -34,6 +34,8 @@
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
+    "Reviews/review-host",
+    "Reviews/review-loop-page",
     "Core/dashboard-navigation",
     "Core/dashboard-bridge"
   ],
@@ -42,7 +44,8 @@
     "Sidebar/project-highlights",
     "Todos/todo-list",
     "Prompts/prompt-library",
-    "Accounts/account-popover"
+    "Accounts/account-popover",
+    "Reviews/review-loop"
   ],
   "contracts": {
     "renderer": [

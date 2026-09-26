@@ -40,6 +40,8 @@ enum CodexConfiguration {
         for: .applicationSupportDirectory, in: .userDomainMask
     ).first!.appendingPathComponent("Codex Dashboard", isDirectory: true)
 
+    static let reviewLoopURL = applicationSupportDirectory.appendingPathComponent("review-loop.json")
+
     static let stateDatabaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
     static let globalStateURL = codexDirectory.appendingPathComponent(".codex-global-state.json")
     static let authenticationURL = codexDirectory.appendingPathComponent("auth.json")

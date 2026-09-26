@@ -40,7 +40,10 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         promptLibraryStore: PromptLibraryFileStore
     ) throws {
         self.codex = codex
-        self.renderer = try renderer ?? DashboardRenderer(promptLibraryStore: promptLibraryStore)
+        self.renderer = try renderer ?? DashboardRenderer(
+            promptLibraryStore: promptLibraryStore,
+            reviewLoopStore: ReviewLoopFileStore(url: CodexConfiguration.reviewLoopURL)
+        )
     }
 
     var codexIsRunning: Bool { codex.isRunning }
