@@ -12,6 +12,7 @@ final class DashboardRenderer {
     private let devTools: any DevToolsServing
     private let injectionBundle: InjectionBundle
     private let compatibilityChecker: RendererCompatibilityChecker
+    private let reviewLoopBridge: ReviewLoopBridge?
     private let promptLibraryBridge: PromptLibraryBridge?
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshot?
@@ -32,6 +33,7 @@ final class DashboardRenderer {
         devTools: any DevToolsServing = DevToolsClient(),
         injectionBundle: InjectionBundle? = nil,
         promptLibraryStore: PromptLibraryFileStore? = nil,
+        reviewLoopStore: (any ReviewLoopStoring)? = nil,
         healthCheckInterval: TimeInterval = 30,
         promptLibrarySynchronizationInterval: TimeInterval = 10,
         now: @escaping () -> Date = Date.init
@@ -41,6 +43,7 @@ final class DashboardRenderer {
         promptLibraryBridge = promptLibraryStore.map {
             PromptLibraryBridge(devTools: devTools, store: $0)
         }
+        reviewLoopBridge = reviewLoopStore.map { ReviewLoopBridge(devTools: devTools, store: $0) }
         self.healthCheckInterval = healthCheckInterval
         self.promptLibrarySynchronizationInterval = promptLibrarySynchronizationInterval
         self.now = now
@@ -206,6 +209,7 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
+        try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
     }

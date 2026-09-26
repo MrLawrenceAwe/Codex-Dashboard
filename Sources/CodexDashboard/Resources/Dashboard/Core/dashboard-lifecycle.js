@@ -45,6 +45,12 @@ const dashboardLifecycle = (() => {
       if (event.type === 'click') hooks.openTodos();
       return;
     }
+    if (target?.closest(`#${dashboardElements.elementIDs.reviewNavButton}`)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.type === 'click') hooks.openReviews();
+      return;
+    }
     if (event.type === 'click' && target?.closest('aside')) {
       if (hooks.isOpen()) hooks.close();
       scheduleRepair({ rebindHosts: true });
@@ -76,7 +82,7 @@ const dashboardLifecycle = (() => {
 
   function attachPage() {
     const pageHost = codexHost.pageHost();
-    [dashboardElements.elementIDs.taskPage, dashboardElements.elementIDs.todoPage].forEach((id) => {
+    [dashboardElements.elementIDs.taskPage, dashboardElements.elementIDs.todoPage, dashboardElements.elementIDs.reviewPage].forEach((id) => {
       const page = document.getElementById(id);
       if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
     });
@@ -149,8 +155,10 @@ const dashboardLifecycle = (() => {
     const dashboardElementIsMissing = [
       dashboardElements.elementIDs.taskPage,
       dashboardElements.elementIDs.todoPage,
+      dashboardElements.elementIDs.reviewPage,
       dashboardElements.elementIDs.taskNavButton,
       dashboardElements.elementIDs.todoNavButton,
+      dashboardElements.elementIDs.reviewNavButton,
     ].some((id) => !document.getElementById(id));
     if (!dashboardWasRemoved && !dashboardElementIsMissing && observedStructureRoot?.isConnected) return;
     scheduleRepair({ rebindHosts: true });
@@ -226,6 +234,8 @@ const dashboardLifecycle = (() => {
         && document.getElementById(dashboardElements.elementIDs.taskNavButton)
         && document.getElementById(dashboardElements.elementIDs.todoPage)
         && document.getElementById(dashboardElements.elementIDs.todoNavButton)
+        && document.getElementById(dashboardElements.elementIDs.reviewPage)
+        && document.getElementById(dashboardElements.elementIDs.reviewNavButton)
     );
   }
 

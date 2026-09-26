@@ -73,7 +73,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
               await window.__waitForTodoSaves?.();
               return [
                 taskButton.nextElementSibling === todoButton,
-                todoButton.nextElementSibling?.textContent.trim(),
+                todoButton.nextElementSibling?.nextElementSibling?.textContent.trim(),
                 document.querySelector('[data-todo-project]') === null,
                 document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
                 document.querySelector('[data-todo-progress]') === null,
