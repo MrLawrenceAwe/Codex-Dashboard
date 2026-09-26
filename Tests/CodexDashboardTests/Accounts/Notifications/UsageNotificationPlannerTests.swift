@@ -499,6 +499,32 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertTrue(alerts.first?.body.contains("\n⏱ 5-hour 90% · 📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
+    func testWeeklyEarlyResetTitleIdentifiesTheWeeklyLimit() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let savedAccount = account(named: "Personal")
+        let previous = CodexAccountUsage(
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 67, resetsAt: now.addingTimeInterval(24 * 60 * 60))
+        )
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: nil,
+                weekly: CodexUsageWindow(usedPercent: 0, resetsAt: now.addingTimeInterval(7 * 24 * 60 * 60))
+            ),
+            fetchedAt: now
+        )
+
+        let alerts = UsageNotificationPlanner.resetNotifications(
+            for: [savedAccount],
+            usageByAccountID: [savedAccount.id: current],
+            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            now: now
+        )
+
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.title, "Codex weekly usage reset early")
+    }
+
     func testPlansAnImmediateAlertWhenUsageDropsAfterTheScheduledReset() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
