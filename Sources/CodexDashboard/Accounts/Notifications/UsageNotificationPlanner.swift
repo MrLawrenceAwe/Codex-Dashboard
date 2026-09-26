@@ -291,7 +291,7 @@ enum UsageNotificationPlanner {
         if previousReset > now {
             return ImmediateUsageNotification(
                 identifier: identifier,
-                title: "Codex limit reset early",
+                title: windowName == "Weekly" ? "Codex weekly usage reset early" : "Codex limit reset early",
                 body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(nextResetDescription).\n\(usageSummary)"
             )
         }
