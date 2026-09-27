@@ -14,12 +14,19 @@ const reviewLoopPage = (() => {
   });
 
   function mountNavigation() {
-    return mountDashboardNavigationButton({
+    const mounted = mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.reviewNavButton,
       afterID: dashboardElements.elementIDs.todoNavButton,
       label: 'Review loop',
-      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loop</span></span>`,
+      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loop</span></span><span class="review-nav-spinner" data-review-navigation-running role="status" aria-label="Review loop running" title="Review loop running" hidden></span>`,
     });
+    if (mounted) renderNavigationStatus();
+    return mounted;
+  }
+
+  function renderNavigationStatus() {
+    const spinner = document.querySelector('[data-review-navigation-running]');
+    if (spinner) spinner.hidden = !['waiting', 'running'].includes(snapshot.loop?.phase);
   }
 
   function mount() {
@@ -121,6 +128,7 @@ const reviewLoopPage = (() => {
   }
 
   function render() {
+    renderNavigationStatus();
     const root = panel();
     if (!root) return;
     const { loop, projects, error } = snapshot;

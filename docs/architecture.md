@@ -55,12 +55,16 @@ P1, and P2. Each review starts in a new chat on the same branch and checkout.
 
 The review prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
-The reviewer returns a structured findings report. The selected priority limit
-also constrains the report schema. If no qualifying issues are found, the loop
-stops without sending a fix request. Otherwise the same chat receives exactly
+The driver appends a Markdown response contract to each prompt. Reviews show a
+summary and a separate priority heading, explanation, and file link for each
+finding. The selected priority limit constrains the requested findings.
+`ReviewLoopReport` reads the explicit status and finding count, rejecting missing
+sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
+stops without sending a fix request. Otherwise the same chat receives
 **Address and commit**, **Address both and commit**, or **Address all and commit**,
 according to the number of qualifying findings. The workflow does not request
-tests or require a test result. A structured fix report identifies the commit.
+tests or require a test result. A Markdown fix report identifies the addressed
+finding count and commit. No JSON output schema is sent to Codex.
 Dashboard independently verifies a clean working tree, unchanged branch,
 matching HEAD, and ancestry from the round's starting commit before scheduling
 the next fresh review. A round limit is a backstop, not a successful review.
@@ -77,7 +81,8 @@ panel only queues controls and displays snapshots; it does not own execution.
 State is atomically persisted to `~/Library/Application Support/Codex Dashboard/review-loop.json`.
 Intent is saved before each task or follow-up launch. Unknown launches are never
 resent automatically. Relaunching Dashboard pauses unfinished loops; Resume
-reconciles known tasks first. Malformed reports, failed/interrupted turns, approval
+reconciles known tasks first. Responses from older JSON-format turns are not
+converted; start a new loop if an unfinished old turn returns that format. Malformed reports, failed/interrupted turns, approval
 requests, dirty checkouts, or unexpected changes stop progression with an
 explanation. Pause lets the current review/fix round finish. Stop prevents new
 work without interrupting an already-running chat. Keep both Codex and Dashboard

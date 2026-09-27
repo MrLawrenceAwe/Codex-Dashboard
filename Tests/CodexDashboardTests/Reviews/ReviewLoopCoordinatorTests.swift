@@ -455,19 +455,17 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         return thread
     }
     func review(priorities: [ReviewFinding.Priority]) {
-        let report = ReviewReport(outcome: .reviewed, findings: priorities.map {
-            ReviewFinding(priority: $0, title: "Example issue", body: "Evidence and impact")
-        }, summary: "Review finished")
-        finishTurn(report)
+        let findings = priorities.map { "## [\($0.rawValue)] Example issue\nEvidence and impact" }.joined(separator: "\n\n")
+        finishTurn("# Review complete\n\nFindings: \(priorities.count)\n\n## Summary\nReview finished\n\n" + findings)
     }
     func finish(findings: Int, commit: String) {
         self.commit = commit
-        finishTurn(ReviewRoundResult(outcome: .fixed, findings: findings, commit: commit, summary: "Changes committed"))
+        finishTurn("# Fixes committed\n\nFindings addressed: \(findings)\nCommit: `\(commit)`\n\n## Summary\nChanges committed")
     }
-    private func finishTurn(_ report: some Encodable) {
+    private func finishTurn(_ report: String) {
         let last = thread.turns.last!
         thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
-            ReviewTurnState(id: last.id, status: "completed", finalMessage: String(decoding: try! JSONEncoder().encode(report), as: UTF8.self))
+            ReviewTurnState(id: last.id, status: "completed", finalMessage: report)
         ])
     }
 }
