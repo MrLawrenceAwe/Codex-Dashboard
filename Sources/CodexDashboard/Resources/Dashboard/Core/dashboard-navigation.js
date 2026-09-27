@@ -68,10 +68,8 @@ const dashboardNavigation = (() => {
   }
 
   function destroy() {
-    reviewLoopPage.close();
     reviewRPCClient.destroy();
-    taskDashboard.destroy();
-    todoList.destroy();
+    dashboardPages.forEach(({ controller }) => controller.destroy());
     dashboardLifecycle.destroy();
     threadCatalog.clear();
     delete window.__codexDashboard;

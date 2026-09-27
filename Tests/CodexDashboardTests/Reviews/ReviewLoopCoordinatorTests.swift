@@ -461,7 +461,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loop))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertNil(try store.load()?.speed)
+        XCTAssertEqual(try store.load()?.speed, .standard)
         try Data("broken".utf8).write(to: url)
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertNotNil(recovered.error)

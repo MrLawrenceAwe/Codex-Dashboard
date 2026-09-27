@@ -3,6 +3,19 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
+    func testProjectAndModelListsReadEveryPage() async throws {
+        let connection = ReviewListDevTools()
+        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+        let projects = try await driver.projects()
+        let models = try await driver.models()
+        XCTAssertEqual(projects.map(\.name), ["Alpha", "Zeta"])
+        XCTAssertEqual(models.map(\.model), ["model-a", "model-b"])
+        let projectCursors = await connection.cursors(for: "project/list")
+        let modelCursors = await connection.cursors(for: "model/list")
+        XCTAssertEqual(projectCursors, [nil, "next"])
+        XCTAssertEqual(modelCursors, [nil, "next"])
+    }
+
     func testNewReviewThreadUsesStandardSpeed() async throws {
         let connection = ReviewReportDevTools()
         let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
@@ -111,6 +124,38 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertFalse(prompt.lowercased().contains("checks"))
         XCTAssertEqual(prompt, "Fix all findings; commit once")
         XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
+    }
+}
+
+private actor ReviewListDevTools: DevToolsServing {
+    private var requests: [(method: String, cursor: String?)] = []
+
+    func cursors(for method: String) -> [String?] {
+        requests.filter { $0.method == method }.map(\.cursor)
+    }
+
+    func mainRendererTargets() async -> [DevToolsTarget] { [] }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
+        let prefix = "window.__codexDashboard.reviewRequest("
+        let request = try JSONSerialization.jsonObject(with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any]
+        let method = request?["method"] as? String ?? ""
+        let cursor = (request?["params"] as? [String: Any])?["cursor"] as? String
+        requests.append((method, cursor))
+        let row: String
+        switch (method, cursor) {
+        case ("project/list", nil):
+            row = #"{"id":"z","name":"Zeta","roots":[{"path":"/tmp/z"}]}"#
+        case ("project/list", "next"):
+            row = #"{"id":"a","name":"Alpha","roots":[{"path":"/tmp/a"}]}"#
+        case ("model/list", nil):
+            row = #"{"model":"model-a","displayName":"A","supportedReasoningEfforts":[{"reasoningEffort":"high"}]}"#
+        case ("model/list", "next"):
+            row = #"{"model":"model-b","displayName":"B","supportedReasoningEfforts":[]}"#
+        default: throw ReviewLoopError("Unexpected list request")
+        }
+        let next = cursor == nil ? #""next""# : "null"
+        return #"{"result":{"data":[\#(row)],"nextCursor":\#(next)}}"#
     }
 }
 

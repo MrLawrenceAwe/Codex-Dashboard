@@ -28,7 +28,7 @@ final class ReviewLoopBridge {
             } catch { actionError = error.localizedDescription }
         }
         for window in targets {
-            if let serialized = try await devTools.evaluateString("window.__codexDashboard.pendingReviewAction()", in: window),
+            if let serialized = try await devTools.evaluateString(RendererScript.pendingReviewAction, in: window),
                let action = try? JSONDecoder().decode(ReviewLoopAction.self, from: Data(serialized.utf8)) {
                 if action.id != acknowledgedActionID {
                     do {
@@ -61,7 +61,6 @@ final class ReviewLoopBridge {
                                          progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)
-        let json = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
-        _ = try await devTools.evaluateBoolean("window.__codexDashboard.applyReviewLoop(\(json))", in: target)
+        _ = try await devTools.evaluateBoolean(RendererScript.deliverReviewLoop(snapshot), in: target)
     }
 }

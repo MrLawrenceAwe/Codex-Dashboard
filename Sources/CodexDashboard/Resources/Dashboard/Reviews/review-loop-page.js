@@ -69,5 +69,10 @@ const reviewLoopPage = (() => {
     render();
     return true;
   }
-  return { mountPage, mountNavigation, open: pageState.open, close: pageState.close, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, apply, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
+  function destroy() {
+    pageState.close();
+    pendingAction = null;
+  }
+
+  return { mountPage, mountNavigation, open: pageState.open, close: pageState.close, destroy, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, apply, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
 })();
