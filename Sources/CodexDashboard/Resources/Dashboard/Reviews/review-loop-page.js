@@ -39,6 +39,9 @@ const reviewLoopPage = (() => {
       </header>
       <form data-review-form>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
+        <label>Project type<select data-review-project-type aria-label="Project type">
+          <option value="">General project</option><option value="personal">Personal project</option>
+        </select></label>
         <label>Fix priorities<select data-review-priority aria-label="Review priority limit">
           <option value="P0">P0 · Critical</option><option value="P1">P1+ · High</option>
           <option value="P2" selected>P2+ · Medium</option><option value="P3">P3+ · All</option>
@@ -79,6 +82,7 @@ const reviewLoopPage = (() => {
       const model = details.querySelector('[data-review-model]').value;
       const effort = details.querySelector('[data-review-effort]').value;
       queue({ selection: model ? { model, effort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
+        instructions: details.querySelector('[data-review-project-type]').value === 'personal' ? '(this is a project for personal use)' : '',
         priorityLimit: details.querySelector('[data-review-priority]').value,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });

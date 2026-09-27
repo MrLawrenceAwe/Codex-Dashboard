@@ -50,9 +50,10 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 ## Review loops
 
 The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
-single-folder project, a priority limit (**P0**, **P1+**, **P2+**, or **P3+**), optional
-review instructions, a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P2+ includes P0,
+single-folder project, a priority limit (**P0**, **P1+**, **P2+**, or **P3+**), a project type (general or personal), a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P2+ includes P0,
 P1, and P2. Each review starts in a new chat on the same branch and checkout.
+
+The review prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
 The reviewer returns a structured findings report. The selected priority limit
 also constrains the report schema. If no qualifying issues are found, the loop

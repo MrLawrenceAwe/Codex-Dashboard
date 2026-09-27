@@ -9,7 +9,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
         try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id,
-                                              instructions: "Check input validation", maxRounds: limit, loopID: nil), projects: [project])
+                                              instructions: "", maxRounds: limit, loopID: nil), projects: [project])
         return (coordinator, store, ReviewTestDriver())
     }
 
@@ -34,7 +34,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1, "Do not launch in the same checkpoint observation")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1", "thread-2"])
-        XCTAssertTrue(driver.prompts[2].contains("Expected starting HEAD: fixed"))
+        XCTAssertEqual(driver.prompts[2], "Review project for bugs and issues.")
         XCTAssertFalse(driver.prompts[2].contains("last round's findings"))
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
@@ -46,7 +46,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testProgressTracksSubmittedAndConditionalPrompts() async throws {
         let (coordinator, _, driver) = try make()
         XCTAssertNil(coordinator.progress?.current)
-        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("[HEAD verified before review]") == true)
+        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Review project for bugs and issues.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress?.step, "Reviewing")
         XCTAssertEqual(coordinator.progress?.current?.text, driver.prompts.last)
@@ -57,13 +57,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.progress?.upcoming?.text, "Address both and commit")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress?.current?.text, driver.prompts.last)
-        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("[commit from the current fix]") == true)
+        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Review project for bugs and issues.")
         try coordinator.apply(action("pause", for: coordinator), projects: [project])
         XCTAssertTrue(coordinator.progress?.upcoming?.note.contains("resume") == true)
         driver.finish(findings: 2, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress?.step, "Paused")
-        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("Expected starting HEAD: fixed") == true)
+        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Review project for bugs and issues.")
         try coordinator.apply(action("stop", for: coordinator), projects: [project])
         XCTAssertNil(coordinator.progress?.upcoming)
         XCTAssertEqual(coordinator.progress?.currentLabel, "Latest prompt")
