@@ -339,7 +339,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(store.loop?.rounds.last?.fixTurnID, "turn-2")
     }
 
-    func testRoundLimitDoesNotReportCleanOrLaunchAnotherTask() async throws {
+    func testRoundLimitFinishesConfiguredWorkWithoutLaunchingAnotherTask() async throws {
         let (coordinator, _, driver) = try make(limit: 1)
         await coordinator.advance(using: driver, threads: [])
         driver.review(priorities: [.p2])
@@ -349,6 +349,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loop?.phase, .limitReached)
         XCTAssertEqual(coordinator.progress?.step, "Limit reached")
+        XCTAssertEqual(coordinator.loop?.message, "All configured review rounds completed.")
         XCTAssertNil(coordinator.progress?.upcoming)
         try coordinator.apply(action("resume", for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
