@@ -53,7 +53,7 @@ final class ReviewLoopCoordinator {
             }
             let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, speed: action.speed ?? .standard, priorityLimit: action.priorityLimit ?? .p2))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, focus: action.focus ?? .bugs, speed: action.speed ?? .standard, priorityLimit: action.priorityLimit ?? .p2))
         case "pause", "resume", "stop":
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
@@ -194,9 +194,9 @@ final class ReviewLoopCoordinator {
                 round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
                                                  commit: repo.commit, summary: report.summary)
                 updated.phase = .completed
-                updated.message = "Review \(round.number) found no \(updated.priorityLimit.rangeLabel) issues. No fix prompt was sent."
+                updated.message = "Review \(round.number) found no \(updated.priorityLimit.rangeLabel) findings. No fix prompt was sent."
             } else {
-                updated.message = "Review \(round.number) found \(report.qualifyingFindings(upTo: updated.priorityLimit).count) \(updated.priorityLimit.rangeLabel) issues. Preparing the fix prompt."
+                updated.message = "Review \(round.number) found \(report.qualifyingFindings(upTo: updated.priorityLimit).count) \(updated.priorityLimit.rangeLabel) findings. Preparing the fix prompt."
             }
             updated.rounds[updated.rounds.count - 1] = round
             try persist(updated)
