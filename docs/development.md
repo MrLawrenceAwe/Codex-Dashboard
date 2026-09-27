@@ -15,7 +15,7 @@ ignored `injection.js` is built by the production `InjectionBundle` loader, incl
 the Swift-defined prompt schema; preview fixtures use the current thread contract.
 Generation exits before starting the menu-bar application.
 
-Shared page visibility, navigation-button construction, and icons live in `Core`. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-presentation-state.js` owns unread reconciliation, completion ticks, and polling. `Threads/thread-catalog.js` owns sorting, project matching, and the thread-ID index; dashboard, to-do, and prompt controllers receive its lookup operations during startup. The bridge applies each snapshot to the catalog before refreshing the pages. The prompt controller receives an
+Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-presentation-state.js` owns unread reconciliation, completion ticks, and polling. `Threads/thread-catalog.js` owns sorting, project matching, and the thread-ID index; dashboard, to-do, and prompt controllers receive its lookup operations during startup. The bridge applies each snapshot to the catalog before refreshing the pages. The prompt controller receives an
 explicit thread lookup for composer context. Native import/export and renderer
 persistence share the prompt store constructed by the application coordinator.
 

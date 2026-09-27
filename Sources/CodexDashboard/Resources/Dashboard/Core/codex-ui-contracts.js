@@ -21,7 +21,11 @@ const codexUIContracts = (() => {
   }
 
   function navigation() {
-    return document.querySelector('nav, [role="navigation"]');
+    // The app rail precedes Home navigation; only the latter owns chat rows.
+    const root = sidebar();
+    if (!root) return null;
+    return root.querySelector('nav:not([data-app-navigation-rail]), [role="navigation"]')
+      || (root.matches('[role="navigation"]') ? root : null);
   }
 
   function visibleAction(label, root = document) {
