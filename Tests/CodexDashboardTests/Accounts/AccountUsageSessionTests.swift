@@ -58,7 +58,7 @@ final class AccountUsageSessionTests: XCTestCase {
 
     func testSavedUsageCoalescesOnlyMatchingAccounts() async throws {
         let provider = PerAccountUsageProvider()
-        let cache = UsageCache(
+        let cache = AccountUsageFileCache(
             cacheURL: FileManager.default.temporaryDirectory
                 .appendingPathComponent("AccountUsageSessionTests-\(UUID().uuidString).json")
         )

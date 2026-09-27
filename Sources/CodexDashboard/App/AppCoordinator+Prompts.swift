@@ -8,7 +8,7 @@ extension AppCoordinator {
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
-        await synchronizationGate.cancelAndWait()
+        await synchronizationCoalescer.cancelAndWait()
         do {
             try promptLibraryStore.importDocument(from: sourceURL)
             dashboardRuntime?.useStoredPromptLibraryOnNextSync()

@@ -10,7 +10,7 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForNavigation = false } = {}) {
+  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForStableComposer = false } = {}) {
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
     const [loadedItem] = await todoStore.loadImages([item]);
@@ -25,7 +25,7 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
           observedComposer = null;
           return null;
         }
-        if (!waitForNavigation) return current;
+        if (!waitForStableComposer) return current;
         // Codex can reuse the new-task editor when the project stays the same.
         // Wait for a stable editor, whether navigation reused or replaced it.
         if (current !== observedComposer) {
@@ -112,7 +112,7 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
   async function openTodoInNewThread(item) {
     if (isDestroyed() || !item?.project || !await codexHost.newChat(item.project.id) || isDestroyed()) return;
     pageState.close();
-    await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, waitForNavigation: true });
+    await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, waitForStableComposer: true });
   }
 
   async function pasteTodoInThread(item) {

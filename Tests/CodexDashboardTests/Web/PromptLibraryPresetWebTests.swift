@@ -32,7 +32,7 @@ extension PromptLibraryWebTests {
             """
             (() => {
               window.__codexDashboard.applyPromptLibrary(\(payload));
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-edit="unknown-model"]').click();
               const option = document.querySelector('[name="presetModel"] option:checked');
               return JSON.stringify({
@@ -199,7 +199,7 @@ extension PromptLibraryWebTests {
                 document.body.append(menu);
               });
 
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               const presetDefaults = {
                 modelValue: document.querySelector('[name="presetModel"]').value,
@@ -305,7 +305,7 @@ extension PromptLibraryWebTests {
                   usePreset: true,
                 }],
               });
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
                 .map((item) => item.textContent);
               document.querySelector('[data-prompt-edit]').click();
@@ -329,7 +329,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               const fields = document.querySelector('[data-prompt-preset-fields]');
               const defaults = {
@@ -373,7 +373,7 @@ extension PromptLibraryWebTests {
               trigger.textContent = 'Current model';
               document.querySelector('.composer-shell').append(trigger);
 
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Unavailable preset';
               document.querySelector('[name="content"]').value = 'Do not insert this';

@@ -69,7 +69,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 return: null,
               };
 
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               const scopeOptions = [...document.querySelector('[name="scope"]').options]
                 .map((option) => option.textContent);
@@ -107,7 +107,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               launcher.focus();
               launcher.click();
               const lastButton = document.querySelector('[data-prompt-new-section]');
@@ -166,7 +166,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               return [
                 document.querySelectorAll('[data-prompt-use]').length,
                 Boolean(document.querySelector('[data-prompt-section="Old"]')),
@@ -190,7 +190,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
               composer.value = 'alpha beta gamma';
               composer.focus();
               composer.setSelectionRange(6, 10);
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Use selection';
               document.querySelector('[name="content"]').value = 'Selected: {{selection}}';
@@ -220,7 +220,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
                 sections: [],
               };
               window.__codexDashboard.applyPromptLibrary(library);
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-edit="prompt-1"]').click();
 
               const name = document.querySelector('[name="name"]');

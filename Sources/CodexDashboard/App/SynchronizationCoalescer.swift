@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class SynchronizationGate {
+final class SynchronizationCoalescer {
     private var task: Task<Void, Never>?
     private var taskID: UUID?
     private var trailingSynchronizationRequested = false

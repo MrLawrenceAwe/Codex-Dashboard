@@ -2,13 +2,13 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class UsageCacheTests: XCTestCase {
+final class AccountUsageFileCacheTests: XCTestCase {
     func testRoundTripsNonSensitiveUsageSnapshots() throws {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("UsageCacheTests-\(UUID().uuidString)")
+            .appendingPathComponent("AccountUsageFileCacheTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
         let cacheURL = directory.appendingPathComponent("account-usage.json")
-        let store = UsageCache(cacheURL: cacheURL)
+        let store = AccountUsageFileCache(cacheURL: cacheURL)
         let accountID = UUID()
         let snapshot = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -44,6 +44,6 @@ final class UsageCacheTests: XCTestCase {
         let cacheURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("MissingAccountUsageCache-\(UUID().uuidString).json")
 
-        XCTAssertEqual(try UsageCache(cacheURL: cacheURL).load(), [:])
+        XCTAssertEqual(try AccountUsageFileCache(cacheURL: cacheURL).load(), [:])
     }
 }

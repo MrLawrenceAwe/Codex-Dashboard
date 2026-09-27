@@ -1,7 +1,7 @@
 const reviewLoopView = (() => {
   let projectsSignature = '';
   let modelsSignature = '';
-  const focusLabels = { bugs: 'Bugs and issues', organisation: 'Code minimisation and organisation', naming: 'Code minimisation, organisation and naming', performance: 'Performance and responsiveness' };
+  const focusLabels = { bugs: 'Bugs and issues', organisation: 'Simplification and structure', naming: 'Simplification, structure and naming', performance: 'Performance and responsiveness' };
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
@@ -108,7 +108,7 @@ const reviewLoopView = (() => {
     if (spinner) spinner.hidden = !snapshot.loops.some(loop => ['waiting', 'running'].includes(loop.phase));
   }
 
-  function renderEfforts(snapshot, pendingAction, kind = 'review') {
+  function renderReasoningOptions(snapshot, pendingAction, kind = 'review') {
     const root = panel();
     if (!root) return;
     const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
@@ -135,7 +135,7 @@ const reviewLoopView = (() => {
           if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
           modelSelect.value = selected;
         }
-        renderEfforts(snapshot, pendingAction, kind);
+        renderReasoningOptions(snapshot, pendingAction, kind);
       }
       modelsSignature = nextModelsSignature;
     }
@@ -259,5 +259,5 @@ const reviewLoopView = (() => {
     modelsSignature = '';
   }
 
-  return { createPage, render, renderEfforts, renderReviewSettings, renderNavigationStatus, reset };
+  return { createPage, render, renderReasoningOptions, renderReviewSettings, renderNavigationStatus, reset };
 })();

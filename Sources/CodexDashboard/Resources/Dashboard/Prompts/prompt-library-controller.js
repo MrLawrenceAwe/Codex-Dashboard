@@ -352,7 +352,7 @@ function createPromptLibrary({ findThread }) {
   }
 
   function mount() {
-    promptLauncher.mount(openLibrary);
+    promptLibraryButton.mount(openLibrary);
     promptInteractionEventTypes.forEach((type) => {
       document.addEventListener(type, handlePromptInteraction, true);
     });
@@ -362,7 +362,7 @@ function createPromptLibrary({ findThread }) {
     promptInteractionEventTypes.forEach((type) => {
       document.removeEventListener(type, handlePromptInteraction, true);
     });
-    promptLauncher.unmount();
+    promptLibraryButton.unmount();
     closeLibrary({ restoreFocus: false });
   }
 

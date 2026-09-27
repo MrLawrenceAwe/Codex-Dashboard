@@ -32,14 +32,14 @@ final class AppCoordinator: ObservableObject {
     let accountPopoverActionListener = AccountPopoverActionListener()
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
-    let typingActivityDetector: any TypingActivityDetecting
+    let keyboardActivityDetector: any KeyboardActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
     let accounts: AccountCoordinator
     let notificationUsageRefresher: NotificationUsageRefresher
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
     let desktopUsageNotifier: any DesktopUsageNotifying
     let phoneUsageNotifier: any PhoneUsageNotifying
-    let synchronizationGate = SynchronizationGate()
+    let synchronizationCoalescer = SynchronizationCoalescer()
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
@@ -73,7 +73,7 @@ final class AppCoordinator: ObservableObject {
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
-        typingActivityDetector: any TypingActivityDetecting = SystemTypingActivityDetector(),
+        keyboardActivityDetector: any KeyboardActivityDetecting = SystemKeyboardActivityDetector(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager = CodexAccountManager(),
         accountUsageProvider: any AccountUsageProviding = AppServerUsageProvider(),
@@ -92,7 +92,7 @@ final class AppCoordinator: ObservableObject {
         )
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
-        self.typingActivityDetector = typingActivityDetector
+        self.keyboardActivityDetector = keyboardActivityDetector
         self.promptLibraryStore = promptLibraryStore
         self.compatibilityIssueNotifier = compatibilityIssueNotifier
         self.desktopUsageNotifier = desktopUsageNotifier
@@ -175,7 +175,7 @@ final class AppCoordinator: ObservableObject {
         accounts.persistUsageCache(force: true)
         refreshScheduler.stop()
         accountPopoverActionListener.stop()
-        synchronizationGate.cancel()
+        synchronizationCoalescer.cancel()
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
             self.activationObserver = nil
@@ -188,7 +188,7 @@ final class AppCoordinator: ObservableObject {
 
     func synchronizeDashboard() async {
         guard !isPerformingAction else { return }
-        await synchronizationGate.perform { [weak self] in await self?.synchronizeRuntime() }
+        await synchronizationCoalescer.perform { [weak self] in await self?.synchronizeRuntime() }
     }
 
     func restartCodexAndEnableDashboard() async {
@@ -263,7 +263,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func cancelSynchronization() async {
-        await synchronizationGate.cancelAndWait()
+        await synchronizationCoalescer.cancelAndWait()
     }
 
     func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {

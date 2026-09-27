@@ -123,7 +123,7 @@ const dashboardLifecycle = (() => {
       if (shouldRebindHosts) {
         observeHosts();
         sidebarProjectHighlights.mount();
-        promptLauncher.scheduleSync();
+        promptLibraryButton.scheduleSync();
       }
       if (shouldSyncUnread) {
         hooks.syncSidebarMarkers();
@@ -171,7 +171,7 @@ const dashboardLifecycle = (() => {
       scheduleRepair({ rebindHosts: true });
       return;
     }
-    promptLauncher.scheduleSync();
+    promptLibraryButton.scheduleSync();
   }
 
   function mountPagesAndNavigation() {

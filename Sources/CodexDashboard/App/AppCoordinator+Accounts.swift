@@ -86,7 +86,7 @@ extension AppCoordinator {
         isPerformingAction = true
         defer { isPerformingAction = false }
         refreshGeneration += 1
-        await synchronizationGate.cancelAndWait()
+        await synchronizationCoalescer.cancelAndWait()
         accounts.invalidateUsage()
         do {
             try await loadThreadSnapshot()

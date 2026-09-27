@@ -4,7 +4,7 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
   const observedSidebarReadStates = new Map();
   const completionIndicatorDurationMs = 60_000;
   const completionIndicatorExpiryByThreadID = new Map();
-  let completedTickTimer;
+  let completionIndicatorTimer;
   let unreadSyncTimer;
   let unreadMonitoringStarted = false;
 
@@ -68,15 +68,15 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
   }
 
   function scheduleCompletedTickExpiry() {
-    if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
+    if (completionIndicatorTimer !== undefined) clearTimeout(completionIndicatorTimer);
     const now = Date.now();
     const expiries = [...completionIndicatorExpiryByThreadID.values()].filter((expiry) => expiry > now);
     if (!expiries.length) {
-      completedTickTimer = undefined;
+      completionIndicatorTimer = undefined;
       return;
     }
-    completedTickTimer = window.setTimeout(() => {
-      completedTickTimer = undefined;
+    completionIndicatorTimer = window.setTimeout(() => {
+      completionIndicatorTimer = undefined;
       onChange();
       scheduleCompletedTickExpiry();
     }, Math.min(...expiries) - now);
@@ -141,9 +141,9 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
 
   function destroy() {
     if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
-    if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
+    if (completionIndicatorTimer !== undefined) clearTimeout(completionIndicatorTimer);
     unreadSyncTimer = undefined;
-    completedTickTimer = undefined;
+    completionIndicatorTimer = undefined;
     completionIndicatorExpiryByThreadID.clear();
     sidebarUnreadOverrides.clear();
     observedSidebarReadStates.clear();
