@@ -68,10 +68,12 @@ enum ReviewLoopPresentation {
         switch loop.focus {
         case .bugs:
             return "Fix \(findings); commit once"
-        case .organisation:
-            return "Address \(findings) by minimising and organising the code while preserving behaviour; commit once"
-        case .naming:
-            return "Address \(findings) by minimising and organising the code and improving unclear, overly long, abbreviated, or misleading names. Update affected references consistently and preserve behaviour; commit once"
+        case .organisation, .naming:
+            switch round.review?.findings.count ?? 0 {
+            case 1: return "Address"
+            case 2: return "Address both"
+            default: return "Address all"
+            }
         case .performance:
             return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
         }
