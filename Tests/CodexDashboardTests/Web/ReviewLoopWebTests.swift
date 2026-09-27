@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
-    func testMultipleLoopsSelectionTargetsControlsAndExcludesBusyProjects() async throws {
+    func testConcurrentCardsTargetControlsAndExcludeBusyProjects() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -12,16 +12,67 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const projects = [{id:'a',name:'A',path:'/tmp/a'},{id:'b',name:'B',path:'/tmp/b'},{id:'c',name:'C',path:'/tmp/c'}];
           const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',priorityLimit:'P2',maxRounds:5,rounds:[],message:project.name}));
           api.applyReviewLoop({projects,loops,error:null});
-          const picker = document.querySelector('[data-review-selected]');
-          picker.value = 'a'; picker.dispatchEvent(new Event('change'));
+          const cards = document.querySelectorAll('[data-review-activity]');
           const setup = document.querySelector('[data-review-project]');
-          const before = [picker.options.length,setup.value,...[...setup.options].map(option => option.disabled),document.querySelector('[data-review-start]').disabled,document.querySelector('[data-review-form]').hidden];
+          const before = [cards.length,setup.value,...[...setup.options].map(option => option.disabled),document.querySelector('[data-review-start]').disabled,document.querySelector('[data-review-form]').hidden];
           document.querySelector('[data-review-action="stop"]').click();
           const action = JSON.parse(api.pendingReviewAction());
           return [...before,action.kind,action.loopID];
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, [2, "c", true, true, false, false, false, "stop", "a"])
+    }
+
+    func testConcurrentCardsPreserveDetailsAndScopePendingStatus() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <html><head><style>body { margin:0; } aside { width:160px; }
+        #codex-dashboard-review-page { transition:none !important; }
+        </style></head><body><aside role="navigation"><button class="sidebar-item">New chat</button></aside><main>Conversation</main></body></html>
+        """, baseURL: URL(string: "https://review-loop.test"))
+        webView.frame = CGRect(x: 0, y: 0, width: 1440, height: 1100)
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const projects = ['Dashboard', 'Website', 'Archive'].map((name, i) => ({id:String(i),name,path:'/tmp/' + i}));
+          const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',maxRounds:5,
+            message:i === 2 ? 'Review complete' : 'Reviewing changes',rounds:[{number:1,result:{outcome:'fixed',summary:'Fixed issue',commit:'1234567890'}}]}));
+          const snapshot = {projects,loops,error:null};
+          api.applyReviewLoop(snapshot); api.openReviews();
+          const cards = () => [...document.querySelectorAll('[data-review-activity]')];
+          const first = cards()[0];
+          first.querySelector('details').open = true;
+          api.applyReviewLoop(snapshot);
+          const preserved = cards()[0] === first && first.querySelector('details').open && !cards()[1].querySelector('details').open;
+          cards()[1].querySelector('[data-review-action="pause"]').click();
+          const action = JSON.parse(api.pendingReviewAction());
+          const scoped = first.querySelector('[data-review-status]').textContent === 'Reviewing changes' && cards()[1].querySelector('[data-review-status]').textContent === 'Requesting pause…';
+          api.applyReviewLoop({...snapshot,acknowledgedActionID:action.id});
+          const a = cards()[0].getBoundingClientRect(), b = cards()[1].getBoundingClientRect();
+          return [preserved,action.loopID,scoped,a.top === b.top,b.left > a.left,document.querySelector('[data-review-overview]').textContent];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "1", true, true, true, "2 active · 3 total"])
+        try await Task.sleep(for: .milliseconds(150))
+        let image = try await webView.takeSnapshot(configuration: nil)
+        if let data = image.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0) })?.representation(using: .png, properties: [:]) {
+            try data.write(to: URL(fileURLWithPath: "/tmp/codex-review-board.png"))
+        }
+        webView.frame = CGRect(x: 0, y: 0, width: 640, height: 900)
+        try await Task.sleep(for: .milliseconds(150))
+        let narrow = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const panel = document.querySelector('[data-review-loop]');
+          const cards = [...document.querySelectorAll('[data-review-activity]')];
+          const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
+          return panel.scrollWidth <= panel.clientWidth && a.left === b.left && b.top > a.top;
+        })()
+        """) as? Bool
+        XCTAssertEqual(narrow, true)
+        _ = try await webView.evaluateAsyncJavaScript("""
+        window.__codexDashboard.applyReviewLoop({projects:[],loops:[],error:null})
+        """)
+        let remaining = try await webView.evaluateAsyncJavaScript("document.querySelectorAll('[data-review-activity]').length") as? Int
+        XCTAssertEqual(remaining, 0)
     }
 
     func testPriorityOptionsDescribeIncludedFindings() async throws {
@@ -165,7 +216,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewLoop(snapshot);
           const active = [document.querySelector('[data-review-form]').hidden,
             !document.querySelector('[data-review-activity]').hidden,
-            document.querySelector('[data-review-context] strong').textContent,
+            document.querySelector('[data-review-project-name]').textContent,
             document.querySelector('.review-round-details').open,
             document.querySelector('.review-round-details p').textContent,
             document.querySelector('[data-review-action="pause"]').textContent,
@@ -192,7 +243,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',maxRounds:1,
-            message:'Round limit reached after committing fixes. No clean review has been confirmed.',
+            message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewLoop({projects:[project],loops:[loop],error:null,
             progress:{[loop.id]:{step:'Limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
@@ -211,7 +262,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             limitColor === successColor];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "Round limit reached after committing fixes. No clean review has been confirmed.", false])
+        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "All configured review rounds completed.", true])
     }
 
     func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {

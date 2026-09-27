@@ -1,7 +1,6 @@
 const reviewLoopView = (() => {
   let projectsSignature = '';
   let modelsSignature = '';
-  let selectedLoopID = null;
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
@@ -16,22 +15,24 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <div><span class="review-eyebrow">Automated code review</span><h1>Review loops</h1><p>A fresh perspective. A fix. Another pass.</p></div>
+        <div><h1>Review loops</h1></div><span class="review-overview" data-review-overview></span>
       </header>
+      <section class="review-board" data-review-board aria-label="Review loops"></section>
+      <p class="review-empty" data-review-empty>No loops yet.</p>
       <form data-review-form>
-        <div class="review-setup-heading"><h2>Set up a loop</h2><p>Run one active loop per project. Different projects can run at the same time.</p></div>
+        <div class="review-setup-heading"><h2>New loop</h2></div>
         <fieldset class="review-scope"><legend class="review-visually-hidden">Review scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
           <option value="">General project</option><option value="personal">Personal project</option>
         </select></label>
-        <label class="review-priority">Review and fix priorities<select data-review-priority aria-label="Review and fix priority limit">
+        <label class="review-priority">Priorities<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">P0 only · Critical</option><option value="P1">P0–P1 · High and critical</option>
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required></label>
         </fieldset>
-        <details class="review-execution-options"><summary>Model &amp; speed <span>Optional</span></summary>
+        <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
         <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
         <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
@@ -43,10 +44,19 @@ const reviewLoopView = (() => {
         </div>
       </form>
       <div data-review-error role="alert" hidden></div>
-      <section class="review-activity" data-review-activity aria-labelledby="review-activity-title">
-        <label data-review-picker hidden>Loops<select data-review-selected aria-label="Select review loop"></select></label>
-        <div class="review-section-heading"><h2 id="review-activity-title" data-review-activity-title>How it works</h2><span data-review-badge hidden></span></div>
-        <div data-review-context class="review-context" hidden></div>
+      `;
+    page.append(details);
+    return page;
+  }
+
+  function createCard(loop) {
+    const card = document.createElement('article');
+    card.className = 'review-activity';
+    card.dataset.reviewActivity = '';
+    card.dataset.loopId = loop.id;
+    card.innerHTML = `
+      <div class="review-section-heading"><h2 data-review-project-name></h2><span data-review-badge></span></div>
+      <div data-review-context class="review-context"></div>
         <div data-review-status role="status" aria-live="polite"></div>
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
@@ -62,19 +72,8 @@ const reviewLoopView = (() => {
           </details>
           <p class="review-next-message" data-review-next-message></p>
         </div>
-        <div class="review-empty" data-review-empty>
-          <p>Each round moves your project closer to a clean review.</p>
-          <div class="review-workflow" aria-label="Round workflow">
-            <div><span class="review-workflow-number" aria-hidden="true">01</span><div><strong>Review</strong><p>A fresh task checks your project for qualifying issues.</p></div></div>
-            <div><span class="review-workflow-number" aria-hidden="true">02</span><div><strong>Fix &amp; commit</strong><p>Findings are addressed and the fixes are committed.</p></div></div>
-            <div><span class="review-workflow-number" aria-hidden="true">03</span><div><strong>Verify &amp; repeat</strong><p>The commit is verified before the next review begins.</p></div></div>
-          </div>
-          <div class="review-guide-note">You can pause after a round or stop the loop at any time.</div>
-        </div>
-        <ol data-review-rounds aria-label="Review rounds"></ol>
-      </section>`;
-    page.append(details);
-    return page;
+        <ol data-review-rounds aria-label="Review rounds"></ol>`;
+    return card;
   }
 
   function renderNavigationStatus(snapshot) {
@@ -98,13 +97,6 @@ const reviewLoopView = (() => {
     const root = panel();
     if (!root) return;
     const { loops, projects, error } = snapshot;
-    if (!loops.some(loop => loop.id === selectedLoopID)) selectedLoopID = loops.at(-1)?.id || null;
-    const loop = loops.find(loop => loop.id === selectedLoopID);
-    const picker = root.querySelector('[data-review-selected]');
-    const options = loops.map((item, index) => `<option value="${escape(item.id)}">${index + 1}. ${escape(item.project.name)} · ${escape(item.phase === 'limitReached' ? 'Limit reached' : item.phase)}</option>`).join('');
-    if (picker.innerHTML !== options) picker.innerHTML = options;
-    picker.value = selectedLoopID || '';
-    root.querySelector('[data-review-picker]').hidden = !loops.length;
     const models = snapshot.models || [];
     const modelSelect = root.querySelector('[data-review-model]');
     const nextModelsSignature = JSON.stringify(models);
@@ -128,37 +120,44 @@ const reviewLoopView = (() => {
       select.value = availableProjects.some(project => project.id === selected) ? selected : availableProjects[0]?.id || '';
       projectsSignature = signature;
     }
-    root.querySelector('[data-review-form]').hidden = false;
-    const form = root.querySelector('[data-review-form]');
-    const activity = root.querySelector('[data-review-activity]');
-    if (loop && activity.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(activity, form);
-    if (!loop && form.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(form, activity);
-    root.dataset.hasLoop = String(!!loop);
-    root.querySelector('[data-review-activity-title]').textContent = loop ? 'Loop activity' : 'How it works';
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
-    const badge = root.querySelector('[data-review-badge]');
-    badge.textContent = loop?.phase === 'limitReached' ? 'Limit reached' : loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
-    badge.hidden = !loop;
-    badge.dataset.phase = loop?.phase || '';
-    const context = root.querySelector('[data-review-context]');
-    context.hidden = !loop;
-    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}` : '';
-    root.querySelector('[data-review-status]').textContent = pendingAction
-      ? ({ start: 'Starting loop…', pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
-      : loop?.message || '';
-    const completedRounds = (loop?.rounds || []).filter(round => round.result).length;
-    root.querySelector('[data-review-round-progress]').hidden = !loop;
-    root.querySelector('[data-review-round-count]').textContent = loop ? `${completedRounds} of ${loop.maxRounds}` : '';
-    const meter = root.querySelector('[data-review-meter]');
-    meter.max = loop?.maxRounds || 1;
-    meter.value = completedRounds;
-    root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
-    renderProgress(root, loop, snapshot.progress?.[loop?.id]);
-    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : `${loop ? 'Start new loop' : 'Start loop'} <span aria-hidden="true">→</span>`;
+    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
+    root.querySelector('[data-review-empty]').hidden = !!loops.length;
+    const activeCount = loops.filter(loop => !isFinished(loop)).length;
+    root.querySelector('[data-review-overview]').textContent = loops.length ? `${activeCount} active · ${loops.length} total` : '';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
+    const board = root.querySelector('[data-review-board]');
+    const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
+    const ordered = [...loops].sort((a, b) => Number(isFinished(a)) - Number(isFinished(b)));
+    for (const [index, loop] of ordered.entries()) {
+      const card = cards.get(loop.id) || createCard(loop);
+      if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
+      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction);
+      cards.delete(loop.id);
+    }
+    cards.forEach(card => card.remove());
+  }
+
+  function renderCard(root, loop, progress, pendingAction) {
+    root.querySelector('[data-review-project-name]').textContent = loop.project.name;
+    root.setAttribute('aria-label', loop.project.name);
+    const badge = root.querySelector('[data-review-badge]');
+    badge.textContent = loop.phase === 'limitReached' ? 'Limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
+    badge.dataset.phase = loop.phase;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
+    root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
+      ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
+      : loop.message || '';
+    const completedRounds = loop.rounds.filter(round => round.result).length;
+    root.querySelector('[data-review-round-progress]').hidden = false;
+    root.querySelector('[data-review-round-count]').textContent = `${completedRounds} of ${loop.maxRounds}`;
+    const meter = root.querySelector('[data-review-meter]');
+    meter.max = loop.maxRounds;
+    meter.value = completedRounds;
+    renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
     controls.innerHTML = isFinished(loop) ? '' : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
@@ -207,5 +206,5 @@ const reviewLoopView = (() => {
     modelsSignature = '';
   }
 
-  return { selectLoop: id => { selectedLoopID = id; }, createPage, render, renderEfforts, renderNavigationStatus, reset };
+  return { createPage, render, renderEfforts, renderNavigationStatus, reset };
 })();
