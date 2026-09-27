@@ -10,6 +10,7 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
     var failedImmediateTitle: String?
     var immediateTitles: [String] = []
     var scheduledRequests: [UNNotificationRequest] = []
+    var onImmediate: (() -> Void)?
 
     func pendingRequests() async -> [UNNotificationRequest] { [] }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
@@ -26,6 +27,7 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
             throw URLError(.cannotConnectToHost)
         }
         immediateTitles.append(request.content.title)
+        onImmediate?()
     }
 }
 
@@ -87,6 +89,45 @@ final class DesktopUsageNotifierTests: XCTestCase {
         XCTAssertTrue(center.scheduledRequests.allSatisfy {
             $0.content.body.contains("was last recorded as")
         })
+    }
+
+    func testDeliveredReminderIsNotScheduledOrDeliveredAgainAfterRefreshOrRelaunch() async throws {
+        let now = Date.now
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, codexAccountID: nil)
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(
+                    usedPercent: 17, resetsAt: now.addingTimeInterval(60 * 60 + 1)
+                ),
+                weekly: CodexUsageWindow(
+                    usedPercent: 51, resetsAt: now.addingTimeInterval(4 * 24 * 60 * 60)
+                )
+            ),
+            fetchedAt: now
+        )
+        let center = RecordingDesktopNotificationCenter()
+        let defaults = try makeDefaults()
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        notifier.setDeadlineUsageRefreshHandler { _ in snapshot }
+        let firstReminder = expectation(description: "First five-hour reminder delivered")
+        center.onImmediate = { firstReminder.fulfill() }
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+        await fulfillment(of: [firstReminder], timeout: 3)
+        center.onImmediate = nil
+        for _ in 0..<20 {
+            await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+        }
+        let reopened = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
+        reopened.setDeadlineUsageRefreshHandler { _ in snapshot }
+        await reopened.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+
+        XCTAssertEqual(center.immediateTitles, ["Codex 5-hour usage resets in one hour"])
+        XCTAssertEqual(
+            center.scheduledRequests.filter { $0.identifier.contains("-5-hour-1h") }.count,
+            1
+        )
     }
 
     func testOverlappingUpdatesDeliverImmediateAlertsOnce() async throws {

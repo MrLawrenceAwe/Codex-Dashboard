@@ -124,7 +124,7 @@ enum UsageNotificationPlanner {
         return String(notification.identifier[..<separator])
     }
 
-    private static func deadlinesDifferMeaningfully(_ lhs: Date, _ rhs: Date) -> Bool {
+    static func deadlinesDifferMeaningfully(_ lhs: Date, _ rhs: Date) -> Bool {
         abs(lhs.timeIntervalSince(rhs)) > resetTimeCorrectionTolerance
     }
 

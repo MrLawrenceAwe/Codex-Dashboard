@@ -131,7 +131,9 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         {
             requestsByIdentifier[notification.identifier] = notification
         }
-        let requests = requestsByIdentifier.values.sorted { $0.identifier < $1.identifier }
+        let requests = requestsByIdentifier.values
+            .filter { !wasDelivered($0) }
+            .sorted { $0.identifier < $1.identifier }
         let pendingRequests = await notificationCenter.pendingRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
             request.identifier.hasPrefix(Self.legacyIdentifierPrefix) ? request.identifier : nil
@@ -232,10 +234,12 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
 
     private func deliverFresh(_ notification: ScheduledUsageNotification) async {
         guard liveNotificationsByIdentifier[notification.identifier] == notification,
+              !wasDelivered(notification),
               let deadlineUsageRefresh,
               let snapshot = await deadlineUsageRefresh(notification.accountID),
               !Task.isCancelled,
-              liveNotificationsByIdentifier[notification.identifier] == notification
+              liveNotificationsByIdentifier[notification.identifier] == notification,
+              !wasDelivered(notification)
         else { return }
         guard let refreshed = UsageNotificationPlanner.refreshedContent(
             for: notification, using: snapshot, now: .now
@@ -256,9 +260,19 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         } catch {
             return
         }
+        history.recordDeadlineDelivery(notification)
         notificationCenter.removePendingRequests(withIdentifiers: [notification.identifier])
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [notification.identifier])
         cancelLiveTask(notification.identifier)
+    }
+
+    private func wasDelivered(_ notification: ScheduledUsageNotification) -> Bool {
+        guard let deliveredDeadline = history.deliveredDeadline(for: notification.identifier) else {
+            return false
+        }
+        return !UsageNotificationPlanner.deadlinesDifferMeaningfully(
+            deliveredDeadline, notification.deadlineDate
+        )
     }
 
     private func cancelLiveTask(_ identifier: String) {
