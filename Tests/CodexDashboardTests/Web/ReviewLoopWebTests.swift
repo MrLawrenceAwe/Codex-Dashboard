@@ -4,6 +4,35 @@ import XCTest
 
 @MainActor
 final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
+    func testSidebarSpinnerTracksActiveLoopAndNavigationRemount() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let states = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'loop-1',project,phase:'waiting',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Waiting'};
+          const snapshot = {projects:[project],loop,error:null};
+          const spinner = () => document.querySelector('[data-review-navigation-running]');
+          const states = [spinner().hidden];
+          api.applyReviewLoop(snapshot);
+          states.push(spinner().hidden, spinner().getAttribute('aria-label'));
+          loop.phase = 'running'; api.applyReviewLoop(snapshot);
+          states.push(spinner().hidden);
+          document.getElementById('codex-dashboard-review-navigation').remove();
+          api.ensureMounted();
+          states.push(spinner().hidden);
+          loop.phase = 'paused'; api.applyReviewLoop(snapshot);
+          states.push(spinner().hidden);
+          loop.phase = 'completed'; api.applyReviewLoop(snapshot);
+          states.push(spinner().hidden);
+          api.applyReviewLoop({...snapshot,loop:null});
+          states.push(spinner().hidden);
+          return states;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(states, [true, false, "Review loop running", false, false, true, true, true])
+    }
+
     func testPanelQueuesOnceAndAcknowledgesWithoutTouchingComposer() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

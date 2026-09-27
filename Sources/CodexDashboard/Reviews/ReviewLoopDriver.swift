@@ -96,15 +96,9 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     }
 
     func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String {
-        let schema: [String: Any]
-        switch kind {
-        case .review(let limit): schema = Self.reviewSchema(upTo: limit)
-        case .fix: schema = Self.fixSchema
-        }
         var params: [String: Any] = [
             "threadId": threadID,
-            "input": [["type": "text", "text": prompt, "text_elements": []]],
-            "outputSchema": schema,
+            "input": [["type": "text", "text": prompt + "\n\n" + ReviewLoopReport.instructions(for: kind), "text_elements": []]],
         ]
         if let selection {
             params["model"] = selection.model
@@ -201,31 +195,4 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["--no-optional-locks", "-C", path] + arguments, timeout: 5)
     }
 
-    static func reviewSchema(upTo limit: ReviewFinding.Priority) -> [String: Any] {
-        ["type": "object", "additionalProperties": false,
-         "required": ["outcome", "findings", "summary"],
-         "properties": [
-            "outcome": ["type": "string", "enum": ["reviewed", "blocked"]],
-            "summary": ["type": "string"],
-            "findings": ["type": "array", "items": [
-                "type": "object", "additionalProperties": false,
-                "required": ["priority", "title", "body"],
-                "properties": [
-                    "priority": ["type": "string", "enum": limit.included],
-                    "title": ["type": "string"], "body": ["type": "string"],
-                ],
-            ]],
-         ]]
-    }
-
-    static var fixSchema: [String: Any] {
-        ["type": "object", "additionalProperties": false,
-         "required": ["outcome", "findings", "commit", "summary"],
-         "properties": [
-            "outcome": ["type": "string", "enum": ["fixed", "blocked"]],
-            "findings": ["type": "integer", "minimum": 0, "description": "Number of review findings addressed and committed"],
-            "commit": ["type": "string", "description": "Full Git commit ID from git rev-parse HEAD after committing the fixes; empty when blocked"],
-            "summary": ["type": "string"],
-         ]]
-    }
 }

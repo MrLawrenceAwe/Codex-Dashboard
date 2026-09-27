@@ -144,7 +144,7 @@ final class ReviewLoopCoordinator {
         if round.review == nil {
             if reviewTurn.status == "inProgress" { return }
             try requireCompleted(reviewTurn)
-            let report: ReviewReport = try decodeReport(reviewTurn)
+            let report = try ReviewLoopReport.review(reviewTurn.finalMessage)
             guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
             let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -191,7 +191,7 @@ final class ReviewLoopCoordinator {
         }
         if fixTurn.status == "inProgress" { return }
         try requireCompleted(fixTurn)
-        let result: ReviewRoundResult = try decodeReport(fixTurn)
+        let result = try ReviewLoopReport.fix(fixTurn.finalMessage)
         guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
         let reportedCommit = try await driver.resolveCommit(result.commit, at: updated.project.path)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -241,14 +241,6 @@ final class ReviewLoopCoordinator {
         guard turn.status == "completed" else {
             throw ReviewLoopError("The task was interrupted, failed, or did not start. Open its chat to resolve the issue.")
         }
-    }
-
-    private func decodeReport<T: Decodable>(_ turn: ReviewTurnState) throws -> T {
-        guard let text = turn.finalMessage,
-              let result = try? JSONDecoder().decode(T.self, from: Data(text.utf8)) else {
-            throw ReviewLoopError("The task did not return a valid structured report. Open its chat to inspect the result.")
-        }
-        return result
     }
 
     private func persist(_ updated: ReviewLoop) throws {

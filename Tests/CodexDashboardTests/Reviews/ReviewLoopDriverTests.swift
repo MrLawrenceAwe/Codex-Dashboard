@@ -3,6 +3,28 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
+    func testTurnsRequestMarkdownWithoutForcingJSON() async throws {
+        let connection = ReviewReportDevTools()
+        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+        for kind: ReviewTurnKind in [.review(.p1), .fix] {
+            let id = try await driver.startTurn(threadID: "thread", prompt: "Do the work", kind: kind,
+                                                selection: ReviewModelSelection(model: "chosen", effort: "high"))
+            XCTAssertEqual(id, "turn")
+            let expression = await connection.expression
+            let prefix = "window.__codexDashboard.reviewRequest("
+            let data = Data(expression.dropFirst(prefix.count).dropLast().utf8)
+            let request = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let params = try XCTUnwrap(request["params"] as? [String: Any])
+            XCTAssertNil(params["outputSchema"])
+            XCTAssertEqual(params["model"] as? String, "chosen")
+            XCTAssertEqual(params["effort"] as? String, "high")
+            let input = try XCTUnwrap(params["input"] as? [[String: Any]])
+            let text = try XCTUnwrap(input.first?["text"] as? String)
+            XCTAssertTrue(text.hasPrefix("Do the work\n\n"))
+            XCTAssertTrue(text.contains(ReviewLoopReport.instructions(for: kind)))
+        }
+    }
+
     func testReadsTwoTurnsWithOptionalMessagePhaseAndRejectsExtraTurns() throws {
         let turn: [String: Any] = ["id": "review", "status": "completed", "items": [
             ["type": "agentMessage", "phase": "commentary", "text": "Working"],
@@ -63,13 +85,22 @@ final class ReviewLoopDriverTests: XCTestCase {
         }
     }
 
-    func testFixPromptDoesNotAskForTestingAndSchemaHasNoTestGate() throws {
+    func testFixPromptDoesNotAskForTesting() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 5)
         let prompt = ReviewLoopCoordinator.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
         XCTAssertEqual(prompt, "Address all and commit")
-        let properties = try XCTUnwrap(ReviewLoopDriver.fixSchema["properties"] as? [String: Any])
-        XCTAssertNil(properties["checksPassed"])
+        XCTAssertFalse(ReviewLoopReport.instructions(for: .fix).lowercased().contains("test"))
+    }
+}
+
+private actor ReviewReportDevTools: DevToolsServing {
+    var expression = ""
+    func mainRendererTargets() async -> [DevToolsTarget] { [] }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
+        self.expression = expression
+        return "{\"result\":{\"turn\":{\"id\":\"turn\"}}}"
     }
 }
