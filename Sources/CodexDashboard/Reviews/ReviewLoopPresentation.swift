@@ -29,7 +29,7 @@ enum ReviewLoopPresentation {
             if let round, unfinished, !round.fixRequested {
                 upcoming = ReviewPromptPreview(title: "Fix & commit · round \(round.number)",
                     text: fixPrompt(for: loop, round: round),
-                    note: round.review == nil ? "Only if qualifying issues are found. Wording follows the finding count." : "After the checkout passes verification.")
+                    note: round.review == nil ? "Only if qualifying findings are found. Wording follows the finding count." : "After the checkout passes verification.")
             } else if loop.rounds.count < loop.maxRounds {
                 let note = loop.phase == .paused ? "After resume and checkout verification."
                     : loop.pauseRequested ? "After this round pauses and you resume."
@@ -46,14 +46,34 @@ enum ReviewLoopPresentation {
 
     static func reviewPrompt(for loop: ReviewLoop) -> String {
         let context = loop.instructions.isEmpty ? "" : " \(loop.instructions)"
-        return "Review project for bugs and issues\(context)."
+        switch loop.focus {
+        case .bugs:
+            return "Review project for bugs and issues\(context)."
+        case .organisation:
+            return "Do a code minimisation and organisation review\(context)."
+        case .naming:
+            return "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
+        case .performance:
+            return "Review project for performance and responsiveness\(context)."
+        }
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
+        let findings: String
         switch round.review?.qualifyingFindings(upTo: loop.priorityLimit).count ?? 0 {
-        case 1: return "Fix the finding; commit once"
-        case 2: return "Fix both findings; commit once"
-        default: return "Fix all findings; commit once"
+        case 1: findings = "the finding"
+        case 2: findings = "both findings"
+        default: findings = "all findings"
+        }
+        switch loop.focus {
+        case .bugs:
+            return "Fix \(findings); commit once"
+        case .organisation:
+            return "Address \(findings) by minimising and organising the code while preserving behaviour; commit once"
+        case .naming:
+            return "Address \(findings) by minimising and organising the code and improving unclear, overly long, abbreviated, or misleading names. Update affected references consistently and preserve behaviour; commit once"
+        case .performance:
+            return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
         }
     }
 }

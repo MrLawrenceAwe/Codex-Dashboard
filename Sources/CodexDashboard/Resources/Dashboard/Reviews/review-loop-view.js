@@ -1,6 +1,7 @@
 const reviewLoopView = (() => {
   let projectsSignature = '';
   let modelsSignature = '';
+  const focusLabels = { bugs: 'Bugs and issues', organisation: 'Code minimisation and organisation', naming: 'Code minimisation, organisation and naming', performance: 'Performance and responsiveness' };
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
@@ -20,11 +21,15 @@ const reviewLoopView = (() => {
       <section class="review-board" data-review-board aria-label="Active review loops"></section>
       <section class="review-history" data-review-history aria-label="Previous review loops" hidden>
         <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
-        <div data-review-history-card></div>
+        <details class="review-history-details" data-review-history-details>
+          <summary>Review details</summary>
+          <div data-review-history-card></div>
+        </details>
       </section>
       <p class="review-empty" data-review-empty>No loops yet.</p>
       <form data-review-form>
         <div class="review-setup-heading"><h2>New loop</h2></div>
+        <label>Review type<select data-review-focus aria-label="Review type">${Object.entries(focusLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
         <fieldset class="review-scope"><legend class="review-visually-hidden">Review scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
@@ -168,7 +173,7 @@ const reviewLoopView = (() => {
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    root.querySelector('[data-review-context]').innerHTML = `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus])}</span><span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -191,7 +196,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-rounds]').innerHTML = (loop?.rounds || []).map(round => `<li>
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(({ clean: 'No qualifying findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying issues` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      <span>${escape(({ clean: 'No qualifying findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
       ${round.result?.summary ? `<details class="review-round-details" data-round="${round.number}" ${expandedRounds.has(String(round.number)) ? 'open' : ''}><summary>View summary</summary><p>${escape(round.result.summary)}</p></details>` : ''}
     </div></li>`).join('');
   }

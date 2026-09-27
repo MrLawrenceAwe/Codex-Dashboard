@@ -509,6 +509,53 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.speeds, [.fast, .fast, .fast, .fast, .fast])
     }
 
+    func testPerformanceReviewIncludesOptionalProjectContext() {
+        var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
+                              instructions: "(this is a project for personal use)", maxRounds: 3)
+        loop.focus = .performance
+        XCTAssertEqual(ReviewLoopPresentation.reviewPrompt(for: loop),
+                       "Review project for performance and responsiveness (this is a project for personal use).")
+    }
+
+    func testReviewFocusPersistsAndDrivesBothTurnsAndNextRound() async throws {
+        for focus in ReviewFocus.allCases {
+            let store = ReviewTestStore()
+            let coordinator = ReviewLoopCoordinator(store: store)
+            var start = ReviewLoopAction(id: "focus", kind: "start", projectID: project.id,
+                                         instructions: "", maxRounds: 3, loopID: nil)
+            start.focus = focus
+            try coordinator.apply(start, projects: [project])
+            let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
+            XCTAssertEqual(saved.focus, focus)
+            let expectedReview: String
+            let expectedFix: String
+            switch focus {
+            case .bugs:
+                expectedReview = "Review project for bugs and issues."
+                expectedFix = "Fix the finding; commit once"
+            case .organisation:
+                expectedReview = "Do a code minimisation and organisation review."
+                expectedFix = "Address the finding by minimising and organising the code while preserving behaviour; commit once"
+            case .naming:
+                expectedReview = "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
+                expectedFix = "Address the finding by minimising and organising the code and improving unclear, overly long, abbreviated, or misleading names. Update affected references consistently and preserve behaviour; commit once"
+            case .performance:
+                expectedReview = "Review project for performance and responsiveness."
+                expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
+            }
+            let driver = ReviewTestDriver()
+            await coordinator.advance(using: driver, threads: [])
+            driver.review(priorities: [.p1])
+            await coordinator.advance(using: driver, threads: [])
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix])
+            driver.finish(findings: 1, commit: "fixed")
+            await coordinator.advance(using: driver, threads: [])
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix, expectedReview])
+        }
+    }
+
     func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("loop.json")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
@@ -518,8 +565,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(try store.load(), coordinator.loops)
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
+        olderLoop.removeValue(forKey: "focus")
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
         XCTAssertEqual(try store.load().first?.speed, .standard)
+        XCTAssertEqual(try store.load().first?.focus, .bugs)
         try Data("broken".utf8).write(to: url)
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertNotNil(recovered.error)

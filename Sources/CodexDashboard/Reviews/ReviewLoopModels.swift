@@ -36,6 +36,10 @@ struct ReviewModelSelection: Codable, Equatable, Sendable {
     }
 }
 
+enum ReviewFocus: String, Codable, CaseIterable, Sendable {
+    case bugs, organisation, naming, performance
+}
+
 enum ReviewSpeed: String, Codable, Sendable {
     case standard, fast
     var serviceTier: String { self == .fast ? "priority" : "default" }
@@ -106,6 +110,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let instructions: String
     let maxRounds: Int
     var selection: ReviewModelSelection? = nil
+    var focus: ReviewFocus = .bugs
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority = .p2
     var phase: ReviewLoopPhase = .waiting
@@ -119,7 +124,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 
 extension ReviewLoop {
     private enum CodingKeys: String, CodingKey {
-        case id, startActionID, project, instructions, maxRounds, selection, speed,
+        case id, startActionID, project, instructions, maxRounds, selection, focus, speed,
              priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
     }
 
@@ -131,6 +136,7 @@ extension ReviewLoop {
         instructions = try values.decode(String.self, forKey: .instructions)
         maxRounds = try values.decode(Int.self, forKey: .maxRounds)
         selection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
+        focus = try values.decodeIfPresent(ReviewFocus.self, forKey: .focus) ?? .bugs
         speed = try values.decodeIfPresent(ReviewSpeed.self, forKey: .speed) ?? .standard
         priorityLimit = try values.decode(ReviewFinding.Priority.self, forKey: .priorityLimit)
         phase = try values.decode(ReviewLoopPhase.self, forKey: .phase)
@@ -151,6 +157,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let maxRounds: Int?
     let loopID: UUID?
     var selection: ReviewModelSelection? = nil
+    var focus: ReviewFocus? = nil
     var speed: ReviewSpeed? = nil
     var priorityLimit: ReviewFinding.Priority? = nil
 }

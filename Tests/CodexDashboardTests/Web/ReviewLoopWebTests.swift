@@ -110,6 +110,27 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["A,B", "C", 4, "D", true, true, "B", "D", 5, "A", "A", "", true, "B", 0, false])
     }
 
+    func testPreviousReviewDetailsStartCollapsedAndStayOpenDuringRefresh() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const snapshot = {projects:[project],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',maxRounds:5,
+            rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
+          api.applyReviewLoop(snapshot);
+          const history = document.querySelector('[data-review-history]');
+          const details = document.querySelector('[data-review-history-details]');
+          const card = document.querySelector('[data-review-history-card]');
+          const initial = [history.hidden,details.open,card.getBoundingClientRect().height];
+          details.querySelector('summary').click();
+          api.applyReviewLoop(snapshot);
+          return [...initial,details.open,card.getBoundingClientRect().height > 0];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [false, false, 0, true, true])
+    }
+
     func testPriorityOptionsDescribeIncludedFindings() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: DashboardWebTestHarness.basicTodoHTML,
@@ -153,6 +174,30 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(states, [true, false, "Review loop running", false, false, true, true, true])
+    }
+
+    func testReviewTypesQueueSelectedFocusAndKeepProjectTypeOptional() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const snapshot = {projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null};
+          api.applyReviewLoop(snapshot);
+          const select = document.querySelector('[data-review-focus]');
+          const results = [];
+          for (const option of select.options) {
+            select.value = option.value;
+            select.dispatchEvent(new Event('change'));
+            const hidden = document.querySelector('.review-project-type').hidden;
+            document.querySelector('[data-review-start]').click();
+            const action = JSON.parse(api.pendingReviewAction());
+            results.push(action.focus, hidden);
+            api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
+          }
+          return results;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["bugs", false, "organisation", false, "naming", false, "performance", false])
     }
 
     func testPanelQueuesOnceAndAcknowledgesWithoutTouchingComposer() async throws {
