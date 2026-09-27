@@ -119,8 +119,8 @@ final class RecordingCodexForegrounder: CodexForegrounding {
     }
 }
 
-struct StubTypingActivityDetector: TypingActivityDetecting {
-    var isUserTyping = false
+struct StubKeyboardActivityDetector: KeyboardActivityDetecting {
+    var hasRecentKeyboardActivity = false
 }
 
 struct StubCompatibilityChecker: LocalCompatibilityChecking {
@@ -407,7 +407,7 @@ extension XCTestCase {
         observeFileChanges: Bool = true,
         installedCodexVersion: @escaping () -> String? = { nil },
         codexForegrounder: any CodexForegrounding = RecordingCodexForegrounder(),
-        typingActivityDetector: any TypingActivityDetecting = StubTypingActivityDetector(),
+        keyboardActivityDetector: any KeyboardActivityDetecting = StubKeyboardActivityDetector(),
         promptLibraryStore: PromptLibraryFileStore = PromptLibraryFileStore(),
         accountManager: CodexAccountManager? = nil,
         accountUsageProvider: any AccountUsageProviding = StubAccountUsageProvider(),
@@ -433,7 +433,7 @@ extension XCTestCase {
             observeFileChanges: observeFileChanges,
             installedCodexVersion: installedCodexVersion,
             codexForegrounder: codexForegrounder,
-            typingActivityDetector: typingActivityDetector,
+            keyboardActivityDetector: keyboardActivityDetector,
             promptLibraryStore: promptLibraryStore,
             accountManager: isolatedAccountManager,
             accountUsageProvider: accountUsageProvider,

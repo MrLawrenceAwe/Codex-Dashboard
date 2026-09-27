@@ -89,7 +89,7 @@ extension AppCoordinatorTests {
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
-            typingActivityDetector: StubTypingActivityDetector(isUserTyping: true),
+            keyboardActivityDetector: StubKeyboardActivityDetector(hasRecentKeyboardActivity: true),
             runtimeFactory: { _ in runtime }
         )
 

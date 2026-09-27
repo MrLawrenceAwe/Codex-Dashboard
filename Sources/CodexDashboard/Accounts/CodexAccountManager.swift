@@ -33,7 +33,7 @@ final class CodexAccountManager: @unchecked Sendable {
             activeCredentialFile: activeCredentialFile,
             fileManager: fileManager
         )
-        self.usageCacheStore = usageCacheStore ?? UsageCache(
+        self.usageCacheStore = usageCacheStore ?? AccountUsageFileCache(
             cacheURL: metadataURL.deletingLastPathComponent()
                 .appendingPathComponent("account-usage.json"),
             fileManager: fileManager

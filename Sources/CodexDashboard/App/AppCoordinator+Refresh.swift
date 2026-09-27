@@ -124,7 +124,7 @@ extension AppCoordinator {
             let completedThread = snapshot.catalog.threads.first { $0.id == completedThreadID }
             if foregroundOnTaskCompletion,
                completedThread?.originatesFromChromeExtension != true,
-               !typingActivityDetector.isUserTyping {
+               !keyboardActivityDetector.hasRecentKeyboardActivity {
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)
             }

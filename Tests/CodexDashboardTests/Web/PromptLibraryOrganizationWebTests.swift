@@ -10,7 +10,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               const createPrompt = (name, content) => {
                 document.querySelector('[data-prompt-new]').click();
                 document.querySelector('[name="name"]').value = name;
@@ -57,7 +57,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new-section]').click();
               document.querySelector('[name="sectionName"]').value = 'Research';
               document.querySelector('[data-prompt-section-form] button[type="submit"]').click();
@@ -115,7 +115,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               for (let index = 1; index <= 14; index += 1) {
                 document.querySelector('[data-prompt-new-section]').click();
                 document.querySelector('[name="sectionName"]').value = `Section ${index}`;
@@ -148,7 +148,7 @@ extension PromptLibraryWebTests {
         let exportedLibrary = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'Temporary';
               document.querySelector('[name="section"]').value = 'Keep me';
@@ -170,7 +170,7 @@ extension PromptLibraryWebTests {
             """
             (() => {
               window.__codexDashboard.applyPromptLibrary(\(library));
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               return Boolean(document.querySelector('[data-prompt-section="Keep me"]'));
             })()
             """
@@ -184,7 +184,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new]').click();
               document.querySelector('[name="name"]').value = 'General prompt';
               document.querySelector('[name="section"]').value = 'General';
@@ -220,7 +220,7 @@ extension PromptLibraryWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               document.querySelector('[data-prompt-new-section]').click();
               document.querySelector('[name="sectionName"]').value = 'Ops';
               document.querySelector('[data-prompt-section-form] button[type="submit"]').click();

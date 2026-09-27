@@ -64,7 +64,7 @@ extension DashboardRendererTests {
         let composerControlsExpression = try XCTUnwrap(
             expressions.first { $0.contains("Boolean(codexUIContracts.composerAddButton())") }
         )
-        XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-launcher"))
+        XCTAssertFalse(composerControlsExpression.contains("data-codex-prompt-library-button"))
         XCTAssertTrue(
             expressions.contains { $0.contains("codexUIContracts.probeModelPickerControls()") }
         )

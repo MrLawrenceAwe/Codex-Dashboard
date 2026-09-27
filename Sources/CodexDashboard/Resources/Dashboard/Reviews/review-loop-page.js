@@ -43,7 +43,7 @@ const reviewLoopPage = (() => {
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopView.renderReviewSettings());
-    for (const kind of ['review', 'fix']) details.querySelector(`[data-${kind}-model]`).addEventListener('change', () => reviewLoopView.renderEfforts(snapshot, pendingAction, kind));
+    for (const kind of ['review', 'fix']) details.querySelector(`[data-${kind}-model]`).addEventListener('change', () => reviewLoopView.renderReasoningOptions(snapshot, pendingAction, kind));
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
       const control = event.target.closest('[data-review-action]');

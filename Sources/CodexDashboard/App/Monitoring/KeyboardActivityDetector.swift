@@ -1,18 +1,18 @@
 import CoreGraphics
 import Foundation
 
-protocol TypingActivityDetecting {
-    var isUserTyping: Bool { get }
+protocol KeyboardActivityDetecting {
+    var hasRecentKeyboardActivity: Bool { get }
 }
 
-struct SystemTypingActivityDetector: TypingActivityDetecting {
+struct SystemKeyboardActivityDetector: KeyboardActivityDetecting {
     private let quietPeriod: TimeInterval
 
     init(quietPeriod: TimeInterval = 1.5) {
         self.quietPeriod = quietPeriod
     }
 
-    var isUserTyping: Bool {
+    var hasRecentKeyboardActivity: Bool {
         CGEventSource.secondsSinceLastEventType(
             .combinedSessionState,
             eventType: .keyDown

@@ -45,18 +45,18 @@ extension PromptLibraryWebTests {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              document.querySelector('[data-codex-prompt-launcher]').remove();
+              document.querySelector('[data-codex-prompt-library-button]').remove();
             })()
             """
         )
 
         try await DashboardWebTestHarness.waitForJavaScript(
-            "Boolean(document.querySelector('[data-codex-prompt-launcher]'))",
+            "Boolean(document.querySelector('[data-codex-prompt-library-button]'))",
             in: webView
         )
     }
 
-    func testPromptLauncherMountsWhenNewChatComposerAppearsAfterNavigation() async throws {
+    func testPromptLibraryButtonMountsWhenNewChatComposerAppearsAfterNavigation() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript(
             """
@@ -80,7 +80,7 @@ extension PromptLibraryWebTests {
             """
             (() => {
               const addButton = document.querySelector('button[aria-label="Add"]');
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               return Boolean(addButton && addButton.nextElementSibling === launcher);
             })()
             """,
@@ -93,7 +93,7 @@ extension PromptLibraryWebTests {
         let textareaResult = try await webView.evaluateJavaScript(
             """
             (() => {
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               const composer = document.querySelector('textarea[placeholder="Do anything"]');
               launcher.click();
               document.querySelector('[data-prompt-new]').click();
@@ -119,7 +119,7 @@ extension PromptLibraryWebTests {
         let richTextResult = try await richTextWebView.evaluateJavaScript(
             """
             (() => {
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               const contentEditable = document.querySelector('[contenteditable="true"]');
               contentEditable.classList.add('ProseMirror');
               contentEditable.textContent = 'Existing content';
@@ -222,7 +222,7 @@ extension PromptLibraryWebTests {
               const composerShell = document.querySelector('.composer-shell');
               const activeThreadProps = { conversationId: 'project-a-thread' };
               composerShell.__reactFiber$test = { memoizedProps: activeThreadProps, return: null };
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               const createPrompt = (name, scope) => {
                 document.querySelector('[data-prompt-new]').click();
                 document.querySelector('[name="name"]').value = name;
@@ -281,7 +281,7 @@ extension PromptLibraryWebTests {
             (() => {
               document.documentElement.style.setProperty('--app-color-background-button-primary', '#000000');
               document.documentElement.style.setProperty('--app-color-text-button-primary', '#000000');
-              document.querySelector('[data-codex-prompt-launcher]').click();
+              document.querySelector('[data-codex-prompt-library-button]').click();
               const newPrompt = document.querySelector('[data-prompt-new]');
               const styles = getComputedStyle(newPrompt);
               return {
@@ -301,20 +301,20 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(values["textFill"] as? String, "rgb(33, 33, 33)")
     }
 
-    func testPromptLauncherIsAdjacentToAddAndRemovedOnDestroy() async throws {
+    func testPromptLibraryButtonIsAdjacentToAddAndRemovedOnDestroy() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
               const addButton = document.querySelector('button[aria-label="Add"]');
-              const launcher = document.querySelector('[data-codex-prompt-launcher]');
+              const launcher = document.querySelector('[data-codex-prompt-library-button]');
               const adjacentToAdd = addButton.nextElementSibling === launcher;
               const accessibleName = launcher.getAttribute('aria-label');
               window.__codexDashboard.destroy();
               return {
                 adjacentToAdd,
                 accessibleName,
-                removedOnDestroy: !document.querySelector('[data-codex-prompt-launcher]'),
+                removedOnDestroy: !document.querySelector('[data-codex-prompt-library-button]'),
               };
             })()
             """

@@ -12,7 +12,7 @@ protocol UsageCaching: Sendable {
     func save(_ snapshots: [UUID: CodexAccountUsageSnapshot]) throws
 }
 
-final class UsageCache: UsageCaching, @unchecked Sendable {
+final class AccountUsageFileCache: UsageCaching, @unchecked Sendable {
     private let cacheURL: URL
     private let fileManager: FileManager
     private let lock = NSLock()

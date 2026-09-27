@@ -14,7 +14,7 @@
     "Composer/composer-model-picker",
     "Composer/composer-adapter",
     "Prompts/prompt-reordering",
-    "Prompts/prompt-launcher",
+    "Prompts/prompt-library-button",
     "Prompts/prompt-library-dialog",
     "Prompts/prompt-library-view",
     "Prompts/prompt-library-controller",

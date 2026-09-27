@@ -1,4 +1,4 @@
-const promptLauncher = (() => {
+const promptLibraryButton = (() => {
   let syncQueued = false;
   let syncTimer;
   let onActivate;
@@ -6,8 +6,8 @@ const promptLauncher = (() => {
   function createButton(addButton) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.dataset.codexPromptLauncher = '';
-    button.className = 'dashboard-prompt-launcher';
+    button.dataset.codexPromptLibraryButton = '';
+    button.className = 'dashboard-prompt-library-button';
     button.setAttribute('aria-label', 'Prompts');
     button.title = 'Saved prompts';
     button.innerHTML = `
@@ -27,7 +27,7 @@ const promptLauncher = (() => {
   function synchronize() {
     syncQueued = false;
     const addButton = codexUIContracts.composerAddButton(dashboardElements.elementIDs.promptDialog);
-    const currentButton = document.querySelector('[data-codex-prompt-launcher]');
+    const currentButton = document.querySelector('[data-codex-prompt-library-button]');
     if (!addButton) {
       currentButton?.remove();
       return;
@@ -56,7 +56,7 @@ const promptLauncher = (() => {
     syncQueued = false;
     syncTimer = undefined;
     onActivate = undefined;
-    document.querySelectorAll('[data-codex-prompt-launcher]').forEach((button) => button.remove());
+    document.querySelectorAll('[data-codex-prompt-library-button]').forEach((button) => button.remove());
   }
 
   return { mount, scheduleSync, unmount };
