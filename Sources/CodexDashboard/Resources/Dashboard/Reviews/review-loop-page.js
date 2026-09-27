@@ -34,19 +34,19 @@ const reviewLoopPage = (() => {
     details.dataset.reviewLoop = '';
     details.innerHTML = `
       <header><h1>Review loop</h1><span data-review-badge></span></header>
-      <p>Each review uses a fresh chat. If it finds issues at your selected priority, a follow-up asks Codex to address them and commit. A review with no qualifying issues stops the loop.</p>
+      <p class="review-description">Review, fix, commit. Repeat until clear.</p>
       <form data-review-form>
-        <label>Project<select data-review-project required aria-label="Review project"></select></label>
-        <label>Priority limit<select data-review-priority aria-label="Review priority limit">
-          <option value="P0">P0 — critical</option><option value="P1">P1+ — high</option>
-          <option value="P2" selected>P2+ — normal</option><option value="P3">P3+ — all</option>
+        <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
+        <label>Priority<select data-review-priority aria-label="Review priority limit">
+          <option value="P0">P0</option><option value="P1">P1+</option>
+          <option value="P2" selected>P2+</option><option value="P3">P3+</option>
         </select></label>
-        <label>Maximum rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
-        <label>Model<select data-review-model aria-label="Review model"><option value="">Use Codex defaults</option></select></label>
-        <label>Reasoning effort<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
-        <label class="review-instructions">Review instructions (optional)<textarea data-review-instructions rows="3" maxlength="20000" placeholder="Areas or behavior to focus on"></textarea></label>
-        <p class="review-instructions">Runs in the existing checkout using your selected model. Start from a clean branch; keep Codex and Dashboard running. Only local projects with one folder are supported.</p>
-        <button type="submit" data-review-start>Start review loop</button>
+        <label>Max rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
+        <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
+        <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <div class="review-form-footer">
+          <button type="submit" data-review-start>Start loop</button>
+        </div>
       </form>
       <div data-review-status role="status" aria-live="polite"></div>
       <div data-review-error role="alert" hidden></div>
@@ -60,7 +60,6 @@ const reviewLoopPage = (() => {
       const model = details.querySelector('[data-review-model]').value;
       const effort = details.querySelector('[data-review-effort]').value;
       queue({ selection: model ? { model, effort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
-        instructions: details.querySelector('[data-review-instructions]').value,
         priorityLimit: details.querySelector('[data-review-priority]').value,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
@@ -107,7 +106,7 @@ const reviewLoopPage = (() => {
     const nextModelsSignature = JSON.stringify(models);
     if (nextModelsSignature !== modelsSignature) {
       const selected = modelSelect.value;
-      modelSelect.innerHTML = '<option value="">Use Codex defaults</option>' + models.map(model => `<option value="${escape(model.model)}">${escape(model.displayName)}</option>`).join('');
+      modelSelect.innerHTML = '<option value="">Codex default</option>' + models.map(model => `<option value="${escape(model.model)}">${escape(model.displayName)}</option>`).join('');
       if (selected) {
         if (!models.some(model => model.model === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
         modelSelect.value = selected;
@@ -119,14 +118,15 @@ const reviewLoopPage = (() => {
     const signature = JSON.stringify(projects);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)} — ${escape(project.path)}</option>`).join('') : '<option value="">No local projects available</option>';
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}</option>`).join('') : '<option value="">No local projects available</option>';
       if (projects.some(project => project.id === selected)) select.value = selected;
       projectsSignature = signature;
     }
     root.querySelector('[data-review-form]').hidden = !terminal(loop);
-    root.querySelectorAll('[data-review-form] input, [data-review-form] textarea, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
+    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
-    root.querySelector('[data-review-badge]').textContent = loop ? `· ${loop.phase}` : '';
+    root.querySelector('[data-review-badge]').textContent = loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
+    root.querySelector('[data-review-badge]').hidden = !loop;
     root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…' : loop ? `${loop.project.name} · ${loop.selection ? `${loop.selection.model}${loop.selection.effort ? ` / ${loop.selection.effort}` : ''} · ` : ''}${loop.priorityLimit}${loop.priorityLimit === 'P0' ? '' : '+'}: ${loop.message}` : '';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
@@ -134,13 +134,14 @@ const reviewLoopPage = (() => {
     const controls = root.querySelector('[data-review-controls]');
     controls.innerHTML = terminal(loop) ? '' : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
-      : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.phase === 'running' ? 'Pause after this round' : 'Pause'}</button>`}
+      : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
     root.querySelector('[data-review-rounds]').innerHTML = (loop?.rounds || []).map(round => `<li>
+      <div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(round.result?.outcome || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying issues` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span>
-      ${round.result ? `<p>${escape(round.result.summary)}</p>` : ''}
+      <span>${escape(round.result?.outcome || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying issues` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      ${round.result?.summary ? `<details class="review-round-details"><summary>Details</summary><p>${escape(round.result.summary)}</p></details>` : ''}
     </li>`).join('');
   }
   function apply(next) {
