@@ -17,6 +17,11 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil, instructions: nil, maxRounds: nil, loopID: coordinator.loop?.id)
     }
 
+    private func stop(_ coordinator: ReviewLoopCoordinator) {
+        do { try coordinator.apply(action("stop", for: coordinator), projects: [project]) }
+        catch { XCTFail("Could not stop review loop: \(error)") }
+    }
+
     func testFixCommitThenFreshReviewThenCleanStops() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
@@ -210,6 +215,54 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1)
     }
 
+    func testStopDuringRepositoryCheckPreventsReviewLaunch() async throws {
+        let (coordinator, _, driver) = try make()
+        driver.onRepository = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertTrue(driver.createdThreads.isEmpty)
+    }
+
+    func testStopDuringThreadCreationRecordsThreadWithoutSendingPrompt() async throws {
+        let (coordinator, store, driver) = try make()
+        driver.onCreateThread = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertEqual(store.loop?.rounds.last?.threadID, "thread-1")
+        XCTAssertTrue(driver.prompts.isEmpty)
+    }
+
+    func testStopDuringPromptSubmissionRecordsTurnWithoutResumingLoop() async throws {
+        let (coordinator, store, driver) = try make()
+        driver.onStartTurn = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertEqual(store.loop?.rounds.last?.reviewTurnID, "turn-1")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 1)
+    }
+
+    func testStopDuringReviewReadDoesNotSubmitFix() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        driver.onReadThread = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertEqual(driver.prompts.count, 1)
+    }
+
+    func testStopDuringFixSubmissionKeepsStoppedPhaseAndTurnID() async throws {
+        let (coordinator, store, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        driver.onStartTurn = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertEqual(store.loop?.rounds.last?.fixTurnID, "turn-2")
+    }
+
     func testRoundLimitDoesNotReportCleanOrLaunchAnotherTask() async throws {
         let (coordinator, _, driver) = try make(limit: 1)
         await coordinator.advance(using: driver, threads: [])
@@ -334,9 +387,14 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var prompts: [String] = []
     var selections: [ReviewModelSelection?] = []
     var thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
+    var onRepository: (() -> Void)?
+    var onCreateThread: (() -> Void)?
+    var onStartTurn: (() -> Void)?
+    var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
     func repository(at path: String) async throws -> ReviewRepositoryState {
-        ReviewRepositoryState(root: "/tmp/example", branch: branch, commit: commit, clean: clean)
+        onRepository?()
+        return ReviewRepositoryState(root: "/tmp/example", branch: branch, commit: commit, clean: clean)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
     func createThread(project: ReviewProject, title: String) async throws -> String {
@@ -345,6 +403,7 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         let id = "thread-\(createdThreads.count + 1)"
         createdThreads.append(id)
         thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
+        onCreateThread?()
         return id
     }
     func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String {
@@ -352,9 +411,13 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         selections.append(selection)
         let id = "turn-\(prompts.count)"
         thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
+        onStartTurn?()
         return id
     }
-    func readThread(_ threadID: String) async throws -> ReviewThreadState { thread }
+    func readThread(_ threadID: String) async throws -> ReviewThreadState {
+        onReadThread?()
+        return thread
+    }
     func review(priorities: [ReviewFinding.Priority]) {
         let report = ReviewReport(outcome: .reviewed, findings: priorities.map {
             ReviewFinding(priority: $0, title: "Example issue", body: "Evidence and impact")
