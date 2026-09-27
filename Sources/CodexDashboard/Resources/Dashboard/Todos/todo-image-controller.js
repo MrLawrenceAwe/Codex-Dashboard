@@ -1,6 +1,7 @@
 function createTodoImageController({ isDestroyed, getItems, updateItem }) {
   const maximumBytes = 2 * 1024 * 1024;
   const readers = new Set();
+  const pendingAttachments = new Map();
   let draft;
 
   function setError(message = '') {
@@ -73,7 +74,17 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
   function attachToItem(id, file) {
     const item = getItems().find((candidate) => candidate.id === id);
     if (!item || item.completed) return;
-    read(file, (image) => updateItem(id, { image }));
+    const attachment = Symbol();
+    pendingAttachments.set(id, attachment);
+    const started = read(file, (image) => {
+      if (pendingAttachments.get(id) !== attachment) return;
+      pendingAttachments.delete(id);
+      const current = getItems().find((candidate) => candidate.id === id);
+      if (current && !current.completed) updateItem(id, { image });
+    }, () => {
+      if (pendingAttachments.get(id) === attachment) pendingAttachments.delete(id);
+    });
+    if (!started) pendingAttachments.delete(id);
   }
 
   function bind(page) {
@@ -130,6 +141,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
   }
 
   function destroy() {
+    pendingAttachments.clear();
     readers.forEach((reader) => reader.abort());
     readers.clear();
   }

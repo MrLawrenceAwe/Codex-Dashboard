@@ -5,6 +5,55 @@ import XCTest
 
 @MainActor
 final class TodoImagesWebTests: SerializedDashboardWebTestCase {
+    func testOlderImageReadCannotReplaceNewerPaste() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: DashboardWebTestHarness.basicTodoHTML,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              window.__codexDashboard.openTodos();
+              document.querySelector('[data-todo-new-title]').value = 'Image order';
+              document.querySelector('[data-todo-form]').requestSubmit();
+              await window.__waitForTodoSaves();
+              const originalReader = window.FileReader;
+              const readers = [];
+              window.FileReader = class {
+                constructor() { this.listeners = {}; readers.push(this); }
+                addEventListener(type, handler) { this.listeners[type] = handler; }
+                readAsDataURL() {}
+                abort() {}
+                finish() {
+                  this.result = 'data:image/png;base64,AA==';
+                  this.listeners.load();
+                  this.listeners.loadend();
+                }
+              };
+              try {
+                const paste = (name) => {
+                  const file = new File([new Uint8Array([1])], name, { type: 'image/png' });
+                  const event = new Event('paste', { bubbles: true, cancelable: true });
+                  Object.defineProperty(event, 'clipboardData', { value: { files: [file] } });
+                  document.querySelector('[data-todo-title]').dispatchEvent(event);
+                };
+                paste('first.png');
+                paste('second.png');
+                readers[1].finish();
+                readers[0].finish();
+                await window.__waitForTodoSaves();
+                return [readers.length, document.querySelector('.todo-image-name')?.textContent,
+                  JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].image.name];
+              } finally {
+                window.FileReader = originalReader;
+              }
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(result, [2, "second.png", "second.png"])
+    }
+
     func testNewTaskTransfersTheTodoImageToTheComposer() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """

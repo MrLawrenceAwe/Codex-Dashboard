@@ -80,7 +80,7 @@ final class ReviewLoopCoordinator {
                 try await reconcile(using: driver, threads: threads)
             }
         } catch {
-            guard !storageFailed, var updated = loop else { return }
+            guard !storageFailed, var updated = activeLoop(matching: current.id) else { return }
             updated.phase = .blocked
             updated.message = error.localizedDescription
             do { try persist(updated) } catch { self.error = error.localizedDescription }
@@ -90,6 +90,8 @@ final class ReviewLoopCoordinator {
     private func launch(using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
         guard var updated = loop else { return }
         let repo = try await driver.repository(at: updated.project.path)
+        guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
+        updated = current
         if hasOtherRunningTask(threads, root: repo.root, excluding: nil) { return }
         guard repo.clean else { throw ReviewLoopError("Commit or set aside existing changes before starting a review. The loop will not commit unrelated work.") }
         guard !repo.branch.isEmpty else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
@@ -110,11 +112,18 @@ final class ReviewLoopCoordinator {
         // Record intent before any remote side effect. A crash here must not launch twice.
         try persist(updated)
         let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)")
+        guard let current = matchingLoop(updated.id) else { return }
+        updated = current
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
+        guard updated.phase == .running else { return }
         let turnID = try await driver.startTurn(threadID: threadID, prompt: Self.reviewPrompt(for: updated, round: round), kind: .review(updated.priorityLimit), selection: updated.selection)
+        guard let current = matchingLoop(updated.id) else { return }
+        updated = current
         updated.rounds[updated.rounds.count - 1].reviewTurnID = turnID
-        updated.message = "Review \(round.number) is running in a fresh chat."
+        if updated.phase == .running {
+            updated.message = "Review \(round.number) is running in a fresh chat."
+        }
         try persist(updated)
     }
 
@@ -122,6 +131,10 @@ final class ReviewLoopCoordinator {
         guard var updated = loop, var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
         guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its task ID was saved. Inspect recent tasks before starting a new loop; it will not be sent twice.") }
         let thread = try await driver.readThread(threadID)
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
+        guard let currentRound = updated.rounds.last else { return }
+        round = currentRound
         guard Self.path(thread.cwd) == Self.path(updated.project.path) else { throw ReviewLoopError("The review task moved to a different checkout.") }
         guard let reviewTurn = thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
@@ -134,6 +147,8 @@ final class ReviewLoopCoordinator {
             let report: ReviewReport = try decodeReport(reviewTurn)
             guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
             let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
+            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+            updated = current
             guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
             if !report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty,
                report.qualifyingFindings(upTo: updated.priorityLimit).count != report.findings.count {
@@ -156,12 +171,16 @@ final class ReviewLoopCoordinator {
         guard let report = round.review, !report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty else { throw ReviewLoopError("The review has no qualifying findings to fix.") }
         if !round.fixRequested {
             let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
+            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+            updated = current
             guard repo.commit == round.baseCommit else { throw ReviewLoopError("HEAD changed after the review. Start a new review of the current commit.") }
             round.fixRequested = true
             updated.rounds[updated.rounds.count - 1] = round
             updated.message = "Addressing the \(updated.priorityLimit.label) findings in review \(round.number), then committing."
             try persist(updated)
             let id = try await driver.startTurn(threadID: threadID, prompt: Self.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection)
+            guard let current = matchingLoop(updated.id) else { return }
+            updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id
             try persist(updated)
             return
@@ -175,11 +194,15 @@ final class ReviewLoopCoordinator {
         let result: ReviewRoundResult = try decodeReport(fixTurn)
         guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
         let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
         guard repo.commit == result.commit, result.findings == report.qualifyingFindings(upTo: updated.priorityLimit).count,
               repo.commit != round.baseCommit,
               try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) else {
             throw ReviewLoopError("Commit checkpoint failed: all qualifying fixes must be committed on top of the starting commit, and HEAD must match the fix report.")
         }
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
         updated.phase = updated.pauseRequested || updated.rounds.count >= updated.maxRounds ? .paused : .waiting
         updated.message = updated.rounds.count >= updated.maxRounds
             ? "Round limit reached after committing fixes. No clean review has been confirmed."
@@ -223,6 +246,18 @@ final class ReviewLoopCoordinator {
             self.error = "Review loop stopped because its state could not be saved. \(error.localizedDescription)"
             throw ReviewLoopError(self.error!)
         }
+    }
+
+    private func matchingLoop(_ id: UUID) -> ReviewLoop? {
+        guard let loop, loop.id == id else { return nil }
+        return loop
+    }
+
+    private func activeLoop(matching id: UUID, phase: ReviewLoopPhase? = nil) -> ReviewLoop? {
+        guard let loop = matchingLoop(id),
+              phase.map({ loop.phase == $0 }) ?? [.waiting, .running].contains(loop.phase)
+        else { return nil }
+        return loop
     }
 
     private func hasOtherRunningTask(_ threads: [RendererThread], root: String, excluding: String?) -> Bool {
