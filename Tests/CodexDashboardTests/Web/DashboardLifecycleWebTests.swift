@@ -5,6 +5,60 @@ import XCTest
 
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
+    func testNavigationMountsInHomeBesideWrappedNewChatAndRepairsReplacement() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <aside class="app-shell-left-panel">
+            <nav data-app-navigation-rail="true" aria-label="App navigation">
+              <button>Home</button>
+            </nav>
+            <nav role="navigation" aria-label="Home">
+              <div id="chat-actions">
+                <div id="new-chat-row" class="sidebar-item" style="display:flex;height:32px;overflow:hidden">
+                  <button class="sidebar-item">New chat</button><button>Quick chat</button>
+                </div>
+              </div>
+            </nav>
+          </aside>
+          <main>Conversation surface</main>
+        </body></html>
+        """)
+        let assertion = """
+        (() => {
+          const ids = ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation',
+            'codex-dashboard-review-navigation'];
+          return ids.every((id, index) => {
+            const button = document.getElementById(id);
+            return button?.parentElement.id === 'chat-actions'
+              && button.previousElementSibling.id === (index ? ids[index - 1] : 'new-chat-row')
+              && button.getBoundingClientRect().height > 0;
+          }) && !document.querySelector('[data-app-navigation-rail] [id^="codex-dashboard"]');
+        })()
+        """
+        let mounted = try await webView.evaluateJavaScript(assertion) as? Bool
+        XCTAssertEqual(mounted, true)
+        let opensPages = try await webView.evaluateJavaScript("""
+        (() => {
+          return ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation',
+            'codex-dashboard-review-navigation'].map((id) => {
+            document.getElementById(id).click();
+            return document.getElementById(id).getAttribute('aria-current') === 'page';
+          });
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(opensPages, [true, true, true])
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          const navigation = document.querySelector('nav[aria-label="Home"]');
+          const replacement = navigation.cloneNode(true);
+          replacement.querySelectorAll('[id^="codex-dashboard"]').forEach((node) => node.remove());
+          navigation.replaceWith(replacement);
+          return window.__codexDashboard.ensureMounted();
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(assertion, in: webView)
+    }
+
     func testInjectedNavigationIsOutsideNewChatTooltipTrigger() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>

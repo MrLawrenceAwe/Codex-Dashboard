@@ -12,7 +12,13 @@ const codexHost = {
     if (!navigation) return null;
     const buttons = [...navigation.querySelectorAll('button')];
     const newChat = buttons.find((button) => button.textContent.trim() === 'New chat');
-    const newChatRow = newChat?.closest('.sidebar-item');
+    let newChatRow = newChat?.closest('.sidebar-item');
+    // The main button and its full-width action row both carry sidebar-item.
+    // Insert after the outer row so our entries are not clipped beside Quick chat.
+    while (newChatRow?.parentElement?.closest('.sidebar-item')
+      && navigation.contains(newChatRow.parentElement.closest('.sidebar-item'))) {
+      newChatRow = newChatRow.parentElement.closest('.sidebar-item');
+    }
     // New chat is wrapped in Codex's tooltip trigger. Inserting our rows after
     // its button would make them children of that trigger, causing the New chat
     // ⌘N tooltip to appear when either injected row is hovered.
