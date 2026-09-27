@@ -81,8 +81,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let instructions: String
     let maxRounds: Int
     var selection: ReviewModelSelection? = nil
-    // Optional so review loops saved before the speed control still load as Standard.
-    var speed: ReviewSpeed? = nil
+    var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority = .p2
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
@@ -90,6 +89,31 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var expectedCommit: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
+}
+
+extension ReviewLoop {
+    private enum CodingKeys: String, CodingKey {
+        case id, startActionID, project, instructions, maxRounds, selection, speed,
+             priorityLimit, phase, pauseRequested, branch, expectedCommit, rounds, message
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        startActionID = try values.decode(String.self, forKey: .startActionID)
+        project = try values.decode(ReviewProject.self, forKey: .project)
+        instructions = try values.decode(String.self, forKey: .instructions)
+        maxRounds = try values.decode(Int.self, forKey: .maxRounds)
+        selection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
+        speed = try values.decodeIfPresent(ReviewSpeed.self, forKey: .speed) ?? .standard
+        priorityLimit = try values.decode(ReviewFinding.Priority.self, forKey: .priorityLimit)
+        phase = try values.decode(ReviewLoopPhase.self, forKey: .phase)
+        pauseRequested = try values.decode(Bool.self, forKey: .pauseRequested)
+        branch = try values.decodeIfPresent(String.self, forKey: .branch)
+        expectedCommit = try values.decodeIfPresent(String.self, forKey: .expectedCommit)
+        rounds = try values.decode([ReviewRound].self, forKey: .rounds)
+        message = try values.decode(String.self, forKey: .message)
+    }
 }
 
 struct ReviewLoopAction: Codable, Sendable {

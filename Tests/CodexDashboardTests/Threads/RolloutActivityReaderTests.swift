@@ -12,7 +12,7 @@ final class RolloutActivityReaderTests: XCTestCase {
                 #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_started"}}"#,
             ])
             var reader = RolloutActivityReader()
-            let event = try XCTUnwrap(reader.latestEvent(at: url.path, codexLaunchDate: .distantPast))
+            let event = try XCTUnwrap(reader.latestRecordedEvent(at: url.path))
             XCTAssertEqual(event.kind, .started)
             XCTAssertEqual(event.timestamp.timeIntervalSince1970, seconds, accuracy: 0.001)
         }
@@ -31,8 +31,8 @@ final class RolloutActivityReaderTests: XCTestCase {
         )
         var reader = RolloutActivityReader()
 
-        _ = reader.load(at: firstURL.path, codexLaunchDate: .distantPast)
-        _ = reader.load(at: secondURL.path, codexLaunchDate: .distantPast)
+        _ = reader.latestRecordedEvent(at: firstURL.path)
+        _ = reader.latestRecordedEvent(at: secondURL.path)
         XCTAssertEqual(reader.cachedEntryCount, 2)
 
         reader.retainCache(for: [secondURL.path])
@@ -49,18 +49,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         )
         var reader = RolloutActivityReader()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .running)
-    }
-
-    func testLifecycleEventBeforeApplicationLaunchIsIdle() throws {
-        let rolloutURL = try CodexTestFixtures.makeRollout(
-            lifecycleEvents: ["task_complete", "task_started"],
-            finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
-            testCase: self
-        )
-        var reader = RolloutActivityReader()
-
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantFuture), .idle)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .started)
     }
 
     func testIgnoresHistoricalLifecycleEventEmbeddedInCompaction() throws {
@@ -76,7 +65,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         let rolloutURL = try makeRollout(lines: lines)
         var reader = RolloutActivityReader()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .completed)
     }
 
     func testSkipsOversizedNonLifecycleLineWithoutLosingEarlierEvent() throws {
@@ -90,10 +79,10 @@ final class RolloutActivityReaderTests: XCTestCase {
         let rolloutURL = try makeRollout(lines: lines)
         var reader = RolloutActivityReader()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .running)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .started)
     }
 
-    func testAbortedTurnIsIdle() throws {
+    func testReadsAbortedTurn() throws {
         let rolloutURL = try CodexTestFixtures.makeRollout(
             lifecycleEvents: ["task_complete", "task_started", "turn_aborted"],
             finalResponseAtUnixSeconds: Int64(Date().timeIntervalSince1970) - 90,
@@ -101,8 +90,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         )
         var reader = RolloutActivityReader()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
-        XCTAssertEqual(reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind, .aborted)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .aborted)
     }
 
     func testUsageLimitCompletionIsAForcedHalt() throws {
@@ -113,9 +101,8 @@ final class RolloutActivityReaderTests: XCTestCase {
         ])
         var reader = RolloutActivityReader()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
         XCTAssertEqual(
-            reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind,
+            reader.latestRecordedEvent(at: rolloutURL.path)?.kind,
             .forcedHalt
         )
     }
@@ -128,12 +115,12 @@ final class RolloutActivityReaderTests: XCTestCase {
         var reader = RolloutActivityReader()
 
         XCTAssertEqual(
-            reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind,
+            reader.latestRecordedEvent(at: rolloutURL.path)?.kind,
             .completed
         )
     }
 
-    func testAppendedCompletionReusesCachedHistoryAndClearsRunningState() throws {
+    func testAppendedCompletionReusesCachedHistory() throws {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let startedTimestamp = formatter.string(from: Date().addingTimeInterval(-1))
@@ -141,7 +128,7 @@ final class RolloutActivityReaderTests: XCTestCase {
             #"{"timestamp":"\#(startedTimestamp)","type":"event_msg","payload":{"type":"task_started"}}"#,
         ])
         var reader = RolloutActivityReader()
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .running)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .started)
 
         let completedTimestamp = formatter.string(from: Date())
         let appendHandle = try FileHandle(forWritingTo: rolloutURL)
@@ -152,8 +139,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         try appendHandle.write(contentsOf: Data("\n".utf8))
         try appendHandle.close()
 
-        XCTAssertEqual(reader.load(at: rolloutURL.path, codexLaunchDate: .distantPast), .idle)
-        XCTAssertEqual(reader.latestEvent(at: rolloutURL.path, codexLaunchDate: .distantPast)?.kind, .completed)
+        XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .completed)
     }
 
     private func makeRollout(lines: [String]) throws -> URL {

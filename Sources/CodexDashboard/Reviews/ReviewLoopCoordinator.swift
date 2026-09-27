@@ -128,13 +128,13 @@ final class ReviewLoopCoordinator {
         updated.message = "Starting review \(round.number) of \(updated.maxRounds)."
         // Record intent before any remote side effect. A crash here must not launch twice.
         try persist(updated)
-        let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)", speed: updated.speed ?? .standard)
+        let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)", speed: updated.speed)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
         guard updated.phase == .running else { return }
-        let turnID = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.reviewPrompt(for: updated), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed ?? .standard)
+        let turnID = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.reviewPrompt(for: updated), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].reviewTurnID = turnID
@@ -195,7 +195,7 @@ final class ReviewLoopCoordinator {
             updated.rounds[updated.rounds.count - 1] = round
             updated.message = "Addressing the \(updated.priorityLimit.label) findings in review \(round.number), then committing."
             try persist(updated)
-            let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed ?? .standard)
+            let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed)
             guard let current = matchingLoop(updated.id) else { return }
             updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id

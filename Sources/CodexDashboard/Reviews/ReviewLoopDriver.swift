@@ -13,43 +13,43 @@ final class ReviewLoopDriver: ReviewLoopDriving {
 
     func projects() async throws -> [ReviewProject] {
         var projects: [ReviewProject] = []
-        var cursor: String?
-        repeat {
-            var params: [String: Any] = ["limit": 100]
-            if let cursor { params["cursor"] = cursor }
-            let response = try await request("project/list", params)
-            guard let rows = response["data"] as? [[String: Any]] else { throw ReviewLoopError("Codex returned an invalid project list.") }
-            for row in rows {
-                guard let id = row["id"] as? String, let name = row["name"] as? String,
-                      let roots = row["roots"] as? [[String: Any]], roots.count == 1,
-                      let path = roots.first?["path"] as? String, path.hasPrefix("/") else { continue }
-                projects.append(ReviewProject(id: id, name: name, path: path))
-            }
-            let next = response["nextCursor"] as? String
-            guard next == nil || next != cursor else { throw ReviewLoopError("Codex repeated its project cursor.") }
-            cursor = next
-        } while cursor != nil
+        for row in try await listedRows(method: "project/list", description: "project") {
+            guard let id = row["id"] as? String, let name = row["name"] as? String,
+                  let roots = row["roots"] as? [[String: Any]], roots.count == 1,
+                  let path = roots.first?["path"] as? String, path.hasPrefix("/") else { continue }
+            projects.append(ReviewProject(id: id, name: name, path: path))
+        }
         return projects.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     func models() async throws -> [ReviewModel] {
         var models: [ReviewModel] = []
+        for row in try await listedRows(method: "model/list", description: "model") where row["hidden"] as? Bool != true {
+            guard let model = row["model"] as? String, let name = row["displayName"] as? String,
+                  let efforts = row["supportedReasoningEfforts"] as? [[String: Any]] else { continue }
+            models.append(ReviewModel(model: model, displayName: name, efforts: efforts.compactMap { $0["reasoningEffort"] as? String }))
+        }
+        return models
+    }
+
+    private func listedRows(method: String, description: String) async throws -> [[String: Any]] {
+        var rows: [[String: Any]] = []
         var cursor: String?
         repeat {
             var params: [String: Any] = ["limit": 100]
             if let cursor { params["cursor"] = cursor }
-            let response = try await request("model/list", params)
-            guard let rows = response["data"] as? [[String: Any]] else { throw ReviewLoopError("Codex returned an invalid model list.") }
-            for row in rows where row["hidden"] as? Bool != true {
-                guard let model = row["model"] as? String, let name = row["displayName"] as? String,
-                      let efforts = row["supportedReasoningEfforts"] as? [[String: Any]] else { continue }
-                models.append(ReviewModel(model: model, displayName: name, efforts: efforts.compactMap { $0["reasoningEffort"] as? String }))
+            let response = try await request(method, params)
+            guard let page = response["data"] as? [[String: Any]] else {
+                throw ReviewLoopError("Codex returned an invalid \(description) list.")
             }
+            rows.append(contentsOf: page)
             let next = response["nextCursor"] as? String
-            guard next == nil || next != cursor else { throw ReviewLoopError("Codex repeated its model cursor.") }
+            guard next == nil || next != cursor else {
+                throw ReviewLoopError("Codex repeated its \(description) cursor.")
+            }
             cursor = next
         } while cursor != nil
-        return models
+        return rows
     }
 
     func repository(at path: String) async throws -> ReviewRepositoryState {
@@ -170,9 +170,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     }
 
     private func request(_ method: String, _ params: [String: Any]) async throws -> [String: Any] {
-        let data = try JSONSerialization.data(withJSONObject: ["method": method, "params": params], options: [.sortedKeys])
-        let argument = String(decoding: data, as: UTF8.self)
-        let expression = "window.__codexDashboard.reviewRequest(\(argument))"
+        let expression = try RendererScript.reviewRequest(method: method, params: params)
         guard let text = try await devTools.evaluateString(expression, in: target, timeout: .seconds(25)),
               let data = text.data(using: .utf8),
               let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

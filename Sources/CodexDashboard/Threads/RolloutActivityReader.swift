@@ -40,17 +40,14 @@ struct RolloutActivityReader {
         cache = cache.filter { paths.contains($0.key) }
     }
 
-    mutating func load(
-        at path: String,
-        codexLaunchDate: Date?
-    ) -> ThreadRunState {
+    mutating func latestRecordedEvent(at path: String) -> ThreadLifecycleEvent? {
         let fileURL = URL(fileURLWithPath: path)
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = (attributes[.size] as? NSNumber)?.uint64Value,
             let modifiedAt = attributes[.modificationDate] as? Date
         else {
-            return .idle
+            return nil
         }
 
         let cached = cache[path]
@@ -77,30 +74,7 @@ struct RolloutActivityReader {
             event: event
         )
 
-        guard
-            let codexLaunchDate,
-            let event,
-            event.timestamp >= codexLaunchDate
-        else { return .idle }
-        return event.kind == .started ? .running : .idle
-    }
-
-    mutating func latestEvent(
-        at path: String,
-        codexLaunchDate: Date?
-    ) -> ThreadLifecycleEvent? {
-        _ = load(at: path, codexLaunchDate: codexLaunchDate)
-        guard
-            let codexLaunchDate,
-            let event = cache[path]?.event,
-            event.timestamp >= codexLaunchDate
-        else { return nil }
         return event
-    }
-
-    mutating func latestRecordedEvent(at path: String) -> ThreadLifecycleEvent? {
-        _ = load(at: path, codexLaunchDate: nil)
-        return cache[path]?.event
     }
 
     private func read(

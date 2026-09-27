@@ -65,6 +65,20 @@ enum RendererScript {
         return "(() => window.__codexDashboard?.acknowledgePendingPromptLibrary?.(\(json)) === true)()"
     }
 
+    static let pendingReviewAction = "window.__codexDashboard?.pendingReviewAction?.() ?? null"
+
+    static func deliverReviewLoop(_ snapshot: ReviewLoopSnapshot) throws -> String {
+        "window.__codexDashboard?.applyReviewLoop?.(\(try encodeJSON(snapshot))) === true"
+    }
+
+    static func reviewRequest(method: String, params: [String: Any]) throws -> String {
+        let request = try JSONSerialization.data(
+            withJSONObject: ["method": method, "params": params],
+            options: [.sortedKeys]
+        )
+        return "window.__codexDashboard.reviewRequest(\(String(decoding: request, as: UTF8.self)))"
+    }
+
     private static func encodeJSON(_ value: some Encodable) throws -> String {
         String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
     }
