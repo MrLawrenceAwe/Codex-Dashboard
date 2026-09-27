@@ -7,7 +7,8 @@ enum ReviewReportContract {
         let format: String
         switch kind {
         case .review(let limit):
-            format = """
+            if let limit {
+                format = """
             # Review complete
             Findings: N
 
@@ -19,6 +20,20 @@ enum ReviewReportContract {
 
             Report only \(limit.included.joined(separator: ", ")) findings. Repeat the finding section for each, replacing P? with its actual priority. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
+            } else {
+                format = """
+            # Review complete
+            Findings: N
+
+            ## Summary
+            Brief summary.
+
+            ## Short title
+            Evidence, impact, and linked file location.
+
+            Report all actionable findings without priority labels or rankings. Repeat the finding section for each. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            """
+            }
         case .fix:
             format = """
             # Fixes committed
@@ -38,7 +53,7 @@ enum ReviewReportContract {
         """
     }
 
-    static func review(_ text: String?) throws -> ReviewReport {
+    static func review(_ text: String?, priorityLimit: ReviewFinding.Priority?) throws -> ReviewReport {
         let sections = try sections(text)
         let header = lines(sections[0])
         guard header.count == 2,
@@ -49,10 +64,21 @@ enum ReviewReportContract {
         let findings = try sections.dropFirst(2).map { section -> ReviewFinding in
             guard let newline = section.firstIndex(of: "\n") else { throw invalid() }
             let titleLine = String(section[..<newline])
-            guard titleLine.count > 5, titleLine.hasPrefix("["),
-                  titleLine.dropFirst(3).hasPrefix("] "),
-                  let priority = ReviewFinding.Priority(rawValue: String(titleLine.dropFirst().prefix(2))) else { throw invalid() }
-            let title = String(titleLine.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            let priority: ReviewFinding.Priority?
+            let title: String
+            if priorityLimit != nil {
+                guard titleLine.count > 5, titleLine.hasPrefix("["),
+                      titleLine.dropFirst(3).hasPrefix("] "),
+                      let parsed = ReviewFinding.Priority(rawValue: String(titleLine.dropFirst().prefix(2))) else { throw invalid() }
+                priority = parsed
+                title = String(titleLine.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            } else {
+                guard !titleLine.isEmpty, !titleLine.hasPrefix("[P0] "),
+                      !titleLine.hasPrefix("[P1] "), !titleLine.hasPrefix("[P2] "),
+                      !titleLine.hasPrefix("[P3] ") else { throw invalid() }
+                priority = nil
+                title = titleLine.trimmingCharacters(in: .whitespaces)
+            }
             let body = String(section[section.index(after: newline)...]).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty, !body.isEmpty else { throw invalid() }
             return ReviewFinding(priority: priority, title: title, body: body)

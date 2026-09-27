@@ -38,6 +38,8 @@ struct ReviewModelSelection: Codable, Equatable, Sendable {
 
 enum ReviewFocus: String, Codable, CaseIterable, Sendable {
     case bugs, organisation, naming, performance
+
+    var usesPriorities: Bool { self == .bugs || self == .performance }
 }
 
 enum ReviewSpeed: String, Codable, Sendable {
@@ -73,7 +75,7 @@ struct ReviewFinding: Codable, Equatable, Sendable {
         var rangeLabel: String { self == .p0 ? "P0" : "P0–\(rawValue)" }
         var included: [String] { Self.allCases.filter { $0.rank <= rank }.map(\.rawValue) }
     }
-    let priority: Priority
+    let priority: Priority?
     let title: String
     let body: String
 }
@@ -83,12 +85,13 @@ struct ReviewReport: Codable, Equatable, Sendable {
     let outcome: Outcome
     let findings: [ReviewFinding]
     let summary: String
-    func qualifyingFindings(upTo limit: ReviewFinding.Priority) -> [ReviewFinding] {
-        findings.filter { $0.priority.rank <= limit.rank }
+    func findings(upTo limit: ReviewFinding.Priority?) -> [ReviewFinding] {
+        guard let limit else { return findings }
+        return findings.filter { $0.priority.map { $0.rank <= limit.rank } ?? false }
     }
 }
 
-enum ReviewTurnKind { case review(ReviewFinding.Priority), fix }
+enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix }
 
 struct ReviewRoundResult: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Sendable { case clean, fixed, blocked }
@@ -112,7 +115,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var selection: ReviewModelSelection? = nil
     var focus: ReviewFocus = .bugs
     var speed: ReviewSpeed = .standard
-    var priorityLimit: ReviewFinding.Priority = .p2
+    var priorityLimit: ReviewFinding.Priority? = nil
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
     var branch: String?
@@ -138,7 +141,9 @@ extension ReviewLoop {
         selection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
         focus = try values.decodeIfPresent(ReviewFocus.self, forKey: .focus) ?? .bugs
         speed = try values.decodeIfPresent(ReviewSpeed.self, forKey: .speed) ?? .standard
-        priorityLimit = try values.decode(ReviewFinding.Priority.self, forKey: .priorityLimit)
+        priorityLimit = focus.usesPriorities
+            ? try values.decodeIfPresent(ReviewFinding.Priority.self, forKey: .priorityLimit) ?? .p2
+            : nil
         phase = try values.decode(ReviewLoopPhase.self, forKey: .phase)
         pauseRequested = try values.decode(Bool.self, forKey: .pauseRequested)
         branch = try values.decodeIfPresent(String.self, forKey: .branch)

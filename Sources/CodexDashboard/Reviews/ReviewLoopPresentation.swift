@@ -29,7 +29,7 @@ enum ReviewLoopPresentation {
             if let round, unfinished, !round.fixRequested {
                 upcoming = ReviewPromptPreview(title: "Fix & commit · round \(round.number)",
                     text: fixPrompt(for: loop, round: round),
-                    note: round.review == nil ? "Only if qualifying findings are found. Wording follows the finding count." : "After the checkout passes verification.")
+                    note: round.review == nil ? "Only if findings are found. Wording follows the finding count." : "After the checkout passes verification.")
             } else if loop.rounds.count < loop.maxRounds {
                 let note = loop.phase == .paused ? "After resume and checkout verification."
                     : loop.pauseRequested ? "After this round pauses and you resume."
@@ -60,7 +60,7 @@ enum ReviewLoopPresentation {
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
         let findings: String
-        switch round.review?.qualifyingFindings(upTo: loop.priorityLimit).count ?? 0 {
+        switch round.review?.findings.count ?? 0 {
         case 1: findings = "the finding"
         case 2: findings = "both findings"
         default: findings = "all findings"
