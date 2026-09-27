@@ -61,20 +61,20 @@ struct UsageNotificationHistory {
         userDefaults.set(Array(identifiers), forKey: immediateIdentifiersKey)
     }
 
-    private static let phoneDeliveredDeadlinesKey = "ntfyDeliveredAccountResets"
+    private var deliveredDeadlinesKey: String {
+        channel == .desktop ? "accountDeliveredDeadlineNotifications" : "ntfyDeliveredAccountResets"
+    }
 
     func deliveredDeadline(for identifier: String) -> Date? {
-        guard channel == .phone,
-              let timestamp = userDefaults.dictionary(forKey: Self.phoneDeliveredDeadlinesKey)?[identifier]
-                as? Double else { return nil }
+        guard let timestamp = userDefaults.dictionary(forKey: deliveredDeadlinesKey)?[identifier]
+            as? Double else { return nil }
         return Date(timeIntervalSince1970: timestamp)
     }
 
     func recordDeadlineDelivery(_ notification: ScheduledUsageNotification) {
-        guard channel == .phone else { return }
-        var delivered = userDefaults.dictionary(forKey: Self.phoneDeliveredDeadlinesKey) ?? [:]
+        var delivered = userDefaults.dictionary(forKey: deliveredDeadlinesKey) ?? [:]
         delivered[notification.identifier] = notification.deadlineDate.timeIntervalSince1970
-        userDefaults.set(delivered, forKey: Self.phoneDeliveredDeadlinesKey)
+        userDefaults.set(delivered, forKey: deliveredDeadlinesKey)
     }
 
     func observations() -> [UUID: UsageObservation] {
