@@ -64,6 +64,18 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return ReviewRepositoryState(root: root, branch: branch, commit: head, clean: status.isEmpty)
     }
 
+    func resolveCommit(_ commit: String, at path: String) async throws -> String {
+        guard (4...64).contains(commit.count),
+              commit.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) || (65...70).contains($0) }) else {
+            throw ReviewLoopError("Commit checkpoint failed: the fix report must contain a Git commit ID.")
+        }
+        let result = try await runGit(["rev-parse", "--verify", "--end-of-options", commit.lowercased() + "^{commit}"], at: path)
+        guard result.terminationStatus == 0 else {
+            throw ReviewLoopError("Commit checkpoint failed: the reported commit ID is missing, ambiguous, or does not identify a commit.")
+        }
+        return String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool {
         let result = try await runGit(["merge-base", "--is-ancestor", commit, head], at: path)
         guard result.terminationStatus <= 1 else { throw ReviewLoopError("Could not verify the review commit ancestry.") }
@@ -212,7 +224,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
          "properties": [
             "outcome": ["type": "string", "enum": ["fixed", "blocked"]],
             "findings": ["type": "integer", "minimum": 0, "description": "Number of review findings addressed and committed"],
-            "commit": ["type": "string"],
+            "commit": ["type": "string", "description": "Full Git commit ID from git rev-parse HEAD after committing the fixes; empty when blocked"],
             "summary": ["type": "string"],
          ]]
     }

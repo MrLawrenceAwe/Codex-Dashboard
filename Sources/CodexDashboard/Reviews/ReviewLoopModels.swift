@@ -143,6 +143,7 @@ struct ReviewLoopError: LocalizedError {
 protocol ReviewLoopDriving {
     func projects() async throws -> [ReviewProject]
     func repository(at path: String) async throws -> ReviewRepositoryState
+    func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
     func createThread(project: ReviewProject, title: String) async throws -> String
     func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String
