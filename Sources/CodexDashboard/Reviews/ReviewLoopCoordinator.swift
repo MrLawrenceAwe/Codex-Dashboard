@@ -40,7 +40,7 @@ final class ReviewLoopCoordinator {
             }
             let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, priorityLimit: action.priorityLimit ?? .p2))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, speed: action.speed ?? .standard, priorityLimit: action.priorityLimit ?? .p2))
         case "pause", "resume", "stop":
             guard var updated = loop, action.loopID == updated.id else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
@@ -111,13 +111,13 @@ final class ReviewLoopCoordinator {
         updated.message = "Starting review \(round.number) of \(updated.maxRounds)."
         // Record intent before any remote side effect. A crash here must not launch twice.
         try persist(updated)
-        let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)")
+        let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)", speed: updated.speed ?? .standard)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
         guard updated.phase == .running else { return }
-        let turnID = try await driver.startTurn(threadID: threadID, prompt: Self.reviewPrompt(for: updated, round: round), kind: .review(updated.priorityLimit), selection: updated.selection)
+        let turnID = try await driver.startTurn(threadID: threadID, prompt: Self.reviewPrompt(for: updated, round: round), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed ?? .standard)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].reviewTurnID = turnID
@@ -178,7 +178,7 @@ final class ReviewLoopCoordinator {
             updated.rounds[updated.rounds.count - 1] = round
             updated.message = "Addressing the \(updated.priorityLimit.label) findings in review \(round.number), then committing."
             try persist(updated)
-            let id = try await driver.startTurn(threadID: threadID, prompt: Self.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection)
+            let id = try await driver.startTurn(threadID: threadID, prompt: Self.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed ?? .standard)
             guard let current = matchingLoop(updated.id) else { return }
             updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id

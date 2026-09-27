@@ -56,6 +56,7 @@ const reviewLoopPage = (() => {
         <label>Max rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
         <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
         <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <label>Speed<select data-review-speed aria-label="Review speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         <div class="review-form-footer">
           <button type="submit" data-review-start>Start loop <span aria-hidden="true">→</span></button>
         </div>
@@ -89,6 +90,7 @@ const reviewLoopPage = (() => {
       const model = details.querySelector('[data-review-model]').value;
       const effort = details.querySelector('[data-review-effort]').value;
       queue({ selection: model ? { model, effort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
+        speed: details.querySelector('[data-review-speed]').value,
         instructions: details.querySelector('[data-review-project-type]').value === 'personal' ? '(this is a project for personal use)' : '',
         priorityLimit: details.querySelector('[data-review-priority]').value,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
@@ -162,7 +164,7 @@ const reviewLoopPage = (() => {
     badge.dataset.phase = loop?.phase || '';
     const context = root.querySelector('[data-review-context]');
     context.hidden = !loop;
-    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${escape(loop.priorityLimit)}${loop.priorityLimit === 'P0' ? '' : '+'} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span>${loop.selection ? `<span>${escape(loop.selection.model)}${loop.selection.effort ? ` · ${escape(loop.selection.effort)}` : ''}</span>` : ''}` : '';
+    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${escape(loop.priorityLimit)}${loop.priorityLimit === 'P0' ? '' : '+'} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.model)}${loop.selection.effort ? ` · ${escape(loop.selection.effort)}` : ''}</span>` : ''}` : '';
     root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…' : loop?.message || '';
     root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
     renderProgress(root, loop, snapshot.progress);

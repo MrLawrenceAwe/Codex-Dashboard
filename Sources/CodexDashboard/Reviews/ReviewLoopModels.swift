@@ -11,6 +11,11 @@ struct ReviewModelSelection: Codable, Equatable, Sendable {
     let effort: String?
 }
 
+enum ReviewSpeed: String, Codable, Sendable {
+    case standard, fast
+    var serviceTier: String { self == .fast ? "priority" : "default" }
+}
+
 struct ReviewProject: Codable, Equatable, Sendable {
     let id: String
     let name: String
@@ -71,6 +76,8 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let instructions: String
     let maxRounds: Int
     var selection: ReviewModelSelection? = nil
+    // Optional so review loops saved before the speed control still load as Standard.
+    var speed: ReviewSpeed? = nil
     var priorityLimit: ReviewFinding.Priority = .p2
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
@@ -88,6 +95,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let maxRounds: Int?
     let loopID: UUID?
     var selection: ReviewModelSelection? = nil
+    var speed: ReviewSpeed? = nil
     var priorityLimit: ReviewFinding.Priority? = nil
 }
 
@@ -145,8 +153,8 @@ protocol ReviewLoopDriving {
     func repository(at path: String) async throws -> ReviewRepositoryState
     func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
-    func createThread(project: ReviewProject, title: String) async throws -> String
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String
+    func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String
+    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
     func readThread(_ threadID: String) async throws -> ReviewThreadState
 }
 
