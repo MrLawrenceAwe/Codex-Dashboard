@@ -67,7 +67,8 @@ tests or require a test result. A Markdown fix report identifies the addressed
 finding count and commit. No JSON output schema is sent to Codex.
 Dashboard independently verifies a clean working tree, unchanged branch,
 matching HEAD, and ancestry from the round's starting commit before scheduling
-the next fresh review. A round limit is a backstop, not a successful review.
+the next fresh review. Reaching the round limit ends the loop with a distinct
+**Limit reached** status because the final fix commit has not had a clean review.
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 

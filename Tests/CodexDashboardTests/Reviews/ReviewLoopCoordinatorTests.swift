@@ -347,11 +347,32 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         driver.finish(findings: 1, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loop?.phase, .paused)
+        XCTAssertEqual(coordinator.loop?.phase, .limitReached)
+        XCTAssertEqual(coordinator.progress?.step, "Limit reached")
+        XCTAssertNil(coordinator.progress?.upcoming)
         try coordinator.apply(action("resume", for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loop?.phase, .paused)
+        XCTAssertEqual(coordinator.loop?.phase, .limitReached)
         XCTAssertEqual(driver.createdThreads.count, 1)
+        let previousID = coordinator.loop?.id
+        try coordinator.apply(ReviewLoopAction(id: "new-start", kind: "start", projectID: project.id,
+                                               instructions: "", maxRounds: 2, loopID: nil), projects: [project])
+        XCTAssertNotEqual(coordinator.loop?.id, previousID)
+        XCTAssertEqual(coordinator.loop?.phase, .waiting)
+    }
+
+    func testSavedPausedLoopAtRoundLimitBecomesLimitReached() async throws {
+        let (coordinator, store, driver) = try make(limit: 1)
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p2])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        await coordinator.advance(using: driver, threads: [])
+        store.loop?.phase = .paused
+        let restored = ReviewLoopCoordinator(store: store)
+        XCTAssertEqual(restored.loop?.phase, .limitReached)
+        XCTAssertEqual(store.loop?.phase, .limitReached)
     }
 
     func testReplayedStartActionDoesNotCreateSecondLoopAfterCompletion() async throws {

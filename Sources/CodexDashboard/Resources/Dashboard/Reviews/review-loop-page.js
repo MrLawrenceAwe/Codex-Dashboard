@@ -5,7 +5,7 @@ const reviewLoopPage = (() => {
   let modelsSignature = '';
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
-  const terminal = loop => !loop || ['completed', 'stopped', 'blocked'].includes(loop.phase);
+  const terminal = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
 
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.reviewPage,
@@ -159,7 +159,7 @@ const reviewLoopPage = (() => {
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
     const badge = root.querySelector('[data-review-badge]');
-    badge.textContent = loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
+    badge.textContent = loop?.phase === 'limitReached' ? 'Limit reached' : loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
     badge.hidden = !loop;
     badge.dataset.phase = loop?.phase || '';
     const context = root.querySelector('[data-review-context]');

@@ -17,6 +17,14 @@ final class ReviewLoopCoordinator {
         self.store = store
         do {
             loop = try store.load()
+            // Correct saved loops that exhausted their rounds before this phase existed.
+            if var recovered = loop, recovered.phase == .paused,
+               recovered.rounds.count >= recovered.maxRounds,
+               recovered.rounds.last?.result?.outcome == .fixed {
+                recovered.phase = .limitReached
+                try store.save(recovered)
+                loop = recovered
+            }
             // Reconcile a known thread on resume, but never repeat an uncertain launch.
             if var recovered = loop, [.running, .waiting].contains(recovered.phase) {
                 recovered.phase = .paused
@@ -35,7 +43,7 @@ final class ReviewLoopCoordinator {
         switch action.kind {
         case "start":
             if loop?.startActionID == action.id { return }
-            guard loop == nil || [.completed, .stopped, .blocked].contains(loop!.phase) else {
+            guard loop == nil || [.completed, .limitReached, .stopped, .blocked].contains(loop!.phase) else {
                 throw ReviewLoopError("Stop the existing loop before starting another.")
             }
             guard let project = projects.first(where: { $0.id == action.projectID }),
@@ -49,7 +57,7 @@ final class ReviewLoopCoordinator {
             guard var updated = loop, action.loopID == updated.id else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
             }
-            guard ![.completed, .stopped, .blocked].contains(updated.phase) else { return }
+            guard ![.completed, .limitReached, .stopped, .blocked].contains(updated.phase) else { return }
             if action.kind == "stop" {
                 updated.phase = .stopped
                 updated.message = "Stopped scheduling reviews. Any active task can finish in its chat."
@@ -107,7 +115,7 @@ final class ReviewLoopCoordinator {
         if let branch = updated.branch, branch != repo.branch { throw ReviewLoopError("The checkout changed branch. Start a new loop for the new branch.") }
         if let head = updated.expectedCommit, head != repo.commit { throw ReviewLoopError("HEAD changed outside the review loop. Inspect the changes before starting a new loop.") }
         guard updated.rounds.count < updated.maxRounds else {
-            updated.phase = .paused
+            updated.phase = .limitReached
             updated.message = "Round limit reached. No clean review has been confirmed."
             try persist(updated)
             return
@@ -223,7 +231,7 @@ final class ReviewLoopCoordinator {
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        updated.phase = updated.pauseRequested || updated.rounds.count >= updated.maxRounds ? .paused : .waiting
+        updated.phase = updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
         updated.message = updated.rounds.count >= updated.maxRounds
             ? "Round limit reached after committing fixes. No clean review has been confirmed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
@@ -299,7 +307,7 @@ final class ReviewLoopCoordinator {
     var progress: ReviewLoopProgress? {
         guard let loop else { return nil }
         let round = loop.rounds.last
-        let ended = [.completed, .stopped, .blocked].contains(loop.phase)
+        let ended = [.completed, .limitReached, .stopped, .blocked].contains(loop.phase)
         let unfinished = round.map { $0.result == nil } ?? false
         var current: ReviewPromptPreview?
         if let round {
@@ -311,6 +319,7 @@ final class ReviewLoopCoordinator {
         let step: String
         switch loop.phase {
         case .completed: step = "Complete"
+        case .limitReached: step = "Limit reached"
         case .stopped: step = "Stopped"
         case .blocked: step = "Needs attention"
         case .paused: step = "Paused"

@@ -143,6 +143,27 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, true, "Example <project>", true, "Fixed <issue>", "Pause after round", false, 0, "Completed"])
     }
 
+    func testRoundLimitShowsFinalStatusWithoutResume() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',maxRounds:1,
+            message:'Round limit reached after committing fixes. No clean review has been confirmed.',
+            rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
+          window.__codexDashboard.applyReviewLoop({projects:[project],loop,error:null,
+            progress:{step:'Limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
+              nextMessage:'No further prompts scheduled.',threadID:null}});
+          window.__codexDashboard.openReviews();
+          return [document.querySelector('[data-review-badge]').textContent,
+            document.querySelector('[data-review-step]').textContent,
+            document.querySelector('[data-review-controls]').children.length,
+            document.querySelector('[data-review-form]').hidden];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false])
+    }
+
     func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
