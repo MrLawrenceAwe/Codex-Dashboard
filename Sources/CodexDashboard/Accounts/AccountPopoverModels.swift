@@ -31,14 +31,14 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
     let accountID: UUID?
 }
 
-enum AccountPopoverActionWaitResult: Equatable, Sendable {
+enum AccountPopoverActionPollResult: Equatable, Sendable {
     case action(AccountPopoverAction)
-    case timedOut
+    case empty
     case unavailable
 }
 
 enum AccountPopoverActionHandlingOutcome: Equatable, Sendable {
     case handled
-    case timedOut
+    case empty
     case unavailable
 }

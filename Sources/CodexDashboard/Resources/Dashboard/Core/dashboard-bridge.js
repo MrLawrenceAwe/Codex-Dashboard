@@ -1,6 +1,6 @@
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
-  reviewRequest: reviewHost.request,
+  reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewLoop: reviewLoopPage.apply,
   ensureMounted: dashboardNavigation.ensureMounted,

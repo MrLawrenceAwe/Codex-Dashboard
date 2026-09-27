@@ -151,7 +151,7 @@ final class AccountCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(cache.saveCount, previousWrites + 1)
         XCTAssertEqual(Set(cache.savedSnapshots.keys), Set(saved.dropLast().map(\.id)))
-        XCTAssertEqual(coordinator.activeAccountID, saved.last?.id)
+        XCTAssertEqual(coordinator.activeSavedAccountID, saved.last?.id)
         XCTAssertTrue(coordinator.refreshingUsageAccountIDs.isEmpty)
     }
 
@@ -204,7 +204,7 @@ final class AccountCoordinatorTests: XCTestCase {
         await provider.changeAccountUsage(to: usageB)
         try credentialB.write(to: auth)
         coordinator.refreshState()
-        XCTAssertEqual(coordinator.activeAccountID, accountB.id)
+        XCTAssertEqual(coordinator.activeSavedAccountID, accountB.id)
         XCTAssertNil(coordinator.activeUsageStatus.snapshot, "Account B has never had usage fetched; must not show A's usage")
         await coordinator.refreshActiveUsage(codexIsRunning: true)
         XCTAssertEqual(coordinator.activeUsageStatus.snapshot?.usage, usageB)
@@ -234,7 +234,7 @@ final class AccountCoordinatorTests: XCTestCase {
         coordinator.deleteAccount(account.id)
         XCTAssertFalse(coordinator.synchronizeActiveCredentialAfterFileChange())
         XCTAssertTrue(try manager.loadDocument().accounts.isEmpty)
-        XCTAssertNil(coordinator.activeAccountID)
+        XCTAssertNil(coordinator.activeSavedAccountID)
 
         XCTAssertTrue(coordinator.saveCurrentAccount())
         XCTAssertEqual(try manager.loadDocument().accounts.count, 1)

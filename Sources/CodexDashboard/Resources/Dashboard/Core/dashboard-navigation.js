@@ -2,6 +2,14 @@ const threadCatalog = createThreadCatalog();
 const taskDashboard = createTaskDashboard({ catalog: threadCatalog });
 const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject });
 const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
+const dashboardPages = [
+  { controller: taskDashboard, pageID: dashboardElements.elementIDs.taskPage,
+    navigationID: dashboardElements.elementIDs.taskNavButton },
+  { controller: todoList, pageID: dashboardElements.elementIDs.todoPage,
+    navigationID: dashboardElements.elementIDs.todoNavButton },
+  { controller: reviewLoopPage, pageID: dashboardElements.elementIDs.reviewPage,
+    navigationID: dashboardElements.elementIDs.reviewNavButton },
+];
 
 const dashboardNavigation = (() => {
   function applyThreads(nextThreads) {
@@ -11,52 +19,35 @@ const dashboardNavigation = (() => {
     return true;
   }
 
-  function openTasks() {
-    todoList.close();
-    reviewLoopPage.close();
-    taskDashboard.open();
+  function openPage(page) {
+    dashboardPages.forEach(({ controller }) => {
+      if (controller === page) controller.open();
+      else controller.close();
+    });
   }
 
-  function openTodos() {
-    taskDashboard.close();
-    reviewLoopPage.close();
-    todoList.open();
-  }
-
-  function openReviews() {
-    taskDashboard.close();
-    todoList.close();
-    reviewLoopPage.open();
-  }
+  function openTasks() { openPage(taskDashboard); }
+  function openTodos() { openPage(todoList); }
+  function openReviews() { openPage(reviewLoopPage); }
 
   function close() {
-    taskDashboard.close();
-    todoList.close();
-    reviewLoopPage.close();
+    dashboardPages.forEach(({ controller }) => controller.close());
   }
 
   function isOpen() {
-    return taskDashboard.isOpen() || todoList.isOpen() || reviewLoopPage.isOpen();
+    return dashboardPages.some(({ controller }) => controller.isOpen());
   }
 
   function mountNavigation() {
-    const tasksMounted = taskDashboard.mountNavigation();
-    const todosMounted = todoList.mountNavigation();
-    const reviewsMounted = reviewLoopPage.mountNavigation();
-    return tasksMounted && todosMounted && reviewsMounted;
+    return dashboardPages.map(({ controller }) => controller.mountNavigation()).every(Boolean);
   }
 
   function mountPages() {
-    const tasksMounted = taskDashboard.mountPage();
-    const todosMounted = todoList.mountPage();
-    const reviewsMounted = reviewLoopPage.mount();
-    return tasksMounted && todosMounted && reviewsMounted;
+    return dashboardPages.map(({ controller }) => controller.mountPage()).every(Boolean);
   }
 
   function applyVisibility() {
-    taskDashboard.applyVisibility();
-    todoList.applyVisibility();
-    reviewLoopPage.applyVisibility();
+    dashboardPages.forEach(({ controller }) => controller.applyVisibility());
   }
 
   function ensureMounted() {
@@ -65,13 +56,12 @@ const dashboardNavigation = (() => {
       isOpen,
       mountNavigation,
       mountPage: mountPages,
-      openTasks,
-      openTodos,
-      openReviews,
+      openPage,
       applyVisibility,
       requestRender: taskDashboard.requestRender,
       syncSidebarMarkers: taskDashboard.syncSidebarMarkers,
       syncUnread: taskDashboard.syncUnread,
+      pages: dashboardPages,
     });
     taskDashboard.startMonitoring();
     return mounted;
@@ -79,7 +69,7 @@ const dashboardNavigation = (() => {
 
   function destroy() {
     reviewLoopPage.close();
-    reviewHost.destroy();
+    reviewRPCClient.destroy();
     taskDashboard.destroy();
     todoList.destroy();
     dashboardLifecycle.destroy();

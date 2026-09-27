@@ -50,15 +50,14 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 ## Review loops
 
 The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
-single-folder project, a priority limit (**P0**, **P1+**, **P2+**, or **P3+**), a project type (general or personal), a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P2+ includes P0,
-P1, and P2. Each review starts in a new chat on the same branch and checkout.
+single-folder project, a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**), a project type (general or personal), a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout.
 
 The review prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
 The driver appends a Markdown response contract to each prompt. Reviews show a
 summary and a separate priority heading, explanation, and file link for each
 finding. The selected priority limit constrains the requested findings.
-`ReviewLoopReport` reads the explicit status and finding count, rejecting missing
+`ReviewReportContract` reads the explicit status and finding count, rejecting missing
 sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
 stops without sending a fix request. Otherwise the same chat receives
 **Fix the finding; commit once**, **Fix both findings; commit once**, or **Fix all findings; commit once**,
@@ -72,12 +71,12 @@ the next fresh review. Reaching the round limit ends the loop with a distinct
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 
-`Reviews/ReviewLoopCoordinator` owns the state machine; `ReviewLoopDriver` uses
+`Reviews/ReviewLoopCoordinator` owns the state machine, `ReviewLoopPresentation` builds the status and prompt previews, and `ReviewLoopFileStore` persists state; `ReviewLoopDriver` uses
 the desktop renderer's existing local app-server connection and reads Git state
 through argument-based subprocess calls. It uses the saved model selection for every review and fix turn, or configured Codex defaults, and
 does not override permission settings. The bridge polls through the native
 renderer synchronization loop and reads bounded turn/item pages. The renderer
-panel only queues controls and displays snapshots; it does not own execution.
+page queues controls and its view module renders snapshots; it does not own execution.
 
 State is atomically persisted to `~/Library/Application Support/Codex Dashboard/review-loop.json`.
 Intent is saved before each task or follow-up launch. Unknown launches are never

@@ -62,7 +62,7 @@ final class NotificationUsageRefresher {
         _ accountID: UUID, codexIsRunning: Bool
     ) async -> CodexAccountUsageSnapshot? {
         let previousFetch = accounts.usageByAccountID[accountID]?.fetchedAt
-        if accountID == accounts.activeAccountID {
+        if accountID == accounts.activeSavedAccountID {
             await accounts.refreshActiveUsage(
                 codexIsRunning: codexIsRunning
             )

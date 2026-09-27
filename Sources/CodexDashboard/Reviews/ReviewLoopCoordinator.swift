@@ -134,7 +134,7 @@ final class ReviewLoopCoordinator {
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
         guard updated.phase == .running else { return }
-        let turnID = try await driver.startTurn(threadID: threadID, prompt: Self.reviewPrompt(for: updated, round: round), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed ?? .standard)
+        let turnID = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.reviewPrompt(for: updated), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed ?? .standard)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].reviewTurnID = turnID
@@ -161,7 +161,7 @@ final class ReviewLoopCoordinator {
         if round.review == nil {
             if reviewTurn.status == "inProgress" { return }
             try requireCompleted(reviewTurn)
-            let report = try ReviewLoopReport.review(reviewTurn.finalMessage)
+            let report = try ReviewReportContract.review(reviewTurn.finalMessage)
             guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
             let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -174,7 +174,7 @@ final class ReviewLoopCoordinator {
             round.reviewTurnID = reviewTurn.id
             round.review = report
             if report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty {
-                round.result = ReviewRoundResult(outcome: .clean, findings: 0,
+                round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
                                                  commit: repo.commit, summary: report.summary)
                 updated.phase = .completed
                 updated.message = "Review \(round.number) found no \(updated.priorityLimit.label) issues. No fix prompt was sent."
@@ -195,7 +195,7 @@ final class ReviewLoopCoordinator {
             updated.rounds[updated.rounds.count - 1] = round
             updated.message = "Addressing the \(updated.priorityLimit.label) findings in review \(round.number), then committing."
             try persist(updated)
-            let id = try await driver.startTurn(threadID: threadID, prompt: Self.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed ?? .standard)
+            let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed ?? .standard)
             guard let current = matchingLoop(updated.id) else { return }
             updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id
@@ -208,7 +208,7 @@ final class ReviewLoopCoordinator {
         }
         if fixTurn.status == "inProgress" { return }
         try requireCompleted(fixTurn)
-        let result = try ReviewLoopReport.fix(fixTurn.finalMessage)
+        let result = try ReviewReportContract.fix(fixTurn.finalMessage)
         guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
         let reportedCommit = try await inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -220,8 +220,8 @@ final class ReviewLoopCoordinator {
             throw ReviewLoopError("Commit checkpoint failed: HEAD (\(repo.commit)) differs from the reported fix commit (\(reportedCommit)).")
         }
         let expectedFindings = report.qualifyingFindings(upTo: updated.priorityLimit).count
-        guard result.findings == expectedFindings else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findings) of \(expectedFindings) qualifying findings.")
+        guard result.findingCount == expectedFindings else {
+            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findingCount) of \(expectedFindings) qualifying findings.")
         }
         guard repo.commit != round.baseCommit else {
             throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
@@ -237,7 +237,7 @@ final class ReviewLoopCoordinator {
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
-            outcome: result.outcome, findings: result.findings, commit: repo.commit, summary: result.summary)
+            outcome: result.outcome, findingCount: result.findingCount, commit: repo.commit, summary: result.summary)
         updated.expectedCommit = repo.commit
         try persist(updated)
     }
@@ -305,60 +305,6 @@ final class ReviewLoopCoordinator {
     }
 
     var progress: ReviewLoopProgress? {
-        guard let loop else { return nil }
-        let round = loop.rounds.last
-        let ended = [.completed, .limitReached, .stopped, .blocked].contains(loop.phase)
-        let unfinished = round.map { $0.result == nil } ?? false
-        var current: ReviewPromptPreview?
-        if let round {
-            current = ReviewPromptPreview(
-                title: "\(round.fixRequested ? "Fix & commit" : "Review") · round \(round.number)",
-                text: round.fixRequested ? Self.fixPrompt(for: loop, round: round) : Self.reviewPrompt(for: loop, round: round),
-                note: (round.fixRequested ? round.fixTurnID : round.reviewTurnID) == nil ? "Submission not yet confirmed." : "")
-        }
-        let step: String
-        switch loop.phase {
-        case .completed: step = "Complete"
-        case .limitReached: step = "Limit reached"
-        case .stopped: step = "Stopped"
-        case .blocked: step = "Needs attention"
-        case .paused: step = "Paused"
-        case .waiting: step = "Waiting to review"
-        case .running: step = round?.fixRequested == true ? "Fixing & committing" : round?.review != nil ? "Preparing fixes" : "Reviewing"
-        }
-        var upcoming: ReviewPromptPreview?
-        var nextMessage = "No further prompts scheduled."
-        if !ended {
-            if let round, unfinished, !round.fixRequested {
-                upcoming = ReviewPromptPreview(title: "Fix & commit · round \(round.number)",
-                    text: Self.fixPrompt(for: loop, round: round),
-                    note: round.review == nil ? "Only if qualifying issues are found. Wording follows the finding count." : "After the checkout passes verification.")
-            } else if loop.rounds.count < loop.maxRounds {
-                let next = ReviewRound(number: loop.rounds.count + 1,
-                    baseCommit: unfinished ? "[commit from the current fix]" : loop.expectedCommit ?? "[HEAD verified before review]")
-                let note = loop.phase == .paused ? "After resume and checkout verification."
-                    : loop.pauseRequested ? "After this round pauses and you resume."
-                    : unfinished ? "After fixes commit and verification passes. HEAD will use that commit." : "After the project is idle and the checkout passes verification."
-                upcoming = ReviewPromptPreview(title: "Review · round \(next.number)", text: Self.reviewPrompt(for: loop, round: next), note: note)
-            } else {
-                nextMessage = "Round limit reached. No next review scheduled."
-            }
-        }
-        return ReviewLoopProgress(step: step,
-            currentLabel: loop.phase == .running && unfinished && (round?.review == nil || round?.fixRequested == true) ? "Current prompt" : "Latest prompt",
-            current: current, upcoming: upcoming, nextMessage: nextMessage, threadID: round?.threadID)
-    }
-
-    static func reviewPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
-        let context = loop.instructions.isEmpty ? "" : " \(loop.instructions)"
-        return "Review project for bugs and issues\(context)."
-    }
-
-    static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
-        switch round.review?.qualifyingFindings(upTo: loop.priorityLimit).count ?? 0 {
-        case 1: return "Fix the finding; commit once"
-        case 2: return "Fix both findings; commit once"
-        default: return "Fix all findings; commit once"
-        }
+        ReviewLoopPresentation.progress(for: loop)
     }
 }

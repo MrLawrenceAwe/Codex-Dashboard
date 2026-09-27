@@ -70,6 +70,17 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
 }
 
 final class CodexAccountManagerTests: XCTestCase {
+    func testSavedAccountRetainsStoredIdentityKey() throws {
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: .now,
+                                   lastUsedAt: .now, codexAccountID: "codex-123")
+        let data = try JSONEncoder().encode(account)
+        let encoded = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(encoded?["accountIdentifier"] as? String, "codex-123")
+        XCTAssertNil(encoded?["codexAccountID"])
+        XCTAssertEqual(try JSONDecoder().decode(SavedAccount.self, from: data).codexAccountID,
+                       "codex-123")
+    }
+
     private var directory: URL!
     private var authenticationURL: URL!
     private var metadataURL: URL!
@@ -467,11 +478,11 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
-            document.accounts.first(where: { $0.id == lawrenceID })?.accountIdentifier,
+            document.accounts.first(where: { $0.id == lawrenceID })?.codexAccountID,
             "account-lawrence"
         )
         XCTAssertEqual(
-            document.accounts.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,
+            document.accounts.first(where: { $0.id == oluwatoyinID })?.codexAccountID,
             "account-oluwatoyin"
         )
     }
@@ -499,7 +510,7 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(document.version, SavedAccountsDocument.currentVersion)
         XCTAssertEqual(document.activeAccountID, oluwatoyinID)
         XCTAssertEqual(
-            document.accounts.first(where: { $0.id == oluwatoyinID })?.accountIdentifier,
+            document.accounts.first(where: { $0.id == oluwatoyinID })?.codexAccountID,
             "account-oluwatoyin"
         )
     }

@@ -6,7 +6,12 @@ struct SavedAccount: Codable, Equatable, Identifiable, Sendable {
     var name: String
     let createdAt: Date
     var lastUsedAt: Date
-    var accountIdentifier: String?
+    var codexAccountID: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, createdAt, lastUsedAt
+        case codexAccountID = "accountIdentifier"
+    }
 }
 
 struct SavedAccountsDocument: Codable, Equatable, Sendable {

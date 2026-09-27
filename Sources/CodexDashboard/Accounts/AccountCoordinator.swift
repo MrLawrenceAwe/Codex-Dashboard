@@ -9,7 +9,7 @@ enum UsageRefreshAuthorization: Equatable {
 @MainActor
 final class AccountCoordinator: ObservableObject {
     @Published private(set) var savedAccounts: [SavedAccount] = []
-    @Published private(set) var activeAccountID: UUID?
+    @Published private(set) var activeSavedAccountID: UUID?
     @Published private(set) var statusMessage: String?
     @Published private(set) var usageByAccountID: [UUID: CodexAccountUsageSnapshot] = [:]
     @Published private(set) var activeUsageStatus: CodexAccountUsageStatus = .unavailable
@@ -38,7 +38,7 @@ final class AccountCoordinator: ObservableObject {
     }
 
     var activeAccountName: String? {
-        savedAccounts.first { $0.id == activeAccountID }?.name
+        savedAccounts.first { $0.id == activeSavedAccountID }?.name
     }
 
     func refreshState() {
@@ -52,9 +52,9 @@ final class AccountCoordinator: ObservableObject {
             if savedAccounts != accounts { savedAccounts = accounts }
             accountsRequiringSignIn.formIntersection(accounts.map(\.id))
             let identityChanged = activeCodexAccountID != identifier
-            let savedAccountChanged = activeAccountID != document.activeAccountID
+            let savedAccountChanged = activeSavedAccountID != document.activeAccountID
             activeCodexAccountID = identifier
-            if savedAccountChanged { activeAccountID = document.activeAccountID }
+            if savedAccountChanged { activeSavedAccountID = document.activeAccountID }
             if identityChanged || savedAccountChanged {
                 usageGeneration += 1
                 usageSession.invalidate()
@@ -90,7 +90,7 @@ final class AccountCoordinator: ObservableObject {
         do {
             refreshState()
             guard let activeCodexAccountID,
-                  savedAccounts.contains(where: { $0.accountIdentifier == activeCodexAccountID })
+                  savedAccounts.contains(where: { $0.codexAccountID == activeCodexAccountID })
             else { return false }
             let account = try manager.saveCurrentAccount()
             let completedReauthentication = accountsRequiringSignIn.contains(account.id)
@@ -120,7 +120,7 @@ final class AccountCoordinator: ObservableObject {
             accountsRequiringSignIn.remove(accountID)
             persistUsageCache(force: true)
             refreshState()
-            if activeAccountID == nil { activeUsageStatus = .unavailable }
+            if activeSavedAccountID == nil { activeUsageStatus = .unavailable }
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -143,7 +143,7 @@ final class AccountCoordinator: ObservableObject {
     }
 
     func restoreActiveUsageFromCache() {
-        if let activeAccountID, let snapshot = usageByAccountID[activeAccountID] {
+        if let activeSavedAccountID, let snapshot = usageByAccountID[activeSavedAccountID] {
             activeUsageStatus = .stale(snapshot)
         } else {
             activeUsageStatus = .unavailable
@@ -166,7 +166,7 @@ final class AccountCoordinator: ObservableObject {
         guard codexIsRunning else { return }
         refreshState()
         let generation = usageGeneration
-        let accountID = activeAccountID
+        let accountID = activeSavedAccountID
         let previous = activeUsageStatus.snapshot
         activeUsageStatus = .loading(previous: previous)
 
@@ -174,7 +174,7 @@ final class AccountCoordinator: ObservableObject {
             let usage = try await usageSession.fetchUsage()
             guard !Task.isCancelled,
                   generation == usageGeneration,
-                  accountID == activeAccountID
+                  accountID == activeSavedAccountID
             else { return }
             let snapshot = CodexAccountUsageSnapshot(usage: usage, fetchedAt: .now)
             activeUsageStatus = .available(snapshot)
@@ -185,7 +185,7 @@ final class AccountCoordinator: ObservableObject {
         } catch {
             guard !Task.isCancelled,
                   generation == usageGeneration,
-                  accountID == activeAccountID
+                  accountID == activeSavedAccountID
             else { return }
             activeUsageStatus = previous.map(CodexAccountUsageStatus.stale) ?? .unavailable
         }
@@ -193,7 +193,7 @@ final class AccountCoordinator: ObservableObject {
 
     func refreshInactiveUsage(interactionAllowed: Bool = false) async {
         let generation = usageGeneration
-        let inactiveAccounts = savedAccounts.filter { $0.id != activeAccountID }
+        let inactiveAccounts = savedAccounts.filter { $0.id != activeSavedAccountID }
         var shouldPersistUsageCache = false
         defer {
             if shouldPersistUsageCache { persistUsageCache(force: true) }
@@ -216,7 +216,7 @@ final class AccountCoordinator: ObservableObject {
         interactionAllowed: Bool = false,
         persistsUsageCache: Bool = true
     ) async -> UsageRefreshAuthorization {
-        if accountID == activeAccountID { return .notRequired }
+        if accountID == activeSavedAccountID { return .notRequired }
         guard savedAccounts.contains(where: { $0.id == accountID }) else { return .notRequired }
 
         let generation = usageGeneration
@@ -229,7 +229,7 @@ final class AccountCoordinator: ObservableObject {
             let result = try await usageSession.fetchUsage(using: credential, for: accountID)
             guard !Task.isCancelled,
                   generation == usageGeneration,
-                  accountID != activeAccountID,
+                  accountID != activeSavedAccountID,
                   savedAccounts.contains(where: { $0.id == accountID })
             else { return .notRequired }
 
@@ -276,7 +276,7 @@ final class AccountCoordinator: ObservableObject {
     func popoverSnapshot(isBusy: Bool) -> AccountPopoverSnapshot {
         AccountPopoverSnapshot(
             accounts: savedAccounts.map { account in
-                let isActive = account.id == activeAccountID
+                let isActive = account.id == activeSavedAccountID
                 let usageStatus: CodexAccountUsageStatus
                 if isActive {
                     usageStatus = activeUsageStatus
@@ -299,7 +299,7 @@ final class AccountCoordinator: ObservableObject {
                     errorMessage: usageErrorsByAccountID[account.id]
                 )
             },
-            activeAccountID: activeAccountID,
+            activeAccountID: activeSavedAccountID,
             statusMessage: statusMessage,
             isBusy: isBusy || !refreshingUsageAccountIDs.isEmpty
         )

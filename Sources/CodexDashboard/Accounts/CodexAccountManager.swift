@@ -81,7 +81,7 @@ final class CodexAccountManager: @unchecked Sendable {
                 throw CodexAccountError.accountNotFound
             }
             guard
-                let expectedIdentifier = account.accountIdentifier,
+                let expectedIdentifier = account.codexAccountID,
                 let returnedIdentifier = AccountIdentityDecoder.identity(in: credential)?.identifier,
                 returnedIdentifier == expectedIdentifier
             else {
@@ -109,14 +109,14 @@ final class CodexAccountManager: @unchecked Sendable {
             let account: SavedAccount
             if
                 let index = document.accounts.firstIndex(where: {
-                    $0.accountIdentifier == identity.identifier
+                    $0.codexAccountID == identity.identifier
                 }) ?? document.activeAccountID.flatMap({ activeID in
                     document.accounts.firstIndex(where: { $0.id == activeID })
                 })
             {
                 document.accounts[index].name = identity.accountName
                 document.accounts[index].lastUsedAt = timestamp
-                document.accounts[index].accountIdentifier = identity.identifier
+                document.accounts[index].codexAccountID = identity.identifier
                 document.activeAccountID = document.accounts[index].id
                 account = document.accounts[index]
             } else {
@@ -125,7 +125,7 @@ final class CodexAccountManager: @unchecked Sendable {
                     name: identity.accountName,
                     createdAt: timestamp,
                     lastUsedAt: timestamp,
-                    accountIdentifier: identity.identifier
+                    codexAccountID: identity.identifier
                 )
                 document.accounts.append(account)
                 document.activeAccountID = account.id
@@ -153,7 +153,7 @@ final class CodexAccountManager: @unchecked Sendable {
                 try activeCredentialFile.write(targetCredential)
                 document.activeAccountID = accountID
                 document.accounts[index].lastUsedAt = now()
-                document.accounts[index].accountIdentifier = AccountIdentityDecoder.identity(
+                document.accounts[index].codexAccountID = AccountIdentityDecoder.identity(
                     in: targetCredential
                 )?.identifier
                 try documentStore.save(document)

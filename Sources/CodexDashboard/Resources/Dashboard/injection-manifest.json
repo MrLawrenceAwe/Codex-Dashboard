@@ -34,7 +34,8 @@
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Threads/task-dashboard-controller",
-    "Reviews/review-host",
+    "Reviews/review-rpc-client",
+    "Reviews/review-loop-view",
     "Reviews/review-loop-page",
     "Core/dashboard-navigation",
     "Core/dashboard-bridge"

@@ -327,7 +327,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     private let synchronizationError: Error?
     private let restartError: Error?
     private let onRestart: (() -> Void)?
-    private let accountPopoverActionWaitResult: AccountPopoverActionWaitResult
+    private let accountPopoverActionWaitResult: AccountPopoverActionPollResult
     private(set) var restartCallCount = 0
     private(set) var synchronizeCallCount = 0
     private(set) var lastSynchronizedSnapshot: DashboardSnapshot?
@@ -341,7 +341,7 @@ final class StubDashboardRuntime: DashboardRuntime {
         compatibilityChecks: [CompatibilityCheck] = [],
         synchronizationError: Error? = nil,
         restartError: Error? = nil,
-        accountPopoverActionWaitResult: AccountPopoverActionWaitResult = .unavailable,
+        accountPopoverActionWaitResult: AccountPopoverActionPollResult = .unavailable,
         onRestart: (() -> Void)? = nil
     ) {
         self.codexIsRunning = codexIsRunning
@@ -382,7 +382,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     func disableIntegration() async throws -> DashboardDisableOutcome { .codexClosed }
     func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
-    func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
+    func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
         accountPopoverActionWaitResult
     }
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {

@@ -7,8 +7,8 @@ import XCTest
 final class UsageNotificationHistoryTests: XCTestCase {
     func testDecodesEarlierObservationsWithoutBankedResetData() throws {
         struct EarlierObservation: Encodable {
-            let fiveHour: UsageObservation.Window?
-            let weekly: UsageObservation.Window?
+            let fiveHour: CodexUsageWindow?
+            let weekly: CodexUsageWindow?
         }
         let accountID = UUID()
         let data = try JSONEncoder().encode([
@@ -25,7 +25,7 @@ final class UsageNotificationHistoryTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let oldUsage = CodexAccountUsage(
             fiveHour: nil,

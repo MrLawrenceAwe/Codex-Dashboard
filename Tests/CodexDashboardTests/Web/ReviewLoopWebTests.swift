@@ -4,6 +4,22 @@ import XCTest
 
 @MainActor
 final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
+    func testPriorityOptionsDescribeIncludedFindings() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: DashboardWebTestHarness.basicTodoHTML,
+            baseURL: URL(string: "https://review-loop.test")
+        )
+        let labels = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const select = document.querySelector('[data-review-priority]');
+          return [select.getAttribute('aria-label'), ...[...select.options].map(option => option.textContent)];
+        })()
+        """) as? [String]
+        XCTAssertEqual(labels, ["Review and fix priority limit", "P0 only · Critical",
+                                "P0–P1 · High and critical", "P0–P2 · Medium and higher",
+                                "P0–P3 · All priorities"])
+    }
+
     func testSidebarSpinnerTracksActiveLoopAndNavigationRemount() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let states = try await webView.evaluateAsyncJavaScript("""
