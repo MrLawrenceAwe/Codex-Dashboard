@@ -282,20 +282,8 @@ final class ReviewLoopCoordinator {
     }
 
     static func reviewPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
-        """
-        Review this project for actionable bugs and issues at priority \(loop.priorityLimit.label). Report only these priorities: \(loop.priorityLimit.included.joined(separator: ", ")). Independently inspect the current code. This is a fresh review: do not read prior review chats or summaries. Follow the repository's AGENTS.md instructions.
-
-        Work only in this checkout: \(loop.project.path)
-        Expected starting HEAD: \(round.baseCommit)
-        Verify HEAD and a clean working tree before reviewing. If either differs, report blocked.
-        REVIEW ONLY in this turn: do not edit files, fix issues, commit, push, change branches, create worktrees, or launch more chats. Report concrete, actionable findings with priority, title, and a body explaining the evidence, affected file/lines, and impact. Do not invent findings to fill a quota. Report reviewed with an empty findings array when there are no qualifying findings. Report blocked if you cannot complete the review or need user input.
-        If a later message asks you to address findings and commit, address the findings from this review and commit only those changes on the current branch. Do not push or rewrite existing commits. Use the supplied fix-report schema, reporting fixed only when all findings are addressed and committed, or blocked if you cannot do so. The commit field must be the full final HEAD. Leave the working tree clean.
-
-        Additional review instructions:
-        \(loop.instructions.isEmpty ? "None." : loop.instructions)
-
-        Return the required JSON review report: outcome (reviewed or blocked), findings (array of priority/title/body objects), and summary. If no findings meet the selected priority limit, Dashboard stops without sending a fix prompt. Otherwise it sends a separate address-and-commit message in this chat.
-        """
+        let context = loop.instructions.isEmpty ? "" : " \(loop.instructions)"
+        return "Review project for bugs and issues\(context)."
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
