@@ -10,28 +10,31 @@ enum ReviewLoopReport {
             format = """
             # Review complete
             Findings: N
+
             ## Summary
             Brief summary.
-            ## [P1] Short title
+
+            ## [P?] Short title
             Evidence, impact, and linked file location.
 
-            Report only \(limit.included.joined(separator: ", ")) findings. Repeat the finding section with each finding's actual priority; N is the number reported. If none, use N=0 and omit finding sections. If unable to finish, use `# Review blocked`.
+            Report only \(limit.included.joined(separator: ", ")) findings. Repeat the finding section for each, replacing P? with its actual priority. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
         case .fix:
             format = """
             # Fixes committed
             Findings addressed: N
             Commit: `FULL_COMMIT_ID`
+
             ## Summary
             Brief description of changes.
 
-            If unable to finish, use `# Fixes blocked` and Commit: `none`; explain the blocker in Summary. N is the number addressed; use the full Git commit ID when committed.
+            N is the number addressed. Use the full Git commit ID. If blocked, use # Fixes blocked, Commit: `none`, and explain why in Summary.
             """
         }
         return """
-        Return Markdown in this exact structure (no JSON or code fences):
+        Return only Markdown in this structure:
         \(format)
-        Keep the field labels and add no other level-one or level-two headings.
+        Keep fixed headings and labels; replace placeholders. No code fences or other level-one or level-two headings.
         """
     }
 
