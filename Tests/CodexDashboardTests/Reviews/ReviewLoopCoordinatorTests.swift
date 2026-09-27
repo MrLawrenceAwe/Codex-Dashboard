@@ -486,11 +486,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         }
     }
 
-    func testModelSelectionPersistsAndAppliesToReviewAndFix() async throws {
+    func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
         var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, instructions: nil, maxRounds: 3, loopID: nil)
-        start.selection = ReviewModelSelection(modelID: "selected-model", reasoningEffort: "high")
+        start.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: "high")
+        start.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: "low")
         start.speed = .fast
         try coordinator.apply(start, projects: [project])
         let driver = ReviewTestDriver()
@@ -498,14 +499,15 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1])
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(driver.selections, [start.selection, start.selection])
+        XCTAssertEqual(driver.selections, [start.reviewSelection, start.fixSelection])
         XCTAssertEqual(driver.speeds, [.fast, .fast, .fast])
-        XCTAssertEqual(store.loops[store.loops.count - 1].selection, start.selection)
+        XCTAssertEqual(store.loops[store.loops.count - 1].reviewSelection, start.reviewSelection)
+        XCTAssertEqual(store.loops[store.loops.count - 1].fixSelection, start.fixSelection)
         XCTAssertEqual(store.loops[store.loops.count - 1].speed, .fast)
         driver.finish(findings: 1, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(driver.selections, [start.selection, start.selection, start.selection])
+        XCTAssertEqual(driver.selections, [start.reviewSelection, start.fixSelection, start.reviewSelection])
         XCTAssertEqual(driver.speeds, [.fast, .fast, .fast, .fast, .fast])
     }
 

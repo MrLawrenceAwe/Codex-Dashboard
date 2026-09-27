@@ -112,7 +112,8 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let project: ReviewProject
     let instructions: String
     let maxRounds: Int
-    var selection: ReviewModelSelection? = nil
+    var reviewSelection: ReviewModelSelection? = nil
+    var fixSelection: ReviewModelSelection? = nil
     var focus: ReviewFocus = .bugs
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority? = nil
@@ -127,7 +128,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 
 extension ReviewLoop {
     private enum CodingKeys: String, CodingKey {
-        case id, startActionID, project, instructions, maxRounds, selection, focus, speed,
+        case id, startActionID, project, instructions, maxRounds, reviewSelection, fixSelection, selection, focus, speed,
              priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
     }
 
@@ -138,7 +139,9 @@ extension ReviewLoop {
         project = try values.decode(ReviewProject.self, forKey: .project)
         instructions = try values.decode(String.self, forKey: .instructions)
         maxRounds = try values.decode(Int.self, forKey: .maxRounds)
-        selection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
+        let previousSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
+        reviewSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .reviewSelection) ?? previousSelection
+        fixSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .fixSelection) ?? previousSelection
         focus = try values.decodeIfPresent(ReviewFocus.self, forKey: .focus) ?? .bugs
         speed = try values.decodeIfPresent(ReviewSpeed.self, forKey: .speed) ?? .standard
         priorityLimit = focus.usesPriorities
@@ -152,6 +155,27 @@ extension ReviewLoop {
         rounds = try values.decode([ReviewRound].self, forKey: .rounds)
         message = try values.decode(String.self, forKey: .message)
     }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(startActionID, forKey: .startActionID)
+        try values.encode(project, forKey: .project)
+        try values.encode(instructions, forKey: .instructions)
+        try values.encode(maxRounds, forKey: .maxRounds)
+        try values.encodeIfPresent(reviewSelection, forKey: .reviewSelection)
+        try values.encodeIfPresent(fixSelection, forKey: .fixSelection)
+        try values.encode(focus, forKey: .focus)
+        try values.encode(speed, forKey: .speed)
+        try values.encodeIfPresent(priorityLimit, forKey: .priorityLimit)
+        try values.encode(phase, forKey: .phase)
+        try values.encode(pauseRequested, forKey: .pauseRequested)
+        try values.encodeIfPresent(branch, forKey: .branch)
+        try values.encodeIfPresent(checkoutRoot, forKey: .checkoutRoot)
+        try values.encodeIfPresent(expectedCommit, forKey: .expectedCommit)
+        try values.encode(rounds, forKey: .rounds)
+        try values.encode(message, forKey: .message)
+    }
 }
 
 struct ReviewLoopAction: Codable, Sendable {
@@ -161,7 +185,8 @@ struct ReviewLoopAction: Codable, Sendable {
     let instructions: String?
     let maxRounds: Int?
     let loopID: UUID?
-    var selection: ReviewModelSelection? = nil
+    var reviewSelection: ReviewModelSelection? = nil
+    var fixSelection: ReviewModelSelection? = nil
     var focus: ReviewFocus? = nil
     var speed: ReviewSpeed? = nil
     var priorityLimit: ReviewFinding.Priority? = nil

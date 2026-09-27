@@ -50,7 +50,7 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 ## Review loops
 
 The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
-single-folder project, a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**), a project type (general or personal), a model and supported reasoning effort (or Codex defaults), and a maximum of 1–20 rounds (default 5). P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout.
+single-folder project, a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**), a project type (general or personal), separate review and fix models with supported reasoning efforts (or Codex defaults for either), and a maximum of 1–20 rounds (default 5). P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout.
 
 The review prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
@@ -73,7 +73,7 @@ all bugs have been eliminated.
 
 `Reviews/ReviewLoopCoordinator` owns the state machine, `ReviewLoopPresentation` builds the status and prompt previews, and `ReviewLoopFileStore` persists state; `ReviewLoopDriver` uses
 the desktop renderer's existing local app-server connection and reads Git state
-through argument-based subprocess calls. It uses the saved model selection for every review and fix turn, or configured Codex defaults, and
+through argument-based subprocess calls. It uses the saved review selection for review turns and the fix selection for fix turns, or configured Codex defaults for either, and
 does not override permission settings. The bridge polls through the native
 renderer synchronization loop and reads bounded turn/item pages. The renderer
 page queues controls and its view module renders snapshots; it does not own execution.

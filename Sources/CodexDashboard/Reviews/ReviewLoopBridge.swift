@@ -32,10 +32,12 @@ final class ReviewLoopBridge {
                let action = try? JSONDecoder().decode(ReviewLoopAction.self, from: Data(serialized.utf8)) {
                 if action.id != acknowledgedActionID {
                     do {
-                        if action.kind == "start", let selection = action.selection {
-                            guard let model = models.first(where: { $0.modelID == selection.modelID }),
-                                  selection.reasoningEffort == nil || model.supportedReasoningEfforts.contains(selection.reasoningEffort!) else {
-                                throw ReviewLoopError("Choose an available model and supported reasoning effort.")
+                        if action.kind == "start" {
+                            for selection in [action.reviewSelection, action.fixSelection].compactMap({ $0 }) {
+                                guard let model = models.first(where: { $0.modelID == selection.modelID }),
+                                      selection.reasoningEffort == nil || model.supportedReasoningEfforts.contains(selection.reasoningEffort!) else {
+                                    throw ReviewLoopError("Choose available review and fix models with supported reasoning efforts.")
+                                }
                             }
                         }
                         try coordinator.apply(action, projects: projects)

@@ -29,10 +29,13 @@ const reviewLoopPage = (() => {
     details.querySelector('form').addEventListener('submit', event => {
       event.preventDefault();
       if (!event.target.reportValidity()) return;
-      const model = details.querySelector('[data-review-model]').value;
-      const effort = details.querySelector('[data-review-effort]').value;
+      const selection = kind => {
+        const model = details.querySelector(`[data-${kind}-model]`).value;
+        const effort = details.querySelector(`[data-${kind}-effort]`).value;
+        return model ? { modelID: model, reasoningEffort: effort || null } : null;
+      };
       const focus = details.querySelector('[data-review-focus]').value;
-      queue({ selection: model ? { modelID: model, reasoningEffort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
+      queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
         speed: details.querySelector('[data-review-speed]').value,
         instructions: details.querySelector('[data-review-project-type]').value === 'personal' ? '(this is a project for personal use)' : '',
@@ -40,7 +43,7 @@ const reviewLoopPage = (() => {
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopView.renderReviewSettings());
-    details.querySelector('[data-review-model]').addEventListener('change', () => reviewLoopView.renderEfforts(snapshot, pendingAction));
+    for (const kind of ['review', 'fix']) details.querySelector(`[data-${kind}-model]`).addEventListener('change', () => reviewLoopView.renderEfforts(snapshot, pendingAction, kind));
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
       const control = event.target.closest('[data-review-action]');
