@@ -1,5 +1,9 @@
 import Foundation
 
+private struct ReviewInspectionError: Error {
+    let reason: String
+}
+
 /// Single native owner: renderer windows only submit actions and display snapshots.
 @MainActor
 final class ReviewLoopCoordinator {
@@ -79,6 +83,11 @@ final class ReviewLoopCoordinator {
             } else {
                 try await reconcile(using: driver, threads: threads)
             }
+        } catch let inspectionError as ReviewInspectionError {
+            guard !storageFailed, var updated = activeLoop(matching: current.id) else { return }
+            updated.phase = .paused
+            updated.message = "Could not inspect the review state. Resume to retry: \(inspectionError.reason)"
+            do { try persist(updated) } catch { self.error = error.localizedDescription }
         } catch {
             guard !storageFailed, var updated = activeLoop(matching: current.id) else { return }
             updated.phase = .blocked
@@ -89,7 +98,7 @@ final class ReviewLoopCoordinator {
 
     private func launch(using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
         guard var updated = loop else { return }
-        let repo = try await driver.repository(at: updated.project.path)
+        let repo = try await inspect { try await driver.repository(at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
         updated = current
         if hasOtherRunningTask(threads, root: repo.root, excluding: nil) { return }
@@ -130,7 +139,7 @@ final class ReviewLoopCoordinator {
     private func reconcile(using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
         guard var updated = loop, var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
         guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its task ID was saved. Inspect recent tasks before starting a new loop; it will not be sent twice.") }
-        let thread = try await driver.readThread(threadID)
+        let thread = try await inspect { try await driver.readThread(threadID) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard let currentRound = updated.rounds.last else { return }
@@ -193,7 +202,7 @@ final class ReviewLoopCoordinator {
         try requireCompleted(fixTurn)
         let result = try ReviewLoopReport.fix(fixTurn.finalMessage)
         guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
-        let reportedCommit = try await driver.resolveCommit(result.commit, at: updated.project.path)
+        let reportedCommit = try await inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
@@ -209,7 +218,7 @@ final class ReviewLoopCoordinator {
         guard repo.commit != round.baseCommit else {
             throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
         }
-        guard try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) else {
+        guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) }) else {
             throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -227,7 +236,7 @@ final class ReviewLoopCoordinator {
 
     private func checkpoint(using driver: any ReviewLoopDriving, loop: ReviewLoop,
                             threads: [RendererThread], threadID: String) async throws -> ReviewRepositoryState {
-        let repo = try await driver.repository(at: loop.project.path)
+        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
         guard !hasOtherRunningTask(threads, root: repo.root, excluding: threadID) else {
             throw ReviewLoopError("Another task is running in this checkout. Inspect its changes before continuing.")
         }
@@ -241,6 +250,17 @@ final class ReviewLoopCoordinator {
         guard turn.status == "completed" else {
             throw ReviewLoopError("The task was interrupted, failed, or did not start. Open its chat to resolve the issue.")
         }
+    }
+
+    private func inspect<T>(_ read: () async throws -> T) async throws -> T {
+        do { return try await read() }
+        catch { throw ReviewInspectionError(reason: error.localizedDescription) }
+    }
+
+    private func inspectGitProcess<T>(_ read: () async throws -> T) async throws -> T {
+        do { return try await read() }
+        catch let error as ReviewLoopError { throw error }
+        catch { throw ReviewInspectionError(reason: error.localizedDescription) }
     }
 
     private func persist(_ updated: ReviewLoop) throws {
