@@ -57,7 +57,7 @@ final class ReviewLoopBridge {
     }
 
     private func deliver(to target: DevToolsTarget) async throws {
-        let snapshot = ReviewLoopSnapshot(projects: projects, models: models, loop: coordinator.loop,
+        let snapshot = ReviewLoopSnapshot(projects: projects, models: models, loops: coordinator.loops,
                                          progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)

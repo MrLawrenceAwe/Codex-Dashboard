@@ -1,9 +1,10 @@
 const reviewLoopView = (() => {
   let projectsSignature = '';
   let modelsSignature = '';
+  let selectedLoopID = null;
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
-  const canStartLoop = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
+  const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
 
   function createPage() {
     const page = document.createElement('section');
@@ -15,10 +16,10 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <div><span class="review-eyebrow">Automated code review</span><h1>Review loop</h1><p>A fresh perspective. A fix. Another pass.</p></div>
+        <div><span class="review-eyebrow">Automated code review</span><h1>Review loops</h1><p>A fresh perspective. A fix. Another pass.</p></div>
       </header>
       <form data-review-form>
-        <div class="review-setup-heading"><h2>Set up a loop</h2></div>
+        <div class="review-setup-heading"><h2>Set up a loop</h2><p>Run one active loop per project. Different projects can run at the same time.</p></div>
         <fieldset class="review-scope"><legend class="review-visually-hidden">Review scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
@@ -43,6 +44,7 @@ const reviewLoopView = (() => {
       </form>
       <div data-review-error role="alert" hidden></div>
       <section class="review-activity" data-review-activity aria-labelledby="review-activity-title">
+        <label data-review-picker hidden>Loops<select data-review-selected aria-label="Select review loop"></select></label>
         <div class="review-section-heading"><h2 id="review-activity-title" data-review-activity-title>How it works</h2><span data-review-badge hidden></span></div>
         <div data-review-context class="review-context" hidden></div>
         <div data-review-status role="status" aria-live="polite"></div>
@@ -77,7 +79,7 @@ const reviewLoopView = (() => {
 
   function renderNavigationStatus(snapshot) {
     const spinner = document.querySelector('[data-review-navigation-running]');
-    if (spinner) spinner.hidden = !['waiting', 'running'].includes(snapshot.loop?.phase);
+    if (spinner) spinner.hidden = !snapshot.loops.some(loop => ['waiting', 'running'].includes(loop.phase));
   }
 
   function renderEfforts(snapshot, pendingAction) {
@@ -95,7 +97,14 @@ const reviewLoopView = (() => {
     renderNavigationStatus(snapshot);
     const root = panel();
     if (!root) return;
-    const { loop, projects, error } = snapshot;
+    const { loops, projects, error } = snapshot;
+    if (!loops.some(loop => loop.id === selectedLoopID)) selectedLoopID = loops.at(-1)?.id || null;
+    const loop = loops.find(loop => loop.id === selectedLoopID);
+    const picker = root.querySelector('[data-review-selected]');
+    const options = loops.map((item, index) => `<option value="${escape(item.id)}">${index + 1}. ${escape(item.project.name)} · ${escape(item.phase === 'limitReached' ? 'Limit reached' : item.phase)}</option>`).join('');
+    if (picker.innerHTML !== options) picker.innerHTML = options;
+    picker.value = selectedLoopID || '';
+    root.querySelector('[data-review-picker]').hidden = !loops.length;
     const models = snapshot.models || [];
     const modelSelect = root.querySelector('[data-review-model]');
     const nextModelsSignature = JSON.stringify(models);
@@ -110,21 +119,23 @@ const reviewLoopView = (() => {
       renderEfforts(snapshot, pendingAction);
     }
     const select = root.querySelector('[data-review-project]');
-    const signature = JSON.stringify(projects);
+    const busyProjects = new Set(loops.filter(loop => !isFinished(loop)).map(loop => loop.project.id));
+    const availableProjects = projects.filter(project => !busyProjects.has(project.id));
+    const signature = JSON.stringify([projects, [...busyProjects]]);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}</option>`).join('') : '<option value="">No local projects available</option>';
-      if (projects.some(project => project.id === selected)) select.value = selected;
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}" ${busyProjects.has(project.id) ? 'disabled' : ''}>${escape(project.name)}${busyProjects.has(project.id) ? ' · Loop active' : ''}</option>`).join('') : '<option value="">No local projects available</option>';
+      select.value = availableProjects.some(project => project.id === selected) ? selected : availableProjects[0]?.id || '';
       projectsSignature = signature;
     }
-    root.querySelector('[data-review-form]').hidden = !canStartLoop(loop);
+    root.querySelector('[data-review-form]').hidden = false;
     const form = root.querySelector('[data-review-form]');
     const activity = root.querySelector('[data-review-activity]');
     if (loop && activity.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(activity, form);
     if (!loop && form.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(form, activity);
     root.dataset.hasLoop = String(!!loop);
     root.querySelector('[data-review-activity-title]').textContent = loop ? 'Loop activity' : 'How it works';
-    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
+    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = loop?.phase === 'limitReached' ? 'Limit reached' : loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
@@ -143,16 +154,17 @@ const reviewLoopView = (() => {
     meter.max = loop?.maxRounds || 1;
     meter.value = completedRounds;
     root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
-    renderProgress(root, loop, snapshot.progress);
+    renderProgress(root, loop, snapshot.progress?.[loop?.id]);
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : `${loop ? 'Start new loop' : 'Start loop'} <span aria-hidden="true">→</span>`;
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = canStartLoop(loop) ? '' : `${loop.phase === 'paused'
+    controls.innerHTML = isFinished(loop) ? '' : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;
+    controls.querySelectorAll('button').forEach(button => { button.dataset.reviewLoopID = loop.id; });
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
     const expandedRounds = new Set(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('[data-review-rounds] details[open]')].map(details => details.dataset.round) : []);
     root.dataset.renderedLoop = loop?.id || '';
@@ -195,5 +207,5 @@ const reviewLoopView = (() => {
     modelsSignature = '';
   }
 
-  return { createPage, render, renderEfforts, renderNavigationStatus, reset };
+  return { selectLoop: id => { selectedLoopID = id; }, createPage, render, renderEfforts, renderNavigationStatus, reset };
 })();

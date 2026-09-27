@@ -8,30 +8,31 @@ private struct ReviewInspectionError: Error {
 @MainActor
 final class ReviewLoopCoordinator {
     private let store: any ReviewLoopStoring
-    private(set) var loop: ReviewLoop?
+    private(set) var loops: [ReviewLoop] = []
     private(set) var error: String?
     private var storageFailed = false
-    private var isAdvancing = false
+    private var advancingIDs: Set<UUID> = []
+    private var checkoutOwners: [String: UUID] = [:]
 
     init(store: any ReviewLoopStoring) {
         self.store = store
         do {
-            loop = try store.load()
-            // Correct saved loops that exhausted their rounds before this phase existed.
-            if var recovered = loop, recovered.phase == .paused,
-               recovered.rounds.count >= recovered.maxRounds,
-               recovered.rounds.last?.result?.outcome == .fixed {
-                recovered.phase = .limitReached
-                try store.save(recovered)
-                loop = recovered
+            loops = try store.load()
+            for index in loops.indices {
+                if loops[index].phase == .paused,
+                   loops[index].rounds.count >= loops[index].maxRounds,
+                   loops[index].rounds.last?.result?.outcome == .fixed {
+                    loops[index].phase = .limitReached
+                }
+                if [.running, .waiting].contains(loops[index].phase) {
+                    loops[index].phase = .paused
+                    loops[index].message = "Dashboard restarted. Resume to reconcile the last round before continuing."
+                }
             }
-            // Reconcile a known thread on resume, but never repeat an uncertain launch.
-            if var recovered = loop, [.running, .waiting].contains(recovered.phase) {
-                recovered.phase = .paused
-                recovered.message = "Dashboard restarted. Resume to reconcile the last round before continuing."
-                try store.save(recovered)
-                loop = recovered
+            for loop in loops where ![.completed, .limitReached, .stopped, .blocked].contains(loop.phase) {
+                if let root = loop.checkoutRoot { checkoutOwners[Self.path(root)] = loop.id }
             }
+            try store.save(loops)
         } catch {
             self.error = "Review loop storage could not be read: \(error.localizedDescription)"
             storageFailed = true
@@ -42,19 +43,19 @@ final class ReviewLoopCoordinator {
         guard !storageFailed else { throw ReviewLoopError(error ?? "Review loop storage is unavailable.") }
         switch action.kind {
         case "start":
-            if loop?.startActionID == action.id { return }
-            guard loop == nil || [.completed, .limitReached, .stopped, .blocked].contains(loop!.phase) else {
-                throw ReviewLoopError("Stop the existing loop before starting another.")
-            }
+            if loops.contains(where: { $0.startActionID == action.id }) { return }
             guard let project = projects.first(where: { $0.id == action.projectID }),
                   let limit = action.maxRounds, (1...20).contains(limit) else {
                 throw ReviewLoopError("Choose an available local project and 1–20 rounds.")
+            }
+            guard !loops.contains(where: { ![.completed, .limitReached, .stopped, .blocked].contains($0.phase) && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
+                throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
             try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, speed: action.speed ?? .standard, priorityLimit: action.priorityLimit ?? .p2))
         case "pause", "resume", "stop":
-            guard var updated = loop, action.loopID == updated.id else {
+            guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
             }
             guard ![.completed, .limitReached, .stopped, .blocked].contains(updated.phase) else { return }
@@ -81,15 +82,25 @@ final class ReviewLoopCoordinator {
     }
 
     func advance(using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
-        guard !isAdvancing, !storageFailed, let current = loop,
-              [.waiting, .running].contains(current.phase) else { return }
-        isAdvancing = true
-        defer { isAdvancing = false }
+        let ids = loops.filter { [.waiting, .running].contains($0.phase) }.map(\.id)
+        let tasks = ids.map { id in
+            Task { @MainActor in
+                await self.advance(id: id, using: driver, threads: threads)
+            }
+        }
+        for task in tasks { await task.value }
+    }
+
+    private func advance(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
+        guard !advancingIDs.contains(id), !storageFailed,
+              let current = activeLoop(matching: id) else { return }
+        advancingIDs.insert(id)
+        defer { advancingIDs.remove(id) }
         do {
             if current.phase == .waiting {
-                try await launch(using: driver, threads: threads)
+                try await launch(id: id, using: driver, threads: threads)
             } else {
-                try await reconcile(using: driver, threads: threads)
+                try await reconcile(id: id, using: driver, threads: threads)
             }
         } catch let inspectionError as ReviewInspectionError {
             guard !storageFailed, var updated = activeLoop(matching: current.id) else { return }
@@ -104,11 +115,16 @@ final class ReviewLoopCoordinator {
         }
     }
 
-    private func launch(using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
-        guard var updated = loop else { return }
+    private func launch(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
+        guard var updated = matchingLoop(id) else { return }
         let repo = try await inspect { try await driver.repository(at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
         updated = current
+        let root = Self.path(repo.root)
+        if let owner = checkoutOwners[root], owner != id,
+           let other = matchingLoop(owner), ![.completed, .limitReached, .stopped, .blocked].contains(other.phase) { return }
+        // Reserve synchronously after inspection, before any launch can suspend.
+        checkoutOwners[root] = id
         if hasOtherRunningTask(threads, root: repo.root, excluding: nil) { return }
         guard repo.clean else { throw ReviewLoopError("Commit or set aside existing changes before starting a review. The loop will not commit unrelated work.") }
         guard !repo.branch.isEmpty else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
@@ -120,6 +136,7 @@ final class ReviewLoopCoordinator {
             try persist(updated)
             return
         }
+        updated.checkoutRoot = root
         updated.branch = repo.branch
         updated.expectedCommit = repo.commit
         let round = ReviewRound(number: updated.rounds.count + 1, baseCommit: repo.commit)
@@ -144,8 +161,8 @@ final class ReviewLoopCoordinator {
         try persist(updated)
     }
 
-    private func reconcile(using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
-        guard var updated = loop, var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
+    private func reconcile(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
+        guard var updated = matchingLoop(id), var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
         guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its task ID was saved. Inspect recent tasks before starting a new loop; it will not be sent twice.") }
         let thread = try await inspect { try await driver.readThread(threadID) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -272,7 +289,13 @@ final class ReviewLoopCoordinator {
     }
 
     private func persist(_ updated: ReviewLoop) throws {
-        do { try store.save(updated); loop = updated }
+        do {
+            var next = loops
+            if let index = next.firstIndex(where: { $0.id == updated.id }) { next[index] = updated }
+            else { next.append(updated) }
+            try store.save(next)
+            loops = next
+        }
         catch {
             storageFailed = true
             self.error = "Review loop stopped because its state could not be saved. \(error.localizedDescription)"
@@ -281,8 +304,7 @@ final class ReviewLoopCoordinator {
     }
 
     private func matchingLoop(_ id: UUID) -> ReviewLoop? {
-        guard let loop, loop.id == id else { return nil }
-        return loop
+        loops.first { $0.id == id }
     }
 
     private func activeLoop(matching id: UUID, phase: ReviewLoopPhase? = nil) -> ReviewLoop? {
@@ -304,7 +326,9 @@ final class ReviewLoopCoordinator {
         URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
-    var progress: ReviewLoopProgress? {
-        ReviewLoopPresentation.progress(for: loop)
+    var progress: [String: ReviewLoopProgress] {
+        Dictionary(uniqueKeysWithValues: loops.compactMap { loop in
+            ReviewLoopPresentation.progress(for: loop).map { (loop.id.uuidString, $0) }
+        })
     }
 }
