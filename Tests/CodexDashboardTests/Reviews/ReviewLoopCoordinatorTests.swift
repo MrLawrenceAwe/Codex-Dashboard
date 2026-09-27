@@ -129,6 +129,51 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertTrue(driver.createdThreads.isEmpty)
     }
 
+    func testRepositoryReadFailurePausesUntilResumeWithoutLaunching() async throws {
+        let (coordinator, _, driver) = try make()
+        driver.failRepository = true
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .paused)
+        XCTAssertTrue(driver.createdThreads.isEmpty)
+        driver.failRepository = false
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertTrue(driver.createdThreads.isEmpty)
+        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.createdThreads, ["thread-1"])
+    }
+
+    func testThreadReadFailurePausesAndReconcilesKnownTurnAfterResume() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [])
+        driver.failReadThread = true
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .paused)
+        XCTAssertEqual(coordinator.loop?.rounds.last?.threadID, "thread-1")
+        driver.failReadThread = false
+        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .completed)
+        XCTAssertEqual(driver.prompts.count, 1)
+    }
+
+    func testCheckpointReadFailureDoesNotSubmitFixBeforeResume() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p2])
+        driver.failRepository = true
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .paused)
+        XCTAssertEqual(driver.prompts.count, 1)
+        driver.failRepository = false
+        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertEqual(driver.createdThreads.count, 1)
+    }
+
     func testWaitsForOtherRunningTaskIncludingProjectSubdirectory() async throws {
         let (coordinator, _, driver) = try make()
         let thread = ThreadSummary(id: "other", title: "Other", preview: "Other", projectName: "Example", projectPath: "/tmp/example/Sources", recencyEpochMillis: 1, isPinned: false, model: nil, runState: .running, latestLifecycleEvent: nil, workingTreeStatus: .clean)
@@ -423,6 +468,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var resolvedCommit: String?
     var onResolveCommit: (() -> Void)?
     var failCreate = false
+    var failRepository = false
+    var failReadThread = false
     var createCalls = 0
     var createdThreads: [String] = []
     var prompts: [String] = []
@@ -436,6 +483,7 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     func projects() async throws -> [ReviewProject] { [] }
     func repository(at path: String) async throws -> ReviewRepositoryState {
         onRepository?()
+        if failRepository { throw ReviewLoopError("Git timed out") }
         return ReviewRepositoryState(root: "/tmp/example", branch: branch, commit: commit, clean: clean)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
@@ -464,6 +512,7 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     }
     func readThread(_ threadID: String) async throws -> ReviewThreadState {
         onReadThread?()
+        if failReadThread { throw ReviewLoopError("Connection timed out") }
         return thread
     }
     func review(priorities: [ReviewFinding.Priority]) {
