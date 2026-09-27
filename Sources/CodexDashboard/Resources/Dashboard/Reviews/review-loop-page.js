@@ -38,7 +38,6 @@ const reviewLoopPage = (() => {
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-model]').addEventListener('change', () => reviewLoopView.renderEfforts(snapshot, pendingAction));
-    details.querySelector('[data-review-selected]').addEventListener('change', event => { reviewLoopView.selectLoop(event.target.value); render(); });
     details.addEventListener('click', event => {
       const control = event.target.closest('[data-review-action]');
       if (control) queue({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
@@ -65,10 +64,6 @@ const reviewLoopPage = (() => {
   }
 
   function apply(next) {
-    if (pendingAction?.kind === 'start' && next.acknowledgedActionID === pendingAction.id) {
-      const started = next.loops.find(loop => loop.startActionID === pendingAction.id);
-      if (started) reviewLoopView.selectLoop(started.id);
-    }
     snapshot = next;
     if (next.acknowledgedActionID === pendingAction?.id) pendingAction = null;
     render();
