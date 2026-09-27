@@ -16,30 +16,29 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <div><h1>Review loops</h1></div><span class="review-overview" data-review-overview></span>
+        <div><h1>Review loops</h1><p>Review, fix and commit — one round at a time.</p></div><span class="review-overview" data-review-overview></span>
       </header>
-      <section class="review-board" data-review-board aria-label="Active review loops"></section>
-      <section class="review-history" data-review-history aria-label="Previous review loops" hidden>
-        <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
-        <details class="review-history-details" data-review-history-details>
-          <summary>Review details</summary>
-          <div data-review-history-card></div>
-        </details>
+      <section class="review-monitor" aria-labelledby="review-active-title">
+        <div class="review-region-heading"><h2 id="review-active-title">Active loops</h2><span data-review-active-count class="review-count">0</span></div>
+        <section class="review-board" data-review-board aria-label="Active review loops"></section>
+        <div class="review-empty" data-review-empty><strong>No active loops</strong><p>Start a loop to review a project and address its findings. Progress will appear here.</p></div>
       </section>
-      <p class="review-empty" data-review-empty>No loops yet.</p>
-      <form data-review-form>
-        <div class="review-setup-heading"><h2>New loop</h2></div>
-        <label>Review type<select data-review-focus aria-label="Review type">${Object.entries(focusLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
-        <fieldset class="review-scope"><legend class="review-visually-hidden">Review scope</legend>
+      <form data-review-form aria-labelledby="review-setup-title">
+        <div class="review-setup-heading"><h2 id="review-setup-title">New loop</h2><p>Choose a project and what to review.</p></div>
+        <fieldset class="review-scope"><legend>Project &amp; scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
           <option value="">General project</option><option value="personal">Personal project</option>
         </select></label>
+        </fieldset>
+        <fieldset class="review-limits"><legend>Review settings</legend>
+        <label>Review type<select data-review-focus aria-label="Review type">${Object.entries(focusLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
         <label class="review-priority">Priorities<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">P0 only · Critical</option><option value="P1">P0–P1 · High and critical</option>
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
-        <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required></label>
+        <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
+        <p id="review-limit-help" class="review-field-help">Each round reviews findings and commits fixes. Stops when no qualifying findings remain or the limit is reached.</p>
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -48,11 +47,21 @@ const reviewLoopView = (() => {
         <label>Speed<select data-review-speed aria-label="Review speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         </fieldset>
         </details>
+        <p class="review-availability" data-review-availability role="status" hidden></p>
+        <div data-review-error role="alert" hidden></div>
         <div class="review-form-footer">
           <button type="submit" data-review-start>Start loop <span aria-hidden="true">→</span></button>
         </div>
       </form>
-      <div data-review-error role="alert" hidden></div>
+      <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
+        <div class="review-region-heading"><h2 id="review-history-title">Previous loops</h2><span data-review-history-count class="review-count"></span></div>
+        <p>Revisit outcomes and summaries from finished loops.</p>
+        <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
+        <details class="review-history-details" data-review-history-details>
+          <summary>Review details</summary>
+          <div data-review-history-card></div>
+        </details>
+      </section>
       `;
     page.append(details);
     return page;
@@ -132,8 +141,12 @@ const reviewLoopView = (() => {
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
-    root.querySelector('[data-review-empty]').hidden = !!loops.length;
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
+    root.querySelector('[data-review-empty]').hidden = activeCount > 0;
+    root.querySelector('[data-review-active-count]').textContent = activeCount;
+    const availability = root.querySelector('[data-review-availability]');
+    availability.hidden = availableProjects.length > 0;
+    availability.textContent = projects.length ? 'Every project already has an active loop. Finish or stop a loop to start another.' : 'No local projects available. Add a local project in Codex to start a loop.';
     root.querySelector('[data-review-overview]').textContent = loops.length ? `${activeCount} active · ${loops.length} total` : '';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
@@ -141,6 +154,7 @@ const reviewLoopView = (() => {
     renderCards(root.querySelector('[data-review-board]'), loops.filter(loop => !isFinished(loop)), snapshot, pendingAction);
     const history = loops.filter(isFinished);
     root.querySelector('[data-review-history]').hidden = !history.length;
+    root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
     const selectedID = historySelect.value;
     const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(phaseLabel(loop))} · ${loop.rounds.filter(round => round.result).length} of ${loop.maxRounds} rounds</option>`).join('');
