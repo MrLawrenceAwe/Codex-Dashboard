@@ -122,3 +122,7 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-overview { margin-left:auto; color:var(--review-muted); font-size:12px; }
 .dashboard-review-loop .review-section-heading h2 { min-width:0; overflow-wrap:anywhere; font-size:18px; }
 .dashboard-review-loop .review-empty { padding:24px; text-align:center; border:1px dashed var(--review-border); border-radius:12px; }
+
+.dashboard-review-loop .review-history { display:grid; gap:16px; min-width:0; }
+.dashboard-review-loop .review-history[hidden] { display:none; }
+.dashboard-review-loop .review-history > label { max-width:560px; }
