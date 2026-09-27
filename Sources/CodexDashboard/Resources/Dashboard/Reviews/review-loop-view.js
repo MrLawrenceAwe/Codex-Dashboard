@@ -17,7 +17,11 @@ const reviewLoopView = (() => {
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
         <div><h1>Review loops</h1></div><span class="review-overview" data-review-overview></span>
       </header>
-      <section class="review-board" data-review-board aria-label="Review loops"></section>
+      <section class="review-board" data-review-board aria-label="Active review loops"></section>
+      <section class="review-history" data-review-history aria-label="Previous review loops" hidden>
+        <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
+        <div data-review-history-card></div>
+      </section>
       <p class="review-empty" data-review-empty>No loops yet.</p>
       <form data-review-form>
         <div class="review-setup-heading"><h2>New loop</h2></div>
@@ -129,10 +133,27 @@ const reviewLoopView = (() => {
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
-    const board = root.querySelector('[data-review-board]');
+    renderCards(root.querySelector('[data-review-board]'), loops.filter(loop => !isFinished(loop)), snapshot, pendingAction);
+    const history = loops.filter(isFinished);
+    root.querySelector('[data-review-history]').hidden = !history.length;
+    const historySelect = root.querySelector('[data-review-history-select]');
+    const selectedID = historySelect.value;
+    const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(phaseLabel(loop))} · ${loop.rounds.filter(round => round.result).length} of ${loop.maxRounds} rounds</option>`).join('');
+    if (historySelect.dataset.options !== options) {
+      historySelect.innerHTML = options;
+      historySelect.dataset.options = options;
+      historySelect.value = history.some(loop => loop.id === selectedID) ? selectedID : history[0]?.id || '';
+    }
+    renderCards(root.querySelector('[data-review-history-card]'), history.filter(loop => loop.id === historySelect.value), snapshot, pendingAction);
+  }
+
+  function phaseLabel(loop) {
+    return loop.phase === 'limitReached' ? 'Limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
+  }
+
+  function renderCards(board, loops, snapshot, pendingAction) {
     const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
-    const ordered = [...loops].sort((a, b) => Number(isFinished(a)) - Number(isFinished(b)));
-    for (const [index, loop] of ordered.entries()) {
+    for (const [index, loop] of loops.entries()) {
       const card = cards.get(loop.id) || createCard(loop);
       if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
       renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction);
@@ -145,7 +166,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
-    badge.textContent = loop.phase === 'limitReached' ? 'Limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
+    badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
     root.querySelector('[data-review-context]').innerHTML = `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id

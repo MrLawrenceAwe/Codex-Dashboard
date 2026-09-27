@@ -38,6 +38,7 @@ const reviewLoopPage = (() => {
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-model]').addEventListener('change', () => reviewLoopView.renderEfforts(snapshot, pendingAction));
+    details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
       const control = event.target.closest('[data-review-action]');
       if (control) queue({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });

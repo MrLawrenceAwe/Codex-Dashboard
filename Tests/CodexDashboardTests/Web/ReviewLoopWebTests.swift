@@ -75,6 +75,41 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(remaining, 0)
     }
 
+    func testHistoryShowsOneSelectionAndHandlesSnapshotChanges() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const projects = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => ({id,name:id,path:'/tmp/' + id}));
+          const loops = projects.map((project, i) => ({id:project.id,project,
+            phase:['running','paused','completed','limitReached','stopped','blocked'][i],
+            priorityLimit:'P2',maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
+          const snapshot = {projects,loops,error:null};
+          const apply = () => api.applyReviewLoop(snapshot);
+          const active = () => [...document.querySelectorAll('[data-review-board] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
+          const history = () => [...document.querySelectorAll('[data-review-history-card] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
+          apply();
+          const select = document.querySelector('[data-review-history-select]');
+          const states = [active(),history(),select.options.length];
+          select.value = 'D'; select.dispatchEvent(new Event('change'));
+          const card = document.querySelector('[data-review-history-card] article');
+          card.querySelector('.review-round-details').open = true;
+          apply();
+          states.push(history(),card === document.querySelector('[data-review-history-card] article'),card.querySelector('.review-round-details').open);
+          loops[0].phase = 'completed'; apply();
+          states.push(active(),history(),select.options.length);
+          snapshot.loops = loops.filter(loop => loop.id !== 'D'); apply();
+          states.push(history(),select.value);
+          snapshot.loops = [loops[1]]; apply();
+          states.push(history(),document.querySelector('[data-review-history]').hidden,active());
+          snapshot.loops = []; apply();
+          states.push(document.querySelectorAll('[data-review-activity]').length,document.querySelector('[data-review-empty]').hidden);
+          return states;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["A,B", "C", 4, "D", true, true, "B", "D", 5, "A", "A", "", true, "B", 0, false])
+    }
+
     func testPriorityOptionsDescribeIncludedFindings() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: DashboardWebTestHarness.basicTodoHTML,

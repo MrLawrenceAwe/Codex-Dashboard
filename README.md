@@ -9,7 +9,7 @@ This is an independent personal project and is not affiliated with OpenAI.
 ## Project overview
 
 - **Task monitoring:** recent activity, unread status, completion tracking and Git working-tree changes.
-- **Review loops:** multiple concurrent loops across projects (one active loop per project), shown together in a responsive card grid with independent pause/resume/stop controls and saved progress; fresh review chats with a selectable priority limit, automatic address-and-commit follow-ups, and verified commit checkpoints.
+- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops shown together in a responsive card grid and previous loops selected one at a time from a history list; independent pause/resume/stop controls and saved progress; fresh review chats with a selectable priority limit, automatic address-and-commit follow-ups, and verified commit checkpoints.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 - **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
 - **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
