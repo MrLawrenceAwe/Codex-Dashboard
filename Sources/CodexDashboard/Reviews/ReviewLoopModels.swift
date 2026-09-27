@@ -23,7 +23,7 @@ struct ReviewProject: Codable, Equatable, Sendable {
 }
 
 enum ReviewLoopPhase: String, Codable, Sendable {
-    case waiting, running, paused, completed, stopped, blocked
+    case waiting, running, paused, completed, limitReached, stopped, blocked
 }
 
 struct ReviewRound: Codable, Equatable, Sendable {
