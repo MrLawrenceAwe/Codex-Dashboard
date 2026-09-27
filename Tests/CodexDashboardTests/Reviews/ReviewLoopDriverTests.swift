@@ -51,6 +51,16 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertNotEqual(fixed.commit, initial.commit)
         let isAncestor = try await driver.isAncestor(initial.commit, of: fixed.commit, at: directory.path)
         XCTAssertTrue(isAncestor)
+        for reported in [fixed.commit, String(fixed.commit.prefix(7)), String(fixed.commit.prefix(7)).uppercased()] {
+            let resolved = try await driver.resolveCommit(reported, at: directory.path)
+            XCTAssertEqual(resolved, fixed.commit)
+        }
+        for invalid in ["", "HEAD", "main", "--help", "abc", "deadbeef", fixed.commit + "~1"] {
+            do {
+                _ = try await driver.resolveCommit(invalid, at: directory.path)
+                XCTFail("Accepted invalid commit ID: \(invalid)")
+            } catch { }
+        }
     }
 
     func testFixPromptDoesNotAskForTestingAndSchemaHasNoTestGate() throws {

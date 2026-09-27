@@ -193,13 +193,24 @@ final class ReviewLoopCoordinator {
         try requireCompleted(fixTurn)
         let result: ReviewRoundResult = try decodeReport(fixTurn)
         guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
+        let reportedCommit = try await driver.resolveCommit(result.commit, at: updated.project.path)
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
         let repo = try await checkpoint(using: driver, loop: updated, threads: threads, threadID: threadID)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        guard repo.commit == result.commit, result.findings == report.qualifyingFindings(upTo: updated.priorityLimit).count,
-              repo.commit != round.baseCommit,
-              try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) else {
-            throw ReviewLoopError("Commit checkpoint failed: all qualifying fixes must be committed on top of the starting commit, and HEAD must match the fix report.")
+        guard repo.commit == reportedCommit else {
+            throw ReviewLoopError("Commit checkpoint failed: HEAD (\(repo.commit)) differs from the reported fix commit (\(reportedCommit)).")
+        }
+        let expectedFindings = report.qualifyingFindings(upTo: updated.priorityLimit).count
+        guard result.findings == expectedFindings else {
+            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findings) of \(expectedFindings) qualifying findings.")
+        }
+        guard repo.commit != round.baseCommit else {
+            throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
+        }
+        guard try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) else {
+            throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
@@ -208,7 +219,8 @@ final class ReviewLoopCoordinator {
             ? "Round limit reached after committing fixes. No clean review has been confirmed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
-        updated.rounds[updated.rounds.count - 1].result = result
+        updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
+            outcome: result.outcome, findings: result.findings, commit: repo.commit, summary: result.summary)
         updated.expectedCommit = repo.commit
         try persist(updated)
     }

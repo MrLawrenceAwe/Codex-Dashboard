@@ -48,6 +48,36 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
 
+    func testShortReportedCommitIsResolvedAndStoredInFull() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1, .p2])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 2, commit: "35bdc02")
+        let fullCommit = "35bdc02" + String(repeating: "a", count: 33)
+        driver.resolvedCommit = fullCommit
+        driver.commit = fullCommit
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .waiting)
+        XCTAssertEqual(coordinator.loop?.expectedCommit, fullCommit)
+        XCTAssertEqual(coordinator.loop?.rounds.last?.result?.commit, fullCommit)
+        XCTAssertEqual(driver.prompts.count, 2)
+    }
+
+    func testStopDuringCommitResolutionDoesNotAdvance() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p2])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        driver.onResolveCommit = { self.stop(coordinator) }
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loop?.phase, .stopped)
+        XCTAssertNil(coordinator.loop?.rounds.last?.result)
+    }
+
     func testProgressTracksSubmittedAndConditionalPrompts() async throws {
         let (coordinator, _, driver) = try make()
         XCTAssertNil(coordinator.progress?.current)
@@ -109,13 +139,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     }
 
     func testRejectsDirtyTreeWrongCommitAndRewrittenHistory() async throws {
-        for failure in ["dirty", "commit", "ancestry", "branch", "noCommit"] {
+        for failure in ["dirty", "commit", "ancestry", "branch", "noCommit", "findings"] {
             let (coordinator, _, driver) = try make()
             await coordinator.advance(using: driver, threads: [])
             driver.review(priorities: [.p2])
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            driver.finish(findings: 1, commit: failure == "noCommit" ? "base" : "fixed")
+            driver.finish(findings: failure == "findings" ? 0 : 1, commit: failure == "noCommit" ? "base" : "fixed")
             if failure == "dirty" { driver.clean = false }
             if failure == "commit" { driver.commit = "unexpected" }
             if failure == "ancestry" { driver.ancestor = false }
@@ -381,6 +411,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var commit = "base"
     var branch = "main"
     var ancestor = true
+    var resolvedCommit: String?
+    var onResolveCommit: (() -> Void)?
     var failCreate = false
     var createCalls = 0
     var createdThreads: [String] = []
@@ -397,6 +429,10 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         return ReviewRepositoryState(root: "/tmp/example", branch: branch, commit: commit, clean: clean)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
+    func resolveCommit(_ commit: String, at path: String) async throws -> String {
+        onResolveCommit?()
+        return resolvedCommit ?? commit
+    }
     func createThread(project: ReviewProject, title: String) async throws -> String {
         createCalls += 1
         if failCreate { throw ReviewLoopError("Lost response") }
