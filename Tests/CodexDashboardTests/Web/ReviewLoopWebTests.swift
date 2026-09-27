@@ -148,7 +148,14 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-context] strong').textContent,
             document.querySelector('.review-round-details').open,
             document.querySelector('.review-round-details p').textContent,
-            document.querySelector('[data-review-action="pause"]').textContent];
+            document.querySelector('[data-review-action="pause"]').textContent,
+            document.querySelector('[data-review-meter]').value,
+            document.querySelector('[data-review-round-count]').textContent,
+            !!(document.querySelector('[data-review-activity]').compareDocumentPosition(document.querySelector('[data-review-form]')) & Node.DOCUMENT_POSITION_FOLLOWING)];
+          loop.pauseRequested = true;
+          api.applyReviewLoop(snapshot);
+          active.push(document.querySelector('[data-review-action="pause"]').disabled,
+            document.querySelector('[data-review-action="pause"]').textContent);
           loop.phase = 'completed';
           api.applyReviewLoop(snapshot);
           return [...active,document.querySelector('[data-review-form]').hidden,
@@ -156,7 +163,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-badge]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, "Example <project>", true, "Fixed <issue>", "Pause after round", false, 0, "Completed"])
+        XCTAssertEqual(result, [true, true, "Example <project>", true, "Fixed <issue>", "Pause after round", 1, "1 of 5", true, true, "Pausing after round…", false, 0, "Completed"])
     }
 
     func testRoundLimitShowsFinalStatusWithoutResume() async throws {
@@ -184,7 +191,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             limitColor === successColor];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "All configured review rounds completed.", true])
+        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "Round limit reached after committing fixes. No clean review has been confirmed.", false])
     }
 
     func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {

@@ -15,9 +15,11 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <h1>Review loop</h1>
+        <div><h1>Review loop</h1><p>Review, fix, and verify in fresh tasks until no qualifying issues remain.</p></div>
       </header>
       <form data-review-form>
+        <div class="review-setup-heading"><h2>Configure your loop</h2></div>
+        <fieldset class="review-scope"><legend>Review scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label>Project type<select data-review-project-type aria-label="Project type">
           <option value="">General project</option><option value="personal">Personal project</option>
@@ -27,9 +29,14 @@ const reviewLoopView = (() => {
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
         <label>Max rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
+        </fieldset>
+        <details class="review-execution-options"><summary>Model &amp; speed <span>Optional</span></summary>
+        <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
         <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
         <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
         <label>Speed<select data-review-speed aria-label="Review speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
+        </fieldset>
+        </details>
         <div class="review-form-footer">
           <button type="submit" data-review-start>Start loop <span aria-hidden="true">→</span></button>
         </div>
@@ -39,6 +46,7 @@ const reviewLoopView = (() => {
         <div class="review-section-heading"><h2 id="review-activity-title">Loop status</h2><span data-review-badge hidden></span></div>
         <div data-review-context class="review-context" hidden></div>
         <div data-review-status role="status" aria-live="polite"></div>
+        <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
         <div class="review-live" data-review-live hidden>
           <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open task ↗</button></div>
@@ -52,7 +60,7 @@ const reviewLoopView = (() => {
           </details>
           <p class="review-next-message" data-review-next-message></p>
         </div>
-        <p class="review-empty" data-review-empty>No loop started.</p>
+        <div class="review-empty" data-review-empty><strong>Ready when you are</strong><p>Each round reviews your project, fixes qualifying findings, and verifies the commit before continuing.</p><div class="review-workflow" aria-label="Round workflow"><span>1 · Review</span><span>2 · Fix &amp; commit</span><span>3 · Verify</span></div></div>
         <ol data-review-rounds aria-label="Review rounds"></ol>
       </section>`;
     page.append(details);
@@ -102,6 +110,11 @@ const reviewLoopView = (() => {
       projectsSignature = signature;
     }
     root.querySelector('[data-review-form]').hidden = !canStartLoop(loop);
+    const form = root.querySelector('[data-review-form]');
+    const activity = root.querySelector('[data-review-activity]');
+    if (loop && activity.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(activity, form);
+    if (!loop && form.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(form, activity);
+    root.dataset.hasLoop = String(!!loop);
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
     const badge = root.querySelector('[data-review-badge]');
@@ -111,18 +124,25 @@ const reviewLoopView = (() => {
     const context = root.querySelector('[data-review-context]');
     context.hidden = !loop;
     context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}` : '';
-    root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…'
-      : loop?.phase === 'limitReached' ? 'All configured review rounds completed.' : loop?.message || '';
+    root.querySelector('[data-review-status]').textContent = pendingAction
+      ? ({ start: 'Starting loop…', pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
+      : loop?.message || '';
+    const completedRounds = (loop?.rounds || []).filter(round => round.result).length;
+    root.querySelector('[data-review-round-progress]').hidden = !loop;
+    root.querySelector('[data-review-round-count]').textContent = loop ? `${completedRounds} of ${loop.maxRounds}` : '';
+    const meter = root.querySelector('[data-review-meter]');
+    meter.max = loop?.maxRounds || 1;
+    meter.value = completedRounds;
     root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
     renderProgress(root, loop, snapshot.progress);
-    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
+    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : `${loop ? 'Start new loop' : 'Start loop'} <span aria-hidden="true">→</span>`;
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
     const controls = root.querySelector('[data-review-controls]');
     controls.innerHTML = canStartLoop(loop) ? '' : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
-      : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
+      : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
     const expandedRounds = new Set(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('[data-review-rounds] details[open]')].map(details => details.dataset.round) : []);
