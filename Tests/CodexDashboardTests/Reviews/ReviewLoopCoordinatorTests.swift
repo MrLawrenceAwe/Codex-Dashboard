@@ -527,6 +527,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
             XCTAssertEqual(saved.focus, focus)
+            XCTAssertEqual(saved.priorityLimit, focus.usesPriorities ? .p2 : nil)
             let expectedReview: String
             let expectedFix: String
             switch focus {
@@ -545,7 +546,8 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             }
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            driver.review(priorities: [.p1])
+            if focus.usesPriorities { driver.review(priorities: [.p1]) }
+            else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts, [expectedReview, expectedFix])
@@ -649,6 +651,9 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     func review(priorities: [ReviewFinding.Priority]) {
         let findings = priorities.map { "## [\($0.rawValue)] Example issue\nEvidence and impact" }.joined(separator: "\n\n")
         finishTurn("# Review complete\n\nFindings: \(priorities.count)\n\n## Summary\nReview finished\n\n" + findings)
+    }
+    func reviewWithoutPriorities() {
+        finishTurn("# Review complete\n\nFindings: 1\n\n## Summary\nReview finished\n\n## Simplify the layout\nEvidence and impact")
     }
     func finish(findings: Int, commit: String) {
         self.commit = commit

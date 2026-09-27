@@ -53,7 +53,8 @@ final class ReviewLoopCoordinator {
             }
             let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, focus: action.focus ?? .bugs, speed: action.speed ?? .standard, priorityLimit: action.priorityLimit ?? .p2))
+            let focus = action.focus ?? .bugs
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
         case "pause", "resume", "stop":
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
@@ -178,31 +179,31 @@ final class ReviewLoopCoordinator {
         if round.review == nil {
             if reviewTurn.status == "inProgress" { return }
             try requireCompleted(reviewTurn)
-            let report = try ReviewReportContract.review(reviewTurn.finalMessage)
+            let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
             guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
             let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
             updated = current
             guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
-            if !report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty,
-               report.qualifyingFindings(upTo: updated.priorityLimit).count != report.findings.count {
+            let findings = report.findings(upTo: updated.priorityLimit)
+            if !findings.isEmpty, findings.count != report.findings.count {
                 throw ReviewLoopError("The review included findings outside the selected priority limit. Inspect its report before asking to address all.")
             }
             round.reviewTurnID = reviewTurn.id
             round.review = report
-            if report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty {
+            if findings.isEmpty {
                 round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
                                                  commit: repo.commit, summary: report.summary)
                 updated.phase = .completed
-                updated.message = "Review \(round.number) found no \(updated.priorityLimit.rangeLabel) findings. No fix prompt was sent."
+                updated.message = "Review \(round.number) found no \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. No fix prompt was sent."
             } else {
-                updated.message = "Review \(round.number) found \(report.qualifyingFindings(upTo: updated.priorityLimit).count) \(updated.priorityLimit.rangeLabel) findings. Preparing the fix prompt."
+                updated.message = "Review \(round.number) found \(findings.count) \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. Preparing the fix prompt."
             }
             updated.rounds[updated.rounds.count - 1] = round
             try persist(updated)
             return
         }
-        guard let report = round.review, !report.qualifyingFindings(upTo: updated.priorityLimit).isEmpty else { throw ReviewLoopError("The review has no qualifying findings to fix.") }
+        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else { throw ReviewLoopError("The review has no findings to fix.") }
         if !round.fixRequested {
             let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -210,7 +211,7 @@ final class ReviewLoopCoordinator {
             guard repo.commit == round.baseCommit else { throw ReviewLoopError("HEAD changed after the review. Start a new review of the current commit.") }
             round.fixRequested = true
             updated.rounds[updated.rounds.count - 1] = round
-            updated.message = "Addressing the \(updated.priorityLimit.rangeLabel) findings in review \(round.number), then committing."
+            updated.message = "Addressing the \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings in review \(round.number), then committing."
             try persist(updated)
             let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed)
             guard let current = matchingLoop(updated.id) else { return }
@@ -236,9 +237,9 @@ final class ReviewLoopCoordinator {
         guard repo.commit == reportedCommit else {
             throw ReviewLoopError("Commit checkpoint failed: HEAD (\(repo.commit)) differs from the reported fix commit (\(reportedCommit)).")
         }
-        let expectedFindings = report.qualifyingFindings(upTo: updated.priorityLimit).count
+        let expectedFindings = report.findings(upTo: updated.priorityLimit).count
         guard result.findingCount == expectedFindings else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findingCount) of \(expectedFindings) qualifying findings.")
+            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findingCount) of \(expectedFindings) findings.")
         }
         guard repo.commit != round.baseCommit else {
             throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")

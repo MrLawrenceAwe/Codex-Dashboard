@@ -5,6 +5,13 @@ const reviewLoopView = (() => {
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
+  const usesPriorities = focus => !['organisation', 'naming'].includes(focus);
+
+  function renderReviewSettings() {
+    const root = panel();
+    if (!root) return;
+    root.querySelector('.review-priority').hidden = !usesPriorities(root.querySelector('[data-review-focus]').value);
+  }
 
   function createPage() {
     const page = document.createElement('section');
@@ -38,7 +45,7 @@ const reviewLoopView = (() => {
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Each round reviews findings and commits fixes. Stops when no qualifying findings remain or the limit is reached.</p>
+        <p id="review-limit-help" class="review-field-help">Each round reviews findings and commits fixes. Stops when no findings remain or the limit is reached.</p>
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -140,6 +147,7 @@ const reviewLoopView = (() => {
     }
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
+    renderReviewSettings();
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
     root.querySelector('[data-review-empty]').hidden = activeCount > 0;
@@ -187,7 +195,7 @@ const reviewLoopView = (() => {
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus])}</span><span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus] || focusLabels.bugs)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -210,7 +218,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-rounds]').innerHTML = (loop?.rounds || []).map(round => `<li>
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(({ clean: 'No qualifying findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      <span>${escape(({ clean: 'No findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.length} findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
       ${round.result?.summary ? `<details class="review-round-details" data-round="${round.number}" ${expandedRounds.has(String(round.number)) ? 'open' : ''}><summary>View summary</summary><p>${escape(round.result.summary)}</p></details>` : ''}
     </div></li>`).join('');
   }
@@ -246,5 +254,5 @@ const reviewLoopView = (() => {
     modelsSignature = '';
   }
 
-  return { createPage, render, renderEfforts, renderNavigationStatus, reset };
+  return { createPage, render, renderEfforts, renderReviewSettings, renderNavigationStatus, reset };
 })();

@@ -20,7 +20,7 @@ final class ReviewReportContractTests: XCTestCase {
     """
 
     func testReadsReadableFindingsWithLinksAndParagraphs() throws {
-        let report = try ReviewReportContract.review(review.replacingOccurrences(of: "\n", with: "\r\n"))
+        let report = try ReviewReportContract.review(review.replacingOccurrences(of: "\n", with: "\r\n"), priorityLimit: .p3)
         XCTAssertEqual(report.outcome, .reviewed)
         XCTAssertEqual(report.findings.map(\.priority), [.p1, .p2])
         XCTAssertEqual(report.findings[0].title, "Stop can be undone")
@@ -30,8 +30,19 @@ final class ReviewReportContractTests: XCTestCase {
 
     func testCleanAndBlockedReviewsAreDistinct() throws {
         let clean = "# Review complete\nFindings: 0\n\n## Summary\nNo issues found."
-        XCTAssertEqual(try ReviewReportContract.review(clean).findings, [])
-        XCTAssertEqual(try ReviewReportContract.review(clean.replacingOccurrences(of: "complete", with: "blocked")).outcome, .blocked)
+        XCTAssertEqual(try ReviewReportContract.review(clean, priorityLimit: .p3).findings, [])
+        XCTAssertEqual(try ReviewReportContract.review(clean.replacingOccurrences(of: "complete", with: "blocked"), priorityLimit: .p3).outcome, .blocked)
+    }
+
+    func testUnprioritisedReportAcceptsPlainFindingsAndRejectsPriorityLabels() throws {
+        let text = "# Review complete\nFindings: 1\n\n## Summary\nOne improvement.\n\n## Simplify the layout\nThe duplicated layout code can be shared."
+        let report = try ReviewReportContract.review(text, priorityLimit: nil)
+        XCTAssertEqual(report.findings.count, 1)
+        XCTAssertNil(report.findings[0].priority)
+        XCTAssertEqual(report.findings[0].title, "Simplify the layout")
+        XCTAssertThrowsError(try ReviewReportContract.review(text.replacingOccurrences(of: "## Simplify", with: "## [P2] Simplify"), priorityLimit: nil))
+        XCTAssertThrowsError(try ReviewReportContract.review(text, priorityLimit: .p2))
+        XCTAssertTrue(ReviewReportContract.instructions(for: .review(nil)).contains("without priority labels"))
     }
 
     func testMalformedOrIncompleteReviewsFailClosed() {
@@ -41,7 +52,7 @@ final class ReviewReportContractTests: XCTestCase {
                             "```markdown\n" + review + "\n```",
                             "# Review complete\nFindings: 0\n\n## Summary\n",
                             review + "\n# Review complete\nFindings: 0"] {
-            XCTAssertThrowsError(try ReviewReportContract.review(text))
+            XCTAssertThrowsError(try ReviewReportContract.review(text, priorityLimit: .p3))
         }
     }
 

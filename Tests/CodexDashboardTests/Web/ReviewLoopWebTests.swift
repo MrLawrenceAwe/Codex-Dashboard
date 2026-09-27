@@ -188,16 +188,17 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           for (const option of select.options) {
             select.value = option.value;
             select.dispatchEvent(new Event('change'));
-            const hidden = document.querySelector('.review-project-type').hidden;
+            const hidden = document.querySelector('.review-priority').hidden;
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
-            results.push(action.focus, hidden);
+            results.push(action.focus, hidden, action.priorityLimit);
             api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
           }
           return results;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["bugs", false, "organisation", false, "naming", false, "performance", false])
+        XCTAssertEqual(result, ["bugs", false, "P2", "organisation", true, NSNull(),
+                                "naming", true, NSNull(), "performance", false, "P2"])
     }
 
     func testPanelQueuesOnceAndAcknowledgesWithoutTouchingComposer() async throws {
