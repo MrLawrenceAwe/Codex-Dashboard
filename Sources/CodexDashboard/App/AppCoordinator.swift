@@ -175,7 +175,7 @@ final class AppCoordinator: ObservableObject {
         accounts.persistUsageCache(force: true)
         refreshScheduler.stop()
         accountPopoverActionListener.stop()
-        synchronizationGate.stop()
+        synchronizationGate.cancel()
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
             self.activationObserver = nil
@@ -263,7 +263,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func cancelSynchronization() async {
-        await synchronizationGate.cancel()
+        await synchronizationGate.cancelAndWait()
     }
 
     func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {

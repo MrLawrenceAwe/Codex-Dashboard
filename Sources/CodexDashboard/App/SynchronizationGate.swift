@@ -28,7 +28,7 @@ final class SynchronizationGate {
         }
     }
 
-    func cancel() async {
+    func cancelAndWait() async {
         let current = task
         task = nil
         taskID = nil
@@ -37,7 +37,7 @@ final class SynchronizationGate {
         await current?.value
     }
 
-    func stop() {
+    func cancel() {
         task?.cancel()
         task = nil
         taskID = nil

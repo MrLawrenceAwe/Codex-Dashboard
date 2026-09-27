@@ -231,7 +231,7 @@ final class AccountCoordinatorTests: XCTestCase {
         let account = try manager.saveCurrentAccount()
         let coordinator = AccountCoordinator(manager: manager, usageProvider: StubAccountUsageProvider())
 
-        coordinator.deleteAccount(account.id)
+        coordinator.forgetSavedAccount(account.id)
         XCTAssertFalse(coordinator.synchronizeActiveCredentialAfterFileChange())
         XCTAssertTrue(try manager.loadDocument().accounts.isEmpty)
         XCTAssertNil(coordinator.activeSavedAccountID)

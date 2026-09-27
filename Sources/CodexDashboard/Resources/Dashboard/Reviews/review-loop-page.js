@@ -31,7 +31,7 @@ const reviewLoopPage = (() => {
       if (!event.target.reportValidity()) return;
       const model = details.querySelector('[data-review-model]').value;
       const effort = details.querySelector('[data-review-effort]').value;
-      queue({ selection: model ? { model, effort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
+      queue({ selection: model ? { modelID: model, reasoningEffort: effort || null } : null, kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         speed: details.querySelector('[data-review-speed]').value,
         instructions: details.querySelector('[data-review-project-type]').value === 'personal' ? '(this is a project for personal use)' : '',
         priorityLimit: details.querySelector('[data-review-priority]').value,

@@ -3,13 +3,22 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
+    func testSavedModelSelectionMigratesToCurrentNames() throws {
+        let saved = Data(#"{"model":"chosen","effort":"high"}"#.utf8)
+        let selection = try JSONDecoder().decode(ReviewModelSelection.self, from: saved)
+        XCTAssertEqual(selection.modelID, "chosen")
+        XCTAssertEqual(selection.reasoningEffort, "high")
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(selection)) as? [String: String])
+        XCTAssertEqual(encoded, ["modelID": "chosen", "reasoningEffort": "high"])
+    }
+
     func testProjectAndModelListsReadEveryPage() async throws {
         let connection = ReviewListDevTools()
         let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
         let projects = try await driver.projects()
         let models = try await driver.models()
         XCTAssertEqual(projects.map(\.name), ["Alpha", "Zeta"])
-        XCTAssertEqual(models.map(\.model), ["model-a", "model-b"])
+        XCTAssertEqual(models.map(\.modelID), ["model-a", "model-b"])
         let projectCursors = await connection.cursors(for: "project/list")
         let modelCursors = await connection.cursors(for: "model/list")
         XCTAssertEqual(projectCursors, [nil, "next"])
@@ -39,7 +48,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let cases: [(ReviewTurnKind, ReviewSpeed)] = [(.review(.p1), .standard), (.fix, .fast)]
         for (kind, speed) in cases {
             let id = try await driver.startTurn(threadID: "thread", prompt: "Do the work", kind: kind,
-                                                selection: ReviewModelSelection(model: "chosen", effort: "high"), speed: speed)
+                                                selection: ReviewModelSelection(modelID: "chosen", reasoningEffort: "high"), speed: speed)
             XCTAssertEqual(id, "turn")
             let expression = await connection.expression
             let prefix = "window.__codexDashboard.reviewRequest("

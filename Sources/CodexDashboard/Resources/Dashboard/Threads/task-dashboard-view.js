@@ -91,7 +91,7 @@ const taskDashboardView = (() => {
     visibleThreadLimit,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
-    commitOrPushError,
+    commitDialogError,
     isThreadUnread,
     isCompletionTickVisible,
     state,
@@ -101,8 +101,8 @@ const taskDashboardView = (() => {
     if (!page) return false;
     const notice = page.querySelector('[data-commit-notice]');
     if (notice) {
-      notice.textContent = commitOrPushError;
-      notice.hidden = !commitOrPushError;
+      notice.textContent = commitDialogError;
+      notice.hidden = !commitDialogError;
     }
     page.querySelectorAll('[data-filter]').forEach((button) => {
       const isActive = button.dataset.filter === filterMode;
@@ -126,25 +126,25 @@ const taskDashboardView = (() => {
       ? [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))]
       : null;
     const displayedChangedProjectPaths = changedProjectPaths?.slice(0, visibleThreadLimit);
-    const recentThreads = filterMode === 'recent'
+    const recentThreads = filterMode === 'home'
       ? visibleThreads.filter((thread) => thread.runState !== 'running')
       : null;
     const displayedThreads = changedProjectPaths
       ? visibleThreads.filter((thread) => displayedChangedProjectPaths
         .includes(String(thread.projectPath).trim()))
-      : filterMode === 'recent'
+      : filterMode === 'home'
         ? [...visibleThreads.filter((thread) => thread.runState === 'running'),
           ...recentThreads.slice(0, visibleThreadLimit)]
         : visibleThreads.slice(0, visibleThreadLimit);
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = changedProjectPaths
       ? visibleThreadLimit >= changedProjectPaths.length
-      : filterMode === 'recent'
+      : filterMode === 'home'
         ? visibleThreadLimit >= recentThreads.length
         : displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
-    list.classList.toggle('is-compact', filterMode === 'recent');
-    list.classList.toggle('has-sections', filterMode === 'recent' && state.runningCount > 0);
+    list.classList.toggle('is-compact', filterMode === 'home');
+    list.classList.toggle('has-sections', filterMode === 'home' && state.runningCount > 0);
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'

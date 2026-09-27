@@ -281,8 +281,8 @@ final class DashboardRenderer {
         try? await deliverAccountPopover(snapshot, to: targets)
     }
 
-    func preferNativePromptLibraryOnNextSynchronization() {
-        promptLibraryBridge?.preferNativeLibrary()
+    func useStoredPromptLibraryOnNextSync() {
+        promptLibraryBridge?.useStoredLibrary()
         lastPromptLibrarySynchronization = nil
     }
 

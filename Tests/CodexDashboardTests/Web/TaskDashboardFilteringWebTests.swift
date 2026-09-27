@@ -34,7 +34,7 @@ extension TaskDashboardWebTests {
               const todoControls = () => document.querySelector(
                 '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
               ) === null;
-              const filters = ['recent', 'unread', 'changedProjects'];
+              const filters = ['home', 'unread', 'changedProjects'];
               return filters.map((filter) => {
                 document.querySelector(`[data-filter="${filter}"]`).click();
                 return todoControls();
@@ -143,7 +143,7 @@ extension TaskDashboardWebTests {
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="home"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="running"]') === null,
                 [...document.querySelectorAll('[data-dashboard-section]')]
                   .map((section) => [section.dataset.dashboardSection,
@@ -203,7 +203,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[3] as? Bool, true)
     }
 
-    func testRecentFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
+    func testHomeFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -221,7 +221,7 @@ extension TaskDashboardWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="recent"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="home"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="all"]') === null,
                 initialIDs,
                 document.querySelector('[data-filter-count="recent"]') === null,

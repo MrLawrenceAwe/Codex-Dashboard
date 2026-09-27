@@ -27,7 +27,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         for row in try await listedRows(method: "model/list", description: "model") where row["hidden"] as? Bool != true {
             guard let model = row["model"] as? String, let name = row["displayName"] as? String,
                   let efforts = row["supportedReasoningEfforts"] as? [[String: Any]] else { continue }
-            models.append(ReviewModel(model: model, displayName: name, efforts: efforts.compactMap { $0["reasoningEffort"] as? String }))
+            models.append(ReviewModel(modelID: model, displayName: name, supportedReasoningEfforts: efforts.compactMap { $0["reasoningEffort"] as? String }))
         }
         return models
     }
@@ -103,8 +103,8 @@ final class ReviewLoopDriver: ReviewLoopDriving {
             "input": [["type": "text", "text": prompt + "\n\n" + ReviewReportContract.instructions(for: kind), "text_elements": []]],
         ]
         if let selection {
-            params["model"] = selection.model
-            if let effort = selection.effort { params["effort"] = effort }
+            params["model"] = selection.modelID
+            if let effort = selection.reasoningEffort { params["effort"] = effort }
         }
         let response = try await request("turn/start", params)
         guard let turn = response["turn"] as? [String: Any], let id = turn["id"] as? String else {

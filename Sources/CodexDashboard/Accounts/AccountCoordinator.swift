@@ -110,9 +110,9 @@ final class AccountCoordinator: ObservableObject {
         }
     }
 
-    func deleteAccount(_ accountID: UUID) {
+    func forgetSavedAccount(_ accountID: UUID) {
         do {
-            try manager.deleteAccount(accountID)
+            try manager.forgetSavedAccount(accountID)
             statusMessage = "Removed the saved account from Keychain."
             usageByAccountID[accountID] = nil
             refreshingUsageAccountIDs.remove(accountID)
