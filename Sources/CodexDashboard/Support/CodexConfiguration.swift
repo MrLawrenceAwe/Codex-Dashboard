@@ -5,7 +5,7 @@ enum CodexConfiguration {
     static let bundleIdentifier = "com.openai.codex"
     static let codexApplicationURL = URL(fileURLWithPath: "/Applications/ChatGPT.app", isDirectory: true)
     static let codexExecutableURL = codexApplicationURL
-        .appendingPathComponent("Contents/Resources/codex")
+        .appendingPathComponent("Contents/Resources/codex-cli/bin/codex")
     static let devToolsAddress = "127.0.0.1"
     // Reuse the port of an already-running Codex renderer so restarting only the
     // dashboard does not orphan its connection. New Codex launches still receive

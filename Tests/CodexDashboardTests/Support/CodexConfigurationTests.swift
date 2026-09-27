@@ -8,6 +8,10 @@ final class CodexConfigurationTests: XCTestCase {
             CodexConfiguration.codexApplicationURL.path,
             "/Applications/ChatGPT.app"
         )
+        XCTAssertEqual(
+            CodexConfiguration.codexExecutableURL.path,
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+        )
         XCTAssertTrue((49_152...65_535).contains(CodexConfiguration.devToolsPort))
         XCTAssertEqual(
             CodexConfiguration.launchArguments,
