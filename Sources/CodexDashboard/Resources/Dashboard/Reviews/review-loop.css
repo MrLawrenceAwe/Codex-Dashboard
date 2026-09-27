@@ -89,7 +89,7 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-execution-options > summary { width:100%; color:inherit; font-size:12px; font-weight:500; }
 .dashboard-review-loop .review-execution-options > summary span { float:right; color:var(--review-muted); font-size:11px; font-weight:400; }
 .dashboard-review-loop .review-execution { grid-template-columns:repeat(2, minmax(0, 1fr)); padding-top:18px; }
-.dashboard-review-loop .review-execution label:first-of-type { grid-column:1 / -1; }
+.dashboard-review-loop .review-execution label:last-of-type { grid-column:1 / -1; }
 .dashboard-review-loop :is(.review-execution-legend, .review-visually-hidden) { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); }
 .dashboard-review-loop .review-round-progress { margin-top:24px; padding:16px; background:var(--review-tint); border:1px solid var(--review-border); border-radius:10px; }
 .dashboard-review-loop .review-round-progress > div { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; color:var(--review-muted); font-size:11px; }

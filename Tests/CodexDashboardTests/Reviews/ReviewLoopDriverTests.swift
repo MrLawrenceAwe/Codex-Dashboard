@@ -12,6 +12,19 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertEqual(encoded, ["modelID": "chosen", "reasoningEffort": "high"])
     }
 
+    func testSavedLoopCarriesPreviousSelectionIntoBothTurns() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 2)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved["selection"] = ["modelID": "previous-model", "reasoningEffort": "high"]
+        let restored = try JSONDecoder().decode(ReviewLoop.self, from: JSONSerialization.data(withJSONObject: saved))
+        XCTAssertEqual(restored.reviewSelection?.modelID, "previous-model")
+        XCTAssertEqual(restored.fixSelection?.reasoningEffort, "high")
+        let rewritten = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
+        XCTAssertNil(rewritten["selection"])
+        XCTAssertNotNil(rewritten["reviewSelection"])
+        XCTAssertNotNil(rewritten["fixSelection"])
+    }
+
     func testProjectAndModelListsReadEveryPage() async throws {
         let connection = ReviewListDevTools()
         let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))

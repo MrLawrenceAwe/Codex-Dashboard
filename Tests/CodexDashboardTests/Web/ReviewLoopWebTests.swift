@@ -267,6 +267,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const effort = document.querySelector('[data-review-effort]');
           const choices = [...effort.options].map(o => o.value).join(',');
           effort.value = 'high';
+          const fixModel = document.querySelector('[data-fix-model]');
+          fixModel.value = 'model-b'; fixModel.dispatchEvent(new Event('change'));
+          const fixEffort = document.querySelector('[data-fix-effort]');
+          const fixChoices = [...fixEffort.options].map(o => o.value).join(',');
+          fixEffort.value = 'medium';
           const speed = document.querySelector('[data-review-speed]');
           const defaultSpeed = speed.value;
           speed.value = 'fast';
@@ -274,10 +279,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const action = JSON.parse(api.pendingReviewAction());
           api.openTodos();
           const closed = !document.getElementById('codex-dashboard-review-page').classList.contains('is-open');
-          return [placed,sameWidth,exclusive,restored,choices,defaultSpeed,action.speed,action.selection.modelID,action.selection.reasoningEffort,closed];
+          return [placed,sameWidth,exclusive,restored,choices,fixChoices,defaultSpeed,action.speed,action.reviewSelection.modelID,action.reviewSelection.reasoningEffort,action.fixSelection.modelID,action.fixSelection.reasoningEffort,closed];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, true, true, ",low,high", "standard", "fast", "model-a", "high", true])
+        XCTAssertEqual(result, [true, true, true, true, ",low,high", ",medium", "standard", "fast", "model-a", "high", "model-b", "medium", true])
     }
 
     func testActivityPreservesExpandedSummaryAndShowsLoopState() async throws {

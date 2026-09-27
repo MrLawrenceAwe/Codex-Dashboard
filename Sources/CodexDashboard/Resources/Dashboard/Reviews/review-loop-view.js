@@ -49,8 +49,10 @@ const reviewLoopView = (() => {
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
-        <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
-        <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <label>Review model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
+        <label>Review reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <label>Fix model<select data-fix-model aria-label="Fix model"><option value="">Codex default</option></select></label>
+        <label>Fix reasoning<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
         <label>Speed<select data-review-speed aria-label="Review speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         </fieldset>
         </details>
@@ -106,11 +108,11 @@ const reviewLoopView = (() => {
     if (spinner) spinner.hidden = !snapshot.loops.some(loop => ['waiting', 'running'].includes(loop.phase));
   }
 
-  function renderEfforts(snapshot, pendingAction) {
+  function renderEfforts(snapshot, pendingAction, kind = 'review') {
     const root = panel();
     if (!root) return;
-    const model = (snapshot.models || []).find(item => item.modelID === root.querySelector('[data-review-model]').value);
-    const select = root.querySelector('[data-review-effort]');
+    const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
+    const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
     select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
@@ -123,17 +125,19 @@ const reviewLoopView = (() => {
     if (!root) return;
     const { loops, projects, error } = snapshot;
     const models = snapshot.models || [];
-    const modelSelect = root.querySelector('[data-review-model]');
     const nextModelsSignature = JSON.stringify(models);
     if (nextModelsSignature !== modelsSignature) {
-      const selected = modelSelect.value;
-      modelSelect.innerHTML = '<option value="">Codex default</option>' + models.map(model => `<option value="${escape(model.modelID)}">${escape(model.displayName)}</option>`).join('');
-      if (selected) {
-        if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
-        modelSelect.value = selected;
+      for (const kind of ['review', 'fix']) {
+        const modelSelect = root.querySelector(`[data-${kind}-model]`);
+        const selected = modelSelect.value;
+        modelSelect.innerHTML = '<option value="">Codex default</option>' + models.map(model => `<option value="${escape(model.modelID)}">${escape(model.displayName)}</option>`).join('');
+        if (selected) {
+          if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
+          modelSelect.value = selected;
+        }
+        renderEfforts(snapshot, pendingAction, kind);
       }
       modelsSignature = nextModelsSignature;
-      renderEfforts(snapshot, pendingAction);
     }
     const select = root.querySelector('[data-review-project]');
     const busyProjects = new Set(loops.filter(loop => !isFinished(loop)).map(loop => loop.project.id));
@@ -146,7 +150,7 @@ const reviewLoopView = (() => {
       projectsSignature = signature;
     }
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
-    root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
+    for (const kind of ['review', 'fix']) root.querySelector(`[data-${kind}-effort]`).disabled ||= !root.querySelector(`[data-${kind}-model]`).value;
     renderReviewSettings();
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
@@ -195,7 +199,8 @@ const reviewLoopView = (() => {
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus] || focusLabels.bugs)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}`;
+    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(selection.reasoningEffort)}` : ''}` : 'Codex default'}</span>`;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus] || focusLabels.bugs)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';

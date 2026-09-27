@@ -54,7 +54,7 @@ final class ReviewLoopCoordinator {
             let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
             let focus = action.focus ?? .bugs
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, selection: action.selection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, reviewSelection: action.reviewSelection, fixSelection: action.fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
         case "pause", "resume", "stop":
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
@@ -152,7 +152,7 @@ final class ReviewLoopCoordinator {
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
         guard updated.phase == .running else { return }
-        let turnID = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.reviewPrompt(for: updated), kind: .review(updated.priorityLimit), selection: updated.selection, speed: updated.speed)
+        let turnID = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.reviewPrompt(for: updated), kind: .review(updated.priorityLimit), selection: updated.reviewSelection, speed: updated.speed)
         guard let current = matchingLoop(updated.id) else { return }
         updated = current
         updated.rounds[updated.rounds.count - 1].reviewTurnID = turnID
@@ -213,7 +213,7 @@ final class ReviewLoopCoordinator {
             updated.rounds[updated.rounds.count - 1] = round
             updated.message = "Addressing the \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings in review \(round.number), then committing."
             try persist(updated)
-            let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.selection, speed: updated.speed)
+            let id = try await driver.startTurn(threadID: threadID, prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round), kind: .fix, selection: updated.fixSelection, speed: updated.speed)
             guard let current = matchingLoop(updated.id) else { return }
             updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id
