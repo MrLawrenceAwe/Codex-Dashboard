@@ -43,6 +43,48 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
 
+    func testProgressTracksSubmittedAndConditionalPrompts() async throws {
+        let (coordinator, _, driver) = try make()
+        XCTAssertNil(coordinator.progress?.current)
+        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("[HEAD verified before review]") == true)
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.progress?.step, "Reviewing")
+        XCTAssertEqual(coordinator.progress?.current?.text, driver.prompts.last)
+        XCTAssertTrue(coordinator.progress?.upcoming?.note.contains("Only if") == true)
+        driver.review(priorities: [.p1, .p2])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.progress?.step, "Preparing fixes")
+        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Address both and commit")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.progress?.current?.text, driver.prompts.last)
+        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("[commit from the current fix]") == true)
+        try coordinator.apply(action("pause", for: coordinator), projects: [project])
+        XCTAssertTrue(coordinator.progress?.upcoming?.note.contains("resume") == true)
+        driver.finish(findings: 2, commit: "fixed")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.progress?.step, "Paused")
+        XCTAssertTrue(coordinator.progress?.upcoming?.text.contains("Expected starting HEAD: fixed") == true)
+        try coordinator.apply(action("stop", for: coordinator), projects: [project])
+        XCTAssertNil(coordinator.progress?.upcoming)
+        XCTAssertEqual(coordinator.progress?.currentLabel, "Latest prompt")
+    }
+
+    func testProgressDoesNotQueuePastRoundLimitOrCleanReview() async throws {
+        let (coordinator, _, driver) = try make(limit: 1)
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertNotNil(coordinator.progress?.upcoming)
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertNil(coordinator.progress?.upcoming)
+        let (clean, _, cleanDriver) = try make()
+        await clean.advance(using: cleanDriver, threads: [])
+        cleanDriver.review(priorities: [])
+        await clean.advance(using: cleanDriver, threads: [])
+        XCTAssertEqual(clean.progress?.step, "Complete")
+        XCTAssertNil(clean.progress?.upcoming)
+    }
+
     func testDirtyCheckoutDoesNotLaunchOrCommit() async throws {
         let (coordinator, _, driver) = try make()
         driver.clean = false

@@ -18,7 +18,7 @@ const reviewLoopPage = (() => {
       id: dashboardElements.elementIDs.reviewNavButton,
       afterID: dashboardElements.elementIDs.todoNavButton,
       label: 'Review loop',
-      markup: `<span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loop</span>`,
+      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loop</span></span>`,
     });
   }
 
@@ -33,25 +33,44 @@ const reviewLoopPage = (() => {
     details.className = 'dashboard-review-loop';
     details.dataset.reviewLoop = '';
     details.innerHTML = `
-      <header><h1>Review loop</h1><span data-review-badge></span></header>
-      <p class="review-description">Review, fix, commit. Repeat until clear.</p>
+      <header class="review-page-header">
+        <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
+        <h1>Review loop</h1>
+      </header>
       <form data-review-form>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
-        <label>Priority<select data-review-priority aria-label="Review priority limit">
-          <option value="P0">P0</option><option value="P1">P1+</option>
-          <option value="P2" selected>P2+</option><option value="P3">P3+</option>
+        <label>Fix priorities<select data-review-priority aria-label="Review priority limit">
+          <option value="P0">P0 · Critical</option><option value="P1">P1+ · High</option>
+          <option value="P2" selected>P2+ · Medium</option><option value="P3">P3+ · All</option>
         </select></label>
         <label>Max rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
         <label>Model<select data-review-model aria-label="Review model"><option value="">Codex default</option></select></label>
         <label>Reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
         <div class="review-form-footer">
-          <button type="submit" data-review-start>Start loop</button>
+          <button type="submit" data-review-start>Start loop <span aria-hidden="true">→</span></button>
         </div>
       </form>
-      <div data-review-status role="status" aria-live="polite"></div>
       <div data-review-error role="alert" hidden></div>
-      <div class="review-controls" data-review-controls></div>
-      <ol data-review-rounds></ol>`;
+      <section class="review-activity" data-review-activity aria-labelledby="review-activity-title">
+        <div class="review-section-heading"><h2 id="review-activity-title">Loop status</h2><span data-review-badge hidden></span></div>
+        <div data-review-context class="review-context" hidden></div>
+        <div data-review-status role="status" aria-live="polite"></div>
+        <div class="review-controls" data-review-controls></div>
+        <div class="review-live" data-review-live hidden>
+          <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open task ↗</button></div>
+          <details class="review-prompt" data-review-current-prompt>
+            <summary><span data-review-current-label>Current prompt</span><span data-review-current-title></span></summary>
+            <p data-review-current-note></p><pre data-review-current-text></pre>
+          </details>
+          <details class="review-prompt" data-review-upcoming-prompt>
+            <summary><span>Up next</span><span data-review-upcoming-title></span></summary>
+            <p data-review-upcoming-note></p><pre data-review-upcoming-text></pre>
+          </details>
+          <p class="review-next-message" data-review-next-message></p>
+        </div>
+        <p class="review-empty" data-review-empty>No loop started.</p>
+        <ol data-review-rounds aria-label="Review rounds"></ol>
+      </section>`;
     page.append(details);
     host.append(page);
     details.querySelector('form').addEventListener('submit', event => {
@@ -125,9 +144,17 @@ const reviewLoopPage = (() => {
     root.querySelector('[data-review-form]').hidden = !terminal(loop);
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
-    root.querySelector('[data-review-badge]').textContent = loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
-    root.querySelector('[data-review-badge]').hidden = !loop;
-    root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…' : loop ? `${loop.project.name} · ${loop.selection ? `${loop.selection.model}${loop.selection.effort ? ` / ${loop.selection.effort}` : ''} · ` : ''}${loop.priorityLimit}${loop.priorityLimit === 'P0' ? '' : '+'}: ${loop.message}` : '';
+    const badge = root.querySelector('[data-review-badge]');
+    badge.textContent = loop ? loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1) : '';
+    badge.hidden = !loop;
+    badge.dataset.phase = loop?.phase || '';
+    const context = root.querySelector('[data-review-context]');
+    context.hidden = !loop;
+    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${escape(loop.priorityLimit)}${loop.priorityLimit === 'P0' ? '' : '+'} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span>${loop.selection ? `<span>${escape(loop.selection.model)}${loop.selection.effort ? ` · ${escape(loop.selection.effort)}` : ''}</span>` : ''}` : '';
+    root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…' : loop?.message || '';
+    root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
+    renderProgress(root, loop, snapshot.progress);
+    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
@@ -137,12 +164,41 @@ const reviewLoopPage = (() => {
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    const expandedRounds = new Set(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('[data-review-rounds] details[open]')].map(details => details.dataset.round) : []);
+    root.dataset.renderedLoop = loop?.id || '';
     root.querySelector('[data-review-rounds]').innerHTML = (loop?.rounds || []).map(round => `<li>
-      <div class="review-round-heading">
+      <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(round.result?.outcome || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying issues` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
-      ${round.result?.summary ? `<details class="review-round-details"><summary>Details</summary><p>${escape(round.result.summary)}</p></details>` : ''}
-    </li>`).join('');
+      <span>${escape(({ clean: 'No qualifying findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.filter(finding => finding.priority <= loop.priorityLimit).length} qualifying issues` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      ${round.result?.summary ? `<details class="review-round-details" data-round="${round.number}" ${expandedRounds.has(String(round.number)) ? 'open' : ''}><summary>View summary</summary><p>${escape(round.result.summary)}</p></details>` : ''}
+    </div></li>`).join('');
+  }
+  function renderProgress(root, loop, progress) {
+    const live = root.querySelector('[data-review-live]');
+    live.hidden = !loop || !progress;
+    if (live.hidden) return;
+    if (live.dataset.loopID !== loop.id) {
+      live.querySelectorAll('details').forEach(details => { details.open = false; });
+      live.dataset.loopID = loop.id;
+    }
+    root.querySelector('[data-review-step]').textContent = progress.step;
+    root.querySelector('[data-review-current-label]').textContent = progress.currentLabel;
+    const task = root.querySelector('[data-review-current-task]');
+    task.hidden = !progress.threadID;
+    if (progress.threadID) task.dataset.reviewThread = progress.threadID;
+    else delete task.dataset.reviewThread;
+    for (const kind of ['current', 'upcoming']) {
+      const prompt = progress[kind];
+      root.querySelector(`[data-review-${kind}-prompt]`).hidden = !prompt;
+      root.querySelector(`[data-review-${kind}-title]`).textContent = prompt?.title || '';
+      root.querySelector(`[data-review-${kind}-text]`).textContent = prompt?.text || '';
+      const note = root.querySelector(`[data-review-${kind}-note]`);
+      note.textContent = prompt?.note || '';
+      note.hidden = !prompt?.note;
+    }
+    const nextMessage = root.querySelector('[data-review-next-message]');
+    nextMessage.hidden = !!progress.upcoming;
+    nextMessage.textContent = progress.nextMessage;
   }
   function apply(next) {
     snapshot = next;
