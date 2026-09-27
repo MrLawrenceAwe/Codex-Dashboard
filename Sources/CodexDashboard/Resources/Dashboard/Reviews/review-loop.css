@@ -54,8 +54,8 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-activity { margin-top:28px; padding:24px 28px; border:1px solid var(--review-border); border-radius:16px; }
 .dashboard-review-loop [data-review-badge] { display:flex; align-items:center; gap:6px; padding:5px 9px; border-radius:99px; background:var(--review-tint); font-size:11px; }
 .dashboard-review-loop [data-review-badge]::before { content:''; width:5px; height:5px; border-radius:50%; background:currentColor; }
-.dashboard-review-loop [data-review-badge][data-phase="running"], .dashboard-review-loop [data-review-badge][data-phase="completed"] { color:var(--app-color-text-success, #65b98c); }
-.dashboard-review-loop [data-review-badge][data-phase="paused"], .dashboard-review-loop [data-review-badge][data-phase="limitReached"], .dashboard-review-loop [data-review-badge][data-phase="blocked"] { color:var(--app-color-text-warning, #c99b54); }
+.dashboard-review-loop [data-review-badge][data-phase="running"], .dashboard-review-loop [data-review-badge][data-phase="completed"], .dashboard-review-loop [data-review-badge][data-phase="limitReached"] { color:var(--app-color-text-success, #65b98c); }
+.dashboard-review-loop [data-review-badge][data-phase="paused"], .dashboard-review-loop [data-review-badge][data-phase="blocked"] { color:var(--app-color-text-warning, #c99b54); }
 .dashboard-review-loop .review-context { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:20px; font-size:11px; color:var(--review-muted); overflow-wrap:anywhere; }
 .dashboard-review-loop .review-context strong { width:100%; color:var(--app-color-text-foreground, #ececec); font-size:14px; font-weight:500; }
 .dashboard-review-loop [data-review-status]:not(:empty) { margin-top:12px; line-height:1.6; overflow-wrap:anywhere; color:var(--review-muted); }

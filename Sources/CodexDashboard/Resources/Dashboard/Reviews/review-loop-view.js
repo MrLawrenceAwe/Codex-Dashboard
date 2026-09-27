@@ -111,7 +111,8 @@ const reviewLoopView = (() => {
     const context = root.querySelector('[data-review-context]');
     context.hidden = !loop;
     context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${escape(loop.priorityLimit)}${loop.priorityLimit === 'P0' ? '' : '+'} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.model)}${loop.selection.effort ? ` · ${escape(loop.selection.effort)}` : ''}</span>` : ''}` : '';
-    root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…' : loop?.message || '';
+    root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…'
+      : loop?.phase === 'limitReached' ? 'All configured review rounds completed.' : loop?.message || '';
     root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;
     renderProgress(root, loop, snapshot.progress);
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';

@@ -67,7 +67,7 @@ finding count and commit. No JSON output schema is sent to Codex.
 Dashboard independently verifies a clean working tree, unchanged branch,
 matching HEAD, and ancestry from the round's starting commit before scheduling
 the next fresh review. Reaching the round limit ends the loop with a distinct
-**Limit reached** status because the final fix commit has not had a clean review.
+green **Limit reached** status indicating that all configured rounds finished successfully.
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 

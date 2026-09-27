@@ -116,7 +116,7 @@ final class ReviewLoopCoordinator {
         if let head = updated.expectedCommit, head != repo.commit { throw ReviewLoopError("HEAD changed outside the review loop. Inspect the changes before starting a new loop.") }
         guard updated.rounds.count < updated.maxRounds else {
             updated.phase = .limitReached
-            updated.message = "Round limit reached. No clean review has been confirmed."
+            updated.message = "All configured review rounds completed."
             try persist(updated)
             return
         }
@@ -233,7 +233,7 @@ final class ReviewLoopCoordinator {
         updated = current
         updated.phase = updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
         updated.message = updated.rounds.count >= updated.maxRounds
-            ? "Round limit reached after committing fixes. No clean review has been confirmed."
+            ? "All configured review rounds completed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(

@@ -171,13 +171,20 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             progress:{step:'Limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}});
           window.__codexDashboard.openReviews();
-          return [document.querySelector('[data-review-badge]').textContent,
+          const badge = document.querySelector('[data-review-badge]');
+          const limitColor = getComputedStyle(badge).color;
+          badge.dataset.phase = 'completed';
+          const successColor = getComputedStyle(badge).color;
+          badge.dataset.phase = 'limitReached';
+          return [badge.textContent,
             document.querySelector('[data-review-step]').textContent,
             document.querySelector('[data-review-controls]').children.length,
-            document.querySelector('[data-review-form]').hidden];
+            document.querySelector('[data-review-form]').hidden,
+            document.querySelector('[data-review-status]').textContent,
+            limitColor === successColor];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false])
+        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "All configured review rounds completed.", true])
     }
 
     func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {
