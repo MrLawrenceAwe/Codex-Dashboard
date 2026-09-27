@@ -58,6 +58,7 @@ final class ReviewLoopBridge {
 
     private func deliver(to target: DevToolsTarget) async throws {
         let snapshot = ReviewLoopSnapshot(projects: projects, models: models, loop: coordinator.loop,
+                                         progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)
         let json = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)

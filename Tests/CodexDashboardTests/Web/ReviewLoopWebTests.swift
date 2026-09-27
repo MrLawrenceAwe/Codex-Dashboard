@@ -58,6 +58,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}], models:[{model:'model-a',displayName:'Model A',efforts:['low','high']},{model:'model-b',displayName:'Model B',efforts:['medium']}],loop:null,error:null});
           const nav = document.getElementById('codex-dashboard-review-navigation');
           const placed = nav.previousElementSibling.id === 'codex-dashboard-todo-navigation';
+          const sameWidth = Math.abs(nav.getBoundingClientRect().width - nav.previousElementSibling.getBoundingClientRect().width) < 1;
           nav.click();
           const exclusive = document.querySelectorAll('section.is-open').length === 1 && document.getElementById('codex-dashboard-review-page').classList.contains('is-open');
           document.getElementById('codex-dashboard-review-page').remove();
@@ -72,10 +73,71 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const action = JSON.parse(api.pendingReviewAction());
           api.openTodos();
           const closed = !document.getElementById('codex-dashboard-review-page').classList.contains('is-open');
-          return [placed,exclusive,restored,choices,action.selection.model,action.selection.effort,closed];
+          return [placed,sameWidth,exclusive,restored,choices,action.selection.model,action.selection.effort,closed];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, true, ",low,high", "model-a", "high", true])
+        XCTAssertEqual(result, [true, true, true, true, ",low,high", "model-a", "high", true])
+    }
+
+    func testActivityPreservesExpandedSummaryAndShowsLoopState() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example <project>',path:'/tmp/example'};
+          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',maxRounds:5,message:'Reviewing changes',rounds:[
+            {number:1,threadID:'task-1',result:{outcome:'fixed',commit:'1234567890',summary:'Fixed <issue>'}},
+            {number:2,threadID:'task-2',fixRequested:false}
+          ]};
+          const snapshot = {projects:[project],loop,error:null};
+          api.applyReviewLoop(snapshot);
+          api.openReviews();
+          document.querySelector('.review-round-details').open = true;
+          api.applyReviewLoop(snapshot);
+          const active = [document.querySelector('[data-review-form]').hidden,
+            !document.querySelector('[data-review-activity]').hidden,
+            document.querySelector('[data-review-context] strong').textContent,
+            document.querySelector('.review-round-details').open,
+            document.querySelector('.review-round-details p').textContent,
+            document.querySelector('[data-review-action="pause"]').textContent];
+          loop.phase = 'completed';
+          api.applyReviewLoop(snapshot);
+          return [...active,document.querySelector('[data-review-form]').hidden,
+            document.querySelector('[data-review-controls]').children.length,
+            document.querySelector('[data-review-badge]').textContent];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, true, "Example <project>", true, "Fixed <issue>", "Pause after round", false, 0, "Completed"])
+    }
+
+    func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const snapshot = {projects:[project],error:null,
+            loop:{id:'live',project,phase:'running',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Reviewing'},
+            progress:{step:'Reviewing',currentLabel:'Current prompt',threadID:'task-1',nextMessage:'',
+              current:{title:'Review · round 1',text:'Review <code> & files',note:''},
+              upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}};
+          api.applyReviewLoop(snapshot);
+          const details = document.querySelector('[data-review-current-prompt]');
+          details.open = true;
+          api.applyReviewLoop(snapshot);
+          const active = [!document.querySelector('[data-review-live]').hidden,details.open,
+            document.querySelector('[data-review-current-text]').textContent,
+            document.querySelector('[data-review-current-text]').children.length,
+            document.querySelector('[data-review-current-task]').dataset.reviewThread];
+          snapshot.loop.phase = 'completed';
+          snapshot.progress.upcoming = null;
+          snapshot.progress.nextMessage = 'No further prompts scheduled.';
+          api.applyReviewLoop(snapshot);
+          return [...active,document.querySelector('[data-review-upcoming-prompt]').hidden,
+            document.querySelector('[data-review-next-message]').textContent];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, true, "Review <code> & files", 0, "task-1", true, "No further prompts scheduled."])
     }
 
     func testRequestUsesLocalDesktopConnectionAndCorrelatesResponses() async throws {

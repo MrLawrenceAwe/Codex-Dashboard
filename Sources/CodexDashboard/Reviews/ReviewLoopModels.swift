@@ -95,8 +95,24 @@ struct ReviewLoopSnapshot: Codable, Sendable {
     let projects: [ReviewProject]
     let models: [ReviewModel]
     let loop: ReviewLoop?
+    let progress: ReviewLoopProgress?
     let error: String?
     let acknowledgedActionID: String?
+}
+
+struct ReviewPromptPreview: Codable, Sendable {
+    let title: String
+    let text: String
+    let note: String
+}
+
+struct ReviewLoopProgress: Codable, Sendable {
+    let step: String
+    let currentLabel: String
+    let current: ReviewPromptPreview?
+    let upcoming: ReviewPromptPreview?
+    let nextMessage: String
+    let threadID: String?
 }
 
 struct ReviewRepositoryState: Equatable, Sendable {
