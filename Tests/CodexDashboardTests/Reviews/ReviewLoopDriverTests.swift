@@ -109,7 +109,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let prompt = ReviewLoopCoordinator.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
-        XCTAssertEqual(prompt, "Address all and commit")
+        XCTAssertEqual(prompt, "Fix all findings; commit once")
         XCTAssertFalse(ReviewLoopReport.instructions(for: .fix).lowercased().contains("test"))
     }
 }

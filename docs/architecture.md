@@ -61,7 +61,7 @@ finding. The selected priority limit constrains the requested findings.
 `ReviewLoopReport` reads the explicit status and finding count, rejecting missing
 sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
 stops without sending a fix request. Otherwise the same chat receives
-**Address and commit**, **Address both and commit**, or **Address all and commit**,
+**Fix the finding; commit once**, **Fix both findings; commit once**, or **Fix all findings; commit once**,
 according to the number of qualifying findings. The workflow does not request
 tests or require a test result. A Markdown fix report identifies the addressed
 finding count and commit. No JSON output schema is sent to Codex.

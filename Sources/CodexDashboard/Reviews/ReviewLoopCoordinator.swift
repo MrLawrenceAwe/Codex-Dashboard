@@ -347,9 +347,9 @@ final class ReviewLoopCoordinator {
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
         switch round.review?.qualifyingFindings(upTo: loop.priorityLimit).count ?? 0 {
-        case 1: return "Address and commit"
-        case 2: return "Address both and commit"
-        default: return "Address all and commit"
+        case 1: return "Fix the finding; commit once"
+        case 2: return "Fix both findings; commit once"
+        default: return "Fix all findings; commit once"
         }
     }
 }

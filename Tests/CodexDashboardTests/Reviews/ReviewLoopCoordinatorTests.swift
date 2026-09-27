@@ -90,7 +90,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Address both and commit")
+        XCTAssertEqual(coordinator.progress?.upcoming?.text, "Fix both findings; commit once")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress?.upcoming?.text, "Review project for bugs and issues.")
@@ -383,7 +383,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                     XCTAssertEqual(coordinator.loop?.phase, .completed)
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
-                    XCTAssertEqual(driver.prompts.last, count == 1 ? "Address and commit" : count == 2 ? "Address both and commit" : "Address all and commit")
+                    XCTAssertEqual(driver.prompts.last, count == 1 ? "Fix the finding; commit once" : count == 2 ? "Fix both findings; commit once" : "Fix all findings; commit once")
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
