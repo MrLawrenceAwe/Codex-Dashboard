@@ -267,7 +267,7 @@ enum UsageNotificationPlanner {
         for account: SavedAccount,
         windowName: String,
         current: CodexUsageWindow?,
-        previous: UsageObservation.Window?,
+        previous: CodexUsageWindow?,
         usageSummary: String,
         now: Date
     ) -> ImmediateUsageNotification? {
@@ -306,7 +306,7 @@ enum UsageNotificationPlanner {
         for account: SavedAccount,
         windowName: String,
         current: CodexUsageWindow?,
-        previous: UsageObservation.Window?,
+        previous: CodexUsageWindow?,
         thresholds: [Int],
         usageSummary: String,
         now: Date

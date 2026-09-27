@@ -22,7 +22,7 @@ protocol DashboardRuntime: AnyObject {
     func disableIntegration() async throws -> DashboardDisableOutcome
     func openTaskDashboard() async
     func openThread(_ threadID: String) async
-    func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult
+    func pollAccountPopoverAction() async -> AccountPopoverActionPollResult
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
     func preferNativePromptLibraryOnNextSynchronization()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
@@ -100,8 +100,8 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         await renderer.openThread(threadID)
     }
 
-    func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
-        await renderer.waitForAccountPopoverAction()
+    func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
+        await renderer.pollAccountPopoverAction()
     }
 
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {

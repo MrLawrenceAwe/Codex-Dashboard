@@ -70,7 +70,7 @@ final class DesktopUsageNotifierTests: XCTestCase {
     func testScheduledFallbackDoesNotClaimAnUnverifiedResetTime() async throws {
         let now = Date.now
         let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
-                                   lastUsedAt: now, accountIdentifier: nil)
+                                   lastUsedAt: now, codexAccountID: nil)
         let snapshot = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(
                 usedPercent: 20, resetsAt: now.addingTimeInterval(2 * 60 * 60)
@@ -175,7 +175,7 @@ final class DesktopUsageNotifierTests: XCTestCase {
         let now = Date.now
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now,
-            accountIdentifier: nil
+            codexAccountID: nil
         )
         let reset = now.addingTimeInterval(3 * 24 * 60 * 60)
         let previous = CodexAccountUsageSnapshot(

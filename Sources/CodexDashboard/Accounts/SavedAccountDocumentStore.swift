@@ -28,7 +28,7 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
         let migration = try AccountDocumentMigration.decode(
             data,
             version: storedVersion ?? 0,
-            accountIdentifier: { [vault] accountID in
+            codexAccountID: { [vault] accountID in
                 (try? vault.credentialWithoutUserInteraction(for: accountID))
                     .flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
             }
@@ -58,7 +58,7 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
                 let identity = AccountIdentityDecoder.identity(in: credential)
             else { continue }
             document.accounts[index].name = identity.accountName
-            document.accounts[index].accountIdentifier = identity.identifier
+            document.accounts[index].codexAccountID = identity.identifier
         }
     }
 
@@ -82,21 +82,21 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
         }
         guard let identity = AccountIdentityDecoder.identity(in: credential) else { return }
         if let account = document.accounts.first(where: {
-            $0.accountIdentifier == identity.identifier
+            $0.codexAccountID == identity.identifier
         }) {
             document.activeAccountID = account.id
             return
         }
         if allowNameFallback, let displayName = identity.displayName {
             let candidates = document.accounts.indices.filter {
-                document.accounts[$0].accountIdentifier == nil
+                document.accounts[$0].codexAccountID == nil
                     && AccountIdentityDecoder.accountName(
                         document.accounts[$0].name,
                         matches: displayName
                     )
             }
             if candidates.count == 1, let index = candidates.first {
-                document.accounts[index].accountIdentifier = identity.identifier
+                document.accounts[index].codexAccountID = identity.identifier
                 document.activeAccountID = document.accounts[index].id
                 return
             }

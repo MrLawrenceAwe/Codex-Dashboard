@@ -704,7 +704,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
     }
 
     private func account(named name: String) -> SavedAccount {
-        SavedAccount(id: UUID(), name: name, createdAt: .now, lastUsedAt: .now, accountIdentifier: nil)
+        SavedAccount(id: UUID(), name: name, createdAt: .now, lastUsedAt: .now, codexAccountID: nil)
     }
 
     private func snapshot(

@@ -40,7 +40,7 @@ final class ReviewLoopDriverTests: XCTestCase {
             let input = try XCTUnwrap(params["input"] as? [[String: Any]])
             let text = try XCTUnwrap(input.first?["text"] as? String)
             XCTAssertTrue(text.hasPrefix("Do the work\n\n"))
-            XCTAssertTrue(text.contains(ReviewLoopReport.instructions(for: kind)))
+            XCTAssertTrue(text.contains(ReviewReportContract.instructions(for: kind)))
         }
     }
 
@@ -106,11 +106,11 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testFixPromptDoesNotAskForTesting() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 5)
-        let prompt = ReviewLoopCoordinator.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
+        let prompt = ReviewLoopPresentation.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
         XCTAssertEqual(prompt, "Fix all findings; commit once")
-        XCTAssertFalse(ReviewLoopReport.instructions(for: .fix).lowercased().contains("test"))
+        XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
     }
 }
 

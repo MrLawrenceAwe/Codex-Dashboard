@@ -4,12 +4,12 @@ import Foundation
 extension AppCoordinator {
     func handleAccountPopoverAction() async -> AccountPopoverActionHandlingOutcome {
         guard let dashboardRuntime else { return .unavailable }
-        let result = await dashboardRuntime.waitForAccountPopoverAction()
+        let result = await dashboardRuntime.pollAccountPopoverAction()
         guard !isPerformingAction else { return .unavailable }
         let action: AccountPopoverAction
         switch result {
         case .action(let value): action = value
-        case .timedOut: return .timedOut
+        case .empty: return .empty
         case .unavailable: return .unavailable
         }
         let presentationAlreadyUpdated: Bool
@@ -154,7 +154,7 @@ extension AppCoordinator {
         // The signed-out renderer intentionally has none of the Codex workspace hosts
         // required by the injected dashboard. Reaching it means the account transition
         // succeeded; mounting resumes through normal polling after sign-in.
-        guard accounts.activeAccountID != nil else {
+        guard accounts.activeSavedAccountID != nil else {
             connectionState = .rendererAvailable
             return
         }
@@ -192,7 +192,7 @@ extension AppCoordinator {
         reportsFailure: Bool = true,
         interactionAllowed: Bool = false
     ) async -> UsageRefreshAuthorization {
-        if accountID == accounts.activeAccountID {
+        if accountID == accounts.activeSavedAccountID {
             await refreshAccountUsage()
             return .notRequired
         }

@@ -2,12 +2,15 @@ import Foundation
 
 @MainActor
 final class AccountUsageSession {
+    private struct InFlightRequest<Value: Sendable> {
+        let token: UUID
+        let task: Task<Value, Error>
+    }
+
     private let provider: any AccountUsageProviding
     private let cache: any UsageCaching
-    private var activeUsageTask: Task<CodexAccountUsage, Error>?
-    private var activeUsageTaskID: UUID?
-    private var savedAccountUsageTasks: [UUID: Task<SavedAccountUsageResult, Error>] = [:]
-    private var savedAccountUsageTaskIDs: [UUID: UUID] = [:]
+    private var activeRequest: InFlightRequest<CodexAccountUsage>?
+    private var savedAccountRequests: [UUID: InFlightRequest<SavedAccountUsageResult>] = [:]
     private var resetTask: Task<Void, Never>?
     private var lastCacheSaveAt: Date?
 
@@ -21,8 +24,8 @@ final class AccountUsageSession {
     }
 
     func fetchUsage() async throws -> CodexAccountUsage {
-        if let activeUsageTask {
-            return try await activeUsageTask.value
+        if let activeRequest {
+            return try await activeRequest.task.value
         }
         let taskID = UUID()
         let resetTask = resetTask
@@ -31,13 +34,9 @@ final class AccountUsageSession {
             try Task.checkCancellation()
             return try await provider.usage()
         }
-        activeUsageTask = task
-        activeUsageTaskID = taskID
+        activeRequest = InFlightRequest(token: taskID, task: task)
         defer {
-            if activeUsageTaskID == taskID {
-                activeUsageTask = nil
-                activeUsageTaskID = nil
-            }
+            if activeRequest?.token == taskID { activeRequest = nil }
         }
         return try await task.value
     }
@@ -46,8 +45,8 @@ final class AccountUsageSession {
         using credential: Data,
         for accountID: UUID
     ) async throws -> SavedAccountUsageResult {
-        if let task = savedAccountUsageTasks[accountID] {
-            return try await task.value
+        if let request = savedAccountRequests[accountID] {
+            return try await request.task.value
         }
         let taskID = UUID()
         let resetTask = resetTask
@@ -56,24 +55,18 @@ final class AccountUsageSession {
             try Task.checkCancellation()
             return try await provider.usage(using: credential)
         }
-        savedAccountUsageTasks[accountID] = task
-        savedAccountUsageTaskIDs[accountID] = taskID
+        savedAccountRequests[accountID] = InFlightRequest(token: taskID, task: task)
         defer {
-            if savedAccountUsageTaskIDs[accountID] == taskID {
-                savedAccountUsageTasks[accountID] = nil
-                savedAccountUsageTaskIDs[accountID] = nil
-            }
+            if savedAccountRequests[accountID]?.token == taskID { savedAccountRequests[accountID] = nil }
         }
         return try await task.value
     }
 
     func invalidate() {
-        activeUsageTask?.cancel()
-        activeUsageTask = nil
-        activeUsageTaskID = nil
-        savedAccountUsageTasks.values.forEach { $0.cancel() }
-        savedAccountUsageTasks = [:]
-        savedAccountUsageTaskIDs = [:]
+        activeRequest?.task.cancel()
+        activeRequest = nil
+        savedAccountRequests.values.forEach { $0.task.cancel() }
+        savedAccountRequests = [:]
         let previousReset = resetTask
         resetTask = Task {
             await previousReset?.value

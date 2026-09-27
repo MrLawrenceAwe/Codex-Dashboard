@@ -114,7 +114,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let refresh = SuspendedUsageRefresh()
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: currentDate, lastUsedAt: currentDate,
-            accountIdentifier: nil
+            codexAccountID: nil
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -148,7 +148,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let publisher = SuspendedNtfyPublisher()
         let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
-                                   lastUsedAt: now, accountIdentifier: nil)
+                                   lastUsedAt: now, codexAccountID: nil)
         let reset = now.addingTimeInterval(5 * 60 * 60)
         let previous = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -184,7 +184,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             retryDelay: { _ in .milliseconds(100) }
         )
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let reset = now.addingTimeInterval(60 * 60 + 0.01)
         let available = CodexAccountUsageSnapshot(
@@ -219,7 +219,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             name: "Personal",
             createdAt: now,
             lastUsedAt: now,
-            accountIdentifier: nil
+            codexAccountID: nil
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -262,7 +262,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let publisher = RecordingNtfyPublisher()
         let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let reset = now.addingTimeInterval(60 * 60 + 0.01)
         let scheduled = CodexAccountUsageSnapshot(
@@ -306,7 +306,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             now: { now }
         )
         let account = SavedAccount(
-            id: UUID(), name: "Work", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Work", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -330,7 +330,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let publisher = RecordingNtfyPublisher()
         let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let beforeReset = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -364,7 +364,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let publisher = RecordingNtfyPublisher()
         let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let beforeReset = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -402,7 +402,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
         let publisher = RecordingNtfyPublisher()
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         func snapshot(_ count: Int) -> CodexAccountUsageSnapshot {
             CodexAccountUsageSnapshot(
@@ -437,7 +437,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             now: { now }
         )
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let initialUsage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -481,7 +481,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
             retryDelay: { _ in .milliseconds(100) }
         )
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let usage = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -513,7 +513,7 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let publisher = FailSecondNtfyPublisher()
         let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
         let account = SavedAccount(
-            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, accountIdentifier: nil
+            id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
         )
         let reset = now.addingTimeInterval(5 * 60 * 60)
         let previous = CodexAccountUsageSnapshot(

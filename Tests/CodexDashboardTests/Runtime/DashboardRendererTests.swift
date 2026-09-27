@@ -328,7 +328,7 @@ final class DashboardRendererTests: XCTestCase {
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        let result = await renderer.waitForAccountPopoverAction()
+        let result = await renderer.pollAccountPopoverAction()
 
         XCTAssertEqual(
             result,
@@ -349,19 +349,19 @@ final class DashboardRendererTests: XCTestCase {
                 ]),
                 injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
             )
-            let result = await renderer.waitForAccountPopoverAction()
+            let result = await renderer.pollAccountPopoverAction()
             XCTAssertEqual(result, .action(AccountPopoverAction(kind: .saveCurrentAccount, accountID: nil)))
         }
     }
 
-    func testAccountPopoverWaitDistinguishesTimeoutFromUnavailableRenderer() async throws {
+    func testAccountPopoverPollDistinguishesEmptyQueueFromUnavailableRenderer() async throws {
         let target = DevToolsTarget(
             id: "main",
             type: "page",
             url: "app://-/index.html",
             webSocketURL: "ws://127.0.0.1/main"
         )
-        let timedOutRenderer = try DashboardRenderer(
+        let emptyRenderer = try DashboardRenderer(
             devTools: AccountPopoverRendererDevTools(target: target, action: "null"),
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
@@ -373,10 +373,10 @@ final class DashboardRendererTests: XCTestCase {
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
 
-        let timedOutResult = await timedOutRenderer.waitForAccountPopoverAction()
-        let unavailableResult = await unavailableRenderer.waitForAccountPopoverAction()
+        let emptyResult = await emptyRenderer.pollAccountPopoverAction()
+        let unavailableResult = await unavailableRenderer.pollAccountPopoverAction()
 
-        XCTAssertEqual(timedOutResult, .timedOut)
+        XCTAssertEqual(emptyResult, .empty)
         XCTAssertEqual(unavailableResult, .unavailable)
     }
 

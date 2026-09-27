@@ -33,22 +33,11 @@ const dashboardLifecycle = (() => {
       return;
     }
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest(`#${dashboardElements.elementIDs.taskNavButton}`)) {
+    const page = target && hooks.pages.find(({ navigationID }) => target.closest(`#${navigationID}`));
+    if (page) {
       event.preventDefault();
       event.stopPropagation();
-      if (event.type === 'click') hooks.openTasks();
-      return;
-    }
-    if (target?.closest(`#${dashboardElements.elementIDs.todoNavButton}`)) {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.type === 'click') hooks.openTodos();
-      return;
-    }
-    if (target?.closest(`#${dashboardElements.elementIDs.reviewNavButton}`)) {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.type === 'click') hooks.openReviews();
+      if (event.type === 'click') hooks.openPage(page.controller);
       return;
     }
     if (event.type === 'click' && target?.closest('aside')) {
@@ -82,8 +71,8 @@ const dashboardLifecycle = (() => {
 
   function attachPage() {
     const pageHost = codexHost.pageHost();
-    [dashboardElements.elementIDs.taskPage, dashboardElements.elementIDs.todoPage, dashboardElements.elementIDs.reviewPage].forEach((id) => {
-      const page = document.getElementById(id);
+    hooks.pages.forEach(({ pageID }) => {
+      const page = document.getElementById(pageID);
       if (page && pageHost && page.parentElement !== pageHost) pageHost.append(page);
     });
   }
@@ -152,14 +141,8 @@ const dashboardLifecycle = (() => {
     const dashboardWasRemoved = records.some((record) => (
       [...record.removedNodes].some(containsDashboardElement)
     ));
-    const dashboardElementIsMissing = [
-      dashboardElements.elementIDs.taskPage,
-      dashboardElements.elementIDs.todoPage,
-      dashboardElements.elementIDs.reviewPage,
-      dashboardElements.elementIDs.taskNavButton,
-      dashboardElements.elementIDs.todoNavButton,
-      dashboardElements.elementIDs.reviewNavButton,
-    ].some((id) => !document.getElementById(id));
+    const dashboardElementIsMissing = hooks.pages.some(({ pageID, navigationID }) =>
+      !document.getElementById(pageID) || !document.getElementById(navigationID));
     if (!dashboardWasRemoved && !dashboardElementIsMissing && observedStructureRoot?.isConnected) return;
     scheduleRepair({ rebindHosts: true });
   }
@@ -228,15 +211,9 @@ const dashboardLifecycle = (() => {
       resizeObserver = new ResizeObserver(syncContentInset);
       observeSidebarSize();
     }
-    return Boolean(
-      document.getElementById(dashboardElements.elementIDs.style)
-        && document.getElementById(dashboardElements.elementIDs.taskPage)
-        && document.getElementById(dashboardElements.elementIDs.taskNavButton)
-        && document.getElementById(dashboardElements.elementIDs.todoPage)
-        && document.getElementById(dashboardElements.elementIDs.todoNavButton)
-        && document.getElementById(dashboardElements.elementIDs.reviewPage)
-        && document.getElementById(dashboardElements.elementIDs.reviewNavButton)
-    );
+    return Boolean(document.getElementById(dashboardElements.elementIDs.style))
+      && hooks.pages.every(({ pageID, navigationID }) =>
+        document.getElementById(pageID) && document.getElementById(navigationID));
   }
 
   function destroy() {

@@ -591,7 +591,7 @@ extension AppCoordinatorTests {
         _ = await coordinator.refreshSavedAccountUsage(first.id)
         let receivedCredentials = await provider.credentials()
 
-        XCTAssertEqual(coordinator.accounts.activeAccountID, second.id)
+        XCTAssertEqual(coordinator.accounts.activeSavedAccountID, second.id)
         XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
         XCTAssertEqual(receivedCredentials, [firstCredential])
         XCTAssertEqual(vault.credential(for: first.id), refreshedFirstCredential)

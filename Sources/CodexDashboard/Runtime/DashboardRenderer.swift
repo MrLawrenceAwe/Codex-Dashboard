@@ -253,7 +253,7 @@ final class DashboardRenderer {
         }
     }
 
-    func waitForAccountPopoverAction() async -> AccountPopoverActionWaitResult {
+    func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
         var foundAvailableRenderer = false
         for target in await targets() {
             do {
@@ -272,7 +272,7 @@ final class DashboardRenderer {
                 continue
             }
         }
-        return foundAvailableRenderer ? .timedOut : .unavailable
+        return foundAvailableRenderer ? .empty : .unavailable
     }
 
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {

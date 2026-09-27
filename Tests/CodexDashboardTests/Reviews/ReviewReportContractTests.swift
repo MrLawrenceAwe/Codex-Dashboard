@@ -1,7 +1,7 @@
 import XCTest
 @testable import CodexDashboard
 
-final class ReviewLoopReportTests: XCTestCase {
+final class ReviewReportContractTests: XCTestCase {
     private let review = """
     # Review complete
 
@@ -20,7 +20,7 @@ final class ReviewLoopReportTests: XCTestCase {
     """
 
     func testReadsReadableFindingsWithLinksAndParagraphs() throws {
-        let report = try ReviewLoopReport.review(review.replacingOccurrences(of: "\n", with: "\r\n"))
+        let report = try ReviewReportContract.review(review.replacingOccurrences(of: "\n", with: "\r\n"))
         XCTAssertEqual(report.outcome, .reviewed)
         XCTAssertEqual(report.findings.map(\.priority), [.p1, .p2])
         XCTAssertEqual(report.findings[0].title, "Stop can be undone")
@@ -30,8 +30,8 @@ final class ReviewLoopReportTests: XCTestCase {
 
     func testCleanAndBlockedReviewsAreDistinct() throws {
         let clean = "# Review complete\nFindings: 0\n\n## Summary\nNo issues found."
-        XCTAssertEqual(try ReviewLoopReport.review(clean).findings, [])
-        XCTAssertEqual(try ReviewLoopReport.review(clean.replacingOccurrences(of: "complete", with: "blocked")).outcome, .blocked)
+        XCTAssertEqual(try ReviewReportContract.review(clean).findings, [])
+        XCTAssertEqual(try ReviewReportContract.review(clean.replacingOccurrences(of: "complete", with: "blocked")).outcome, .blocked)
     }
 
     func testMalformedOrIncompleteReviewsFailClosed() {
@@ -41,24 +41,33 @@ final class ReviewLoopReportTests: XCTestCase {
                             "```markdown\n" + review + "\n```",
                             "# Review complete\nFindings: 0\n\n## Summary\n",
                             review + "\n# Review complete\nFindings: 0"] {
-            XCTAssertThrowsError(try ReviewLoopReport.review(text))
+            XCTAssertThrowsError(try ReviewReportContract.review(text))
         }
     }
 
     func testFixReportRequiresExplicitCountCommitAndSummary() throws {
         let text = "# Fixes committed\n\nFindings addressed: 2\nCommit: `abc1234`\n\n## Summary\nFixed both races."
-        let result = try ReviewLoopReport.fix(text)
+        let result = try ReviewReportContract.fix(text)
         XCTAssertEqual(result.outcome, .fixed)
-        XCTAssertEqual(result.findings, 2)
+        XCTAssertEqual(result.findingCount, 2)
         XCTAssertEqual(result.commit, "abc1234")
         XCTAssertEqual(result.summary, "Fixed both races.")
         let blocked = text.replacingOccurrences(of: "committed", with: "blocked").replacingOccurrences(of: "abc1234", with: "none")
-        XCTAssertEqual(try ReviewLoopReport.fix(blocked).outcome, .blocked)
+        XCTAssertEqual(try ReviewReportContract.fix(blocked).outcome, .blocked)
         for invalid in [text.replacingOccurrences(of: "abc1234", with: "none"),
                         text.replacingOccurrences(of: "Findings addressed: 2", with: "Findings addressed: -1"),
                         text.replacingOccurrences(of: "Commit: `abc1234`", with: ""),
                         text + "\n## Extra\nUnexpected"] {
-            XCTAssertThrowsError(try ReviewLoopReport.fix(invalid))
+            XCTAssertThrowsError(try ReviewReportContract.fix(invalid))
         }
+    }
+
+    func testRoundResultRetainsStoredFindingKey() throws {
+        let stored = Data(#"{"outcome":"fixed","findings":2,"commit":"abc1234","summary":"Done"}"#.utf8)
+        let result = try JSONDecoder().decode(ReviewRoundResult.self, from: stored)
+        XCTAssertEqual(result.findingCount, 2)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
+        XCTAssertEqual(encoded?["findings"] as? Int, 2)
+        XCTAssertNil(encoded?["findingCount"])
     }
 }

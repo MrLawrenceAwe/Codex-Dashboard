@@ -2,7 +2,7 @@ import Foundation
 
 /// A readable Markdown contract. Missing or inconsistent fields stop the loop;
 /// prose alone must never be mistaken for a clean review or a committed fix.
-enum ReviewLoopReport {
+enum ReviewReportContract {
     static func instructions(for kind: ReviewTurnKind) -> String {
         let format: String
         switch kind {
@@ -70,7 +70,7 @@ enum ReviewLoopReport {
               header[2].hasPrefix("Commit: `"), header[2].hasSuffix("`") else { throw invalid() }
         let commit = String(header[2].dropFirst(9).dropLast())
         guard !commit.isEmpty, !commit.contains("`"), outcome != .fixed || commit != "none" else { throw invalid() }
-        return ReviewRoundResult(outcome: outcome, findings: count, commit: outcome == .blocked ? "" : commit,
+        return ReviewRoundResult(outcome: outcome, findingCount: count, commit: outcome == .blocked ? "" : commit,
                                  summary: try content(sections[1], prefix: "Summary\n"))
     }
 

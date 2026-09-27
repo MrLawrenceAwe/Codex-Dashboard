@@ -1,4 +1,4 @@
-const reviewHost = (() => {
+const reviewRPCClient = (() => {
   const pending = new Map();
   const methods = new Set(['model/list', 'project/list', 'thread/start', 'thread/name/set', 'turn/start', 'thread/read', 'thread/turns/list', 'thread/items/list']);
   function receive(event) {

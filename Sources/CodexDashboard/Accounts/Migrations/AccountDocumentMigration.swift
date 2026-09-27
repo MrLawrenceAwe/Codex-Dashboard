@@ -11,7 +11,7 @@ enum AccountDocumentMigration {
     static func decode(
         _ data: Data,
         version: Int,
-        accountIdentifier: @escaping (UUID) -> String?
+        codexAccountID: @escaping (UUID) -> String?
     ) throws -> Result {
         switch version {
         case SavedAccountsDocument.currentVersion:
@@ -46,7 +46,7 @@ enum AccountDocumentMigration {
             )
         case 1, 2:
             return Result(
-                document: try currentDocument(from: data, accountIdentifier: accountIdentifier),
+                document: try currentDocument(from: data, codexAccountID: codexAccountID),
                 requiresNameFallback: true,
                 requiresIdentitySynchronization: true,
                 requiresRewrite: true
@@ -58,7 +58,7 @@ enum AccountDocumentMigration {
 
     private static func currentDocument(
         from data: Data,
-        accountIdentifier: ((UUID) -> String?)? = nil
+        codexAccountID: ((UUID) -> String?)? = nil
     ) throws -> SavedAccountsDocument {
         let legacy = try JSONDecoder().decode(LegacySavedAccountsDocument.self, from: data)
         return SavedAccountsDocument(
@@ -68,8 +68,8 @@ enum AccountDocumentMigration {
                     name: account.name,
                     createdAt: account.createdAt,
                     lastUsedAt: account.lastUsedAt,
-                    accountIdentifier: account.accountIdentifier
-                        ?? accountIdentifier?(account.id)
+                    codexAccountID: account.codexAccountID
+                        ?? codexAccountID?(account.id)
                 )
             },
             activeAccountID: legacy.activeAccountID
@@ -82,7 +82,12 @@ private struct LegacySavedAccount: Decodable {
     let name: String
     let createdAt: Date
     let lastUsedAt: Date
-    let accountIdentifier: String?
+    let codexAccountID: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, createdAt, lastUsedAt
+        case codexAccountID = "accountIdentifier"
+    }
 }
 
 private struct LegacySavedAccountsDocument: Decodable {

@@ -53,18 +53,13 @@ struct ScheduledUsageNotification: Equatable, Sendable {
 }
 
 struct UsageObservation: Codable, Equatable, Sendable {
-    struct Window: Codable, Equatable, Sendable {
-        let usedPercent: Int
-        let resetsAt: Date?
-    }
-
-    let fiveHour: Window?
-    let weekly: Window?
+    let fiveHour: CodexUsageWindow?
+    let weekly: CodexUsageWindow?
     let bankedResets: CodexBankedResetSummary?
 
     init(usage: CodexAccountUsage) {
-        fiveHour = usage.fiveHour.map { Window(usedPercent: $0.usedPercent, resetsAt: $0.resetsAt) }
-        weekly = usage.weekly.map { Window(usedPercent: $0.usedPercent, resetsAt: $0.resetsAt) }
+        fiveHour = usage.fiveHour
+        weekly = usage.weekly
         bankedResets = usage.bankedResets
     }
 }
