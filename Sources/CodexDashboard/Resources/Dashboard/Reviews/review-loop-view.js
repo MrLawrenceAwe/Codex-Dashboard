@@ -15,20 +15,20 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <div><h1>Review loop</h1><p>Review, fix, and verify in fresh tasks until no qualifying issues remain.</p></div>
+        <div><span class="review-eyebrow">Automated code review</span><h1>Review loop</h1><p>A fresh perspective. A fix. Another pass.</p></div>
       </header>
       <form data-review-form>
-        <div class="review-setup-heading"><h2>Configure your loop</h2></div>
-        <fieldset class="review-scope"><legend>Review scope</legend>
+        <div class="review-setup-heading"><h2>Set up a loop</h2></div>
+        <fieldset class="review-scope"><legend class="review-visually-hidden">Review scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
-        <label>Project type<select data-review-project-type aria-label="Project type">
+        <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
           <option value="">General project</option><option value="personal">Personal project</option>
         </select></label>
-        <label>Review and fix priorities<select data-review-priority aria-label="Review and fix priority limit">
+        <label class="review-priority">Review and fix priorities<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">P0 only · Critical</option><option value="P1">P0–P1 · High and critical</option>
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
-        <label>Max rounds<input data-review-limit type="number" min="1" max="20" value="5" required></label>
+        <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required></label>
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed <span>Optional</span></summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -43,7 +43,7 @@ const reviewLoopView = (() => {
       </form>
       <div data-review-error role="alert" hidden></div>
       <section class="review-activity" data-review-activity aria-labelledby="review-activity-title">
-        <div class="review-section-heading"><h2 id="review-activity-title">Loop status</h2><span data-review-badge hidden></span></div>
+        <div class="review-section-heading"><h2 id="review-activity-title" data-review-activity-title>How it works</h2><span data-review-badge hidden></span></div>
         <div data-review-context class="review-context" hidden></div>
         <div data-review-status role="status" aria-live="polite"></div>
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
@@ -60,7 +60,15 @@ const reviewLoopView = (() => {
           </details>
           <p class="review-next-message" data-review-next-message></p>
         </div>
-        <div class="review-empty" data-review-empty><strong>Ready when you are</strong><p>Each round reviews your project, fixes qualifying findings, and verifies the commit before continuing.</p><div class="review-workflow" aria-label="Round workflow"><span>1 · Review</span><span>2 · Fix &amp; commit</span><span>3 · Verify</span></div></div>
+        <div class="review-empty" data-review-empty>
+          <p>Each round moves your project closer to a clean review.</p>
+          <div class="review-workflow" aria-label="Round workflow">
+            <div><span class="review-workflow-number" aria-hidden="true">01</span><div><strong>Review</strong><p>A fresh task checks your project for qualifying issues.</p></div></div>
+            <div><span class="review-workflow-number" aria-hidden="true">02</span><div><strong>Fix &amp; commit</strong><p>Findings are addressed and the fixes are committed.</p></div></div>
+            <div><span class="review-workflow-number" aria-hidden="true">03</span><div><strong>Verify &amp; repeat</strong><p>The commit is verified before the next review begins.</p></div></div>
+          </div>
+          <div class="review-guide-note">You can pause after a round or stop the loop at any time.</div>
+        </div>
         <ol data-review-rounds aria-label="Review rounds"></ol>
       </section>`;
     page.append(details);
@@ -115,6 +123,7 @@ const reviewLoopView = (() => {
     if (loop && activity.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(activity, form);
     if (!loop && form.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_PRECEDING) root.insertBefore(form, activity);
     root.dataset.hasLoop = String(!!loop);
+    root.querySelector('[data-review-activity-title]').textContent = loop ? 'Loop activity' : 'How it works';
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     root.querySelector('[data-review-effort]').disabled ||= !modelSelect.value;
     const badge = root.querySelector('[data-review-badge]');
