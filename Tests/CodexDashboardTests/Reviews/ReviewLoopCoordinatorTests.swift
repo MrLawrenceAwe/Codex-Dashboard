@@ -26,6 +26,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1"])
+        XCTAssertEqual(driver.speeds, [.standard, .standard])
         XCTAssertEqual(store.loop?.rounds.first?.reviewTurnID, "turn-1")
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: []) // read review
@@ -366,6 +367,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let coordinator = ReviewLoopCoordinator(store: store)
         var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, instructions: nil, maxRounds: 3, loopID: nil)
         start.selection = ReviewModelSelection(model: "selected-model", effort: "high")
+        start.speed = .fast
         try coordinator.apply(start, projects: [project])
         let driver = ReviewTestDriver()
         await coordinator.advance(using: driver, threads: [])
@@ -373,11 +375,14 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.selections, [start.selection, start.selection])
+        XCTAssertEqual(driver.speeds, [.fast, .fast, .fast])
         XCTAssertEqual(store.loop?.selection, start.selection)
+        XCTAssertEqual(store.loop?.speed, .fast)
         driver.finish(findings: 1, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.selections, [start.selection, start.selection, start.selection])
+        XCTAssertEqual(driver.speeds, [.fast, .fast, .fast, .fast, .fast])
     }
 
     func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {
@@ -387,6 +392,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let (coordinator, _, _) = try make()
         try store.save(try XCTUnwrap(coordinator.loop))
         XCTAssertEqual(try store.load(), coordinator.loop)
+        var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loop))) as? [String: Any])
+        olderLoop.removeValue(forKey: "speed")
+        try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
+        XCTAssertNil(try store.load()?.speed)
         try Data("broken".utf8).write(to: url)
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertNotNil(recovered.error)
@@ -418,6 +427,7 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var createdThreads: [String] = []
     var prompts: [String] = []
     var selections: [ReviewModelSelection?] = []
+    var speeds: [ReviewSpeed] = []
     var thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
     var onRepository: (() -> Void)?
     var onCreateThread: (() -> Void)?
@@ -433,7 +443,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         onResolveCommit?()
         return resolvedCommit ?? commit
     }
-    func createThread(project: ReviewProject, title: String) async throws -> String {
+    func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String {
+        speeds.append(speed)
         createCalls += 1
         if failCreate { throw ReviewLoopError("Lost response") }
         let id = "thread-\(createdThreads.count + 1)"
@@ -442,9 +453,10 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         onCreateThread?()
         return id
     }
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String {
+    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         prompts.append(prompt)
         selections.append(selection)
+        speeds.append(speed)
         let id = "turn-\(prompts.count)"
         thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
         onStartTurn?()

@@ -3,12 +3,30 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
+    func testNewReviewThreadUsesStandardSpeed() async throws {
+        let connection = ReviewReportDevTools()
+        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+        let id = try await driver.createThread(project: ReviewProject(id: "project", name: "Project", path: "/tmp/project"), title: "Review", speed: .standard)
+        XCTAssertEqual(id, "thread")
+        let expression = await connection.expressions.first!
+        let prefix = "window.__codexDashboard.reviewRequest("
+        let request = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any])
+        let params = try XCTUnwrap(request["params"] as? [String: Any])
+        XCTAssertEqual(request["method"] as? String, "thread/start")
+        XCTAssertEqual(params["serviceTier"] as? String, "default")
+        _ = try await driver.createThread(project: ReviewProject(id: "project", name: "Project", path: "/tmp/project"), title: "Fast review", speed: .fast)
+        let fastExpression = await connection.expressions.dropLast().last!
+        let fastRequest = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(fastExpression.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any])
+        XCTAssertEqual((fastRequest["params"] as? [String: Any])?["serviceTier"] as? String, "priority")
+    }
+
     func testTurnsRequestMarkdownWithoutForcingJSON() async throws {
         let connection = ReviewReportDevTools()
         let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
-        for kind: ReviewTurnKind in [.review(.p1), .fix] {
+        let cases: [(ReviewTurnKind, ReviewSpeed)] = [(.review(.p1), .standard), (.fix, .fast)]
+        for (kind, speed) in cases {
             let id = try await driver.startTurn(threadID: "thread", prompt: "Do the work", kind: kind,
-                                                selection: ReviewModelSelection(model: "chosen", effort: "high"))
+                                                selection: ReviewModelSelection(model: "chosen", effort: "high"), speed: speed)
             XCTAssertEqual(id, "turn")
             let expression = await connection.expression
             let prefix = "window.__codexDashboard.reviewRequest("
@@ -18,6 +36,7 @@ final class ReviewLoopDriverTests: XCTestCase {
             XCTAssertNil(params["outputSchema"])
             XCTAssertEqual(params["model"] as? String, "chosen")
             XCTAssertEqual(params["effort"] as? String, "high")
+            XCTAssertEqual(params["serviceTierForTurn"] as? String, speed.serviceTier)
             let input = try XCTUnwrap(params["input"] as? [[String: Any]])
             let text = try XCTUnwrap(input.first?["text"] as? String)
             XCTAssertTrue(text.hasPrefix("Do the work\n\n"))
@@ -96,11 +115,17 @@ final class ReviewLoopDriverTests: XCTestCase {
 }
 
 private actor ReviewReportDevTools: DevToolsServing {
-    var expression = ""
+    var expressions: [String] = []
+    var expression: String { expressions.last ?? "" }
     func mainRendererTargets() async -> [DevToolsTarget] { [] }
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
     func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
-        self.expression = expression
+        expressions.append(expression)
+        let prefix = "window.__codexDashboard.reviewRequest("
+        let request = try JSONSerialization.jsonObject(with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any]
+        if request?["method"] as? String == "thread/start" {
+            return "{\"result\":{\"thread\":{\"id\":\"thread\"}}}"
+        }
         return "{\"result\":{\"turn\":{\"id\":\"turn\"}}}"
     }
 }

@@ -99,14 +99,17 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const effort = document.querySelector('[data-review-effort]');
           const choices = [...effort.options].map(o => o.value).join(',');
           effort.value = 'high';
+          const speed = document.querySelector('[data-review-speed]');
+          const defaultSpeed = speed.value;
+          speed.value = 'fast';
           document.querySelector('[data-review-start]').click();
           const action = JSON.parse(api.pendingReviewAction());
           api.openTodos();
           const closed = !document.getElementById('codex-dashboard-review-page').classList.contains('is-open');
-          return [placed,sameWidth,exclusive,restored,choices,action.selection.model,action.selection.effort,closed];
+          return [placed,sameWidth,exclusive,restored,choices,defaultSpeed,action.speed,action.selection.model,action.selection.effort,closed];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, true, true, ",low,high", "model-a", "high", true])
+        XCTAssertEqual(result, [true, true, true, true, ",low,high", "standard", "fast", "model-a", "high", true])
     }
 
     func testActivityPreservesExpandedSummaryAndShowsLoopState() async throws {

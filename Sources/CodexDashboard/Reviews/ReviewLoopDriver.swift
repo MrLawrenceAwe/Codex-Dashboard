@@ -82,9 +82,10 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return result.terminationStatus == 0
     }
 
-    func createThread(project: ReviewProject, title: String) async throws -> String {
+    func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String {
         let response = try await request("thread/start", [
             "cwd": project.path, "projectId": project.id,
+            "serviceTier": speed.serviceTier,
             "experimentalRawEvents": false, "ephemeral": false,
         ])
         guard let thread = response["thread"] as? [String: Any], let id = thread["id"] as? String else {
@@ -95,9 +96,10 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return id
     }
 
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?) async throws -> String {
+    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         var params: [String: Any] = [
             "threadId": threadID,
+            "serviceTierForTurn": speed.serviceTier,
             "input": [["type": "text", "text": prompt + "\n\n" + ReviewLoopReport.instructions(for: kind), "text_elements": []]],
         ]
         if let selection {
