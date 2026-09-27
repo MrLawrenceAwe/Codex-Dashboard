@@ -73,7 +73,7 @@ const codexHost = {
     }));
   },
 
-  async openCommitOrPush(thread) {
+  async openCommitDialog(thread) {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
 
     this.navigateToThread(thread);

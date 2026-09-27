@@ -433,7 +433,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
         var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, instructions: nil, maxRounds: 3, loopID: nil)
-        start.selection = ReviewModelSelection(model: "selected-model", effort: "high")
+        start.selection = ReviewModelSelection(modelID: "selected-model", reasoningEffort: "high")
         start.speed = .fast
         try coordinator.apply(start, projects: [project])
         let driver = ReviewTestDriver()

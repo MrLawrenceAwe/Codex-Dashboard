@@ -14,7 +14,7 @@ function createTaskDashboard({ catalog }) {
     rootClass: 'codex-dashboard-open',
   });
   let viewNeedsRender = true;
-  let commitOrPushError = '';
+  let commitDialogError = '';
   const presentationState = createThreadPresentationState({ findThread: catalog.findThread, isOpen: pageState.isOpen, onChange: requestRender });
   const { isThreadUnread, isCompletionTickVisible } = presentationState;
 
@@ -67,20 +67,20 @@ function createTaskDashboard({ catalog }) {
     codexHost.navigateToThread(thread);
   }
 
-  async function openCommitOrPushForProject(projectPath) {
-    commitOrPushError = '';
+  async function openCommitDialogForProject(projectPath) {
+    commitDialogError = '';
     const thread = threads.find(
       (item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath,
     );
     if (!thread) {
-      commitOrPushError = 'No idle task is available for this project.';
+      commitDialogError = 'No idle task is available for this project.';
       renderDashboard();
       return;
     }
     closeDashboard();
-    const result = await codexHost.openCommitOrPush(thread);
+    const result = await codexHost.openCommitDialog(thread);
     if (result.opened) return;
-    commitOrPushError = result.reason;
+    commitDialogError = result.reason;
     dashboardNavigation.openTasks();
     renderDashboard();
   }
@@ -94,7 +94,7 @@ function createTaskDashboard({ catalog }) {
       visibleThreadLimit: visibleLimit,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
-      commitOrPushError,
+      commitDialogError,
       isThreadUnread,
       isCompletionTickVisible,
       state,
@@ -179,7 +179,7 @@ function createTaskDashboard({ catalog }) {
           const projectPath = projectIndicators.dataset.projectIndicators;
           if (hiddenChangeIndicatorPaths.has(projectPath)) hiddenChangeIndicatorPaths.delete(projectPath);
           else hiddenChangeIndicatorPaths.add(projectPath);
-          commitOrPushError = '';
+          commitDialogError = '';
           savePreferences();
           renderDashboard();
           return;
@@ -187,7 +187,7 @@ function createTaskDashboard({ catalog }) {
         const projectCommit = event.target.closest('[data-project-commit]');
         if (projectCommit) {
           event.preventDefault();
-          void openCommitOrPushForProject(projectCommit.dataset.projectCommit);
+          void openCommitDialogForProject(projectCommit.dataset.projectCommit);
           return;
         }
         const projectToggle = event.target.closest('[data-project-toggle]');

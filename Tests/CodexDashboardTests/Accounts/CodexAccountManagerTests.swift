@@ -209,7 +209,7 @@ final class CodexAccountManagerTests: XCTestCase {
             )
         }
 
-        XCTAssertThrowsError(try manager.deleteAccount(account.id))
+        XCTAssertThrowsError(try manager.forgetSavedAccount(account.id))
         XCTAssertEqual(vault.deleteCallCount, 0)
         XCTAssertEqual(vault.credential(for: account.id), credential)
     }
@@ -220,7 +220,7 @@ final class CodexAccountManagerTests: XCTestCase {
         let account = try manager.saveCurrentAccount()
         vault.failDeletion()
 
-        XCTAssertThrowsError(try manager.deleteAccount(account.id)) { error in
+        XCTAssertThrowsError(try manager.forgetSavedAccount(account.id)) { error in
             XCTAssertTrue(error is MemoryAccountCredentialVault.TestError)
         }
         XCTAssertEqual(try manager.loadDocument().accounts, [account])
@@ -245,7 +245,7 @@ final class CodexAccountManagerTests: XCTestCase {
             )
         }
 
-        XCTAssertThrowsError(try manager.deleteAccount(account.id)) { error in
+        XCTAssertThrowsError(try manager.forgetSavedAccount(account.id)) { error in
             guard case CodexAccountError.recoveryFailed = error else {
                 return XCTFail("Unexpected error: \(error)")
             }

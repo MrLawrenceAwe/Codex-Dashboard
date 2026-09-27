@@ -2,8 +2,8 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
   let unreadThreadIDs = new Set();
   const sidebarUnreadOverrides = new Map();
   const observedSidebarReadStates = new Map();
-  const completedTickDuration = 60_000;
-  const completedTickExpiryByThreadID = new Map();
+  const completionIndicatorDurationMs = 60_000;
+  const completionIndicatorExpiryByThreadID = new Map();
   let completedTickTimer;
   let unreadSyncTimer;
   let unreadMonitoringStarted = false;
@@ -44,12 +44,12 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
       changed = true;
       const thread = findThread(threadID);
       if (thread?.latestLifecycleEventKind === 'completed') {
-        completedTickExpiryByThreadID.set(threadID, Date.now() + completedTickDuration);
+        completionIndicatorExpiryByThreadID.set(threadID, Date.now() + completionIndicatorDurationMs);
       }
     });
     nextUnreadThreadIDs.forEach((threadID) => {
       if (!unreadThreadIDs.has(threadID)) changed = true;
-      completedTickExpiryByThreadID.delete(threadID);
+      completionIndicatorExpiryByThreadID.delete(threadID);
     });
     unreadThreadIDs = nextUnreadThreadIDs;
     scheduleCompletedTickExpiry();
@@ -59,10 +59,10 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
   function isCompletionTickVisible(thread) {
     if (thread.latestLifecycleEventKind !== 'completed') return false;
     if (isThreadUnread(thread)) return true;
-    const expiry = completedTickExpiryByThreadID.get(thread.id);
+    const expiry = completionIndicatorExpiryByThreadID.get(thread.id);
     if (!expiry) return false;
     if (expiry > Date.now()) return true;
-    completedTickExpiryByThreadID.delete(thread.id);
+    completionIndicatorExpiryByThreadID.delete(thread.id);
     scheduleCompletedTickExpiry();
     return false;
   }
@@ -70,7 +70,7 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
   function scheduleCompletedTickExpiry() {
     if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
     const now = Date.now();
-    const expiries = [...completedTickExpiryByThreadID.values()].filter((expiry) => expiry > now);
+    const expiries = [...completionIndicatorExpiryByThreadID.values()].filter((expiry) => expiry > now);
     if (!expiries.length) {
       completedTickTimer = undefined;
       return;
@@ -124,8 +124,8 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
       if (override.isUnread) nextUnreadThreadIDs.add(id);
       else nextUnreadThreadIDs.delete(id);
     });
-    completedTickExpiryByThreadID.forEach((_, threadID) => {
-      if (!findThread(threadID)) completedTickExpiryByThreadID.delete(threadID);
+    completionIndicatorExpiryByThreadID.forEach((_, threadID) => {
+      if (!findThread(threadID)) completionIndicatorExpiryByThreadID.delete(threadID);
     });
     syncUnreadFromSidebar(nextUnreadThreadIDs);
     scheduleUnreadSync(1500);
@@ -144,7 +144,7 @@ function createThreadPresentationState({ findThread, isOpen, onChange }) {
     if (completedTickTimer !== undefined) clearTimeout(completedTickTimer);
     unreadSyncTimer = undefined;
     completedTickTimer = undefined;
-    completedTickExpiryByThreadID.clear();
+    completionIndicatorExpiryByThreadID.clear();
     sidebarUnreadOverrides.clear();
     observedSidebarReadStates.clear();
     unreadThreadIDs.clear();

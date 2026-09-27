@@ -33,7 +33,7 @@ extension AppCoordinator {
             presentationAlreadyUpdated = false
         case .forgetAccount:
             guard let accountID = action.accountID else { return .unavailable }
-            accounts.deleteAccount(accountID)
+            accounts.forgetSavedAccount(accountID)
             presentationAlreadyUpdated = false
         }
         if !presentationAlreadyUpdated {
@@ -86,7 +86,7 @@ extension AppCoordinator {
         isPerformingAction = true
         defer { isPerformingAction = false }
         refreshGeneration += 1
-        await synchronizationGate.cancel()
+        await synchronizationGate.cancelAndWait()
         accounts.invalidateUsage()
         do {
             try await loadThreadSnapshot()

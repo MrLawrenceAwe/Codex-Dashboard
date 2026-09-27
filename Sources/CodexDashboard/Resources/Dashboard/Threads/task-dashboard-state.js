@@ -24,14 +24,16 @@ const taskDashboardState = (() => {
         }
         delete stored.collapsedProjects;
       }
-      if (legacy !== null || hasLegacyIndicatorPaths || hasLegacyCollapsedPaths) {
+      const hadRecentHomeFilter = stored.filterMode === 'recent';
+      if (hadRecentHomeFilter) stored.filterMode = 'home';
+      if (legacy !== null || hasLegacyIndicatorPaths || hasLegacyCollapsedPaths || hadRecentHomeFilter) {
         localStorage.setItem(preferencesKey, JSON.stringify(stored));
         if (legacy !== null) localStorage.removeItem(legacyPreferencesKey);
       }
     } catch (_) {}
     return {
-      filterMode: ['recent', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'recent',
+      filterMode: ['home', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'home',
       collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
         ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
       hiddenChangeIndicatorPaths: new Set(Array.isArray(stored.hiddenChangeIndicatorPaths)
@@ -74,7 +76,7 @@ const taskDashboardState = (() => {
     isThreadUnread,
   }) {
     return threads.filter((thread) => {
-      const matchesFilter = filterMode === 'recent'
+      const matchesFilter = filterMode === 'home'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim()));

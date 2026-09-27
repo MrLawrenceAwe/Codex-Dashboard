@@ -362,7 +362,7 @@ final class StubDashboardRuntime: DashboardRuntime {
             webSocketURL: "ws://127.0.0.1/main"
         )]
     }
-    func preferNativePromptLibraryOnNextSynchronization() {}
+    func useStoredPromptLibraryOnNextSync() {}
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1

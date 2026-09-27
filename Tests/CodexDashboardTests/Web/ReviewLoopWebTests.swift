@@ -101,7 +101,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          api.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}], models:[{model:'model-a',displayName:'Model A',efforts:['low','high']},{model:'model-b',displayName:'Model B',efforts:['medium']}],loop:null,error:null});
+          api.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}], models:[{modelID:'model-a',displayName:'Model A',supportedReasoningEfforts:['low','high']},{modelID:'model-b',displayName:'Model B',supportedReasoningEfforts:['medium']}],loop:null,error:null});
           const nav = document.getElementById('codex-dashboard-review-navigation');
           const placed = nav.previousElementSibling.id === 'codex-dashboard-todo-navigation';
           const sameWidth = Math.abs(nav.getBoundingClientRect().width - nav.previousElementSibling.getBoundingClientRect().width) < 1;
@@ -122,7 +122,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const action = JSON.parse(api.pendingReviewAction());
           api.openTodos();
           const closed = !document.getElementById('codex-dashboard-review-page').classList.contains('is-open');
-          return [placed,sameWidth,exclusive,restored,choices,defaultSpeed,action.speed,action.selection.model,action.selection.effort,closed];
+          return [placed,sameWidth,exclusive,restored,choices,defaultSpeed,action.speed,action.selection.modelID,action.selection.reasoningEffort,closed];
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, [true, true, true, true, ",low,high", "standard", "fast", "model-a", "high", true])

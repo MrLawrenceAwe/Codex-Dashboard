@@ -33,8 +33,8 @@ final class ReviewLoopBridge {
                 if action.id != acknowledgedActionID {
                     do {
                         if action.kind == "start", let selection = action.selection {
-                            guard let model = models.first(where: { $0.model == selection.model }),
-                                  selection.effort == nil || model.efforts.contains(selection.effort!) else {
+                            guard let model = models.first(where: { $0.modelID == selection.modelID }),
+                                  selection.reasoningEffort == nil || model.supportedReasoningEfforts.contains(selection.reasoningEffort!) else {
                                 throw ReviewLoopError("Choose an available model and supported reasoning effort.")
                             }
                         }

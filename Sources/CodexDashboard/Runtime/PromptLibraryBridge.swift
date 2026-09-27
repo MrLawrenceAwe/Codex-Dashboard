@@ -12,7 +12,7 @@ final class PromptLibraryBridge {
         self.store = store
     }
 
-    func preferNativeLibrary() {
+    func useStoredLibrary() {
         nativeLibraryIsAuthoritative = true
     }
 

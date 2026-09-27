@@ -211,7 +211,7 @@ extension DashboardRendererTests {
         try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
 
         await devTools.setPendingLibrary(pendingJSON)
-        renderer.preferNativePromptLibraryOnNextSynchronization()
+        renderer.useStoredPromptLibraryOnNextSync()
         try await renderer.synchronize(snapshot, on: [target])
 
         XCTAssertEqual(try store.load(), imported)

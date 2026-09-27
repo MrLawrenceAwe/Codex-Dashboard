@@ -67,11 +67,11 @@ const reviewLoopView = (() => {
   function renderEfforts(snapshot, pendingAction) {
     const root = panel();
     if (!root) return;
-    const model = (snapshot.models || []).find(item => item.model === root.querySelector('[data-review-model]').value);
+    const model = (snapshot.models || []).find(item => item.modelID === root.querySelector('[data-review-model]').value);
     const select = root.querySelector('[data-review-effort]');
     const selected = select.value;
-    select.innerHTML = '<option value="">Model default</option>' + (model?.efforts || []).map(value => `<option value="${escape(value)}">${escape(value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1))}</option>`).join('');
-    if (model?.efforts.includes(selected)) select.value = selected;
+    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1))}</option>`).join('');
+    if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
     select.disabled = !model || !!pendingAction;
   }
 
@@ -85,9 +85,9 @@ const reviewLoopView = (() => {
     const nextModelsSignature = JSON.stringify(models);
     if (nextModelsSignature !== modelsSignature) {
       const selected = modelSelect.value;
-      modelSelect.innerHTML = '<option value="">Codex default</option>' + models.map(model => `<option value="${escape(model.model)}">${escape(model.displayName)}</option>`).join('');
+      modelSelect.innerHTML = '<option value="">Codex default</option>' + models.map(model => `<option value="${escape(model.modelID)}">${escape(model.displayName)}</option>`).join('');
       if (selected) {
-        if (!models.some(model => model.model === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
+        if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
         modelSelect.value = selected;
       }
       modelsSignature = nextModelsSignature;
@@ -110,7 +110,7 @@ const reviewLoopView = (() => {
     badge.dataset.phase = loop?.phase || '';
     const context = root.querySelector('[data-review-context]');
     context.hidden = !loop;
-    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${escape(loop.priorityLimit)}${loop.priorityLimit === 'P0' ? '' : '+'} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.model)}${loop.selection.effort ? ` · ${escape(loop.selection.effort)}` : ''}</span>` : ''}` : '';
+    context.innerHTML = loop ? `<strong>${escape(loop.project.name)}</strong><span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`} priorities</span><span>${loop.rounds.length} / ${loop.maxRounds} rounds</span><span>${loop.speed === 'fast' ? 'Fast' : 'Standard'} speed</span>${loop.selection ? `<span>${escape(loop.selection.modelID)}${loop.selection.reasoningEffort ? ` · ${escape(loop.selection.reasoningEffort)}` : ''}</span>` : ''}` : '';
     root.querySelector('[data-review-status]').textContent = pendingAction ? 'Saving…'
       : loop?.phase === 'limitReached' ? 'All configured review rounds completed.' : loop?.message || '';
     root.querySelector('[data-review-empty]').hidden = !!loop || !!pendingAction;

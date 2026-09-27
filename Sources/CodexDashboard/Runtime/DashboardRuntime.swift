@@ -24,7 +24,7 @@ protocol DashboardRuntime: AnyObject {
     func openThread(_ threadID: String) async
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
-    func preferNativePromptLibraryOnNextSynchronization()
+    func useStoredPromptLibraryOnNextSync()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
@@ -108,8 +108,8 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         await renderer.synchronizeAccountPopover(snapshot)
     }
 
-    func preferNativePromptLibraryOnNextSynchronization() {
-        renderer.preferNativePromptLibraryOnNextSynchronization()
+    func useStoredPromptLibraryOnNextSync() {
+        renderer.useStoredPromptLibraryOnNextSync()
     }
 
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] {

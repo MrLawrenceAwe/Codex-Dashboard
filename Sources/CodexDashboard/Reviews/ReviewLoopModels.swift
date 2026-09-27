@@ -1,14 +1,39 @@
 import Foundation
 
 struct ReviewModel: Codable, Sendable {
-    let model: String
+    let modelID: String
     let displayName: String
-    let efforts: [String]
+    let supportedReasoningEfforts: [String]
 }
 
 struct ReviewModelSelection: Codable, Equatable, Sendable {
-    let model: String
-    let effort: String?
+    let modelID: String
+    let reasoningEffort: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case modelID, reasoningEffort
+        case savedModelID = "model"
+        case savedReasoningEffort = "effort"
+    }
+
+    init(modelID: String, reasoningEffort: String?) {
+        self.modelID = modelID
+        self.reasoningEffort = reasoningEffort
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        modelID = try values.decodeIfPresent(String.self, forKey: .modelID)
+            ?? values.decode(String.self, forKey: .savedModelID)
+        reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
+            ?? values.decodeIfPresent(String.self, forKey: .savedReasoningEffort)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(modelID, forKey: .modelID)
+        try values.encodeIfPresent(reasoningEffort, forKey: .reasoningEffort)
+    }
 }
 
 enum ReviewSpeed: String, Codable, Sendable {
@@ -41,7 +66,7 @@ struct ReviewFinding: Codable, Equatable, Sendable {
     enum Priority: String, Codable, CaseIterable, Sendable {
         case p0 = "P0", p1 = "P1", p2 = "P2", p3 = "P3"
         var rank: Int { Self.allCases.firstIndex(of: self)! }
-        var label: String { self == .p0 ? "P0" : "\(rawValue)+" }
+        var rangeLabel: String { self == .p0 ? "P0" : "P0–\(rawValue)" }
         var included: [String] { Self.allCases.filter { $0.rank <= rank }.map(\.rawValue) }
     }
     let priority: Priority
