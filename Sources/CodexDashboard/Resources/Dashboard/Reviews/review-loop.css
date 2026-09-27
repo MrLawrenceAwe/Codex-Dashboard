@@ -127,3 +127,5 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
   .dashboard-review-loop .review-round-heading { align-items:flex-start; flex-direction:column; gap:4px; }
   .dashboard-review-loop .review-round-heading span { text-align:left; }
 }
+
+.dashboard-review-loop [data-review-picker] { margin-bottom:20px; }

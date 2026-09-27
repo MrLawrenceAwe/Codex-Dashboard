@@ -111,6 +111,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
     var branch: String?
+    var checkoutRoot: String?
     var expectedCommit: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
@@ -119,7 +120,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 extension ReviewLoop {
     private enum CodingKeys: String, CodingKey {
         case id, startActionID, project, instructions, maxRounds, selection, speed,
-             priorityLimit, phase, pauseRequested, branch, expectedCommit, rounds, message
+             priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
     }
 
     init(from decoder: Decoder) throws {
@@ -135,6 +136,7 @@ extension ReviewLoop {
         phase = try values.decode(ReviewLoopPhase.self, forKey: .phase)
         pauseRequested = try values.decode(Bool.self, forKey: .pauseRequested)
         branch = try values.decodeIfPresent(String.self, forKey: .branch)
+        checkoutRoot = try values.decodeIfPresent(String.self, forKey: .checkoutRoot)
         expectedCommit = try values.decodeIfPresent(String.self, forKey: .expectedCommit)
         rounds = try values.decode([ReviewRound].self, forKey: .rounds)
         message = try values.decode(String.self, forKey: .message)
@@ -156,8 +158,8 @@ struct ReviewLoopAction: Codable, Sendable {
 struct ReviewLoopSnapshot: Codable, Sendable {
     let projects: [ReviewProject]
     let models: [ReviewModel]
-    let loop: ReviewLoop?
-    let progress: ReviewLoopProgress?
+    let loops: [ReviewLoop]
+    let progress: [String: ReviewLoopProgress]
     let error: String?
     let acknowledgedActionID: String?
 }
@@ -202,7 +204,7 @@ struct ReviewLoopError: LocalizedError {
 }
 
 @MainActor
-protocol ReviewLoopDriving {
+protocol ReviewLoopDriving: Sendable {
     func projects() async throws -> [ReviewProject]
     func repository(at path: String) async throws -> ReviewRepositoryState
     func resolveCommit(_ commit: String, at path: String) async throws -> String
@@ -214,6 +216,6 @@ protocol ReviewLoopDriving {
 
 @MainActor
 protocol ReviewLoopStoring {
-    func load() throws -> ReviewLoop?
-    func save(_ loop: ReviewLoop) throws
+    func load() throws -> [ReviewLoop]
+    func save(_ loops: [ReviewLoop]) throws
 }
