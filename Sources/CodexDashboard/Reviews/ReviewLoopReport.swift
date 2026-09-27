@@ -8,23 +8,30 @@ enum ReviewLoopReport {
         switch kind {
         case .review(let limit):
             format = """
-            Start with `# Review complete` (or `# Review blocked` if unable to finish).
-            On the next nonblank line write `Findings: N`, with the exact finding count.
-            Then write `## Summary` and a short summary, including relevant validation.
-            For each finding, write `## [P1] Short title` using its actual priority, followed by a paragraph explaining the evidence, impact, and a linked file location. Only include \(limit.included.joined(separator: ", ")) findings.
-            Use zero findings only when there are none; keep the Summary section even then.
+            # Review complete
+            Findings: N
+            ## Summary
+            Brief summary.
+            ## [P1] Short title
+            Evidence, impact, and linked file location.
+
+            Report only \(limit.included.joined(separator: ", ")) findings. Repeat the finding section with each finding's actual priority; N is the number reported. If none, use N=0 and omit finding sections. If unable to finish, use `# Review blocked`.
             """
         case .fix:
             format = """
-            Start with `# Fixes committed` (or `# Fixes blocked` if unable to finish).
-            On the next nonblank lines write `Findings addressed: N` and `Commit: ` followed by the full Git commit ID in backticks (use `none` when blocked).
-            Then write `## Summary` and a concise description of the changes or the blocker.
+            # Fixes committed
+            Findings addressed: N
+            Commit: `FULL_COMMIT_ID`
+            ## Summary
+            Brief description of changes.
+
+            If unable to finish, use `# Fixes blocked` and Commit: `none`; explain the blocker in Summary. N is the number addressed; use the full Git commit ID when committed.
             """
         }
         return """
-        Final response format for this review loop: use readable Markdown, never JSON or an outer code fence.
+        Return Markdown in this exact structure (no JSON or code fences):
         \(format)
-        Keep these exact headings and field labels so the loop can read the report. Use normal Markdown paragraphs, lists, inline code, and links within sections; do not add other level-one or level-two headings or fenced code blocks.
+        Keep the field labels and add no other level-one or level-two headings.
         """
     }
 
