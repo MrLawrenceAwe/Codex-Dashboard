@@ -111,7 +111,7 @@ function createTodoList({ threadReferencesForProject }) {
   }
 
   function loadItemImages() {
-    todoStore.loadImages(items).then((hydratedItems) => {
+    todoImageStore.load(items).then((hydratedItems) => {
       if (destroyed) return;
       const hydratedImages = new Map(hydratedItems.map((item) => [item.id, item.image?.dataURL]));
       let changed = false;

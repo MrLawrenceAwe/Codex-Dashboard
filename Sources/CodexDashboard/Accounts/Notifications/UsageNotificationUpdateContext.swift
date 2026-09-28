@@ -37,7 +37,7 @@ final class UsageNotificationUpdateContext {
             sentUpdates: history.deadlines(for: .updates),
             now: currentDate
         )
-        history.saveDeadlines(plan.unchangedDeadlines, for: .known)
+        history.saveDeadlines(plan.deadlinesWithoutUpdateAlerts, for: .known)
         await apply(plan, currentDate)
     }
 }

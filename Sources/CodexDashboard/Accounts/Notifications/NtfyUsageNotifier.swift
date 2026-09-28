@@ -124,7 +124,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         now currentDate: Date
     ) async {
         let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
-        let eligibleDeadlines = (plan.unchangedDeadlines + plan.scheduled)
+        let eligibleDeadlines = (plan.deadlinesWithoutUpdateAlerts + plan.scheduled)
             .reduce(into: [String: Date]()) { result, notification in
                 result[notification.sourceIdentifier] = notification.deadlineDate
             }

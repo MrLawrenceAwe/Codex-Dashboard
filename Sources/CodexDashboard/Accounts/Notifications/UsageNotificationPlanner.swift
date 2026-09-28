@@ -9,7 +9,7 @@ enum UsageNotificationPlanner {
     struct Plan {
         let scheduled: [ScheduledUsageNotification]
         let immediate: [ImmediateUsageNotification]
-        let unchangedDeadlines: [ScheduledUsageNotification]
+        let deadlinesWithoutUpdateAlerts: [ScheduledUsageNotification]
     }
 
     static func plan(
@@ -37,7 +37,7 @@ enum UsageNotificationPlanner {
                 for: accounts, usageByAccountID: usageByAccountID,
                 previousObservations: previousObservations, now: now
             ),
-            unchangedDeadlines: all.filter { !updateSources.contains($0.sourceIdentifier) }
+            deadlinesWithoutUpdateAlerts: all.filter { !updateSources.contains($0.sourceIdentifier) }
         )
     }
 

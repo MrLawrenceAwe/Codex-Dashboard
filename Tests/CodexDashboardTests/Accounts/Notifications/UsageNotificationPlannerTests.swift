@@ -37,7 +37,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             )
             XCTAssertFalse(plan.scheduled.contains { $0.identifier.contains("-5-hour-") })
             XCTAssertTrue(plan.immediate.isEmpty)
-            XCTAssertEqual(plan.unchangedDeadlines.count, 7)
+            XCTAssertEqual(plan.deadlinesWithoutUpdateAlerts.count, 7)
         }
     }
 

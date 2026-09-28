@@ -69,11 +69,7 @@ enum ReviewLoopPresentation {
         case .bugs:
             return "Fix \(findings); commit once"
         case .organisation, .naming:
-            switch round.review?.findings.count ?? 0 {
-            case 1: return "Address"
-            case 2: return "Address both"
-            default: return "Address all"
-            }
+            return "Address \(findings); commit once"
         case .performance:
             return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
         }

@@ -538,10 +538,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                 expectedFix = "Fix the finding; commit once"
             case .organisation:
                 expectedReview = "Do a code minimisation and organisation review."
-                expectedFix = "Address"
+                expectedFix = "Address the finding; commit once"
             case .naming:
                 expectedReview = "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
-                expectedFix = "Address"
+                expectedFix = "Address the finding; commit once"
             case .performance:
                 expectedReview = "Review project for performance and responsiveness."
                 expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"

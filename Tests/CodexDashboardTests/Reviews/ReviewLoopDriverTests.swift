@@ -147,6 +147,20 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertEqual(prompt, "Fix all findings; commit once")
         XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
     }
+
+    func testOrganisationFixPromptNamesFindingsAndCommitForEachCount() {
+        for focus in [ReviewFocus.organisation, .naming] {
+            var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 5)
+            loop.focus = focus
+            for (count, expected) in [(1, "Address the finding; commit once"), (2, "Address both findings; commit once"), (3, "Address all findings; commit once")] {
+                var round = ReviewRound(number: 1, baseCommit: "abc")
+                round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
+                    ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
+                }, summary: "Findings")
+                XCTAssertEqual(ReviewLoopPresentation.fixPrompt(for: loop, round: round), expected)
+            }
+        }
+    }
 }
 
 private actor ReviewListDevTools: DevToolsServing {

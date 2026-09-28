@@ -2,8 +2,6 @@ const todoStore = (() => {
   const storageKey = 'codex-dashboard.todos';
   const tagsStorageKey = 'codex-dashboard.todo-tags';
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
-  const imageDatabaseName = 'codex-dashboard.todo-images';
-  const imageStoreName = 'images';
   const version = 8;
   const supportedVersions = new Set([1, 2, 3, 4, 5, 6, 7, version]);
   const maximumTags = 8;
@@ -173,7 +171,7 @@ const todoStore = (() => {
     if (writeProtectionReason()) return false;
     let includesImageData = false;
     try {
-      await persistImages(items);
+      await todoImageStore.persist(items);
     } catch (_) {
       // Inline storage preserves images when IndexedDB is unavailable.
       includesImageData = true;
@@ -183,7 +181,7 @@ const todoStore = (() => {
       if (writeProtectionReason()) return false;
       localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
       localStorage.setItem(storageKey, documentData(items, includesImageData));
-      await pruneImages(items).catch(() => {});
+      await todoImageStore.prune(items).catch(() => {});
       return true;
     } catch (_) {
       try {
@@ -192,68 +190,6 @@ const todoStore = (() => {
       } catch (_) {}
       return false;
     }
-  }
-
-  function imageDatabase() {
-    if (!window.indexedDB) return Promise.reject(new Error('IndexedDB is unavailable.'));
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(imageDatabaseName, 1);
-      request.addEventListener('upgradeneeded', () => {
-        if (!request.result.objectStoreNames.contains(imageStoreName)) {
-          request.result.createObjectStore(imageStoreName);
-        }
-      });
-      request.addEventListener('success', () => resolve(request.result));
-      request.addEventListener('error', () => reject(request.error));
-    });
-  }
-
-  async function withImageStore(mode, operation) {
-    const database = await imageDatabase();
-    try {
-      return await new Promise((resolve, reject) => {
-        const transaction = database.transaction(imageStoreName, mode);
-        const result = operation(transaction.objectStore(imageStoreName));
-        transaction.addEventListener('complete', () => resolve(result));
-        transaction.addEventListener('abort', () => reject(transaction.error));
-        transaction.addEventListener('error', () => reject(transaction.error));
-      });
-    } finally {
-      database.close();
-    }
-  }
-
-  function persistImages(items) {
-    return withImageStore('readwrite', (store) => {
-      items.filter((item) => item.image?.dataURL)
-        .forEach((item) => store.put(item.image.dataURL, item.image.storageKey));
-    });
-  }
-
-  function pruneImages(items) {
-    const imageIDs = new Set(items.filter((item) => item.image)
-      .map((item) => item.image.storageKey));
-    return withImageStore('readwrite', (store) => {
-      const keys = store.getAllKeys();
-      keys.addEventListener('success', () => {
-        keys.result.forEach((id) => { if (!imageIDs.has(id)) store.delete(id); });
-      });
-    });
-  }
-
-  function loadImages(items) {
-    const pending = items.filter((item) => item.image && !item.image.dataURL);
-    if (!pending.length) return Promise.resolve(items);
-    return withImageStore('readonly', (store) => {
-      const hydrated = new Map();
-      pending.forEach((item) => {
-        const request = store.get(item.image.storageKey);
-        request.addEventListener('success', () => hydrated.set(item.id, request.result || ''));
-      });
-      return hydrated;
-    }).then((hydrated) => items.map((item) => item.image && hydrated.has(item.id)
-      ? { ...item, image: { ...item.image, dataURL: hydrated.get(item.id) } }
-      : item)).catch(() => items);
   }
 
   function create(title, body = '', image = null, tags = []) {
@@ -269,5 +205,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, loadImages, load, loadTags, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
+  return { create, load, loadTags, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
 })();

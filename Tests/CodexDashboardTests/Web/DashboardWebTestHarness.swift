@@ -55,6 +55,7 @@ enum DashboardWebTestHarness {
     static func trackedTodoInjection(_ injection: InjectionBundle) -> String {
         injection.mountExpression.replacingOccurrences(of: "function createTodoList({ threadReferencesForProject }) {", with: """
         window.__todoStoreForTests = todoStore;
+        window.__todoImageStoreForTests = todoImageStore;
         const pendingTodoSaves = new Set();
         const saveTodoSnapshot = todoStore.save;
         todoStore.save = (...args) => {
