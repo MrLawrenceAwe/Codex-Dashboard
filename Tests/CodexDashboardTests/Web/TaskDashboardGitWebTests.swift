@@ -132,6 +132,7 @@ extension TaskDashboardWebTests {
                 document.querySelector('[data-project-indicators]').textContent.trim(),
                 document.querySelector('.dashboard-hidden-indicators')?.open,
                 document.querySelector('.dashboard-hidden-indicators summary')?.textContent.trim(),
+                document.querySelectorAll('.dashboard-git-project .dashboard-git-changes').length,
               ];
               document.querySelector('[data-project-indicators]').click();
               const restored = [
@@ -139,6 +140,7 @@ extension TaskDashboardWebTests {
                 document.querySelector('[data-navigation-changes]').hidden,
                 document.querySelectorAll('[data-project-commit]').length,
                 document.querySelector('[data-project-indicators]').textContent.trim(),
+                document.querySelectorAll('.dashboard-git-project .dashboard-git-changes').length,
               ];
               return [before, muted, restored];
             })()
@@ -147,8 +149,8 @@ extension TaskDashboardWebTests {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Hide change indicators"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 1, "Show change indicators", false, "Indicators hidden1"])
-        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Hide change indicators"])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 1, "Show change indicators", false, "Indicators hidden1", 0])
+        XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Hide change indicators", 1])
     }
 
     func testMissingGitActionsReportsSpecificFailure() async throws {
@@ -191,7 +193,7 @@ extension TaskDashboardWebTests {
         let state = try await webView.evaluateJavaScript(
             """
             [
-              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
               document.querySelector('[data-commit-notice]').hidden,
               document.querySelector('[data-commit-notice]').textContent,
             ]
@@ -312,7 +314,7 @@ extension TaskDashboardWebTests {
               document.documentElement.dataset.selectedThread,
               document.documentElement.dataset.gitMenuCount,
               document.documentElement.dataset.commitOpened,
-              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
             ]
             """
         ) as? [Any]
@@ -397,7 +399,7 @@ extension TaskDashboardWebTests {
             """
             [
               document.documentElement.dataset.commitOpened,
-              document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
             ]
             """
         ) as? [Any]

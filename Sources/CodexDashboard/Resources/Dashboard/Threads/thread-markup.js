@@ -73,6 +73,7 @@ const threadMarkup = (() => {
 
   function renderThreadList(visibleThreads, {
     filterMode,
+    runningThreadCount = 0,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
     isUnread,
@@ -85,9 +86,9 @@ const threadMarkup = (() => {
         isUnread: isUnread(item),
         isCompletionTickVisible,
       })).join('');
-      const running = visibleThreads.filter((item) => item.runState === 'running');
+      const running = visibleThreads.slice(0, runningThreadCount);
       if (!running.length) return renderRows(visibleThreads);
-      const recent = visibleThreads.filter((item) => item.runState !== 'running');
+      const recent = visibleThreads.slice(runningThreadCount);
       return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running tasks">
         <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
         ${renderRows(running)}
@@ -107,7 +108,7 @@ const threadMarkup = (() => {
               <span class="dashboard-project-name">${domUtils.escapeHTML(projectName)}</span>
               <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
             </span>
-            <span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>
+            ${hiddenChangeIndicatorPaths.has(projectPath) ? '' : `<span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>`}
           </div>
           <span class="dashboard-project-summary">
             ${renderProjectActions(projectPath, projectThreads, hiddenChangeIndicatorPaths.has(projectPath))}

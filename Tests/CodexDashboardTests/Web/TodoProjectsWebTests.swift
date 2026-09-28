@@ -180,6 +180,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
+              document.querySelector('[data-app-action-sidebar-project-id="dashboard"]')['__reactFiber$test'] = {
+                memoizedProps: { group: { projectId: 'dashboard', projectKind: 'local', path: '/tmp/dashboard' } },
+              };
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
@@ -248,6 +251,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
+              document.querySelector('[data-app-action-sidebar-project-id="dashboard"]')['__reactFiber$test'] = {
+                memoizedProps: { group: { projectId: 'dashboard', projectKind: 'local', path: '/tmp/dashboard' } },
+              };
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
@@ -303,6 +309,12 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         let choices = try await webView.evaluateJavaScript(
             """
             (() => {
+              document.querySelector('[data-app-action-sidebar-project-id="/tmp/one/shared"]')['__reactFiber$test'] = {
+                memoizedProps: { group: { projectId: '/tmp/one/shared', projectKind: 'local', path: '/tmp/one/shared' } },
+              };
+              document.querySelector('[data-app-action-sidebar-project-id="opaque-project"]')['__reactFiber$test'] = {
+                memoizedProps: { group: { projectId: 'opaque-project', projectKind: 'local', path: '/tmp/two/shared' } },
+              };
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openTodos();
               const project = document.querySelector('[data-todo-new-project]');
@@ -318,8 +330,8 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         ) as? [Any]
         let values = try XCTUnwrap(choices)
         XCTAssertEqual(values[0] as? [String], ["", "one"])
-        XCTAssertEqual(values[1] as? [String], [""])
-        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[1] as? [String], ["", "two"])
+        XCTAssertEqual(values[2] as? Bool, false)
     }
 
     func testExistingTodoCanBeAssignedAndUnassignedFromAProject() async throws {
@@ -472,6 +484,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         let chatChoices = try await webView.evaluateJavaScript(
             """
             (() => {
+              document.querySelector('[data-app-action-sidebar-project-id="/tmp/project"]')['__reactFiber$test'] = {
+                memoizedProps: { group: { projectId: '/tmp/project', projectKind: 'local', path: '/tmp/project' } },
+              };
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');

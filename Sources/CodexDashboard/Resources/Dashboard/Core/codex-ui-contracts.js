@@ -67,8 +67,18 @@ const codexUIContracts = (() => {
       const id = String(row.getAttribute('data-app-action-sidebar-project-id') || '').trim();
       const name = String(row.getAttribute('data-app-action-sidebar-project-label') || '').trim();
       if (!id || !name || seen.has(id)) return result;
+      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
+      let fiber = fiberKey ? row[fiberKey] : null;
+      let path = '';
+      while (fiber && !path) {
+        const group = (fiber.memoizedProps || fiber.pendingProps)?.group;
+        if (group?.projectId === id && group?.projectKind === 'local') {
+          path = String(group.path || '').trim();
+        }
+        fiber = fiber.return;
+      }
       seen.add(id);
-      result.push({ id, name });
+      result.push({ id, name, path });
       return result;
     }, []);
   }

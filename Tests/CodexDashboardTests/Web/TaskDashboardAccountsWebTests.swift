@@ -26,7 +26,7 @@ extension TaskDashboardWebTests {
             """
             (() => {
               const sidebarRight = document.querySelector('aside').getBoundingClientRect().right;
-              const pageLeft = document.querySelector('#codex-dashboard-page').getBoundingClientRect().left;
+              const pageLeft = document.querySelector('#codex-dashboard-task-page').getBoundingClientRect().left;
               const inset = getComputedStyle(document.documentElement)
                 .getPropertyValue('--codex-dashboard-content-left');
               return [sidebarRight, pageLeft, inset];
