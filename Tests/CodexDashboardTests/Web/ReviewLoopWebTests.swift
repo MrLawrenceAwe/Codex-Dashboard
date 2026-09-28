@@ -173,10 +173,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(states, [true, false, "Review loop running", false, false, true, true, true])
+        XCTAssertEqual(states, [true, false, "Review loops running", false, false, true, true, true])
     }
 
-    func testReviewTypesQueueSelectedFocusAndKeepProjectTypeOptional() async throws {
+    func testReviewTypesQueueSelectedFocusAndKeepPromptContextOptional() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -208,13 +208,13 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           window.__codexDashboard.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null});
           window.__codexDashboard.openReviews();
           document.querySelector('[data-review-priority]').value = 'P1';
-          document.querySelector('[data-review-project-type]').value = 'personal';
+          document.querySelector('[data-review-prompt-context]').value = 'personal';
           document.querySelector('[data-review-start]').click();
           const first = JSON.parse(window.__codexDashboard.pendingReviewAction());
           document.querySelector('[data-review-start]').click();
           const same = first.id === JSON.parse(window.__codexDashboard.pendingReviewAction()).id;
           window.__codexDashboard.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
-          return [first.kind,first.projectID,first.maxRounds,first.projectType.kind,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
+          return [first.kind,first.projectID,first.maxRounds,first.promptContext.kind,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["start", "p", 5, "personal", "P1", true, true, "Dirty checkout"])

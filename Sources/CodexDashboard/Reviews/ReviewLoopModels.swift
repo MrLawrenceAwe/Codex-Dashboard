@@ -47,12 +47,12 @@ enum ReviewSpeed: String, Codable, Sendable {
     var serviceTier: String { self == .fast ? "priority" : "default" }
 }
 
-enum ReviewProjectType: Equatable, Sendable {
+enum ReviewPromptContext: Equatable, Sendable {
     case general
     case personal
     case savedContext(String)
 
-    var promptContext: String {
+    var promptSuffix: String {
         switch self {
         case .general: ""
         case .personal: " (this is a project for personal use)"
@@ -61,7 +61,7 @@ enum ReviewProjectType: Equatable, Sendable {
     }
 }
 
-extension ReviewProjectType: Codable {
+extension ReviewPromptContext: Codable {
     private enum CodingKeys: String, CodingKey { case kind, context }
 
     init(from decoder: Decoder) throws {
@@ -70,7 +70,7 @@ extension ReviewProjectType: Codable {
         case "general": self = .general
         case "personal": self = .personal
         case "savedContext": self = .savedContext(try values.decode(String.self, forKey: .context))
-        default: throw DecodingError.dataCorruptedError(forKey: .kind, in: values, debugDescription: "Unknown review project type")
+        default: throw DecodingError.dataCorruptedError(forKey: .kind, in: values, debugDescription: "Unknown review prompt context")
         }
     }
 
@@ -149,7 +149,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let id: UUID
     let startActionID: String
     let project: ReviewProject
-    let projectType: ReviewProjectType
+    let promptContext: ReviewPromptContext
     let maxRounds: Int
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
@@ -167,7 +167,9 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 
 extension ReviewLoop {
     private enum CodingKeys: String, CodingKey {
-        case id, startActionID, project, projectType, instructions, maxRounds, reviewSelection, fixSelection, selection, focus, speed,
+        // Existing review-loop.json files store this field as projectType.
+        case id, startActionID, project, instructions,
+             promptContext = "projectType", maxRounds, reviewSelection, fixSelection, selection, focus, speed,
              priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
     }
 
@@ -176,14 +178,14 @@ extension ReviewLoop {
         id = try values.decode(UUID.self, forKey: .id)
         startActionID = try values.decode(String.self, forKey: .startActionID)
         project = try values.decode(ReviewProject.self, forKey: .project)
-        if let projectType = try values.decodeIfPresent(ReviewProjectType.self, forKey: .projectType) {
-            self.projectType = projectType
+        if let promptContext = try values.decodeIfPresent(ReviewPromptContext.self, forKey: .promptContext) {
+            self.promptContext = promptContext
         } else {
             let previousContext = try values.decode(String.self, forKey: .instructions)
             switch previousContext {
-            case "": projectType = .general
-            case "(this is a project for personal use)": projectType = .personal
-            default: projectType = .savedContext(previousContext)
+            case "": promptContext = .general
+            case "(this is a project for personal use)": promptContext = .personal
+            default: promptContext = .savedContext(previousContext)
             }
         }
         maxRounds = try values.decode(Int.self, forKey: .maxRounds)
@@ -209,7 +211,7 @@ extension ReviewLoop {
         try values.encode(id, forKey: .id)
         try values.encode(startActionID, forKey: .startActionID)
         try values.encode(project, forKey: .project)
-        try values.encode(projectType, forKey: .projectType)
+        try values.encode(promptContext, forKey: .promptContext)
         try values.encode(maxRounds, forKey: .maxRounds)
         try values.encodeIfPresent(reviewSelection, forKey: .reviewSelection)
         try values.encodeIfPresent(fixSelection, forKey: .fixSelection)

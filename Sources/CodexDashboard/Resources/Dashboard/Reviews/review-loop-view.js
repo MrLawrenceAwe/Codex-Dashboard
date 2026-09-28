@@ -16,7 +16,7 @@ const reviewLoopView = (() => {
   function createPage() {
     const page = document.createElement('section');
     page.id = dashboardElements.elementIDs.reviewPage;
-    page.setAttribute('aria-label', 'Review loop');
+    page.setAttribute('aria-label', 'Review loops');
     const details = document.createElement('div');
     details.className = 'dashboard-review-loop';
     details.dataset.reviewLoop = '';
@@ -34,7 +34,7 @@ const reviewLoopView = (() => {
         <div class="review-setup-heading"><h2 id="review-setup-title">New loop</h2><p>Choose a project and what to review.</p></div>
         <fieldset class="review-scope"><legend>Project &amp; scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
-        <label class="review-project-type">Project type<select data-review-project-type aria-label="Project type">
+        <label class="review-project-context">Project context<select data-review-prompt-context aria-label="Project context">
           <option value="">General project</option><option value="personal">Personal project</option>
         </select></label>
         </fieldset>

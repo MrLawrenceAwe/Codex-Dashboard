@@ -9,12 +9,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
         try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id,
-                                              projectType: .general, maxRounds: limit, loopID: nil), projects: [project])
+                                              promptContext: .general, maxRounds: limit, loopID: nil), projects: [project])
         return (coordinator, store, ReviewTestDriver())
     }
 
     private func action(_ kind: String, for coordinator: ReviewLoopCoordinator) -> ReviewLoopAction {
-        ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil, projectType: nil, maxRounds: nil, loopID: coordinator.loops.last?.id)
+        ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil, promptContext: nil, maxRounds: nil, loopID: coordinator.loops.last?.id)
     }
 
     private func stop(_ coordinator: ReviewLoopCoordinator) {
@@ -22,15 +22,15 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         catch { XCTFail("Could not stop review loop: \(error)") }
     }
 
-    func testRendererProjectTypeDecodesAndBuildsPersonalPrompt() throws {
+    func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {
         let payload = Data("""
-        {"id":"start","kind":"start","projectID":"project","projectType":{"kind":"personal"},"maxRounds":3}
+        {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3}
         """.utf8)
         let action = try JSONDecoder().decode(ReviewLoopAction.self, from: payload)
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
         try coordinator.apply(action, projects: [project])
-        XCTAssertEqual(coordinator.loops.first?.projectType, .personal)
+        XCTAssertEqual(coordinator.loops.first?.promptContext, .personal)
         XCTAssertEqual(ReviewLoopPresentation.reviewPrompt(for: try XCTUnwrap(coordinator.loops.first)),
                        "Review project for bugs and issues (this is a project for personal use).")
     }
@@ -39,7 +39,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let (coordinator, store, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
         let start = ReviewLoopAction(id: "second-start", kind: "start", projectID: second.id,
-                                     projectType: .general, maxRounds: 3, loopID: nil)
+                                     promptContext: .general, maxRounds: 3, loopID: nil)
         try coordinator.apply(start, projects: [project, second])
         try coordinator.apply(start, projects: [project, second])
         XCTAssertEqual(coordinator.loops.count, 2)
@@ -58,7 +58,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let (coordinator, _, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
         try coordinator.apply(ReviewLoopAction(id: "second-start", kind: "start", projectID: second.id,
-                                              projectType: .general, maxRounds: 3, loopID: nil), projects: [second])
+                                              promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.failingPath = project.path
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.map(\.phase), [.paused, .running])
@@ -71,7 +71,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let recovered = ReviewLoopCoordinator(store: store)
         let second = ReviewProject(id: "nested", name: "Nested", path: "/tmp/example/subdir")
         try recovered.apply(ReviewLoopAction(id: "nested-start", kind: "start", projectID: second.id,
-                                            projectType: .general, maxRounds: 3, loopID: nil), projects: [second])
+                                            promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.repositoryRoot = project.path
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createCalls, 1)
@@ -81,7 +81,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testOneActiveLoopPerProjectIncludingPausedAndChangedPath() throws {
         let (coordinator, _, _) = try make()
         let start = ReviewLoopAction(id: "duplicate", kind: "start", projectID: project.id,
-                                     projectType: .general, maxRounds: 3, loopID: nil)
+                                     promptContext: .general, maxRounds: 3, loopID: nil)
         XCTAssertThrowsError(try coordinator.apply(start, projects: [project]))
         try coordinator.apply(action("pause", for: coordinator), projects: [project])
         let moved = ReviewProject(id: project.id, name: project.name, path: "/tmp/moved")
@@ -427,7 +427,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1)
         let previousID = coordinator.loops.last?.id
         try coordinator.apply(ReviewLoopAction(id: "new-start", kind: "start", projectID: project.id,
-                                               projectType: .general, maxRounds: 2, loopID: nil), projects: [project])
+                                               promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
         XCTAssertNotEqual(coordinator.loops.last?.id, previousID)
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
     }
@@ -452,7 +452,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         let id = coordinator.loops.last?.id
-        try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id, projectType: nil, maxRounds: 5, loopID: nil), projects: [project])
+        try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil), projects: [project])
         XCTAssertEqual(coordinator.loops.last?.id, id)
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
     }
@@ -463,7 +463,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                 let store = ReviewTestStore()
                 let coordinator = ReviewLoopCoordinator(store: store)
                 var start = ReviewLoopAction(id: UUID().uuidString, kind: "start", projectID: project.id,
-                                             projectType: nil, maxRounds: 5, loopID: nil)
+                                             promptContext: nil, maxRounds: 5, loopID: nil)
                 start.priorityLimit = limit
                 try coordinator.apply(start, projects: [project])
                 let driver = ReviewTestDriver()
@@ -486,7 +486,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         for priorities: [ReviewFinding.Priority] in [[.p2], [.p1, .p2]] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = ReviewLoopAction(id: "start", kind: "start", projectID: project.id, projectType: nil, maxRounds: 5, loopID: nil)
+            var start = ReviewLoopAction(id: "start", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
             start.priorityLimit = .p1
             try coordinator.apply(start, projects: [project])
             let driver = ReviewTestDriver()
@@ -502,7 +502,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
-        var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, projectType: nil, maxRounds: 3, loopID: nil)
+        var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 3, loopID: nil)
         start.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: "high")
         start.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: "low")
         start.speed = .fast
@@ -526,7 +526,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
 
     func testPerformanceReviewIncludesOptionalProjectContext() {
         var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
-                              projectType: .personal, maxRounds: 3)
+                              promptContext: .personal, maxRounds: 3)
         loop.focus = .performance
         XCTAssertEqual(ReviewLoopPresentation.reviewPrompt(for: loop),
                        "Review project for performance and responsiveness (this is a project for personal use).")
@@ -537,7 +537,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
             var start = ReviewLoopAction(id: "focus", kind: "start", projectID: project.id,
-                                         projectType: .general, maxRounds: 3, loopID: nil)
+                                         promptContext: .general, maxRounds: 3, loopID: nil)
             start.focus = focus
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
@@ -588,10 +588,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
         XCTAssertEqual(try store.load().first?.speed, .standard)
         XCTAssertEqual(try store.load().first?.focus, .bugs)
-        XCTAssertEqual(try store.load().first?.projectType, .personal)
+        XCTAssertEqual(try store.load().first?.promptContext, .personal)
         olderLoop["instructions"] = "(saved custom context)"
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertEqual(try store.load().first?.projectType, .savedContext("(saved custom context)"))
+        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
         try Data("broken".utf8).write(to: url)
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertNotNil(recovered.error)

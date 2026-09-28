@@ -12,8 +12,8 @@ const reviewLoopPage = (() => {
     const mounted = mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.reviewNavButton,
       afterID: dashboardElements.elementIDs.todoNavButton,
-      label: 'Review loop',
-      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loop</span></span><span class="review-nav-spinner" data-review-navigation-running role="status" aria-label="Review loop running" title="Review loop running" hidden></span>`,
+      label: 'Review loops',
+      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loops</span></span><span class="review-nav-spinner" data-review-navigation-running role="status" aria-label="Review loops running" title="Review loops running" hidden></span>`,
     });
     if (mounted) reviewLoopView.renderNavigationStatus(snapshot);
     return mounted;
@@ -38,7 +38,7 @@ const reviewLoopPage = (() => {
       queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
         speed: details.querySelector('[data-review-speed]').value,
-        projectType: { kind: details.querySelector('[data-review-project-type]').value || 'general' },
+        promptContext: { kind: details.querySelector('[data-review-prompt-context]').value || 'general' },
         priorityLimit: ['organisation', 'naming'].includes(focus) ? null : details.querySelector('[data-review-priority]').value,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });

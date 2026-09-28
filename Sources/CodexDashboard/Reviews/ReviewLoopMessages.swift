@@ -4,7 +4,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let id: String
     let kind: String
     let projectID: String?
-    let projectType: ReviewProjectType?
+    let promptContext: ReviewPromptContext?
     let maxRounds: Int?
     let loopID: UUID?
     var reviewSelection: ReviewModelSelection? = nil

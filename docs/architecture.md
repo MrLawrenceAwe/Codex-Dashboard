@@ -49,8 +49,8 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 
 ## Review loops
 
-The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
-single-folder project, a review type (bugs and issues, simplification and structure, simplification and naming, or performance), a project type (general or personal), Standard or Fast speed, separate review and fix models with supported reasoning efforts (or Codex defaults for either), and a maximum of 1–20 rounds (default 5). Bugs and performance reviews also have a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**); P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout. Multiple projects can have active loops, with one active loop per project and checkout.
+The sidebar includes a dedicated **Review loops** page beside **To-dos**. Choose a local,
+single-folder project, a review type (bugs and issues, simplification and structure, simplification and naming, or performance), project context (general or personal), Standard or Fast speed, separate review and fix models with supported reasoning efforts (or Codex defaults for either), and a maximum of 1–20 rounds (default 5). Bugs and performance reviews also have a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**); P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout. Multiple projects can have active loops, with one active loop per project and checkout.
 
 The review prompt follows the selected review type. The bugs prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
