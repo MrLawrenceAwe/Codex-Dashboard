@@ -47,6 +47,45 @@ enum ReviewSpeed: String, Codable, Sendable {
     var serviceTier: String { self == .fast ? "priority" : "default" }
 }
 
+enum ReviewProjectType: Equatable, Sendable {
+    case general
+    case personal
+    case savedContext(String)
+
+    var promptContext: String {
+        switch self {
+        case .general: ""
+        case .personal: " (this is a project for personal use)"
+        case .savedContext(let context): " \(context)"
+        }
+    }
+}
+
+extension ReviewProjectType: Codable {
+    private enum CodingKeys: String, CodingKey { case kind, context }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        switch try values.decode(String.self, forKey: .kind) {
+        case "general": self = .general
+        case "personal": self = .personal
+        case "savedContext": self = .savedContext(try values.decode(String.self, forKey: .context))
+        default: throw DecodingError.dataCorruptedError(forKey: .kind, in: values, debugDescription: "Unknown review project type")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .general: try values.encode("general", forKey: .kind)
+        case .personal: try values.encode("personal", forKey: .kind)
+        case .savedContext(let context):
+            try values.encode("savedContext", forKey: .kind)
+            try values.encode(context, forKey: .context)
+        }
+    }
+}
+
 struct ReviewProject: Codable, Equatable, Sendable {
     let id: String
     let name: String
@@ -110,7 +149,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let id: UUID
     let startActionID: String
     let project: ReviewProject
-    let instructions: String
+    let projectType: ReviewProjectType
     let maxRounds: Int
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
@@ -128,7 +167,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 
 extension ReviewLoop {
     private enum CodingKeys: String, CodingKey {
-        case id, startActionID, project, instructions, maxRounds, reviewSelection, fixSelection, selection, focus, speed,
+        case id, startActionID, project, projectType, instructions, maxRounds, reviewSelection, fixSelection, selection, focus, speed,
              priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
     }
 
@@ -137,7 +176,16 @@ extension ReviewLoop {
         id = try values.decode(UUID.self, forKey: .id)
         startActionID = try values.decode(String.self, forKey: .startActionID)
         project = try values.decode(ReviewProject.self, forKey: .project)
-        instructions = try values.decode(String.self, forKey: .instructions)
+        if let projectType = try values.decodeIfPresent(ReviewProjectType.self, forKey: .projectType) {
+            self.projectType = projectType
+        } else {
+            let previousContext = try values.decode(String.self, forKey: .instructions)
+            switch previousContext {
+            case "": projectType = .general
+            case "(this is a project for personal use)": projectType = .personal
+            default: projectType = .savedContext(previousContext)
+            }
+        }
         maxRounds = try values.decode(Int.self, forKey: .maxRounds)
         let previousSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
         reviewSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .reviewSelection) ?? previousSelection
@@ -161,7 +209,7 @@ extension ReviewLoop {
         try values.encode(id, forKey: .id)
         try values.encode(startActionID, forKey: .startActionID)
         try values.encode(project, forKey: .project)
-        try values.encode(instructions, forKey: .instructions)
+        try values.encode(projectType, forKey: .projectType)
         try values.encode(maxRounds, forKey: .maxRounds)
         try values.encodeIfPresent(reviewSelection, forKey: .reviewSelection)
         try values.encodeIfPresent(fixSelection, forKey: .fixSelection)
@@ -176,83 +224,4 @@ extension ReviewLoop {
         try values.encode(rounds, forKey: .rounds)
         try values.encode(message, forKey: .message)
     }
-}
-
-struct ReviewLoopAction: Codable, Sendable {
-    let id: String
-    let kind: String
-    let projectID: String?
-    let instructions: String?
-    let maxRounds: Int?
-    let loopID: UUID?
-    var reviewSelection: ReviewModelSelection? = nil
-    var fixSelection: ReviewModelSelection? = nil
-    var focus: ReviewFocus? = nil
-    var speed: ReviewSpeed? = nil
-    var priorityLimit: ReviewFinding.Priority? = nil
-}
-
-struct ReviewLoopSnapshot: Codable, Sendable {
-    let projects: [ReviewProject]
-    let models: [ReviewModel]
-    let loops: [ReviewLoop]
-    let progress: [String: ReviewLoopProgress]
-    let error: String?
-    let acknowledgedActionID: String?
-}
-
-struct ReviewPromptPreview: Codable, Sendable {
-    let title: String
-    let text: String
-    let note: String
-}
-
-struct ReviewLoopProgress: Codable, Sendable {
-    let step: String
-    let currentLabel: String
-    let current: ReviewPromptPreview?
-    let upcoming: ReviewPromptPreview?
-    let nextMessage: String
-    let threadID: String?
-}
-
-struct ReviewRepositoryState: Equatable, Sendable {
-    let root: String
-    let branch: String
-    let commit: String
-    let clean: Bool
-}
-
-struct ReviewTurnState: Sendable {
-    let id: String
-    let status: String
-    let finalMessage: String?
-}
-
-struct ReviewThreadState: Sendable {
-    let cwd: String
-    let turns: [ReviewTurnState]
-}
-
-struct ReviewLoopError: LocalizedError {
-    let message: String
-    init(_ message: String) { self.message = message }
-    var errorDescription: String? { message }
-}
-
-@MainActor
-protocol ReviewLoopDriving: Sendable {
-    func projects() async throws -> [ReviewProject]
-    func repository(at path: String) async throws -> ReviewRepositoryState
-    func resolveCommit(_ commit: String, at path: String) async throws -> String
-    func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
-    func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
-    func readThread(_ threadID: String) async throws -> ReviewThreadState
-}
-
-@MainActor
-protocol ReviewLoopStoring {
-    func load() throws -> [ReviewLoop]
-    func save(_ loops: [ReviewLoop]) throws
 }

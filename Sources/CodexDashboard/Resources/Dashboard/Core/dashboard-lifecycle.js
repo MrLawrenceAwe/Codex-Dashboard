@@ -126,7 +126,7 @@ const dashboardLifecycle = (() => {
         promptLibraryButton.scheduleSync();
       }
       if (shouldSyncUnread) {
-        hooks.syncSidebarMarkers();
+        hooks.syncInterruptedSidebarMarkers();
         if (hooks.syncUnread()) hooks.requestRender();
       }
     });
@@ -161,7 +161,7 @@ const dashboardLifecycle = (() => {
       return [...record.addedNodes, ...record.removedNodes].some(containsThreadRow);
     });
     if (threadRowsChanged) {
-      hooks.syncSidebarMarkers();
+      hooks.syncInterruptedSidebarMarkers();
       scheduleRepair({ syncUnread: true });
     }
   }
@@ -194,7 +194,7 @@ const dashboardLifecycle = (() => {
     mountPagesAndNavigation();
     // Reconcile markers on health checks too, including after host DOM repairs
     // when the catalog itself has not changed.
-    hooks.syncSidebarMarkers();
+    hooks.syncInterruptedSidebarMarkers();
     syncContentInset();
     sidebarProjectHighlights.start();
     promptLibrary.mount();

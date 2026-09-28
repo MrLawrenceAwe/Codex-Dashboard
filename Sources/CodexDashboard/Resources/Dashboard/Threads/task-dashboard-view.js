@@ -154,7 +154,7 @@ const taskDashboardView = (() => {
     }
     updateMarkup(
       list,
-      threadMarkup.list(displayedThreads, {
+      threadMarkup.renderThreadList(displayedThreads, {
         filterMode,
         collapsedProjectPaths,
         hiddenChangeIndicatorPaths,

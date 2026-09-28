@@ -51,10 +51,8 @@ final class ReviewLoopCoordinator {
             guard !loops.contains(where: { ![.completed, .limitReached, .stopped, .blocked].contains($0.phase) && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
-            let instructions = (action.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard instructions.count <= 20_000 else { throw ReviewLoopError("Review instructions are too long.") }
             let focus = action.focus ?? .bugs
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, instructions: instructions, maxRounds: limit, reviewSelection: action.reviewSelection, fixSelection: action.fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, projectType: action.projectType ?? .general, maxRounds: limit, reviewSelection: action.reviewSelection, fixSelection: action.fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
         case "pause", "resume", "stop":
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")

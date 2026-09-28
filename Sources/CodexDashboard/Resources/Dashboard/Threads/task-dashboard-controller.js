@@ -42,7 +42,7 @@ function createTaskDashboard({ catalog }) {
     return taskDashboardState.summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths);
   }
 
-  function syncSidebarMarkers() {
+  function syncInterruptedSidebarMarkers() {
     const nextInterruptedThreadIDs = new Set(
       threads
         .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
@@ -241,7 +241,7 @@ function createTaskDashboard({ catalog }) {
 
   function applyThreads(nextThreads) {
     threads = nextThreads;
-    syncSidebarMarkers();
+    syncInterruptedSidebarMarkers();
     presentationState.applyThreads(threads);
     // A native refresh can update the catalog, unread state, and Git state in a
     // short burst. Keep the renderer responsive by applying only the latest
@@ -272,7 +272,7 @@ function createTaskDashboard({ catalog }) {
     applyVisibility: pageState.applyVisibility,
     startMonitoring: presentationState.startMonitoring,
     requestRender,
-    syncSidebarMarkers,
+    syncInterruptedSidebarMarkers,
     syncUnread: presentationState.syncUnread,
     destroy,
     open: openDashboard,

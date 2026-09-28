@@ -214,10 +214,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.querySelector('[data-review-start]').click();
           const same = first.id === JSON.parse(window.__codexDashboard.pendingReviewAction()).id;
           window.__codexDashboard.applyReviewLoop({projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
-          return [first.kind,first.projectID,first.maxRounds,first.instructions,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
+          return [first.kind,first.projectID,first.maxRounds,first.projectType.kind,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["start", "p", 5, "(this is a project for personal use)", "P1", true, true, "Dirty checkout"])
+        XCTAssertEqual(result, ["start", "p", 5, "personal", "P1", true, true, "Dirty checkout"])
     }
 
     func testExpandedPanelFitsNarrowWindow() async throws {

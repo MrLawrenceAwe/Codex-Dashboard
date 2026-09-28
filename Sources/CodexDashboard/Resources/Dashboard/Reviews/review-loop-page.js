@@ -38,7 +38,7 @@ const reviewLoopPage = (() => {
       queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
         speed: details.querySelector('[data-review-speed]').value,
-        instructions: details.querySelector('[data-review-project-type]').value === 'personal' ? '(this is a project for personal use)' : '',
+        projectType: { kind: details.querySelector('[data-review-project-type]').value || 'general' },
         priorityLimit: ['organisation', 'naming'].includes(focus) ? null : details.querySelector('[data-review-priority]').value,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });

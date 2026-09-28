@@ -39,7 +39,7 @@ const dashboardNavigation = (() => {
       openPage,
       applyVisibility,
       requestRender: taskDashboard.requestRender,
-      syncSidebarMarkers: taskDashboard.syncSidebarMarkers,
+      syncInterruptedSidebarMarkers: taskDashboard.syncInterruptedSidebarMarkers,
       syncUnread: taskDashboard.syncUnread,
       pages: dashboardPages,
     });
