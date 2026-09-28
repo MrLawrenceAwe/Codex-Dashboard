@@ -209,23 +209,9 @@ extension AppCoordinatorTests {
         )
     }
 
-    func testWorkingTreePollingScheduleIsOnlyAFallbackForFileEvents() {
-        XCTAssertEqual(
-            RefreshScheduler.Schedule.workingTree(active: true, fileEventsAvailable: true),
-            .seconds(5 * 60)
-        )
-        XCTAssertEqual(
-            RefreshScheduler.Schedule.workingTree(active: false, fileEventsAvailable: true),
-            .seconds(15 * 60)
-        )
-        XCTAssertEqual(
-            RefreshScheduler.Schedule.workingTree(active: true, fileEventsAvailable: false),
-            .seconds(15)
-        )
-        XCTAssertEqual(
-            RefreshScheduler.Schedule.workingTree(active: false, fileEventsAvailable: false),
-            .seconds(60)
-        )
+    func testWorkingTreePollingBoundsDelayEvenWhenFileEventsFail() {
+        XCTAssertEqual(RefreshScheduler.Schedule.workingTree(active: true), .seconds(15))
+        XCTAssertEqual(RefreshScheduler.Schedule.workingTree(active: false), .seconds(60))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

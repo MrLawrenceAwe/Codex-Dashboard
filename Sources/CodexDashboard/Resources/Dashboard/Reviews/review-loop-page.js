@@ -50,6 +50,11 @@ const reviewLoopPage = (() => {
     }
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
+      const file = event.target.closest('[data-review-file]');
+      if (file) {
+        queue({ kind: 'openFile', loopID: file.dataset.reviewLoopId, filePath: file.dataset.reviewFile });
+        return;
+      }
       const control = event.target.closest('[data-review-action]');
       if (control) queue({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
       const thread = event.target.closest('[data-review-thread]');

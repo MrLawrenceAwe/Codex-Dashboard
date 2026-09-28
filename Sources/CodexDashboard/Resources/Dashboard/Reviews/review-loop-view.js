@@ -9,6 +9,27 @@ const reviewLoopView = (() => {
   const isFinished = loop => finishedLoopIDs.has(loop.id);
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
 
+  function findingBody(body, loopID) {
+    const text = String(body || '');
+    const links = /\[([^\]\n]+)\]\((<[^>\n]+>|[^)\n]+)\)/g;
+    let markup = '';
+    let offset = 0;
+    for (const match of text.matchAll(links)) {
+      markup += escape(text.slice(offset, match.index));
+      const label = escape(match[1]);
+      const target = match[2].replace(/^<|>$/g, '').trim();
+      if (/^https?:\/\//i.test(target)) {
+        markup += `<a href="${escape(target)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      } else if (!/^[a-z][a-z\d+.-]*:/i.test(target) || /:\d+(?::\d+)?$/.test(target) || target.startsWith('file://')) {
+        markup += `<button type="button" class="review-file-link" data-review-file="${escape(target)}" data-review-loop-id="${escape(loopID)}">${label}</button>`;
+      } else {
+        markup += escape(match[0]);
+      }
+      offset = match.index + match[0].length;
+    }
+    return markup + escape(text.slice(offset));
+  }
+
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
@@ -238,7 +259,7 @@ const reviewLoopView = (() => {
       <span>${escape(({ clean: 'No findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.length} findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
       ${round.review?.findings?.length ? `<ul class="review-round-findings" aria-label="Findings from review ${round.number}">${round.review.findings.map(finding => `<li>
         <div class="review-finding-heading">${finding.priority ? `<span class="review-finding-priority" data-priority="${escape(finding.priority)}">${escape(finding.priority)}</span>` : ''}<strong>${escape(finding.title)}</strong></div>
-        <p>${escape(finding.body)}</p>
+        <p>${findingBody(finding.body, loop.id)}</p>
       </li>`).join('')}</ul>` : ''}
       ${round.result?.summary ? `<details class="review-round-details" data-round="${round.number}" ${expandedRounds.has(String(round.number)) ? 'open' : ''}><summary>View summary</summary><p>${escape(round.result.summary)}</p></details>` : ''}
     </div></li>`).join('');

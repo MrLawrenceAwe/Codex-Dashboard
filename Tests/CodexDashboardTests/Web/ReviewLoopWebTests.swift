@@ -416,6 +416,31 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [3, 3, "Broken <link>|Stale confirmation|Unranked issue", "P1|P2|", "Fails on the first click.", true, false, true])
     }
 
+    func testFindingFileLinksOpenThroughReviewActionAndUnsafeSchemesStayText() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'loop-1',project,phase:'completed',maxRounds:1,rounds:[{number:1,
+            review:{findings:[{priority:'P2',title:'A <bug>',body:'See [source](/tmp/example/Sources/File.swift:12), [relative](File.swift:4), [docs](https://example.com/guide), and [unsafe](javascript:alert(1)).'}]}}]};
+          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:['loop-1'],error:null});
+          window.__codexDashboard.openReviews();
+          const finding = document.querySelector('.review-round-findings p');
+          const file = finding.querySelector('[data-review-file]');
+          const relative = finding.querySelectorAll('[data-review-file]')[1];
+          const docs = finding.querySelector('a');
+          const unsafe = finding.textContent.includes('[unsafe](javascript:alert(1))');
+          file.click();
+          const action = JSON.parse(window.__codexDashboard.pendingReviewAction());
+          return [file.textContent,file.dataset.reviewFile,relative.dataset.reviewFile,
+            docs.href,docs.rel,unsafe,action.kind,action.loopID,action.filePath];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["source", "/tmp/example/Sources/File.swift:12", "File.swift:4",
+                                "https://example.com/guide", "noopener noreferrer", true,
+                                "openFile", "loop-1", "/tmp/example/Sources/File.swift:12"])
+    }
+
     func testRoundLimitShowsFinalStatusWithoutResume() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

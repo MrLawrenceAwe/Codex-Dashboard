@@ -2,7 +2,7 @@ import Foundation
 
 struct ReviewLoopAction: Codable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case start, pause, resume, stop
+        case start, pause, resume, stop, openFile
     }
 
     let id: String
@@ -11,6 +11,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let promptContext: ReviewPromptContext?
     let maxRounds: Int?
     let loopID: UUID?
+    var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
     var focus: ReviewFocus? = nil
