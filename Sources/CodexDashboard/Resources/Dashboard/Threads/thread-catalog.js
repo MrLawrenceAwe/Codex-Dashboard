@@ -3,7 +3,7 @@ function createThreadCatalog() {
   let threadsByID = new Map();
 
   function applyThreads(nextThreads) {
-    threads = sortThreadsByRecency(nextThreads);
+    threads = nextThreads;
     threadsByID = new Map(threads.map((thread) => [thread.id, thread]));
     return threads;
   }
@@ -11,14 +11,6 @@ function createThreadCatalog() {
   function clear() {
     threads = [];
     threadsByID.clear();
-  }
-
-  function sortThreadsByRecency(threads) {
-    if (!Array.isArray(threads)) return [];
-    return [...threads].sort((left, right) => {
-      const recencyDifference = Number(right.recencyEpochMillis || 0) - Number(left.recencyEpochMillis || 0);
-      return recencyDifference || String(left.id).localeCompare(String(right.id));
-    });
   }
 
   function threadReferencesForProject(project) {

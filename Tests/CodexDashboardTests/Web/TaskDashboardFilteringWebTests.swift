@@ -207,10 +207,10 @@ extension TaskDashboardWebTests {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "yesterday", title: "Yesterday's task", projectPath: "/tmp/a", recencyEpochMillis: now - 86_400_000),
-            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: now - 3_000),
             .fixture(id: "newest", title: "Latest task", projectPath: "/tmp/a", recencyEpochMillis: now - 1_000),
             .fixture(id: "middle", title: "Middle task", projectPath: "/tmp/b", recencyEpochMillis: now - 2_000),
+            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: now - 3_000),
+            .fixture(id: "yesterday", title: "Yesterday's task", projectPath: "/tmp/a", recencyEpochMillis: now - 86_400_000),
         ])
 
         let result = try await webView.evaluateJavaScript(

@@ -149,7 +149,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const last = store.save([{ ...item, title: 'Latest edit' }], ['Work']);
           const results = await Promise.all([first, failed, last]);
           const saved = store.load();
-          const hydrated = await store.loadImages(saved);
+          const hydrated = await window.__todoImageStoreForTests.load(saved);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
           return [first instanceof Promise && failed instanceof Promise && last instanceof Promise,
             results, writes, saved[0].title, hydrated[0].image.dataURL, store.loadTags(saved)];
@@ -184,7 +184,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           }});
           const saved = await store.save([replacement], []);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
-          const [restored] = await store.loadImages(store.load());
+          const [restored] = await window.__todoImageStoreForTests.load(store.load());
           return [saved, restored.image.dataURL, restored.image.name,
             replacement.image.storageKey !== item.image.storageKey];
         })()
@@ -210,7 +210,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           }});
           const saved = await store.save([{ ...item, image: null }], []);
           Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
-          const [restored] = await store.loadImages(store.load());
+          const [restored] = await window.__todoImageStoreForTests.load(store.load());
           return [saved, restored.image.dataURL];
         })()
         """) as? [AnyHashable]

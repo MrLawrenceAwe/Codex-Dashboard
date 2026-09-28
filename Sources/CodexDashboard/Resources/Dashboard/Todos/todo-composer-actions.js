@@ -13,7 +13,7 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
   async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForStableComposer = false } = {}) {
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
-    const [loadedItem] = await todoStore.loadImages([item]);
+    const [loadedItem] = await todoImageStore.load([item]);
     if (isDestroyed()) return false;
     let observedComposer = null;
     let observedAt = 0;

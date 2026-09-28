@@ -25,6 +25,7 @@
     "Threads/thread-presentation-state",
     "Threads/task-dashboard-view",
     "Threads/task-dashboard-page",
+    "Todos/todo-image-store",
     "Todos/todo-store",
     "Todos/todo-list-view",
     "Todos/todo-image-controller",

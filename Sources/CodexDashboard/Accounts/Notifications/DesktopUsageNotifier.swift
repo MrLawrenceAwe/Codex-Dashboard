@@ -120,7 +120,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         var requestsByIdentifier = Dictionary(
             uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) }
         )
-        for notification in plan.unchangedDeadlines where
+        for notification in plan.deadlinesWithoutUpdateAlerts where
             !notification.isDeadlineUpdate
                 && notification.notificationDate.addingTimeInterval(Self.fallbackDelay) > currentDate
         {
