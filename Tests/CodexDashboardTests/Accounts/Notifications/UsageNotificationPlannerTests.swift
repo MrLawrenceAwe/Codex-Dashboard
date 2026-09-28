@@ -125,7 +125,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
     func testPlansFiveHourWeeklyAndBankedExpiryWarningsAtRequestedLeadTimes() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let account = account(named: "Personal")
-        let notifications = UsageNotificationPlanner.notifications(
+        let notifications = scheduledNotifications(
             for: [account],
             usageByAccountID: [
                 account.id: snapshot(
@@ -193,7 +193,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
                 ),
                 fetchedAt: now
             )
-            return UsageNotificationPlanner.notifications(
+            return scheduledNotifications(
                 for: [savedAccount],
                 usageByAccountID: [savedAccount.id: usage],
                 now: now
@@ -223,7 +223,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             )
         }
         let initial = snapshot(fiveHourUsed: 20, weeklyUsed: 30)
-        let reminder = try XCTUnwrap(UsageNotificationPlanner.notifications(
+        let reminder = try XCTUnwrap(scheduledNotifications(
             for: [account], usageByAccountID: [account.id: initial], now: now
         ).first { $0.kind == .fiveHourReset })
         let fresh = snapshot(fiveHourUsed: 60, weeklyUsed: 30)
@@ -414,7 +414,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
     func testDoesNotScheduleFiveHourWarningAfterItsLeadTime() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
-        let notifications = UsageNotificationPlanner.notifications(
+        let notifications = scheduledNotifications(
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
@@ -701,6 +701,16 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
 
         XCTAssertTrue(alerts.isEmpty)
+    }
+
+    private func scheduledNotifications(
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        now: Date
+    ) -> [ScheduledUsageNotification] {
+        UsageNotificationPlanner.deliverableNotifications(
+            for: accounts, usageByAccountID: usageByAccountID, now: now
+        ).filter { $0.notificationDate > now }
     }
 
     private func account(named name: String) -> SavedAccount {

@@ -41,18 +41,6 @@ enum UsageNotificationPlanner {
         )
     }
 
-    static func notifications(
-        for accounts: [SavedAccount],
-        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        now: Date = .now
-    ) -> [ScheduledUsageNotification] {
-        deliverableNotifications(
-            for: accounts,
-            usageByAccountID: usageByAccountID,
-            now: now
-        ).filter { $0.notificationDate > now }
-    }
-
     static func deliverableNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],

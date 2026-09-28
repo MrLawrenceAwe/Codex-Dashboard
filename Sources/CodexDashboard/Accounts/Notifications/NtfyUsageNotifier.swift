@@ -35,7 +35,8 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
 
-    private let history: UsageNotificationHistory
+    private let updateContext: UsageNotificationUpdateContext
+    private var history: UsageNotificationHistory { updateContext.history }
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
     private let now: () -> Date
@@ -44,8 +45,6 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
     private var retryAttemptsByIdentifier: [String: Int] = [:]
-    private var updateInProgress = false
-    private var updateWaiters: [CheckedContinuation<Void, Never>] = []
 
     private static let maximumDeliveryAttempts = 6
 
@@ -57,7 +56,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             .seconds(min(30 * 60, 60 * (1 << min(attempt - 1, 5))))
         }
     ) {
-        history = UsageNotificationHistory(userDefaults: userDefaults, channel: .phone)
+        updateContext = UsageNotificationUpdateContext(userDefaults: userDefaults, channel: .phone)
         self.userDefaults = userDefaults
         self.publisher = publisher
         self.now = now
@@ -102,29 +101,28 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
-        while updateInProgress {
-            await withCheckedContinuation { updateWaiters.append($0) }
-        }
-        updateInProgress = true
-        defer {
-            updateInProgress = false
-            updateWaiters.forEach { $0.resume() }
-            updateWaiters.removeAll()
-        }
-        guard isEnabled else {
-            cancelAllTasks()
-            return
-        }
-        let currentDate = now()
-        let plan = UsageNotificationPlanner.plan(
+        await updateContext.perform(
             for: accounts,
             usageByAccountID: usageByAccountID,
-            previousObservations: history.observations(),
-            previousDeadlines: history.deadlines(for: .known),
-            sentUpdates: history.deadlines(for: .updates),
-            now: currentDate
-        )
-        history.saveDeadlines(plan.unchangedDeadlines, for: .known)
+            now: now,
+            prepare: {
+                guard isEnabled else {
+                    cancelAllTasks()
+                    return false
+                }
+                return true
+            }
+        ) { plan, currentDate in
+            await apply(plan, for: accounts, usageByAccountID: usageByAccountID, now: currentDate)
+        }
+    }
+
+    private func apply(
+        _ plan: UsageNotificationPlanner.Plan,
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        now currentDate: Date
+    ) async {
         let desired = Dictionary(uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) })
         let eligibleDeadlines = (plan.unchangedDeadlines + plan.scheduled)
             .reduce(into: [String: Date]()) { result, notification in
