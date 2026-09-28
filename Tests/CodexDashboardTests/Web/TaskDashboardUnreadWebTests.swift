@@ -5,6 +5,35 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testMarkAllAsReadReportsUnavailableHostActionWithoutOpeningTasks() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: true),
+        ])
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__unexpectedNavigation = false;
+              window.addEventListener('message', (event) => {
+                if (event.data?.type === 'navigate-to-route') window.__unexpectedNavigation = true;
+              });
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              document.querySelector('[data-mark-all-read]').click();
+              return [
+                document.querySelector('[data-task-notice]').textContent,
+                document.querySelector('[data-filter-count="unread"]').textContent,
+                window.__unexpectedNavigation,
+              ];
+            })()
+            """
+        ) as? [Any]
+        XCTAssertEqual(result?[0] as? String,
+                       "Codex’s read-state action is unavailable. Restart Codex and try again.")
+        XCTAssertEqual(result?[1] as? String, "1")
+        XCTAssertEqual(result?[2] as? Bool, false)
+    }
+
     func testMarkAllAsReadAcknowledgesEveryUnreadThreadIncludingOffSidebar() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -16,15 +45,25 @@ extension TaskDashboardWebTests {
             """
             (() => {
               const threads = (\(payload)).threads;
-              window.__markedRoutes = [];
+              window.__markedReadIDs = [];
               const readIDs = new Set();
+              const row = document.createElement('button');
+              row.setAttribute('data-app-action-sidebar-thread-id', 'local:one');
+              row.__reactFiber$test = {
+                updateQueue: { memoCache: { data: [[{
+                  markThreadAsRead: ({ conversationId }) => {
+                    window.__markedReadIDs.push(conversationId);
+                    readIDs.add(conversationId);
+                    window.__codexDashboard.applyThreads(threads.map((thread) =>
+                      readIDs.has(thread.id) ? { ...thread, isUnread: false } : thread));
+                  },
+                  markThreadAsUnread: () => {},
+                }]] } },
+                return: null,
+              };
+              document.querySelector('aside').append(row);
               window.addEventListener('message', (event) => {
-                if (event.data?.type !== 'navigate-to-route') return;
-                const id = decodeURIComponent(event.data.path.split('/').at(-1));
-                window.__markedRoutes.push(id);
-                readIDs.add(id);
-                window.__codexDashboard.applyThreads(threads.map((thread) =>
-                  readIDs.has(thread.id) ? { ...thread, isUnread: false } : thread));
+                if (event.data?.type === 'navigate-to-route') window.__unexpectedNavigation = true;
               });
               window.__codexDashboard.applyThreads(threads);
               window.__codexDashboard.open();
@@ -44,14 +83,16 @@ extension TaskDashboardWebTests {
         )
         let result = try await webView.evaluateJavaScript(
             """
-            [window.__markedRoutes.join(','),
+            [window.__markedReadIDs.join(','),
+             Boolean(window.__unexpectedNavigation),
              document.querySelector('[data-navigation-count]').hidden,
              document.getElementById('codex-dashboard-task-page').classList.contains('is-open')]
             """
         ) as? [Any]
         XCTAssertEqual(result?[0] as? String, "one,two")
-        XCTAssertEqual(result?[1] as? Bool, true)
+        XCTAssertEqual(result?[1] as? Bool, false)
         XCTAssertEqual(result?[2] as? Bool, true)
+        XCTAssertEqual(result?[3] as? Bool, true)
     }
 
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {

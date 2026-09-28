@@ -223,6 +223,50 @@ const codexUIContracts = (() => {
     return readStates;
   }
 
+  function cachedReadAction(value, visited) {
+    if (!value || typeof value !== 'object' || visited.has(value)) return null;
+    visited.add(value);
+    if (typeof value.markThreadAsRead === 'function'
+        && typeof value.markThreadAsUnread === 'function') return value.markThreadAsRead;
+    const entries = Array.isArray(value) ? value : value.data;
+    if (!Array.isArray(entries)) return null;
+    for (const entry of entries) {
+      const action = cachedReadAction(entry, visited);
+      if (action) return action;
+    }
+    return null;
+  }
+
+  function markThreadsRead(threadIDs) {
+    // Codex caches its sidebar action callbacks on the committed row fiber.
+    // The read callback accepts any local task ID, including one outside the sidebar.
+    const fiberCache = new Map();
+    let markRead = null;
+    for (const row of threadRows()) {
+      if (!row.getAttribute('data-app-action-sidebar-thread-id')?.startsWith('local:')) continue;
+      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
+      let fiber = committedFiber(fiberKey ? row[fiberKey] : null, fiberCache);
+      while (fiber && !markRead) {
+        const visited = new Set();
+        markRead = cachedReadAction(fiber.updateQueue?.memoCache?.data, visited);
+        let hook = fiber.memoizedState;
+        for (let count = 0; hook && !markRead && count < 100; count += 1) {
+          markRead = cachedReadAction(hook.memoizedState, visited);
+          hook = hook.next;
+        }
+        fiber = committedFiber(fiber.return, fiberCache);
+      }
+      if (markRead) break;
+    }
+    if (!markRead) return { available: false, failedIDs: threadIDs };
+    const failedIDs = [];
+    threadIDs.forEach((threadID) => {
+      try { markRead({ conversationId: threadID, hostId: 'local' }); }
+      catch { failedIDs.push(threadID); }
+    });
+    return { available: true, failedIDs };
+  }
+
   function composer(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     return composerSelectors.flatMap((selector) => [...document.querySelectorAll(selector)])
       .find((element) => (
@@ -347,6 +391,7 @@ const codexUIContracts = (() => {
     activeComposerThreadID,
     activeComposerProject,
     threadReadStates,
+    markThreadsRead,
     composer,
     composerAddButton,
     composerEditorView,

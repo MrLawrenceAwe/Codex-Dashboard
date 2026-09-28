@@ -18,6 +18,7 @@ function createTaskDashboard({ catalog }) {
   let markAllReadPending = false;
   let markAllReadError = '';
   let destroyed = false;
+  let readConfirmation;
   let presentationState;
   const completionIndicators = createThreadCompletionIndicators({
     findThread: catalog.findThread,
@@ -27,7 +28,10 @@ function createTaskDashboard({ catalog }) {
   presentationState = createThreadUnreadState({
     findThread: catalog.findThread,
     isOpen: pageState.isOpen,
-    onChange: requestRender,
+    onChange: () => {
+      requestRender();
+      checkReadConfirmation();
+    },
     completionIndicators,
   });
   const { isThreadUnread } = presentationState;
@@ -82,49 +86,62 @@ function createTaskDashboard({ catalog }) {
     codexHost.navigateToThread(thread);
   }
 
+  function unconfirmedReadIDs(ids) {
+    return ids.filter((id) => {
+      const thread = catalog.findThread(id);
+      return !thread || thread.isUnread === true || isThreadUnread(thread);
+    });
+  }
+
+  function checkReadConfirmation() {
+    if (!readConfirmation || unconfirmedReadIDs(readConfirmation.ids).length) return;
+    readConfirmation.finish([]);
+  }
+
+  function waitForReadConfirmation(ids) {
+    return new Promise((resolve) => {
+      const finish = (remaining) => {
+        if (readConfirmation?.finish !== finish) return;
+        clearTimeout(readConfirmation.timer);
+        readConfirmation = undefined;
+        resolve(remaining);
+      };
+      readConfirmation = {
+        ids,
+        finish,
+        timer: window.setTimeout(() => finish(unconfirmedReadIDs(ids)), 5000),
+      };
+      checkReadConfirmation();
+    });
+  }
+
   async function markAllAsRead() {
     if (markAllReadPending) return;
-    const unreadThreads = currentThreads().filter(isThreadUnread);
-    if (!unreadThreads.length) return;
-    const previousThreadID = codexUIContracts.activeComposerThreadID();
-    let failed = 0;
+    const unreadIDs = currentThreads().filter(isThreadUnread).map((thread) => thread.id);
+    if (!unreadIDs.length) return;
     markAllReadPending = true;
     markAllReadError = '';
     commitDialogError = '';
-    codexHost.keepDashboardOpenDuringRead = true;
     renderDashboard();
     try {
-      for (const thread of unreadThreads) {
-        if (destroyed) break;
-        if (!isThreadUnread(thread)) continue;
-        try {
-          codexHost.navigateToThread(thread);
-          const acknowledged = await domUtils.waitFor(() => {
-            presentationState.syncUnread();
-            return !isThreadUnread(thread);
-          }, { timeout: 5000, interval: 100 });
-          if (!acknowledged) failed += 1;
-        } catch {
-          failed += 1;
-        }
+      const { available, failedIDs } = codexHost.markThreadsRead(unreadIDs);
+      if (!available) {
+        markAllReadError = 'Codex’s read-state action is unavailable. Restart Codex and try again.';
+        return;
       }
+      presentationState.syncUnread();
+      const submittedIDs = unreadIDs.filter((id) => !failedIDs.includes(id));
+      const unconfirmedIDs = submittedIDs.length
+        ? await waitForReadConfirmation(submittedIDs) : [];
+      const failed = failedIDs.length + unconfirmedIDs.length;
+      markAllReadError = failed
+        ? `Codex could not confirm ${failed} ${failed === 1 ? 'task' : 'tasks'} as read. Try again.`
+        : '';
+    } catch {
+      markAllReadError = 'Codex’s read-state action failed. Try again.';
     } finally {
-      if (previousThreadID && !destroyed) {
-        try {
-          codexHost.navigateToThread({ id: previousThreadID });
-          await domUtils.waitFor(
-            () => codexUIContracts.isThreadSelected(previousThreadID), { timeout: 1500 },
-          );
-        } catch { /* Keep the dashboard usable if Codex cannot restore the prior task. */ }
-      }
-      codexHost.keepDashboardOpenDuringRead = false;
       markAllReadPending = false;
-      if (!destroyed) {
-        markAllReadError = failed
-          ? `Codex could not confirm ${failed} ${failed === 1 ? 'task' : 'tasks'} as read. Try again.`
-          : '';
-        renderDashboard();
-      }
+      if (!destroyed) renderDashboard();
     }
   }
 
@@ -294,6 +311,7 @@ function createTaskDashboard({ catalog }) {
   function applyThreads() {
     syncInterruptedSidebarMarkers();
     presentationState.applyThreads(currentThreads());
+    checkReadConfirmation();
     // A native refresh can update the catalog, unread state, and Git state in a
     // short burst. Keep the renderer responsive by applying only the latest
     // snapshot in the next frame instead of rebuilding the task list for each
@@ -309,7 +327,7 @@ function createTaskDashboard({ catalog }) {
 
   function destroy() {
     destroyed = true;
-    codexHost.keepDashboardOpenDuringRead = false;
+    readConfirmation?.finish(readConfirmation.ids);
     pageState.close();
     cancelScheduledRender();
     presentationState.destroy();
