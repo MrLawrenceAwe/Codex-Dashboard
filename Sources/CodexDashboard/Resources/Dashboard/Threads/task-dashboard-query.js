@@ -17,21 +17,45 @@ const taskDashboardQuery = (() => {
     return { runningCount, unreadCount, indicatedChangedProjectPaths, allChangedProjectPaths };
   }
 
-  function filter({
+  function selectThreads({
     threads,
     allChangedProjectPaths,
     filterMode,
     isThreadUnread,
+    visibleThreadLimit,
   }) {
-    return threads.filter((thread) => {
-      const matchesFilter = filterMode === 'all'
+    const visibleThreads = threads.filter((thread) =>
+      filterMode === 'all'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
-          && allChangedProjectPaths.has(String(thread.projectPath).trim()));
-      return matchesFilter;
-    });
+          && allChangedProjectPaths.has(String(thread.projectPath).trim())));
+    if (filterMode === 'changedProjects') {
+      const projectPaths = [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))];
+      const displayedProjectPaths = new Set(projectPaths.slice(0, visibleThreadLimit));
+      return {
+        visibleThreads,
+        displayedThreads: visibleThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectPath).trim())),
+        runningThreadCount: 0,
+        hasMore: visibleThreadLimit < projectPaths.length,
+      };
+    }
+    if (filterMode === 'all') {
+      const runningThreads = visibleThreads.filter((thread) => thread.runState === 'running');
+      const recentThreads = visibleThreads.filter((thread) => thread.runState !== 'running');
+      return {
+        visibleThreads,
+        displayedThreads: [...runningThreads, ...recentThreads.slice(0, visibleThreadLimit)],
+        runningThreadCount: runningThreads.length,
+        hasMore: visibleThreadLimit < recentThreads.length,
+      };
+    }
+    return {
+      visibleThreads,
+      displayedThreads: visibleThreads.slice(0, visibleThreadLimit),
+      runningThreadCount: 0,
+      hasMore: visibleThreadLimit < visibleThreads.length,
+    };
   }
 
-
-  return { summarizeActivity, filter };
+  return { summarizeActivity, selectThreads };
 })();
