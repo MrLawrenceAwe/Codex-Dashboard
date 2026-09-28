@@ -80,6 +80,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             Int64($0.timeIntervalSince1970 * 1_000)
         }
         let currentLaunchPredicate = launchMilliseconds.map { "recency_at_ms >= \($0)" } ?? "0"
+        // Inspect empty-preview tasks touched during this launch; only running
+        // ones are kept in the visible catalog below.
+        let candidateThreadPredicate = "(preview <> '' OR \(currentLaunchPredicate))"
         let requiredThreadPredicate = requiredThreadIDs.isEmpty
             ? "0"
             : "id IN (\(requiredThreadIDs.sorted().map(Self.sqlStringLiteral).joined(separator: ", ")))"
@@ -106,7 +109,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                ) AS totalCount
         FROM threads
         WHERE archived = 0
-          AND preview <> ''
+          AND \(candidateThreadPredicate)
           AND (id IN (SELECT id FROM recent_threads) OR \(requiredThreadPredicate) OR \(currentLaunchPredicate))
         ORDER BY recency_at_ms DESC
         """
@@ -128,7 +131,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         rolloutActivityReader.retainCache(for: activityPaths)
         // Any loaded task can be resumed or hit a usage limit without a database
         // write. The reader checks file signatures and only parses changed rollouts.
-        let threadSummaries = threads.map { thread in
+        let candidates: [ThreadSummary] = threads.map { thread in
             let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
             let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
             let isCurrentEvent = recordedEvent.map { event in
@@ -160,7 +163,8 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 workingTreeStatus: .notRepository
             )
             return summary
-        }.sorted { left, right in
+        }
+        let threadSummaries = candidates.filter { $0.preview != "" || $0.runState == .running }.sorted { left, right in
             if left.recencyEpochMillis == right.recencyEpochMillis {
                 return left.id < right.id
             }
@@ -168,7 +172,8 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         }
         return ThreadCatalog(
             threads: threadSummaries,
-            totalThreadCount: threads.first?.totalCount ?? 0
+            totalThreadCount: (threads.first?.totalCount ?? 0)
+                + threadSummaries.count { $0.preview.isEmpty && $0.runState == .running }
         )
     }
 
