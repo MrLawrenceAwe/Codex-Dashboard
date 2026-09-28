@@ -55,7 +55,7 @@ extension DashboardRendererTests {
         XCTAssertEqual(
             checks.map(\.id),
             [
-                "renderer", "sidebar-host", "thread-navigation", "sidebar-unread",
+                "renderer", "sidebar-host", "thread-navigation", "sidebar-unread", "sidebar-bulk-read",
                 "composer", "composer-controls", "profile-menu", "model-picker",
             ]
         )
@@ -70,6 +70,9 @@ extension DashboardRendererTests {
         )
         XCTAssertTrue(expressions.contains {
             $0.contains("codexUIContracts.profileMenuTrigger()")
+        })
+        XCTAssertTrue(expressions.contains {
+            $0.contains("codexUIContracts.markThreadsRead([]).available")
         })
     }
 

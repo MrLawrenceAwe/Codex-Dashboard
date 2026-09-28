@@ -1,5 +1,4 @@
 const codexHost = {
-  keepDashboardOpenDuringRead: false,
   sidebar() {
     return codexUIContracts.sidebar();
   },
@@ -57,6 +56,10 @@ const codexHost = {
 
   threadReadStates() {
     return codexUIContracts.threadReadStates();
+  },
+
+  markThreadsRead(threadIDs) {
+    return codexUIContracts.markThreadsRead(threadIDs);
   },
 
   navigateToThread(thread) {

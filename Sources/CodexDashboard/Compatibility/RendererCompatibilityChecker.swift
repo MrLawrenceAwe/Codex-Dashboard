@@ -56,6 +56,15 @@ struct RendererCompatibilityChecker {
             in: target
         ))
         checks.append(await inspect(
+            id: "sidebar-bulk-read",
+            title: "Bulk read action",
+            expression: contractExpression("codexUIContracts.markThreadsRead([]).available"),
+            failureStatus: .warning,
+            compatibleDetail: "Codex exposes its direct task read-state action.",
+            failureDetail: "The direct read-state action was not found; Mark all as read is unavailable.",
+            in: target
+        ))
+        checks.append(await inspect(
             id: "composer",
             title: "Composer integration",
             expression: contractExpression(
