@@ -89,14 +89,14 @@ const reviewLoopView = (() => {
         <div class="review-controls" data-review-controls></div>
         <div class="review-live" data-review-live hidden>
           <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open task ↗</button></div>
-          <details class="review-prompt" data-review-current-prompt>
-            <summary><span data-review-current-label>Current prompt</span><span data-review-current-title></span></summary>
+          <div class="review-prompt" data-review-current-prompt>
+            <div class="review-prompt-heading"><span data-review-current-label>Current prompt</span><span data-review-current-title></span></div>
             <p data-review-current-note></p><pre data-review-current-text></pre>
-          </details>
-          <details class="review-prompt" data-review-upcoming-prompt>
-            <summary><span>Up next</span><span data-review-upcoming-title></span></summary>
+          </div>
+          <div class="review-prompt" data-review-upcoming-prompt>
+            <div class="review-prompt-heading"><span>Up next</span><span data-review-upcoming-title></span></div>
             <p data-review-upcoming-note></p><pre data-review-upcoming-text></pre>
-          </details>
+          </div>
           <p class="review-next-message" data-review-next-message></p>
         </div>
         <ol data-review-rounds aria-label="Review rounds"></ol>`;
@@ -231,10 +231,6 @@ const reviewLoopView = (() => {
     const live = root.querySelector('[data-review-live]');
     live.hidden = !loop || !progress;
     if (live.hidden) return;
-    if (live.dataset.loopID !== loop.id) {
-      live.querySelectorAll('details').forEach(details => { details.open = false; });
-      live.dataset.loopID = loop.id;
-    }
     root.querySelector('[data-review-step]').textContent = progress.step;
     root.querySelector('[data-review-current-label]').textContent = progress.currentLabel;
     const task = root.querySelector('[data-review-current-task]');

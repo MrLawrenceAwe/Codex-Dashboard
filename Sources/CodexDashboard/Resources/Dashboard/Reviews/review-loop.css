@@ -65,8 +65,8 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-live-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
 .dashboard-review-loop .review-live-heading strong { font-size:13px; font-weight:500; }
 .dashboard-review-loop .review-prompt { border:1px solid var(--review-border); border-radius:8px; padding:12px; margin-top:10px; background:var(--review-tint); }
-.dashboard-review-loop .review-prompt summary { width:100%; font-size:12px; line-height:1.6; color:inherit; }
-.dashboard-review-loop .review-prompt summary span:last-child { color:var(--review-muted); margin-left:12px; }
+.dashboard-review-loop .review-prompt-heading { width:100%; font-size:12px; line-height:1.6; color:inherit; }
+.dashboard-review-loop .review-prompt-heading span:last-child { color:var(--review-muted); margin-left:12px; }
 .dashboard-review-loop .review-prompt p { font-size:11px; margin-top:12px; }
 .dashboard-review-loop .review-prompt pre { margin:12px 0 0; max-height:240px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.65 ui-monospace, SFMono-Regular, monospace; user-select:text; }
 .dashboard-review-loop .review-next-message { margin-top:12px; font-size:12px; }

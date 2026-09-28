@@ -351,7 +351,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "All configured review rounds completed.", true])
     }
 
-    func testLivePromptsRefreshWithoutClosingAndRenderAsText() async throws {
+    func testLivePromptsStayVisibleAfterRefreshAndRenderAsText() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -363,11 +363,13 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
           api.applyReviewLoop(snapshot);
-          const details = document.querySelector('[data-review-current-prompt]');
-          details.open = true;
+          const current = document.querySelector('[data-review-current-prompt]');
+          const upcoming = document.querySelector('[data-review-upcoming-prompt]');
           api.applyReviewLoop(snapshot);
-          const active = [!document.querySelector('[data-review-live]').hidden,details.open,
+          const active = [!document.querySelector('[data-review-live]').hidden,
+            current.tagName,upcoming.tagName,!current.hidden,!upcoming.hidden,
             document.querySelector('[data-review-current-text]').textContent,
+            document.querySelector('[data-review-upcoming-text]').textContent,
             document.querySelector('[data-review-current-text]').children.length,
             document.querySelector('[data-review-current-task]').dataset.reviewThread];
           snapshot.loops[0].phase = 'completed';
@@ -378,7 +380,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-next-message]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, "Review <code> & files", 0, "task-1", true, "No further prompts scheduled."])
+        XCTAssertEqual(result, [true, "DIV", "DIV", true, true, "Review <code> & files", "Address all and commit", 0, "task-1", true, "No further prompts scheduled."])
     }
 
     func testRequestUsesLocalDesktopConnectionAndCorrelatesResponses() async throws {
