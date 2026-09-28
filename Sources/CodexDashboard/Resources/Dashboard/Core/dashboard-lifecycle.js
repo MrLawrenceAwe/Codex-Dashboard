@@ -17,13 +17,13 @@ const dashboardLifecycle = (() => {
   function handleNavigation(event) {
     if (event.type === 'message') {
       if (event.data?.type === 'navigate-to-route') {
-        if (hooks.isOpen()) hooks.close();
+        if (hooks.isOpen() && !codexHost.keepDashboardOpenDuringRead) hooks.close();
         scheduleRepair({ rebindHosts: true });
       }
       return;
     }
     if (event.type === 'popstate' || event.type === 'hashchange') {
-      if (hooks.isOpen()) hooks.close();
+      if (hooks.isOpen() && !codexHost.keepDashboardOpenDuringRead) hooks.close();
       scheduleRepair({ rebindHosts: true });
       return;
     }
@@ -41,7 +41,7 @@ const dashboardLifecycle = (() => {
       return;
     }
     if (event.type === 'click' && target?.closest('aside')) {
-      if (hooks.isOpen()) hooks.close();
+      if (hooks.isOpen() && !codexHost.keepDashboardOpenDuringRead) hooks.close();
       scheduleRepair({ rebindHosts: true });
     }
   }

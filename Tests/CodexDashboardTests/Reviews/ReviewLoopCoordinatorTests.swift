@@ -165,7 +165,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings; commit once")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
@@ -480,7 +480,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                     XCTAssertEqual(coordinator.loops.last?.phase, .completed)
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
-                    XCTAssertEqual(driver.prompts.last, count == 1 ? "Fix the finding; commit once" : count == 2 ? "Fix both findings; commit once" : "Fix all findings; commit once")
+                    XCTAssertEqual(driver.prompts.last, count == 1 ? "Fix the finding and commit" : count == 2 ? "Fix both findings and commit" : "Fix all findings and commit")
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
@@ -553,16 +553,16 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             switch focus {
             case .bugs:
                 expectedReview = "Review project for bugs and issues."
-                expectedFix = "Fix the finding; commit once"
+                expectedFix = "Fix the finding and commit"
             case .organisation:
                 expectedReview = "Do a code minimisation and organisation review."
-                expectedFix = "Address the finding; commit once"
+                expectedFix = "Address the finding and commit"
             case .naming:
                 expectedReview = "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
-                expectedFix = "Address the finding; commit once"
+                expectedFix = "Address the finding and commit"
             case .performance:
                 expectedReview = "Review project for performance and responsiveness."
-                expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
+                expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
             }
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])

@@ -1,5 +1,5 @@
 const taskDashboardPage = (() => {
-  function mount({ onFilter, onLoadMore, onListClick }) {
+  function mount({ onFilter, onMarkAllRead, onLoadMore, onListClick }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = document.createElement('section');
@@ -10,7 +10,7 @@ const taskDashboardPage = (() => {
         <header class="dashboard-header">
           <h1>Task Dashboard</h1>
         </header>
-        <div class="dashboard-notice" data-commit-notice role="alert" hidden></div>
+        <div class="dashboard-notice" data-task-notice role="alert" hidden></div>
         <div class="dashboard-section-header">
           <div class="dashboard-toolbar">
             <div class="dashboard-toolbar-group dashboard-filter-group">
@@ -21,6 +21,7 @@ const taskDashboardPage = (() => {
                 <button type="button" data-filter="changedProjects" aria-label="Changed projects"><span class="dashboard-filter-label">Changed projects</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Changed project count">0</span></button>
               </div>
             </div>
+            <button type="button" class="dashboard-mark-all-read" data-mark-all-read hidden>Mark all as read</button>
           </div>
         </div>
         <main class="dashboard-list" data-thread-list></main>
@@ -29,6 +30,7 @@ const taskDashboardPage = (() => {
     page.querySelectorAll('[data-filter]').forEach((button) => {
       button.addEventListener('click', () => onFilter(button.dataset.filter));
     });
+    page.querySelector('[data-mark-all-read]').addEventListener('click', onMarkAllRead);
     page.querySelector('[data-load-more]').addEventListener('click', onLoadMore);
     page.querySelector('[data-thread-list]').addEventListener('click', onListClick);
     pageHost.append(page);

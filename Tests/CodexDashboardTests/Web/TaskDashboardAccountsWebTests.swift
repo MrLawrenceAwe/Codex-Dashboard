@@ -443,7 +443,7 @@ extension TaskDashboardWebTests {
             """
             (() => {
               window.__codexDashboard.open();
-              const notice = document.querySelector('[data-commit-notice]');
+              const notice = document.querySelector('[data-task-notice]');
               notice.textContent = 'Could not commit.';
               notice.hidden = false;
               return [notice.hidden, notice.textContent];

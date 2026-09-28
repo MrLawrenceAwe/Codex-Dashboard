@@ -67,11 +67,11 @@ enum ReviewLoopPresentation {
         }
         switch loop.focus {
         case .bugs:
-            return "Fix \(findings); commit once"
+            return "Fix \(findings) and commit"
         case .organisation, .naming:
-            return "Address \(findings); commit once"
+            return "Address \(findings) and commit"
         case .performance:
-            return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements; commit once"
+            return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
         }
     }
 }
