@@ -78,7 +78,7 @@ const threadMarkup = (() => {
     isUnread,
     isCompletionTickVisible,
   }) {
-    if (filterMode === 'home') {
+    if (filterMode === 'all') {
       const renderRows = (items) => items.map((item) => thread(item, {
         compact: true,
         showProject: true,

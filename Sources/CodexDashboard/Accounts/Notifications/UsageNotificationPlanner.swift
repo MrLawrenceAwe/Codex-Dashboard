@@ -16,7 +16,19 @@ enum UsageNotificationPlanner {
         var notificationKind: ScheduledUsageNotificationKind {
             self == .fiveHour ? .fiveHourReset : .weeklyReset
         }
+        var leadTimes: [TimeInterval] {
+            self == .fiveHour ? [UsageNotificationPlanner.oneHour] : UsageNotificationPlanner.extendedLeadTimes
+        }
+        var thresholds: [Int] { self == .fiveHour ? [50, 20] : [80, 50, 20] }
+        func window(in usage: CodexAccountUsage) -> CodexUsageWindow? {
+            self == .fiveHour ? usage.fiveHour : usage.weekly
+        }
+        func window(in observation: UsageObservation) -> CodexUsageWindow? {
+            self == .fiveHour ? observation.fiveHour : observation.weekly
+        }
     }
+
+    private static let windowKinds: [UsageWindowKind] = [.fiveHour, .weekly]
 
     struct Plan {
         let scheduled: [ScheduledUsageNotification]
@@ -60,26 +72,16 @@ enum UsageNotificationPlanner {
     ) -> [ScheduledUsageNotification] {
         accounts.flatMap { account -> [ScheduledUsageNotification] in
             guard let usage = usageByAccountID[account.id]?.usage else { return [] }
-            let limitReminders: [ScheduledUsageNotification]
-            if hasWeeklyUsageRemaining(usage) {
-                let fiveHourReminders = hasFiveHourUsageRemaining(usage)
-                    ? limitNotifications(
+            let limitReminders = hasWeeklyUsageRemaining(usage)
+                ? windowKinds.flatMap { kind in
+                    kind == .fiveHour && !hasFiveHourUsageRemaining(usage) ? [] : limitNotifications(
                         for: account,
-                        windowKind: .fiveHour,
-                        window: usage.fiveHour,
-                        leadTimes: [oneHour],
+                        windowKind: kind,
+                        window: kind.window(in: usage),
+                        leadTimes: kind.leadTimes,
                         now: now
-                    ) : []
-                limitReminders = fiveHourReminders + limitNotifications(
-                    for: account,
-                    windowKind: .weekly,
-                    window: usage.weekly,
-                    leadTimes: extendedLeadTimes,
-                    now: now
-                )
-            } else {
-                limitReminders = []
-            }
+                    )
+                } : []
             return limitReminders + bankedResetExpiryNotifications(
                 for: account,
                 resets: usage.bankedResets,
@@ -137,25 +139,16 @@ enum UsageNotificationPlanner {
                   hasWeeklyUsageRemaining(usage),
                   let previous = previousObservations[account.id]
             else { return [] }
-            let fiveHourNotification = resetNotification(
+            return windowKinds.compactMap { kind in
+                resetNotification(
                     for: account,
-                    windowKind: .fiveHour,
-                    current: usage.fiveHour,
-                    previous: previous.fiveHour,
+                    windowKind: kind,
+                    current: kind.window(in: usage),
+                    previous: kind.window(in: previous),
                     usageSummary: usageSummary(for: usage),
                     now: now
                 )
-            return [
-                fiveHourNotification,
-                resetNotification(
-                    for: account,
-                    windowKind: .weekly,
-                    current: usage.weekly,
-                    previous: previous.weekly,
-                    usageSummary: usageSummary(for: usage),
-                    now: now
-                ),
-            ].compactMap { $0 }
+            }
         }.sorted { $0.identifier < $1.identifier }
     }
 
@@ -198,27 +191,17 @@ enum UsageNotificationPlanner {
                   hasWeeklyUsageRemaining(usage),
                   let previous = previousObservations[account.id]
             else { return [] }
-            let fiveHourNotifications = thresholdNotifications(
+            return windowKinds.flatMap { kind in
+                thresholdNotifications(
                     for: account,
-                    windowKind: .fiveHour,
-                    current: usage.fiveHour,
-                    previous: previous.fiveHour,
-                    thresholds: [50, 20],
+                    windowKind: kind,
+                    current: kind.window(in: usage),
+                    previous: kind.window(in: previous),
+                    thresholds: kind.thresholds,
                     usageSummary: usageSummary(for: usage),
                     now: now
                 )
-            return [
-                fiveHourNotifications,
-                thresholdNotifications(
-                    for: account,
-                    windowKind: .weekly,
-                    current: usage.weekly,
-                    previous: previous.weekly,
-                    thresholds: [80, 50, 20],
-                    usageSummary: usageSummary(for: usage),
-                    now: now
-                ),
-            ].flatMap { $0 }
+            }
         }.sorted { $0.identifier < $1.identifier }
     }
 

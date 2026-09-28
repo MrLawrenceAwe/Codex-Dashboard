@@ -26,20 +26,12 @@ final class PromptLibraryBridge {
         mountedDashboard: Bool
     ) async throws {
         guard let firstTarget = targets.first else { return }
-        var nativeWins = nativeLibraryIsAuthoritative
-        var discardedPendingLibrary = false
-        if nativeWins {
-            try await discardPendingLibrary(on: targets)
-            discardedPendingLibrary = true
-        } else if let pendingLibrary = await exportedLibrary(
+        if !nativeLibraryIsAuthoritative,
+           let pendingLibrary = await exportedLibrary(
             using: RendererScript.exportPendingPromptLibrary,
             from: firstTarget
         ) {
-            nativeWins = nativeLibraryIsAuthoritative
-            if nativeWins {
-                try await discardPendingLibrary(on: targets)
-                discardedPendingLibrary = true
-            } else {
+            if !nativeLibraryIsAuthoritative {
                 _ = try store.save(pendingLibrary)
                 let acknowledgement = try RendererScript.acknowledgePendingPromptLibrary(
                     pendingLibrary
@@ -51,30 +43,24 @@ final class PromptLibraryBridge {
         var storedLibrary = try store.load()
         let nativeLibraryChanged = storedLibrary != lastDeliveredLibrary
         let sourceTarget = healthyTargets.first ?? (storedLibrary == nil ? firstTarget : nil)
-        if !nativeLibraryChanged,
+        if !nativeLibraryIsAuthoritative,
+           !nativeLibraryChanged,
            let sourceTarget,
            let rendererLibrary = await exportedLibrary(
                using: RendererScript.exportPromptLibrary,
                from: sourceTarget
            ) {
-            nativeWins = nativeLibraryIsAuthoritative
-            if nativeWins {
-                if !discardedPendingLibrary {
-                    try await discardPendingLibrary(on: targets)
-                    discardedPendingLibrary = true
-                }
-            } else {
+            if !nativeLibraryIsAuthoritative {
                 _ = try store.save(rendererLibrary)
                 storedLibrary = rendererLibrary
             }
         }
 
-        nativeWins = nativeWins || nativeLibraryIsAuthoritative
-        if nativeWins, !discardedPendingLibrary {
+        if nativeLibraryIsAuthoritative {
             try await discardPendingLibrary(on: targets)
         }
         guard let nativeLibrary = storedLibrary else { return }
-        guard nativeWins || mountedDashboard || nativeLibrary != lastDeliveredLibrary else { return }
+        guard nativeLibraryIsAuthoritative || mountedDashboard || nativeLibrary != lastDeliveredLibrary else { return }
 
         try await evaluateAcrossTargets(
             try RendererScript.deliverPromptLibrary(nativeLibrary),
@@ -82,7 +68,7 @@ final class PromptLibraryBridge {
             failureMessage: "The prompt library was unavailable in the Codex renderer."
         )
         lastDeliveredLibrary = nativeLibrary
-        if nativeWins { nativeLibraryIsAuthoritative = false }
+        nativeLibraryIsAuthoritative = false
     }
 
     private func exportedLibrary(

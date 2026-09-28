@@ -86,6 +86,46 @@ const promptStore = (() => {
       ) || normalizedSection;
     },
 
+    createSection(name) {
+      const section = store.resolveSection(name);
+      const sections = store.sections.includes(section)
+        ? store.sections : [...store.sections, section];
+      if (!store.stageLibraryUpdate(store.prompts, sections)) return null;
+      store.collapsedSections.delete(section);
+      store.saveCollapsedSections();
+      return section;
+    },
+
+    renameSection(source, name) {
+      const destination = normalizeSection(name);
+      const conflict = store.sections.some((section) => section !== source
+        && section.localeCompare(destination, undefined, { sensitivity: 'accent' }) === 0);
+      if (conflict) return 'conflict';
+      const prompts = store.prompts.map((prompt) => normalizeSection(prompt.section) === source
+        ? { ...prompt, section: destination } : prompt);
+      const sections = store.sections.map((section) => section === source ? destination : section);
+      if (!store.stageLibraryUpdate(prompts, sections)) return 'failed';
+      store.collapsedSections.delete(source);
+      store.saveCollapsedSections();
+      return 'saved';
+    },
+
+    deleteSection(section) {
+      const prompts = store.prompts.map((prompt) => normalizeSection(prompt.section) === section
+        ? { ...prompt, section: promptLibraryContract.defaultSection } : prompt);
+      const sections = store.sections.filter((item) => item !== section);
+      if (!store.stageLibraryUpdate(prompts, sections)) return false;
+      store.collapsedSections.delete(section);
+      store.saveCollapsedSections();
+      return true;
+    },
+
+    toggleSection(section) {
+      if (store.collapsedSections.has(section)) store.collapsedSections.delete(section);
+      else store.collapsedSections.add(section);
+      store.saveCollapsedSections();
+    },
+
     // Queue a renderer edit; PromptLibraryBridge persists and acknowledges it.
     stageLibraryUpdate(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);

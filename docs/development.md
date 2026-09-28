@@ -15,7 +15,7 @@ ignored `injection.js` is built by the production `InjectionBundle` loader, incl
 the Swift-defined prompt schema; preview fixtures use the current thread contract.
 Generation exits before starting the menu-bar application.
 
-Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation and polling; `Threads/thread-completion-indicators.js` owns completion tick expiry. The native thread catalog supplies recency-sorted snapshots; `Threads/thread-catalog.js` owns project matching and the thread-ID index. Dashboard, to-do, and prompt controllers receive its lookup operations from `Core/dashboard-composition.js`. The bridge applies each snapshot through the composition before refreshing the pages. `Core/dashboard-navigation.js` handles page switching, mounting, visibility, and navigation repair. The prompt controller receives an
+Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation and polling; `Threads/thread-completion-indicators.js` owns completion tick expiry. The native thread catalog supplies recency-sorted snapshots; `Threads/thread-catalog.js` owns project matching and the thread-ID index. `Core/dashboard-bridge.js` creates the dashboard, to-do, and prompt controllers with the catalog lookups they need, then applies each thread snapshot to those controllers. `Core/dashboard-navigation.js` handles page switching, mounting, visibility, and navigation repair. The prompt controller receives an
 explicit thread lookup for composer context. Native import/export and renderer
 persistence share the prompt store constructed by the application coordinator.
 
@@ -43,6 +43,7 @@ older `projectTag` and `projectBadge` fields, and the version 6 `chat` field. Pr
 loading migrates `collapsedProjects` to `collapsedProjectPaths`, and both
 `ignoredProjectPaths` and `mutedProjectPaths` to `hiddenChangeIndicatorPaths`. Successful
 migrations write only current fields; failed migration writes leave stored data intact.
+Task filter preferences migrate `recent` and `home` to `all`, displayed as **All tasks**.
 Keep old field names confined to migration code and legacy fixtures.
 
 Run `swift test` for the complete native and WebKit test suite. Web tests await to-do
