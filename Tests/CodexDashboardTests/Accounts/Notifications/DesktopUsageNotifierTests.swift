@@ -10,11 +10,17 @@ private final class RecordingDesktopNotificationCenter: DesktopNotificationCente
     var failedImmediateTitle: String?
     var immediateTitles: [String] = []
     var scheduledRequests: [UNNotificationRequest] = []
+    var delivered: [DeliveredDesktopNotification] = []
+    var removedDeliveredIdentifiers: [String] = []
     var onImmediate: (() -> Void)?
 
     func pendingRequests() async -> [UNNotificationRequest] { [] }
+    func deliveredNotifications() async -> [DeliveredDesktopNotification] { delivered }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
-    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {}
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {
+        removedDeliveredIdentifiers += identifiers
+        delivered.removeAll { identifiers.contains($0.identifier) }
+    }
     func requestAuthorizationIfNeeded() async -> Bool { authorized }
 
     func add(_ request: UNNotificationRequest) async throws {
@@ -39,6 +45,7 @@ private final class SuspendedDesktopNotificationCenter: DesktopNotificationCente
     private(set) var immediateAttempts = 0
 
     func pendingRequests() async -> [UNNotificationRequest] { [] }
+    func deliveredNotifications() async -> [DeliveredDesktopNotification] { [] }
     func removePendingRequests(withIdentifiers identifiers: [String]) {}
     func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {}
     func requestAuthorizationIfNeeded() async -> Bool { true }
@@ -69,6 +76,54 @@ private final class SuspendedDesktopNotificationCenter: DesktopNotificationCente
 
 @MainActor
 final class DesktopUsageNotifierTests: XCTestCase {
+    func testChangedResetRemovesDeliveredReminderButKeepsCurrentOne() async throws {
+        let now = Date.now
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, codexAccountID: nil)
+        let currentReset = now.addingTimeInterval(48 * 60 * 60)
+        let oldReset = currentReset.addingTimeInterval(4 * 60 * 60)
+        let prefix = "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-weekly-"
+        let oldID = "\(prefix)36h-fresh-123"
+        let currentID = "\(prefix)48h-fresh-456"
+        let center = RecordingDesktopNotificationCenter()
+        center.delivered = [
+            DeliveredDesktopNotification(identifier: oldID, title: "Codex weekly usage resets in 36 hours", deadlineDate: oldReset),
+            DeliveredDesktopNotification(identifier: currentID, title: "Codex weekly usage resets in 48 hours", deadlineDate: currentReset),
+        ]
+        let notifier = DesktopUsageNotifier(notificationCenter: center, userDefaults: try makeDefaults())
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(
+                usedPercent: 20, resetsAt: currentReset
+            )), fetchedAt: now
+        )
+
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+
+        XCTAssertEqual(center.removedDeliveredIdentifiers, [oldID])
+        XCTAssertEqual(center.delivered.map(\.identifier), [currentID])
+    }
+
+    func testOldFormatReminderIsRemovedOnUsageRefresh() async throws {
+        let now = Date.now
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, codexAccountID: nil)
+        let identifier = "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-weekly-36h-fresh-123"
+        let center = RecordingDesktopNotificationCenter()
+        center.delivered = [DeliveredDesktopNotification(
+            identifier: identifier, title: "Codex limit resets in 36 hours", deadlineDate: nil
+        )]
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: CodexUsageWindow(
+                usedPercent: 20, resetsAt: now.addingTimeInterval(72 * 60 * 60)
+            )), fetchedAt: now
+        )
+
+        await DesktopUsageNotifier(notificationCenter: center, userDefaults: try makeDefaults())
+            .updateNotifications(for: [account], usageByAccountID: [account.id: snapshot])
+
+        XCTAssertEqual(center.removedDeliveredIdentifiers, [identifier])
+    }
+
     func testScheduledFallbackDoesNotClaimAnUnverifiedResetTime() async throws {
         let now = Date.now
         let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,

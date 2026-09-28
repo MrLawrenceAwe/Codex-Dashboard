@@ -3,9 +3,16 @@ import UserNotifications
 
 typealias DeadlineUsageRefreshHandler = @MainActor @Sendable (UUID) async -> CodexAccountUsageSnapshot?
 
+struct DeliveredDesktopNotification {
+    let identifier: String
+    let title: String
+    let deadlineDate: Date?
+}
+
 @MainActor
 protocol DesktopNotificationCenter: AnyObject {
     func pendingRequests() async -> [UNNotificationRequest]
+    func deliveredNotifications() async -> [DeliveredDesktopNotification]
     func removePendingRequests(withIdentifiers identifiers: [String])
     func removeDeliveredNotifications(withIdentifiers identifiers: [String])
     func add(_ request: UNNotificationRequest) async throws
@@ -22,6 +29,18 @@ final class SystemDesktopNotificationCenter: DesktopNotificationCenter {
 
     func pendingRequests() async -> [UNNotificationRequest] {
         await center.pendingNotificationRequests()
+    }
+
+    func deliveredNotifications() async -> [DeliveredDesktopNotification] {
+        await center.deliveredNotifications().map { notification in
+            let content = notification.request.content
+            return DeliveredDesktopNotification(
+                identifier: notification.request.identifier,
+                title: content.title,
+                deadlineDate: (content.userInfo["deadlineTimestamp"] as? TimeInterval)
+                    .map(Date.init(timeIntervalSince1970:))
+            )
+        }
     }
 
     func removePendingRequests(withIdentifiers identifiers: [String]) {
@@ -134,6 +153,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
             request.identifier.hasPrefix(Self.legacyIdentifierPrefix) ? request.identifier : nil
         }
         notificationCenter.removePendingRequests(withIdentifiers: existingIdentifiers)
+        await removeOutdatedDeliveredNotifications(using: usageByAccountID)
 
         let immediateNotifications = plan.immediate
         guard !requests.isEmpty || !immediateNotifications.isEmpty, await notificationCenter.requestAuthorizationIfNeeded() else {
@@ -153,6 +173,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
                 content.title = "Check Codex usage"
                 content.body = "\(notification.accountName)’s usage deadline was last recorded as \(UsageNotificationPlanner.formattedDeadline(notification.deadlineDate)). Open Codex Dashboard for current usage."
             }
+            content.userInfo["deadlineTimestamp"] = notification.deadlineDate.timeIntervalSince1970
             content.sound = .default
             let trigger = UNCalendarNotificationTrigger(
                 dateMatching: Calendar.current.dateComponents(
@@ -247,6 +268,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         let content = UNMutableNotificationContent()
         content.title = refreshed.title
         content.body = refreshed.body
+        content.userInfo["deadlineTimestamp"] = notification.deadlineDate.timeIntervalSince1970
         content.sound = .default
         do {
             try await notificationCenter.add(
@@ -268,6 +290,44 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         return !UsageNotificationPlanner.deadlinesDifferMeaningfully(
             deliveredDeadline, notification.deadlineDate
         )
+    }
+
+    private func removeOutdatedDeliveredNotifications(
+        using usageByAccountID: [UUID: CodexAccountUsageSnapshot]
+    ) async {
+        let delivered = await notificationCenter.deliveredNotifications()
+        let outdated = delivered.compactMap { notification -> String? in
+            for (accountID, snapshot) in usageByAccountID {
+                let prefix = "codex-dashboard-account-deadline-v2-\(accountID.uuidString.lowercased())-"
+                guard notification.identifier.hasPrefix(prefix) else { continue }
+                let kind = notification.identifier.dropFirst(prefix.count)
+                let currentDeadline: Date?
+                if kind.hasPrefix("weekly-") {
+                    currentDeadline = snapshot.usage.weekly?.resetsAt
+                } else if kind.hasPrefix("5-hour-") {
+                    currentDeadline = snapshot.usage.fiveHour?.resetsAt
+                } else if kind.hasPrefix("banked-reset-expiry-") {
+                    currentDeadline = snapshot.usage.bankedResets?.nextExpiration
+                } else {
+                    continue
+                }
+                let baseIdentifier = notification.identifier.components(separatedBy: "-fresh-")[0]
+                let recordedDeadline = notification.deadlineDate
+                    ?? history.deliveredDeadline(for: baseIdentifier)
+                if notification.title.hasPrefix("Codex limit resets in ") {
+                    return notification.identifier
+                }
+                guard let currentDeadline else { return notification.identifier }
+                if let recordedDeadline,
+                   UsageNotificationPlanner.deadlinesDifferMeaningfully(recordedDeadline, currentDeadline) {
+                    return notification.identifier
+                }
+            }
+            return nil
+        }
+        if !outdated.isEmpty {
+            notificationCenter.removeDeliveredNotifications(withIdentifiers: outdated)
+        }
     }
 
     private func cancelLiveTask(_ identifier: String) {
