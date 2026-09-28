@@ -83,7 +83,6 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-round-details { margin-top:8px; }
 .dashboard-review-loop summary { cursor:pointer; color:var(--review-muted); font-size:11px; width:fit-content; }
 .dashboard-review-loop .review-round-details p { margin-top:10px; overflow-wrap:anywhere; white-space:pre-wrap; font-size:12px; }
-.dashboard-review-loop .review-page-header p { margin-top:8px; }
 .dashboard-review-loop fieldset { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; min-width:0; margin:0; padding:0; border:0; }
 .dashboard-review-loop .review-execution-options { min-width:0; border-top:1px solid var(--review-border); padding-top:20px; }
 .dashboard-review-loop .review-execution-options > summary { width:100%; color:inherit; font-size:12px; font-weight:500; }
@@ -102,13 +101,11 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-board:empty { display:none; }
 .dashboard-review-loop .review-overview { margin-left:auto; color:var(--review-muted); font-size:12px; }
 .dashboard-review-loop .review-section-heading h2 { min-width:0; overflow-wrap:anywhere; font-size:18px; }
-.dashboard-review-loop .review-empty { display:grid; gap:8px; padding:48px 24px; text-align:center; border:1px dashed var(--review-border); border-radius:16px; background:var(--review-tint); }
+.dashboard-review-loop .review-empty { display:grid; padding:32px 24px; text-align:center; border:1px dashed var(--review-border); border-radius:16px; background:var(--review-tint); }
 .dashboard-review-loop .review-empty strong { font-size:15px; font-weight:500; }
-.dashboard-review-loop .review-empty p { max-width:360px; margin:0 auto; }
 .dashboard-review-loop .review-monitor { min-width:0; }
 .dashboard-review-loop .review-region-heading { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
 .dashboard-review-loop .review-count { display:inline-flex; justify-content:center; min-width:24px; padding:2px 7px; border-radius:6px; background:var(--review-tint); color:var(--review-muted); font-size:11px; font-variant-numeric:tabular-nums; }
-.dashboard-review-loop .review-setup-heading p { margin-top:5px; font-size:12px; }
 .dashboard-review-loop fieldset > legend { padding:0; margin-bottom:12px; font-size:11px; font-weight:600; color:var(--review-muted); }
 .dashboard-review-loop .review-limits { grid-template-columns:90px minmax(0, 1fr); padding-top:4px; }
 .dashboard-review-loop .review-limits > label:first-of-type, .dashboard-review-loop .review-priority { grid-column:1 / -1; }

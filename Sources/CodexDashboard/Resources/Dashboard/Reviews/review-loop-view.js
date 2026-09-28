@@ -24,15 +24,15 @@ const reviewLoopView = (() => {
     details.innerHTML = `
       <header class="review-page-header">
         <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
-        <div><h1>Review loops</h1><p>Review, fix and commit — one round at a time.</p></div><span class="review-overview" data-review-overview></span>
+        <h1>Review loops</h1><span class="review-overview" data-review-overview></span>
       </header>
       <section class="review-monitor" aria-labelledby="review-active-title">
         <div class="review-region-heading"><h2 id="review-active-title">Active loops</h2><span data-review-active-count class="review-count">0</span></div>
         <section class="review-board" data-review-board aria-label="Active review loops"></section>
-        <div class="review-empty" data-review-empty><strong>No active loops</strong><p>Start a loop to review a project and address its findings. Progress will appear here.</p></div>
+        <div class="review-empty" data-review-empty><strong>No active loops</strong></div>
       </section>
       <form data-review-form aria-labelledby="review-setup-title">
-        <div class="review-setup-heading"><h2 id="review-setup-title">New loop</h2><p>Choose a project and what to review.</p></div>
+        <div class="review-setup-heading"><h2 id="review-setup-title">New loop</h2></div>
         <fieldset class="review-scope"><legend>Project &amp; scope</legend>
         <label class="review-project">Project<select data-review-project required aria-label="Review project"></select></label>
         <label class="review-project-context">Project context<select data-review-prompt-context aria-label="Project context">
@@ -46,7 +46,7 @@ const reviewLoopView = (() => {
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits fixes if findings are found. Stops when no findings remain or the limit is reached.</p>
+        <p id="review-limit-help" class="review-field-help">Each round reviews and commits fixes. Stops when no findings remain or the limit is reached.</p>
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -65,7 +65,6 @@ const reviewLoopView = (() => {
       </form>
       <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
         <div class="review-region-heading"><h2 id="review-history-title">Previous loops</h2><span data-review-history-count class="review-count"></span></div>
-        <p>Revisit outcomes and summaries from finished loops.</p>
         <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
         <details class="review-history-details" data-review-history-details>
           <summary>Review details</summary>
