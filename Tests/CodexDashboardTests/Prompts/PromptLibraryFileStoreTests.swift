@@ -41,6 +41,29 @@ final class PromptLibraryFileStoreTests: XCTestCase {
         )
     }
 
+    func testUnreadableExistingLibraryIsNotReplaced() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("prompt-unreadable-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let documentURL = directory.appendingPathComponent("prompt-library.json")
+        let store = PromptLibraryFileStore(documentURL: documentURL)
+        let original = library(model: "gpt-original")
+        try store.save(original)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: documentURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: documentURL.path)
+        }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: documentURL.path))
+        XCTAssertThrowsError(try Data(contentsOf: documentURL))
+        XCTAssertThrowsError(try store.save(library(model: "gpt-new")))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.backupDirectoryURL.path))
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: documentURL.path)
+        XCTAssertEqual(try store.load(), original)
+    }
+
     func testImportRejectsInvalidLibraryWithoutReplacingCurrentDocument() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("prompt-import-\(UUID().uuidString)", isDirectory: true)
