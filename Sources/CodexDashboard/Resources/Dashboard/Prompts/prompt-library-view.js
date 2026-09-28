@@ -3,35 +3,34 @@ const promptLibraryView = (() => {
     return promptLibraryContract.scopeKey(prompt.scope) === promptLibraryContract.scopeKey(scope);
   }
 
-  function render({ dialogState, composerProject, searchTerm, searchSelection } = {}) {
-  const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
-  const content = dialog?.querySelector('[data-prompt-content]');
-  if (!content) return;
-  if (dialogState.mode === 'createSection') {
-    content.innerHTML = `
-      <form class="dashboard-prompt-form" data-prompt-section-form>
-        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" placeholder="e.g. Code review" required /></label>
-        <div class="dashboard-prompt-form-actions">
-          <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
-          <button type="submit" class="dashboard-prompt-primary">Create section</button>
-        </div>
-      </form>`;
-    content.querySelector('[name="sectionName"]')?.focus();
-    return;
+  function renderSectionForm(content, dialogState) {
+    if (dialogState.mode === 'createSection') {
+      content.innerHTML = `
+        <form class="dashboard-prompt-form" data-prompt-section-form>
+          <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" placeholder="e.g. Code review" required /></label>
+          <div class="dashboard-prompt-form-actions">
+            <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
+            <button type="submit" class="dashboard-prompt-primary">Create section</button>
+          </div>
+        </form>`;
+      content.querySelector('[name="sectionName"]')?.focus();
+      return;
+    }
+    if (dialogState.mode === 'renameSection') {
+      content.innerHTML = `
+        <form class="dashboard-prompt-form" data-prompt-section-rename-form>
+          <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${domUtils.escapeHTML(dialogState.section)}" required /></label>
+          <div class="dashboard-prompt-form-actions">
+            <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
+            <button type="submit" class="dashboard-prompt-primary">Rename section</button>
+          </div>
+        </form>`;
+      content.querySelector('[name="sectionName"]')?.focus();
+      return;
+    }
   }
-  if (dialogState.mode === 'renameSection') {
-    content.innerHTML = `
-      <form class="dashboard-prompt-form" data-prompt-section-rename-form>
-        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${domUtils.escapeHTML(dialogState.section)}" required /></label>
-        <div class="dashboard-prompt-form-actions">
-          <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
-          <button type="submit" class="dashboard-prompt-primary">Rename section</button>
-        </div>
-      </form>`;
-    content.querySelector('[name="sectionName"]')?.focus();
-    return;
-  }
-  if (dialogState.mode !== 'list') {
+
+  function renderPromptForm(content, dialogState, composerProject) {
     const prompt = dialogState.mode === 'edit'
       ? promptStore.prompts.find((item) => item.id === dialogState.promptID)
       : undefined;
@@ -46,9 +45,9 @@ const promptLibraryView = (() => {
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${domUtils.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${domUtils.escapeHTML(promptLibraryContract.defaultSection)}" value="${domUtils.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${domUtils.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${composerProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${domUtils.escapeHTML(composerProject.name)}</option>` : ''}</select></label>
-        <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a model preset</label>
+        <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a composer preset</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
-          <legend>Model preset</legend>
+          <legend>Composer preset</legend>
           <label>Model<select name="presetModel">${composerPresets.selectOptions(composerPresets.models, prompt?.preset?.model || composerPresets.defaults.model)}</select></label>
           <label>Effort<select name="presetReasoningEffort">${composerPresets.selectOptions(composerPresets.reasoningEfforts, prompt?.preset?.reasoningEffort || composerPresets.defaults.reasoningEffort)}</select></label>
           <label>Speed<select name="presetSpeed">${composerPresets.selectOptions(composerPresets.speeds, prompt?.preset?.speed || composerPresets.defaults.speed)}</select></label>
@@ -60,105 +59,122 @@ const promptLibraryView = (() => {
         </div>
       </form>`;
     content.querySelector('[name="name"]')?.focus();
-    return;
   }
-  const query = searchTerm.trim().toLowerCase();
-  const matchingPrompts = query ? promptStore.prompts.filter((prompt) => (
-    `${prompt.name} ${prompt.section} ${prompt.content} ${composerPresets.summary(prompt.preset).join(' ')}`
-      .toLowerCase().includes(query)
-  )) : promptStore.prompts;
-  const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => `
-    <article class="dashboard-prompt-row" data-prompt-row-id="${domUtils.escapeHTML(prompt.id)}" draggable="true">
-      <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
-      <div class="dashboard-prompt-row-main">
-        <button type="button" class="dashboard-prompt-use" data-prompt-use="${domUtils.escapeHTML(prompt.id)}">
-          <strong>${domUtils.escapeHTML(prompt.name)}</strong>
-          <span>${domUtils.escapeHTML(prompt.content)}</span>
-          ${composerPresets.summary(prompt.preset).length ? `<span class="dashboard-prompt-preset-summary">${composerPresets.summary(prompt.preset).map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
-        </button>
-        <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use model preset</label>
-      </div>
-      <div class="dashboard-prompt-row-actions">
-        <button type="button" data-prompt-move-up="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} up">↑</button>
-        <button type="button" data-prompt-move-down="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} down">↓</button>
-        <button type="button" data-prompt-edit="${domUtils.escapeHTML(prompt.id)}" aria-label="Edit ${domUtils.escapeHTML(prompt.name)}">Edit</button>
-        <button type="button" data-prompt-delete="${domUtils.escapeHTML(prompt.id)}" aria-label="Delete ${domUtils.escapeHTML(prompt.name)}">Delete</button>
-      </div>
-    </article>`).join('');
-  const scopeGroups = [];
-  if (composerProject) {
-    scopeGroups.push({
-      title: `This project · ${composerProject.name}`,
-      scope: { type: 'project', projectPath: composerProject.path },
-      prompts: matchingPrompts.filter((prompt) => promptMatchesScope(
-        prompt,
-        { type: 'project', projectPath: composerProject.path },
-      )),
-      includeEmptySections: false,
-    });
-  }
-  scopeGroups.push({
-    title: 'Global',
-    scope: { type: 'global' },
-    prompts: matchingPrompts.filter((prompt) => promptMatchesScope(prompt, { type: 'global' })),
-    includeEmptySections: true,
-  });
-  const groups = scopeGroups.map((group, groupIndex) => {
-    const groupedPrompts = new Map();
-    if (group.includeEmptySections && !query) {
-      promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
-    }
-    group.prompts.forEach((prompt) => {
-      const section = promptStore.normalizeSection(prompt.section);
-      if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
-      groupedPrompts.get(section).push(prompt);
-    });
-    const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
-      if (left === promptLibraryContract.defaultSection) return -1;
-      if (right === promptLibraryContract.defaultSection) return 1;
-      return left.localeCompare(right);
-    });
-    const sections = orderedSections.map(([section, sectionPrompts], sectionIndex) => {
-      const collapsed = promptStore.collapsedSections.has(section);
-      const sectionBodyID = `dashboard-prompt-section-${groupIndex}-${sectionIndex}`;
-      const canManageSection = group.scope.type === 'global'
-        && section !== promptLibraryContract.defaultSection;
+
+  function renderList(content, composerProject, searchTerm, searchSelection) {
+    const query = searchTerm.trim().toLowerCase();
+    const matchingPrompts = query ? promptStore.prompts.filter((prompt) => (
+      `${prompt.name} ${prompt.section} ${prompt.content} ${composerPresets.summary(prompt.preset).join(' ')}`
+        .toLowerCase().includes(query)
+    )) : promptStore.prompts;
+    const renderPromptRows = (sectionPrompts) => sectionPrompts.map((prompt) => {
+      const presetSummary = composerPresets.summary(prompt.preset);
       return `
-        <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${domUtils.escapeHTML(section)}" data-prompt-scope-key="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
-          <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${domUtils.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
-            <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${domUtils.escapeHTML(section)}</strong></span>
-            <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
+      <article class="dashboard-prompt-row" data-prompt-row-id="${domUtils.escapeHTML(prompt.id)}" draggable="true">
+        <span class="dashboard-prompt-drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>
+        <div class="dashboard-prompt-row-main">
+          <button type="button" class="dashboard-prompt-use" data-prompt-use="${domUtils.escapeHTML(prompt.id)}">
+            <strong>${domUtils.escapeHTML(prompt.name)}</strong>
+            <span>${domUtils.escapeHTML(prompt.content)}</span>
+            ${presetSummary.length ? `<span class="dashboard-prompt-preset-summary">${presetSummary.map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
           </button>
-          <div class="dashboard-prompt-section-actions">
-            ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section">Delete</button>` : ''}
-          </div>
-          <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
+          <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use composer preset</label>
+        </div>
+        <div class="dashboard-prompt-row-actions">
+          <button type="button" data-prompt-move-up="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} up">↑</button>
+          <button type="button" data-prompt-move-down="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} down">↓</button>
+          <button type="button" data-prompt-edit="${domUtils.escapeHTML(prompt.id)}" aria-label="Edit ${domUtils.escapeHTML(prompt.name)}">Edit</button>
+          <button type="button" data-prompt-delete="${domUtils.escapeHTML(prompt.id)}" aria-label="Delete ${domUtils.escapeHTML(prompt.name)}">Delete</button>
+        </div>
+      </article>`;
+    }).join('');
+    const scopeGroups = [];
+    if (composerProject) {
+      scopeGroups.push({
+        title: `This project · ${composerProject.name}`,
+        scope: { type: 'project', projectPath: composerProject.path },
+        prompts: matchingPrompts.filter((prompt) => promptMatchesScope(
+          prompt,
+          { type: 'project', projectPath: composerProject.path },
+        )),
+        includeEmptySections: false,
+      });
+    }
+    scopeGroups.push({
+      title: 'Global',
+      scope: { type: 'global' },
+      prompts: matchingPrompts.filter((prompt) => promptMatchesScope(prompt, { type: 'global' })),
+      includeEmptySections: true,
+    });
+    const groups = scopeGroups.map((group, groupIndex) => {
+      const groupedPrompts = new Map();
+      if (group.includeEmptySections && !query) {
+        promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
+      }
+      group.prompts.forEach((prompt) => {
+        const section = promptStore.normalizeSection(prompt.section);
+        if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
+        groupedPrompts.get(section).push(prompt);
+      });
+      const orderedSections = [...groupedPrompts.entries()].sort(([left], [right]) => {
+        if (left === promptLibraryContract.defaultSection) return -1;
+        if (right === promptLibraryContract.defaultSection) return 1;
+        return left.localeCompare(right);
+      });
+      const sections = orderedSections.map(([section, sectionPrompts], sectionIndex) => {
+        const collapsed = promptStore.collapsedSections.has(section);
+        const sectionBodyID = `dashboard-prompt-section-${groupIndex}-${sectionIndex}`;
+        const canManageSection = group.scope.type === 'global'
+          && section !== promptLibraryContract.defaultSection;
+        return `
+          <section class="dashboard-prompt-section${collapsed ? ' is-collapsed' : ''}" data-prompt-section="${domUtils.escapeHTML(section)}" data-prompt-scope-key="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
+            <button type="button" class="dashboard-prompt-section-toggle" data-prompt-section-toggle="${domUtils.escapeHTML(section)}" aria-expanded="${String(!collapsed)}" aria-controls="${sectionBodyID}">
+              <span class="dashboard-prompt-section-title"><span class="dashboard-prompt-section-chevron" aria-hidden="true">›</span><strong>${domUtils.escapeHTML(section)}</strong></span>
+              <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
+            </button>
+            <div class="dashboard-prompt-section-actions">
+              ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section">Delete</button>` : ''}
+            </div>
+            <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
+          </section>`;
+      }).join('');
+      const emptyMessage = query ? 'No matching prompts' : 'No prompts saved here yet';
+      return `
+        <section class="dashboard-prompt-scope" data-prompt-scope="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
+          <h3>${domUtils.escapeHTML(group.title)}</h3>
+          ${sections || `<div class="dashboard-prompt-scope-empty">${emptyMessage}</div>`}
         </section>`;
     }).join('');
-    const emptyMessage = query ? 'No matching prompts' : 'No prompts saved here yet';
-    return `
-      <section class="dashboard-prompt-scope" data-prompt-scope="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
-        <h3>${domUtils.escapeHTML(group.title)}</h3>
-        ${sections || `<div class="dashboard-prompt-scope-empty">${emptyMessage}</div>`}
-      </section>`;
-  }).join('');
-  content.innerHTML = `
-    <div class="dashboard-prompt-tools">
-      <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${domUtils.escapeHTML(searchTerm)}" /></label>
-    </div>
-    <div class="dashboard-prompt-list">
-      ${groups}
-    </div>
-    <div class="dashboard-prompt-create-actions">
-      <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
-      <button type="button" class="dashboard-prompt-new dashboard-prompt-new-secondary" data-prompt-new-section>+ New section</button>
-    </div>`;
-  const search = content.querySelector('[data-prompt-search]');
-  search?.focus();
-  if (searchSelection) {
-    search?.setSelectionRange(searchSelection.start, searchSelection.end);
+    content.innerHTML = `
+      <div class="dashboard-prompt-tools">
+        <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${domUtils.escapeHTML(searchTerm)}" /></label>
+      </div>
+      <div class="dashboard-prompt-list">
+        ${groups}
+      </div>
+      <div class="dashboard-prompt-create-actions">
+        <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
+        <button type="button" class="dashboard-prompt-new dashboard-prompt-new-secondary" data-prompt-new-section>+ New section</button>
+      </div>`;
+    const search = content.querySelector('[data-prompt-search]');
+    search?.focus();
+    if (searchSelection) {
+      search?.setSelectionRange(searchSelection.start, searchSelection.end);
+    }
   }
-}
+
+  function render({ dialogState, composerProject, searchTerm, searchSelection } = {}) {
+    const dialog = document.getElementById(dashboardElements.elementIDs.promptDialog);
+    const content = dialog?.querySelector('[data-prompt-content]');
+    if (!content) return;
+    if (dialogState.mode === 'createSection' || dialogState.mode === 'renameSection') {
+      renderSectionForm(content, dialogState);
+    } else if (dialogState.mode === 'list') {
+      renderList(content, composerProject, searchTerm, searchSelection);
+    } else {
+      renderPromptForm(content, dialogState, composerProject);
+    }
+  }
 
   return { render };
 })();

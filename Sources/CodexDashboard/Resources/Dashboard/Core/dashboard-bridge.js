@@ -29,8 +29,8 @@ window.__codexDashboard = {
   openReviews: dashboardNavigation.openReviews,
   openTodos: dashboardNavigation.openTodos,
   applyThreads(nextThreads) {
-    const threads = threadCatalog.applyThreads(nextThreads);
-    taskDashboard.applyThreads(threads);
+    threadCatalog.applyThreads(nextThreads);
+    taskDashboard.applyThreads();
     todoList.refreshThreadOptions();
     return true;
   },

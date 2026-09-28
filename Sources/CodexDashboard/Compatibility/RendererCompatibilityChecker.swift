@@ -91,7 +91,7 @@ struct RendererCompatibilityChecker {
         ))
         checks.append(await inspect(
             id: "model-picker",
-            title: "Model preset controls",
+            title: "Composer preset controls",
             expression: contractExpression(
                 "codexUIContracts.probeModelPickerControls()"
             ),
