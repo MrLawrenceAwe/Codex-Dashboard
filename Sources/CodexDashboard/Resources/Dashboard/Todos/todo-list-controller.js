@@ -99,7 +99,7 @@ function createTodoList({ threadReferencesForProject }) {
       projectFilter = '';
     }
     if (tagFilter && !availableTags.includes(tagFilter)) tagFilter = '';
-    todoListView.render(items, filterMode, availableTags, collectFilterProjects(), {
+    todoListView.render(items, filterMode, availableTags, selectableProjects, {
       project: projectFilter,
       tag: tagFilter,
     });

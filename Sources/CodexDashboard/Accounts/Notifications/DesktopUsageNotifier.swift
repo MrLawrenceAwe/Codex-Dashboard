@@ -76,19 +76,18 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: any DesktopNotificationCenter
-    private let history: UsageNotificationHistory
+    private let updateContext: UsageNotificationUpdateContext
+    private var history: UsageNotificationHistory { updateContext.history }
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
     private var liveNotificationsByIdentifier: [String: ScheduledUsageNotification] = [:]
-    private var updateInProgress = false
-    private var updateWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
         notificationCenter: any DesktopNotificationCenter = SystemDesktopNotificationCenter(),
         userDefaults: UserDefaults = .standard
     ) {
         self.notificationCenter = notificationCenter
-        history = UsageNotificationHistory(userDefaults: userDefaults, channel: .desktop)
+        updateContext = UsageNotificationUpdateContext(userDefaults: userDefaults, channel: .desktop)
     }
 
     deinit {
@@ -103,25 +102,21 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
     ) async {
-        while updateInProgress {
-            await withCheckedContinuation { updateWaiters.append($0) }
-        }
-        updateInProgress = true
-        defer {
-            updateInProgress = false
-            updateWaiters.forEach { $0.resume() }
-            updateWaiters.removeAll()
-        }
-        let currentDate = Date.now
-        let plan = UsageNotificationPlanner.plan(
+        await updateContext.perform(
             for: accounts,
             usageByAccountID: usageByAccountID,
-            previousObservations: history.observations(),
-            previousDeadlines: history.deadlines(for: .known),
-            sentUpdates: history.deadlines(for: .updates),
-            now: currentDate
-        )
-        history.saveDeadlines(plan.unchangedDeadlines, for: .known)
+            now: { .now }
+        ) { plan, currentDate in
+            await apply(plan, for: accounts, usageByAccountID: usageByAccountID, now: currentDate)
+        }
+    }
+
+    private func apply(
+        _ plan: UsageNotificationPlanner.Plan,
+        for accounts: [SavedAccount],
+        usageByAccountID: [UUID: CodexAccountUsageSnapshot],
+        now currentDate: Date
+    ) async {
         var requestsByIdentifier = Dictionary(
             uniqueKeysWithValues: plan.scheduled.map { ($0.identifier, $0) }
         )
