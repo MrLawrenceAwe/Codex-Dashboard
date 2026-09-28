@@ -43,7 +43,11 @@ const reviewLoopPage = (() => {
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopView.renderReviewSettings());
-    for (const kind of ['review', 'fix']) details.querySelector(`[data-${kind}-model]`).addEventListener('change', () => reviewLoopView.renderReasoningOptions(snapshot, pendingAction, kind));
+    for (const kind of ['review', 'fix']) {
+      const model = details.querySelector(`[data-${kind}-model]`);
+      model.addEventListener('change', () => reviewLoopView.renderReasoningOptions(snapshot, pendingAction, kind));
+      model.addEventListener('invalid', () => { details.querySelector('.review-execution-options').open = true; });
+    }
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
       const control = event.target.closest('[data-review-action]');

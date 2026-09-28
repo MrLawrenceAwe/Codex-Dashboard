@@ -5,10 +5,19 @@ import XCTest
 final class ReviewLoopCoordinatorTests: XCTestCase {
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
+    private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
+                             promptContext: ReviewPromptContext?, maxRounds: Int?, loopID: UUID?) -> ReviewLoopAction {
+        var action = ReviewLoopAction(id: id, kind: kind, projectID: projectID,
+                                      promptContext: promptContext, maxRounds: maxRounds, loopID: loopID)
+        action.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: nil)
+        action.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: nil)
+        return action
+    }
+
     private func make(limit: Int = 5) throws -> (ReviewLoopCoordinator, ReviewTestStore, ReviewTestDriver) {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
-        try coordinator.apply(ReviewLoopAction(id: "start", kind: .start, projectID: project.id,
+        try coordinator.apply(startAction(id: "start", kind: .start, projectID: project.id,
                                               promptContext: .general, maxRounds: limit, loopID: nil), projects: [project])
         return (coordinator, store, ReviewTestDriver())
     }
@@ -24,7 +33,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
 
     func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {
         let payload = Data("""
-        {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3}
+        {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3,"reviewSelection":{"modelID":"review-model"},"fixSelection":{"modelID":"fix-model"}}
         """.utf8)
         let action = try JSONDecoder().decode(ReviewLoopAction.self, from: payload)
         let store = ReviewTestStore()
@@ -40,10 +49,24 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode(ReviewLoopAction.self, from: payload))
     }
 
+    func testStartRequiresBothModels() throws {
+        let coordinator = ReviewLoopCoordinator(store: ReviewTestStore())
+        var action = startAction(id: "start", kind: .start, projectID: project.id,
+                                 promptContext: nil, maxRounds: 3, loopID: nil)
+        action.reviewSelection = nil
+        XCTAssertThrowsError(try coordinator.apply(action, projects: [project]))
+        action.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: nil)
+        action.fixSelection = nil
+        XCTAssertThrowsError(try coordinator.apply(action, projects: [project]))
+        action.fixSelection = ReviewModelSelection(modelID: "", reasoningEffort: nil)
+        XCTAssertThrowsError(try coordinator.apply(action, projects: [project]))
+        XCTAssertTrue(coordinator.loops.isEmpty)
+    }
+
     func testConcurrentProjectsKeepIndependentControlsAndRecovery() async throws {
         let (coordinator, store, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
-        let start = ReviewLoopAction(id: "second-start", kind: .start, projectID: second.id,
+        let start = startAction(id: "second-start", kind: .start, projectID: second.id,
                                      promptContext: .general, maxRounds: 3, loopID: nil)
         try coordinator.apply(start, projects: [project, second])
         try coordinator.apply(start, projects: [project, second])
@@ -62,7 +85,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testOneProjectInspectionFailureDoesNotPreventOtherLaunches() async throws {
         let (coordinator, _, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
-        try coordinator.apply(ReviewLoopAction(id: "second-start", kind: .start, projectID: second.id,
+        try coordinator.apply(startAction(id: "second-start", kind: .start, projectID: second.id,
                                               promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.failingPath = project.path
         await coordinator.advance(using: driver, threads: [])
@@ -75,7 +98,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         let recovered = ReviewLoopCoordinator(store: store)
         let second = ReviewProject(id: "nested", name: "Nested", path: "/tmp/example/subdir")
-        try recovered.apply(ReviewLoopAction(id: "nested-start", kind: .start, projectID: second.id,
+        try recovered.apply(startAction(id: "nested-start", kind: .start, projectID: second.id,
                                             promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.repositoryRoot = project.path
         await recovered.advance(using: driver, threads: [])
@@ -85,7 +108,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
 
     func testOneActiveLoopPerProjectIncludingPausedAndChangedPath() throws {
         let (coordinator, _, _) = try make()
-        let start = ReviewLoopAction(id: "duplicate", kind: .start, projectID: project.id,
+        let start = startAction(id: "duplicate", kind: .start, projectID: project.id,
                                      promptContext: .general, maxRounds: 3, loopID: nil)
         XCTAssertThrowsError(try coordinator.apply(start, projects: [project]))
         try coordinator.apply(action(.pause, for: coordinator), projects: [project])
@@ -431,7 +454,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
         XCTAssertEqual(driver.createdThreads.count, 1)
         let previousID = coordinator.loops.last?.id
-        try coordinator.apply(ReviewLoopAction(id: "new-start", kind: .start, projectID: project.id,
+        try coordinator.apply(startAction(id: "new-start", kind: .start, projectID: project.id,
                                                promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
         XCTAssertNotEqual(coordinator.loops.last?.id, previousID)
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
@@ -457,7 +480,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         let id = coordinator.loops.last?.id
-        try coordinator.apply(ReviewLoopAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil), projects: [project])
+        try coordinator.apply(startAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil), projects: [project])
         XCTAssertEqual(coordinator.loops.last?.id, id)
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
     }
@@ -467,7 +490,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             for count in 0...3 {
                 let store = ReviewTestStore()
                 let coordinator = ReviewLoopCoordinator(store: store)
-                var start = ReviewLoopAction(id: UUID().uuidString, kind: .start, projectID: project.id,
+                var start = startAction(id: UUID().uuidString, kind: .start, projectID: project.id,
                                              promptContext: nil, maxRounds: 5, loopID: nil)
                 start.priorityLimit = limit
                 try coordinator.apply(start, projects: [project])
@@ -491,7 +514,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         for priorities: [ReviewFinding.Priority] in [[.p2], [.p1, .p2]] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = ReviewLoopAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
+            var start = startAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
             start.priorityLimit = .p1
             try coordinator.apply(start, projects: [project])
             let driver = ReviewTestDriver()
@@ -507,7 +530,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
-        var start = ReviewLoopAction(id: "selected", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 3, loopID: nil)
+        var start = startAction(id: "selected", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 3, loopID: nil)
         start.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: "high")
         start.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: "low")
         start.speed = .fast
@@ -541,7 +564,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         for focus in ReviewFocus.allCases {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = ReviewLoopAction(id: "focus", kind: .start, projectID: project.id,
+            var start = startAction(id: "focus", kind: .start, projectID: project.id,
                                          promptContext: .general, maxRounds: 3, loopID: nil)
             start.focus = focus
             try coordinator.apply(start, projects: [project])

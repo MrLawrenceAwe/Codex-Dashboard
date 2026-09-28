@@ -18,7 +18,7 @@ enum ReviewReportContract {
             ## [P?] Short title
             Evidence, impact, and linked file location.
 
-            Report only \(limit.included.joined(separator: ", ")) findings. Repeat the finding section for each, replacing P? with its actual priority. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            \(limit.rawValue)+. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
             } else {
                 format = """
@@ -31,7 +31,7 @@ enum ReviewReportContract {
             ## Short title
             Evidence, impact, and linked file location.
 
-            Report all actionable findings without priority labels or rankings. Repeat the finding section for each. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            Report all actionable findings without priority labels or rankings. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
             }
         case .fix:
@@ -47,7 +47,7 @@ enum ReviewReportContract {
             """
         }
         return """
-        Return only Markdown in this structure:
+        Apply this format only to your final response, after completing the work. Use Markdown in this structure:
         \(format)
         Keep fixed headings and labels; replace placeholders. No code fences or other level-one or level-two headings.
         """

@@ -48,11 +48,15 @@ final class ReviewLoopCoordinator {
                   let limit = action.maxRounds, (1...20).contains(limit) else {
                 throw ReviewLoopError("Choose an available local project and 1–20 rounds.")
             }
+            guard let reviewSelection = action.reviewSelection, !reviewSelection.modelID.isEmpty,
+                  let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
+                throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
+            }
             guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let focus = action.focus ?? .bugs
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: action.promptContext ?? .general, maxRounds: limit, reviewSelection: action.reviewSelection, fixSelection: action.fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: action.promptContext ?? .general, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
