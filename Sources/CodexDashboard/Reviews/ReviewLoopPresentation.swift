@@ -45,7 +45,7 @@ enum ReviewLoopPresentation {
     }
 
     static func reviewPrompt(for loop: ReviewLoop) -> String {
-        let context = loop.instructions.isEmpty ? "" : " \(loop.instructions)"
+        let context = loop.projectType.promptContext
         switch loop.focus {
         case .bugs:
             return "Review project for bugs and issues\(context)."

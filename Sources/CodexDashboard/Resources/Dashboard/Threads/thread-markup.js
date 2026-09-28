@@ -9,7 +9,7 @@ const threadMarkup = (() => {
     return `${Math.floor(hours / 24)}d ago`;
   }
 
-  function thread(thread, {
+  function renderThreadRow(thread, {
     showProject = false,
     isUnread = false,
     isCompletionTickVisible = () => false,
@@ -71,7 +71,7 @@ const threadMarkup = (() => {
       <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`;
   }
 
-  function list(visibleThreads, {
+  function renderThreadList(visibleThreads, {
     filterMode,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
@@ -79,7 +79,7 @@ const threadMarkup = (() => {
     isCompletionTickVisible,
   }) {
     if (filterMode === 'all') {
-      const renderRows = (items) => items.map((item) => thread(item, {
+      const renderRows = (items) => items.map((item) => renderThreadRow(item, {
         compact: true,
         showProject: true,
         isUnread: isUnread(item),
@@ -152,10 +152,10 @@ const threadMarkup = (() => {
             ${renderProjectActions(projectPath, projectThreads, indicatorsHidden)}
           </span>
         </header>
-        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => thread(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>
+        <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => renderThreadRow(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>
       </section>`;
     }).join('');
   }
 
-  return { list };
+  return { renderThreadList };
 })();

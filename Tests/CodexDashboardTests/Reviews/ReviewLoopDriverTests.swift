@@ -13,7 +13,7 @@ final class ReviewLoopDriverTests: XCTestCase {
     }
 
     func testSavedLoopCarriesPreviousSelectionIntoBothTurns() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 2)
+        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), projectType: .general, maxRounds: 2)
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         saved["selection"] = ["modelID": "previous-model", "reasoningEffort": "high"]
         let restored = try JSONDecoder().decode(ReviewLoop.self, from: JSONSerialization.data(withJSONObject: saved))
@@ -140,7 +140,7 @@ final class ReviewLoopDriverTests: XCTestCase {
     }
 
     func testFixPromptDoesNotAskForTesting() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 5)
+        let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), projectType: .general, maxRounds: 5)
         let prompt = ReviewLoopPresentation.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
@@ -150,7 +150,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testOrganisationFixPromptNamesFindingsAndCommitForEachCount() {
         for focus in [ReviewFocus.organisation, .naming] {
-            var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), instructions: "", maxRounds: 5)
+            var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), projectType: .general, maxRounds: 5)
             loop.focus = focus
             for (count, expected) in [(1, "Address the finding; commit once"), (2, "Address both findings; commit once"), (3, "Address all findings; commit once")] {
                 var round = ReviewRound(number: 1, baseCommit: "abc")
