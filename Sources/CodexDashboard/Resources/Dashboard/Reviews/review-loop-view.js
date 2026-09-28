@@ -236,6 +236,10 @@ const reviewLoopView = (() => {
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
       <span>${escape(({ clean: 'No findings', fixed: 'Fixes committed', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.length} findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      ${round.review?.findings?.length ? `<ul class="review-round-findings" aria-label="Findings from review ${round.number}">${round.review.findings.map(finding => `<li>
+        <div class="review-finding-heading">${finding.priority ? `<span class="review-finding-priority" data-priority="${escape(finding.priority)}">${escape(finding.priority)}</span>` : ''}<strong>${escape(finding.title)}</strong></div>
+        <p>${escape(finding.body)}</p>
+      </li>`).join('')}</ul>` : ''}
       ${round.result?.summary ? `<details class="review-round-details" data-round="${round.number}" ${expandedRounds.has(String(round.number)) ? 'open' : ''}><summary>View summary</summary><p>${escape(round.result.summary)}</p></details>` : ''}
     </div></li>`).join('');
   }
