@@ -71,6 +71,7 @@ final class ReviewLoopBridge {
         let snapshot = ReviewLoopSnapshot(projects: projects, models: models,
                                          reviewTypes: ReviewFocus.allCases.map(ReviewTypeOption.init),
                                          loops: coordinator.loops,
+                                         finishedLoopIDs: coordinator.loops.filter { $0.phase.isFinished }.map(\.id),
                                          progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)

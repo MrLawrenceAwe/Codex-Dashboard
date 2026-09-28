@@ -35,7 +35,7 @@ const taskDashboardQuery = (() => {
       return {
         visibleThreads,
         displayedThreads: visibleThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectPath).trim())),
-        runningThreadCount: 0,
+        leadingRunningThreadCount: 0,
         hasMore: visibleItemLimit < projectPaths.length,
       };
     }
@@ -45,14 +45,14 @@ const taskDashboardQuery = (() => {
       return {
         visibleThreads,
         displayedThreads: [...runningThreads, ...recentThreads.slice(0, visibleItemLimit)],
-        runningThreadCount: runningThreads.length,
+        leadingRunningThreadCount: runningThreads.length,
         hasMore: visibleItemLimit < recentThreads.length,
       };
     }
     return {
       visibleThreads,
       displayedThreads: visibleThreads.slice(0, visibleItemLimit),
-      runningThreadCount: 0,
+      leadingRunningThreadCount: 0,
       hasMore: visibleItemLimit < visibleThreads.length,
     };
   }

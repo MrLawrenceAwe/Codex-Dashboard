@@ -29,7 +29,7 @@ final class ReviewLoopCoordinator {
                     loops[index].message = "Dashboard restarted. Resume to reconcile the last round before continuing."
                 }
             }
-            for loop in loops where ![.completed, .limitReached, .stopped, .blocked].contains(loop.phase) {
+            for loop in loops where !loop.phase.isFinished {
                 if let root = loop.checkoutRoot { checkoutOwners[Self.path(root)] = loop.id }
             }
             try store.save(loops)
@@ -48,7 +48,7 @@ final class ReviewLoopCoordinator {
                   let limit = action.maxRounds, (1...20).contains(limit) else {
                 throw ReviewLoopError("Choose an available local project and 1–20 rounds.")
             }
-            guard !loops.contains(where: { ![.completed, .limitReached, .stopped, .blocked].contains($0.phase) && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
+            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let focus = action.focus ?? .bugs
@@ -57,7 +57,7 @@ final class ReviewLoopCoordinator {
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
             }
-            guard ![.completed, .limitReached, .stopped, .blocked].contains(updated.phase) else { return }
+            guard !updated.phase.isFinished else { return }
             if action.kind == .stop {
                 updated.phase = .stopped
                 updated.message = "Stopped scheduling reviews. Any active task can finish in its chat."
@@ -120,7 +120,7 @@ final class ReviewLoopCoordinator {
         updated = current
         let root = Self.path(repo.root)
         if let owner = checkoutOwners[root], owner != id,
-           let other = matchingLoop(owner), ![.completed, .limitReached, .stopped, .blocked].contains(other.phase) { return }
+           let other = matchingLoop(owner), !other.phase.isFinished { return }
         // Reserve synchronously after inspection, before any launch can suspend.
         checkoutOwners[root] = id
         if hasOtherRunningTask(threads, root: repo.root, excluding: nil) { return }

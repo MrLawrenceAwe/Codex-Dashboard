@@ -41,7 +41,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const projects = ['Dashboard', 'Website', 'Archive'].map((name, i) => ({id:String(i),name,path:'/tmp/' + i}));
           const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',maxRounds:5,
             message:i === 2 ? 'Review complete' : 'Reviewing changes',rounds:[{number:1,result:{outcome:'fixed',summary:'Fixed issue',commit:'1234567890'}}]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['2'],error:null};
           api.applyReviewLoop(snapshot); api.openReviews();
           const cards = () => [...document.querySelectorAll('[data-review-activity]')];
           const first = cards()[0];
@@ -89,7 +89,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const loops = projects.map((project, i) => ({id:project.id,project,
             phase:['running','paused','completed','limitReached','stopped','blocked'][i],
             priorityLimit:'P2',maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['C','D','E','F'],error:null};
           const apply = () => api.applyReviewLoop(snapshot);
           const active = () => [...document.querySelectorAll('[data-review-board] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
           const history = () => [...document.querySelectorAll('[data-review-history-card] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
@@ -101,7 +101,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           card.querySelector('.review-round-details').open = true;
           apply();
           states.push(history(),card === document.querySelector('[data-review-history-card] article'),card.querySelector('.review-round-details').open);
-          loops[0].phase = 'completed'; apply();
+          loops[0].phase = 'completed'; snapshot.finishedLoopIDs.push('A'); apply();
           states.push(active(),history(),select.options.length);
           snapshot.loops = loops.filter(loop => loop.id !== 'D'); apply();
           states.push(history(),select.value);
@@ -121,7 +121,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',maxRounds:5,
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],finishedLoopIDs:['finished'],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',maxRounds:5,
             rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
           api.applyReviewLoop(snapshot);
           const history = document.querySelector('[data-review-history]');
@@ -345,6 +345,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           active.push(document.querySelector('[data-review-action="pause"]').disabled,
             document.querySelector('[data-review-action="pause"]').textContent);
           loop.phase = 'completed';
+          snapshot.finishedLoopIDs = [loop.id];
           api.applyReviewLoop(snapshot);
           return [...active,document.querySelector('[data-review-form]').hidden,
             document.querySelector('[data-review-controls]').children.length,
@@ -362,7 +363,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',maxRounds:1,
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null,
+          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
             progress:{[loop.id]:{step:'Limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
@@ -404,6 +405,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-current-text]').children.length,
             document.querySelector('[data-review-current-task]').dataset.reviewThread];
           snapshot.loops[0].phase = 'completed';
+          snapshot.finishedLoopIDs = ['live'];
           snapshot.progress.live.upcoming = null;
           snapshot.progress.live.nextMessage = 'No further prompts scheduled.';
           api.applyReviewLoop(snapshot);

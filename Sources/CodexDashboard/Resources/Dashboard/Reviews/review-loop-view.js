@@ -3,9 +3,10 @@ const reviewLoopView = (() => {
   let modelsSignature = '';
   let reviewTypesSignature = '';
   let reviewTypes = [];
+  let finishedLoopIDs = new Set();
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
-  const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
+  const isFinished = loop => finishedLoopIDs.has(loop.id);
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
 
   function renderReviewSettings() {
@@ -46,7 +47,7 @@ const reviewLoopView = (() => {
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Each round reviews and commits fixes. Stops when no findings remain or the limit is reached.</p>
+        <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits fixes when findings are found. Stops when no findings remain or the limit is reached.</p>
         </fieldset>
         <details class="review-execution-options"><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -120,6 +121,7 @@ const reviewLoopView = (() => {
   }
 
   function render(snapshot, pendingAction) {
+    finishedLoopIDs = new Set(snapshot.finishedLoopIDs || []);
     renderNavigationStatus(snapshot);
     const root = panel();
     if (!root) return;

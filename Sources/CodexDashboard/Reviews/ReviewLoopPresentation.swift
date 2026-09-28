@@ -4,44 +4,72 @@ enum ReviewLoopPresentation {
     static func progress(for loop: ReviewLoop?) -> ReviewLoopProgress? {
         guard let loop else { return nil }
         let round = loop.rounds.last
-        let ended = [.completed, .limitReached, .stopped, .blocked].contains(loop.phase)
         let unfinished = round.map { $0.result == nil } ?? false
-        var current: ReviewPromptPreview?
-        if let round {
-            current = ReviewPromptPreview(
-                title: "\(round.fixRequested ? "Fix & commit" : "Review") · round \(round.number)",
-                text: round.fixRequested ? fixPrompt(for: loop, round: round) : reviewPrompt(for: loop),
-                note: (round.fixRequested ? round.fixTurnID : round.reviewTurnID) == nil ? "Submission not yet confirmed." : "")
-        }
-        let step: String
+        let (upcoming, nextMessage) = nextPrompt(for: loop, round: round, unfinished: unfinished)
+        return ReviewLoopProgress(
+            step: step(for: loop, round: round),
+            currentLabel: loop.phase == .running && unfinished && (round?.review == nil || round?.fixRequested == true)
+                ? "Current prompt" : "Latest prompt",
+            current: round.map { currentPrompt(for: loop, round: $0) },
+            upcoming: upcoming,
+            nextMessage: nextMessage,
+            threadID: round?.threadID
+        )
+    }
+
+    private static func step(for loop: ReviewLoop, round: ReviewRound?) -> String {
         switch loop.phase {
-        case .completed: step = "Complete"
-        case .limitReached: step = "Limit reached"
-        case .stopped: step = "Stopped"
-        case .blocked: step = "Needs attention"
-        case .paused: step = "Paused"
-        case .waiting: step = "Waiting to review"
-        case .running: step = round?.fixRequested == true ? "Fixing & committing" : round?.review != nil ? "Preparing fixes" : "Reviewing"
+        case .completed: "Complete"
+        case .limitReached: "Limit reached"
+        case .stopped: "Stopped"
+        case .blocked: "Needs attention"
+        case .paused: "Paused"
+        case .waiting: "Waiting to review"
+        case .running:
+            if round?.fixRequested == true { "Fixing & committing" }
+            else if round?.review != nil { "Preparing fixes" }
+            else { "Reviewing" }
         }
-        var upcoming: ReviewPromptPreview?
-        var nextMessage = "No further prompts scheduled."
-        if !ended {
-            if let round, unfinished, !round.fixRequested {
-                upcoming = ReviewPromptPreview(title: "Fix & commit · round \(round.number)",
-                    text: fixPrompt(for: loop, round: round),
-                    note: round.review == nil ? "Only if findings are found. Wording follows the finding count." : "After the checkout passes verification.")
-            } else if loop.rounds.count < loop.maxRounds {
-                let note = loop.phase == .paused ? "After resume and checkout verification."
-                    : loop.pauseRequested ? "After this round pauses and you resume."
-                    : unfinished ? "After fixes commit and verification passes. HEAD will use that commit." : "After the project is idle and the checkout passes verification."
-                upcoming = ReviewPromptPreview(title: "Review · round \(loop.rounds.count + 1)", text: reviewPrompt(for: loop), note: note)
-            } else {
-                nextMessage = "Round limit reached. No next review scheduled."
-            }
+    }
+
+    private static func currentPrompt(for loop: ReviewLoop, round: ReviewRound) -> ReviewPromptPreview {
+        ReviewPromptPreview(
+            title: "\(round.fixRequested ? "Fix & commit" : "Review") · round \(round.number)",
+            text: round.fixRequested ? fixPrompt(for: loop, round: round) : reviewPrompt(for: loop),
+            note: (round.fixRequested ? round.fixTurnID : round.reviewTurnID) == nil
+                ? "Submission not yet confirmed." : ""
+        )
+    }
+
+    private static func nextPrompt(
+        for loop: ReviewLoop,
+        round: ReviewRound?,
+        unfinished: Bool
+    ) -> (ReviewPromptPreview?, String) {
+        let noNextPrompt = "No further prompts scheduled."
+        if loop.phase.isFinished { return (nil, noNextPrompt) }
+        if let round, unfinished, !round.fixRequested {
+            return (ReviewPromptPreview(
+                title: "Fix & commit · round \(round.number)",
+                text: fixPrompt(for: loop, round: round),
+                note: round.review == nil
+                    ? "Only if findings are found. Wording follows the finding count."
+                    : "After the checkout passes verification."
+            ), noNextPrompt)
         }
-        return ReviewLoopProgress(step: step,
-            currentLabel: loop.phase == .running && unfinished && (round?.review == nil || round?.fixRequested == true) ? "Current prompt" : "Latest prompt",
-            current: current, upcoming: upcoming, nextMessage: nextMessage, threadID: round?.threadID)
+        guard loop.rounds.count < loop.maxRounds else {
+            return (nil, "Round limit reached. No next review scheduled.")
+        }
+        let note: String
+        if loop.phase == .paused { note = "After resume and checkout verification." }
+        else if loop.pauseRequested { note = "After this round pauses and you resume." }
+        else if unfinished { note = "After fixes commit and verification passes. HEAD will use that commit." }
+        else { note = "After the project is idle and the checkout passes verification." }
+        return (ReviewPromptPreview(
+            title: "Review · round \(loop.rounds.count + 1)",
+            text: reviewPrompt(for: loop),
+            note: note
+        ), noNextPrompt)
     }
 
     static func reviewPrompt(for loop: ReviewLoop) -> String {

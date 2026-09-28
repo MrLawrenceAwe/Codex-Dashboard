@@ -585,10 +585,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let (coordinator, _, _) = try make()
         try store.save(coordinator.loops)
         XCTAssertEqual(try store.load(), coordinator.loops)
+        let currentDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        XCTAssertEqual(currentDocument["version"] as? Int, 1)
+        XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
         olderLoop.removeValue(forKey: "focus")
-        olderLoop.removeValue(forKey: "projectType")
+        olderLoop.removeValue(forKey: "promptContext")
         olderLoop["instructions"] = "(this is a project for personal use)"
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
         XCTAssertEqual(try store.load().first?.speed, .standard)
@@ -597,6 +600,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         olderLoop["instructions"] = "(saved custom context)"
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
         XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
+        try JSONSerialization.data(withJSONObject: [olderLoop]).write(to: url)
+        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
+        var futureDocument = currentDocument
+        futureDocument["version"] = 2
+        try JSONSerialization.data(withJSONObject: futureDocument).write(to: url)
+        XCTAssertThrowsError(try store.load())
         try Data("broken".utf8).write(to: url)
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertNotNil(recovered.error)

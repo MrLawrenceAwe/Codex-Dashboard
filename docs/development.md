@@ -46,6 +46,16 @@ migrations write only current fields; failed migration writes leave stored data 
 Task filter preferences migrate `recent` and `home` to `all`, displayed as **All tasks**.
 Keep old field names confined to migration code and legacy fixtures.
 
+Review loops use version 1 of the `review-loop.json` document. The file-store
+boundary converts older unversioned single-loop and array documents, including
+former prompt-context and model-selection fields, before decoding current models.
+The coordinator writes version 1 after a successful load. Keep that conversion
+until a release can establish that all supported installs have loaded and rewritten
+their older files; only then remove the unversioned reader and its fixtures. The
+to-do store likewise retains versions 1–7 because those documents may still hold
+personal items. Do not remove a reader solely because the current writer has moved
+on; first establish a migration cutoff that protects saved data.
+
 Run `swift test` for the complete native and WebKit test suite. Web tests await to-do
 save completion instead of assuming that persistence finishes during a DOM event. To-do web tests are split by presets, tags, projects, images, storage failures, and navigation.
 
