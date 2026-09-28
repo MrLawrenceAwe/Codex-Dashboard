@@ -22,7 +22,8 @@
     "Threads/thread-markup",
     "Threads/task-dashboard-state",
     "Threads/thread-catalog",
-    "Threads/thread-presentation-state",
+    "Threads/thread-completion-indicators",
+    "Threads/thread-unread-state",
     "Threads/task-dashboard-view",
     "Threads/task-dashboard-page",
     "Todos/todo-image-store",
@@ -38,6 +39,7 @@
     "Reviews/review-rpc-client",
     "Reviews/review-loop-view",
     "Reviews/review-loop-page",
+    "Core/dashboard-composition",
     "Core/dashboard-navigation",
     "Core/dashboard-bridge"
   ],

@@ -2,9 +2,9 @@ function createTodoList({ threadReferencesForProject }) {
   let items = todoStore.load();
   let availableTags = todoStore.loadTags(items);
   let projects = [];
-  let projectDraft = null;
+  let selectedProject = null;
   let projectThreads = [];
-  let threadDraft = null;
+  let selectedThread = null;
   let projectObserver;
   let observedProjectSidebar;
   let filterMode = 'open';
@@ -40,9 +40,9 @@ function createTodoList({ threadReferencesForProject }) {
   function refreshProjects() {
     if (destroyed) return;
     projects = codexUIContracts.projects();
-    const selected = projectDraft && projects.some((project) => project.id === projectDraft.id)
-      ? projectDraft.id : '';
-    if (!selected) projectDraft = null;
+    const selected = selectedProject && projects.some((project) => project.id === selectedProject.id)
+      ? selectedProject.id : '';
+    if (!selected) selectedProject = null;
     todoListView.updateProjectOptions(projects, selected);
     refreshThreadOptions();
     updateFilterOptions();
@@ -50,9 +50,9 @@ function createTodoList({ threadReferencesForProject }) {
 
   function refreshThreadOptions() {
     if (destroyed) return;
-    projectThreads = projectDraft ? threadReferencesForProject(projectDraft) : [];
-    if (!projectThreads.some((thread) => thread.id === threadDraft?.id)) threadDraft = null;
-    todoListView.updateThreadOptions(projectThreads, Boolean(projectDraft), threadDraft?.id || '');
+    projectThreads = selectedProject ? threadReferencesForProject(selectedProject) : [];
+    if (!projectThreads.some((thread) => thread.id === selectedThread?.id)) selectedThread = null;
+    todoListView.updateThreadOptions(projectThreads, Boolean(selectedProject), selectedThread?.id || '');
   }
 
   function startProjectObserver() {
@@ -193,8 +193,8 @@ function createTodoList({ threadReferencesForProject }) {
       body: page.querySelector('[data-todo-new-body]').value,
       imageDraft: imageController.draft(),
       tags: tagController.draft(),
-      project: projectDraft,
-      thread: threadDraft,
+      project: selectedProject,
+      thread: selectedThread,
       preset: draftPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]')),
     };
   }
@@ -241,8 +241,8 @@ function createTodoList({ threadReferencesForProject }) {
         body.value = '';
         imageController.reset();
         tagController.reset();
-        projectDraft = null;
-        threadDraft = null;
+        selectedProject = null;
+        selectedThread = null;
         page.querySelector('[data-todo-new-preset-enabled]').checked = false;
         page.querySelector('[data-todo-new-preset-fields]').hidden = true;
         todoListView.updateProjectOptions(projects);
@@ -269,12 +269,12 @@ function createTodoList({ threadReferencesForProject }) {
     });
     const projectInput = page.querySelector('[data-todo-new-project]');
     projectInput.addEventListener('change', () => {
-      projectDraft = projects.find((project) => project.id === projectInput.value) || null;
-      threadDraft = null;
+      selectedProject = projects.find((project) => project.id === projectInput.value) || null;
+      selectedThread = null;
       refreshThreadOptions();
     });
     page.querySelector('[data-todo-new-thread-picker]').addEventListener('change', (event) => {
-      threadDraft = projectThreads.find((thread) => thread.id === event.target.value) || null;
+      selectedThread = projectThreads.find((thread) => thread.id === event.target.value) || null;
     });
     tagController.bindDraft(page);
   }

@@ -1,24 +1,4 @@
-const threadCatalog = createThreadCatalog();
-const taskDashboard = createTaskDashboard({ catalog: threadCatalog });
-const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject });
-const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
-const dashboardPages = [
-  { controller: taskDashboard, pageID: dashboardElements.elementIDs.taskPage,
-    navigationID: dashboardElements.elementIDs.taskNavButton },
-  { controller: todoList, pageID: dashboardElements.elementIDs.todoPage,
-    navigationID: dashboardElements.elementIDs.todoNavButton },
-  { controller: reviewLoopPage, pageID: dashboardElements.elementIDs.reviewPage,
-    navigationID: dashboardElements.elementIDs.reviewNavButton },
-];
-
 const dashboardNavigation = (() => {
-  function applyThreads(nextThreads) {
-    const threads = threadCatalog.applyThreads(nextThreads);
-    taskDashboard.applyThreads(threads);
-    todoList.refreshThreadOptions();
-    return true;
-  }
-
   function openPage(page) {
     dashboardPages.forEach(({ controller }) => {
       if (controller === page) controller.open();
@@ -67,13 +47,5 @@ const dashboardNavigation = (() => {
     return mounted;
   }
 
-  function destroy() {
-    reviewRPCClient.destroy();
-    dashboardPages.forEach(({ controller }) => controller.destroy());
-    dashboardLifecycle.destroy();
-    threadCatalog.clear();
-    delete window.__codexDashboard;
-  }
-
-  return { applyThreads, ensureMounted, destroy, openTasks, openTodos, openReviews, isOpen, close };
+  return { ensureMounted, openTasks, openTodos, openReviews, isOpen, close };
 })();

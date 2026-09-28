@@ -209,7 +209,7 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
-        try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
+        try await reviewLoopBridge?.advanceAndSynchronize(targets: targets, threads: snapshot.threads)
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
     }
@@ -294,21 +294,21 @@ final class DashboardRenderer {
         _ threads: [RendererThread],
         to targets: [DevToolsTarget]
     ) async throws {
-        try await deliver(RendererScript.deliverThreads(threads), to: targets)
+        try await deliver(RendererScript.deliverThreads(threads), to: targets, subject: "thread data")
     }
 
     private func deliverAccountPopover(
         _ snapshot: AccountPopoverSnapshot?,
         to targets: [DevToolsTarget]
     ) async throws {
-        try await deliver(RendererScript.deliverAccountPopover(snapshot), to: targets)
+        try await deliver(RendererScript.deliverAccountPopover(snapshot), to: targets, subject: "account data")
     }
 
-    private func deliver(_ expression: String, to targets: [DevToolsTarget]) async throws {
+    private func deliver(_ expression: String, to targets: [DevToolsTarget], subject: String) async throws {
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
                 throw DashboardError.enableFailed(
-                    "The dashboard was unavailable while thread data was being delivered."
+                    "The dashboard was unavailable while \(subject) was being delivered."
                 )
             }
         }

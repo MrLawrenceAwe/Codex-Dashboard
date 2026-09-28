@@ -113,27 +113,27 @@ final class ReviewLoopDriverTests: XCTestCase {
         }
         try await git(["init", "-b", "main"])
         try await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "Initial"])
-        let driver = ReviewLoopDriver(devTools: DevToolsClient(), target: DevToolsTarget(id: "unused", type: "page", url: nil, webSocketURL: nil))
-        let initial = try await driver.repository(at: directory.path)
+        let checkpoint = ReviewRepositoryCheckpoint()
+        let initial = try await checkpoint.repository(at: directory.path)
         XCTAssertTrue(initial.clean)
         XCTAssertEqual(initial.branch, "main")
         try Data("change".utf8).write(to: directory.appendingPathComponent("fix.txt"))
-        let dirty = try await driver.repository(at: directory.path)
+        let dirty = try await checkpoint.repository(at: directory.path)
         XCTAssertFalse(dirty.clean)
         try await git(["add", "fix.txt"])
         try await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fix"])
-        let fixed = try await driver.repository(at: directory.path)
+        let fixed = try await checkpoint.repository(at: directory.path)
         XCTAssertTrue(fixed.clean)
         XCTAssertNotEqual(fixed.commit, initial.commit)
-        let isAncestor = try await driver.isAncestor(initial.commit, of: fixed.commit, at: directory.path)
+        let isAncestor = try await checkpoint.isAncestor(initial.commit, of: fixed.commit, at: directory.path)
         XCTAssertTrue(isAncestor)
         for reported in [fixed.commit, String(fixed.commit.prefix(7)), String(fixed.commit.prefix(7)).uppercased()] {
-            let resolved = try await driver.resolveCommit(reported, at: directory.path)
+            let resolved = try await checkpoint.resolveCommit(reported, at: directory.path)
             XCTAssertEqual(resolved, fixed.commit)
         }
         for invalid in ["", "HEAD", "main", "--help", "abc", "deadbeef", fixed.commit + "~1"] {
             do {
-                _ = try await driver.resolveCommit(invalid, at: directory.path)
+                _ = try await checkpoint.resolveCommit(invalid, at: directory.path)
                 XCTFail("Accepted invalid commit ID: \(invalid)")
             } catch { }
         }

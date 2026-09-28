@@ -15,8 +15,20 @@ function createTaskDashboard({ catalog }) {
   });
   let viewNeedsRender = true;
   let commitDialogError = '';
-  const presentationState = createThreadPresentationState({ findThread: catalog.findThread, isOpen: pageState.isOpen, onChange: requestRender });
-  const { isThreadUnread, isCompletionTickVisible } = presentationState;
+  let presentationState;
+  const completionIndicators = createThreadCompletionIndicators({
+    findThread: catalog.findThread,
+    isThreadUnread: (thread) => presentationState.isThreadUnread(thread),
+    onChange: requestRender,
+  });
+  presentationState = createThreadUnreadState({
+    findThread: catalog.findThread,
+    isOpen: pageState.isOpen,
+    onChange: requestRender,
+    completionIndicators,
+  });
+  const { isThreadUnread } = presentationState;
+  const isCompletionTickVisible = completionIndicators.isVisible;
 
   function savePreferences() {
     taskDashboardState.savePreferences({
@@ -248,6 +260,7 @@ function createTaskDashboard({ catalog }) {
     pageState.close();
     cancelScheduledRender();
     presentationState.destroy();
+    completionIndicators.destroy();
     document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
     viewNeedsRender = true;
   }
