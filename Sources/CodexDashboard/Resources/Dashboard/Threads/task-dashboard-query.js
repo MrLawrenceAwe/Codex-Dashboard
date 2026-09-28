@@ -22,7 +22,7 @@ const taskDashboardQuery = (() => {
     allChangedProjectPaths,
     filterMode,
     isThreadUnread,
-    visibleThreadLimit,
+    visibleItemLimit,
   }) {
     const visibleThreads = threads.filter((thread) =>
       filterMode === 'all'
@@ -31,12 +31,12 @@ const taskDashboardQuery = (() => {
           && allChangedProjectPaths.has(String(thread.projectPath).trim())));
     if (filterMode === 'changedProjects') {
       const projectPaths = [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))];
-      const displayedProjectPaths = new Set(projectPaths.slice(0, visibleThreadLimit));
+      const displayedProjectPaths = new Set(projectPaths.slice(0, visibleItemLimit));
       return {
         visibleThreads,
         displayedThreads: visibleThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectPath).trim())),
         runningThreadCount: 0,
-        hasMore: visibleThreadLimit < projectPaths.length,
+        hasMore: visibleItemLimit < projectPaths.length,
       };
     }
     if (filterMode === 'all') {
@@ -44,16 +44,16 @@ const taskDashboardQuery = (() => {
       const recentThreads = visibleThreads.filter((thread) => thread.runState !== 'running');
       return {
         visibleThreads,
-        displayedThreads: [...runningThreads, ...recentThreads.slice(0, visibleThreadLimit)],
+        displayedThreads: [...runningThreads, ...recentThreads.slice(0, visibleItemLimit)],
         runningThreadCount: runningThreads.length,
-        hasMore: visibleThreadLimit < recentThreads.length,
+        hasMore: visibleItemLimit < recentThreads.length,
       };
     }
     return {
       visibleThreads,
-      displayedThreads: visibleThreads.slice(0, visibleThreadLimit),
+      displayedThreads: visibleThreads.slice(0, visibleItemLimit),
       runningThreadCount: 0,
-      hasMore: visibleThreadLimit < visibleThreads.length,
+      hasMore: visibleItemLimit < visibleThreads.length,
     };
   }
 

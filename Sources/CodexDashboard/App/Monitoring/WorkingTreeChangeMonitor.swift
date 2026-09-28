@@ -8,20 +8,18 @@ final class WorkingTreeChangeMonitor {
     private var projectWatches: [DispatchSourceFileSystemObject] = []
     private var projectChangeMonitor: RecursiveProjectChangeMonitor?
     private var watchedProjectPaths: Set<String> = []
-    private var projectRefreshTask: Task<Void, Never>?
-    private var projectRefreshTaskID: UUID?
-    private var projectRefreshGeneration: UInt64 = 0
+    private let refreshDebouncer: RefreshDebouncer
     private var pendingProjectPaths: Set<String> = []
     private var refreshWorkingTrees: (@MainActor (Set<String>?) async -> Void)?
-    private let projectRefreshQuietPeriod: Duration
-    private let projectRefreshMaximumDelay: Duration
 
     init(
         projectRefreshQuietPeriod: Duration = WorkingTreeChangeMonitor.projectRefreshQuietPeriod,
         projectRefreshMaximumDelay: Duration = WorkingTreeChangeMonitor.projectRefreshMaximumDelay
     ) {
-        self.projectRefreshQuietPeriod = projectRefreshQuietPeriod
-        self.projectRefreshMaximumDelay = projectRefreshMaximumDelay
+        refreshDebouncer = RefreshDebouncer(
+            quietPeriod: projectRefreshQuietPeriod,
+            maximumDelay: projectRefreshMaximumDelay
+        )
     }
 
     func start(refreshWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void) {
@@ -86,10 +84,7 @@ final class WorkingTreeChangeMonitor {
     }
 
     func stop() {
-        projectRefreshGeneration &+= 1
-        projectRefreshTask?.cancel()
-        projectRefreshTask = nil
-        projectRefreshTaskID = nil
+        refreshDebouncer.cancel()
         pendingProjectPaths = []
         FileSystemWatch.cancel(&projectWatches)
         projectChangeMonitor?.stop()
@@ -100,44 +95,11 @@ final class WorkingTreeChangeMonitor {
 
     private func scheduleProjectRefresh(for paths: Set<String>) {
         pendingProjectPaths.formUnion(paths)
-        projectRefreshGeneration &+= 1
-        guard projectRefreshTask == nil else { return }
-        let taskID = UUID()
-        projectRefreshTaskID = taskID
-        projectRefreshTask = Task { @MainActor [weak self] in
+        refreshDebouncer.schedule { [weak self] in
             guard let self else { return }
-            var maximumDelayDeadline = ContinuousClock.now + self.projectRefreshMaximumDelay
-            while !Task.isCancelled {
-                let generationBeforeQuietPeriod = self.projectRefreshGeneration
-                let now = ContinuousClock.now
-                if now < maximumDelayDeadline {
-                    try? await Task.sleep(
-                        for: min(
-                            self.projectRefreshQuietPeriod,
-                            now.duration(to: maximumDelayDeadline)
-                        )
-                    )
-                }
-
-                guard !Task.isCancelled else { break }
-                if self.projectRefreshGeneration != generationBeforeQuietPeriod,
-                   ContinuousClock.now < maximumDelayDeadline {
-                    continue
-                }
-
-                let paths = self.pendingProjectPaths
-                self.pendingProjectPaths = []
-                if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
-                guard !Task.isCancelled, !self.pendingProjectPaths.isEmpty else { break }
-                maximumDelayDeadline = ContinuousClock.now + self.projectRefreshMaximumDelay
-            }
-
-            if self.projectRefreshTaskID == taskID {
-                self.projectRefreshTask = nil
-                self.projectRefreshTaskID = nil
-            }
-
+            let paths = self.pendingProjectPaths
+            self.pendingProjectPaths = []
+            if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
         }
-
     }
 }

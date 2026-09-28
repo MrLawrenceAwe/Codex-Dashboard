@@ -1,11 +1,12 @@
 const reviewLoopView = (() => {
   let projectsSignature = '';
   let modelsSignature = '';
-  const focusLabels = { bugs: 'Bugs and issues', organisation: 'Simplification and structure', naming: 'Simplification, structure and naming', performance: 'Performance and responsiveness' };
+  let reviewTypesSignature = '';
+  let reviewTypes = [];
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => !loop || ['completed', 'limitReached', 'stopped', 'blocked'].includes(loop.phase);
-  const usesPriorities = focus => !['organisation', 'naming'].includes(focus);
+  const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
 
   function renderReviewSettings() {
     const root = panel();
@@ -39,7 +40,7 @@ const reviewLoopView = (() => {
         </select></label>
         </fieldset>
         <fieldset class="review-limits"><legend>Review settings</legend>
-        <label>Review type<select data-review-focus aria-label="Review type">${Object.entries(focusLabels).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+        <label>Review type<select data-review-focus aria-label="Review type"></select></label>
         <label class="review-priority">Priorities<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">P0 only · Critical</option><option value="P1">P0–P1 · High and critical</option>
           <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
@@ -125,6 +126,15 @@ const reviewLoopView = (() => {
     if (!root) return;
     const { loops, projects, error } = snapshot;
     const models = snapshot.models || [];
+    reviewTypes = snapshot.reviewTypes || [];
+    const nextReviewTypesSignature = JSON.stringify(reviewTypes);
+    if (nextReviewTypesSignature !== reviewTypesSignature) {
+      const focusSelect = root.querySelector('[data-review-focus]');
+      const selected = focusSelect.value;
+      focusSelect.innerHTML = reviewTypes.map(type => `<option value="${escape(type.id)}">${escape(type.label)}</option>`).join('');
+      if (reviewTypes.some(type => type.id === selected)) focusSelect.value = selected;
+      reviewTypesSignature = nextReviewTypesSignature;
+    }
     const nextModelsSignature = JSON.stringify(models);
     if (nextModelsSignature !== modelsSignature) {
       for (const kind of ['review', 'fix']) {
@@ -200,7 +210,8 @@ const reviewLoopView = (() => {
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
     const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(selection.reasoningEffort)}` : ''}` : 'Codex default'}</span>`;
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabels[loop.focus] || focusLabels.bugs)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
+    const focusLabel = reviewTypes.find(type => type.id === loop.focus)?.label || loop.focus || '';
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -253,6 +264,7 @@ const reviewLoopView = (() => {
   function reset() {
     projectsSignature = '';
     modelsSignature = '';
+    reviewTypesSignature = '';
   }
 
   return { createPage, render, renderReasoningOptions, renderReviewSettings, renderNavigationStatus, reset, usesPriorities };

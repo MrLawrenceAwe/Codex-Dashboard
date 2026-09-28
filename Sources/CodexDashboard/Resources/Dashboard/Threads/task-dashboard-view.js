@@ -88,7 +88,7 @@ const taskDashboardView = (() => {
   function render({
     threads,
     filterMode,
-    visibleThreadLimit,
+    visibleItemLimit,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
     commitDialogError,
@@ -121,7 +121,7 @@ const taskDashboardView = (() => {
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
       isThreadUnread,
-      visibleThreadLimit,
+      visibleItemLimit,
     });
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = !hasMore;

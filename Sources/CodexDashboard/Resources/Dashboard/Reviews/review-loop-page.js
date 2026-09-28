@@ -1,5 +1,5 @@
 const reviewLoopPage = (() => {
-  let snapshot = { projects: [], loops: [], error: null };
+  let snapshot = { projects: [], loops: [], reviewTypes: [], error: null };
   let pendingAction = null;
 
   const pageState = createPageVisibilityController({

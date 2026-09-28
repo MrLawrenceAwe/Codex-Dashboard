@@ -23,21 +23,19 @@ final class CodexDataChangeMonitor {
     private var unreadSignature: FileSignature?
     private var accountMetadataSignature: FileSignature?
     private var authenticationSignature: FileSignature?
-    private var dataRefreshTask: Task<Void, Never>?
-    private var dataRefreshTaskID: UUID?
-    private var dataRefreshGeneration: UInt64 = 0
+    private let refreshDebouncer: RefreshDebouncer
     private var refreshCatalog: (@MainActor () async -> Void)?
     private var refreshUnread: (@MainActor () async -> Void)?
     private var refreshAccounts: (@MainActor () async -> Void)?
-    private let dataRefreshQuietPeriod: Duration
-    private let dataRefreshMaximumDelay: Duration
 
     init(
         dataRefreshQuietPeriod: Duration = CodexDataChangeMonitor.dataRefreshQuietPeriod,
         dataRefreshMaximumDelay: Duration = CodexDataChangeMonitor.dataRefreshMaximumDelay
     ) {
-        self.dataRefreshQuietPeriod = dataRefreshQuietPeriod
-        self.dataRefreshMaximumDelay = dataRefreshMaximumDelay
+        refreshDebouncer = RefreshDebouncer(
+            quietPeriod: dataRefreshQuietPeriod,
+            maximumDelay: dataRefreshMaximumDelay
+        )
     }
 
     func start(
@@ -66,10 +64,7 @@ final class CodexDataChangeMonitor {
     }
 
     func stop() {
-        dataRefreshGeneration &+= 1
-        dataRefreshTask?.cancel()
-        dataRefreshTask = nil
-        dataRefreshTaskID = nil
+        refreshDebouncer.cancel()
         FileSystemWatch.cancel(&dataWatches)
         catalogURL = nil
         unreadStateURL = nil
@@ -85,42 +80,11 @@ final class CodexDataChangeMonitor {
     }
 
     private func scheduleDataRefresh() {
-        dataRefreshGeneration &+= 1
-        guard dataRefreshTask == nil else { return }
-        let taskID = UUID()
-        dataRefreshTaskID = taskID
-        dataRefreshTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            var maximumDelayDeadline = ContinuousClock.now + self.dataRefreshMaximumDelay
-            while !Task.isCancelled {
-                let generationBeforeQuietPeriod = self.dataRefreshGeneration
-                let now = ContinuousClock.now
-                if now < maximumDelayDeadline {
-                    try? await Task.sleep(for: min(
-                        self.dataRefreshQuietPeriod,
-                        now.duration(to: maximumDelayDeadline)
-                    ))
-                }
-                guard !Task.isCancelled else { break }
-                if self.dataRefreshGeneration != generationBeforeQuietPeriod {
-                    if ContinuousClock.now < maximumDelayDeadline { continue }
-                }
-
-                await self.refreshChangedData()
-                guard !Task.isCancelled,
-                      self.dataRefreshGeneration != generationBeforeQuietPeriod
-                else { break }
-                maximumDelayDeadline = ContinuousClock.now + self.dataRefreshMaximumDelay
-            }
-
-            if self.dataRefreshTaskID == taskID {
-                self.dataRefreshTask = nil
-                self.dataRefreshTaskID = nil
-            }
-
+        refreshDebouncer.schedule { [weak self] in
+            await self?.refreshChangedData()
         }
-
     }
+
     private func refreshChangedData() async {
         var changed = false
         if let catalogURL {
