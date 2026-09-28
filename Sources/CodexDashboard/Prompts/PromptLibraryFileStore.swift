@@ -39,7 +39,9 @@ final class PromptLibraryFileStore {
     func save(_ document: PromptLibraryDocument) throws -> Bool {
         guard document.isValid else { throw DashboardError.invalidPromptLibrary }
         let data = try encoded(document)
-        let currentData = try? Data(contentsOf: documentURL)
+        let currentData = fileManager.fileExists(atPath: documentURL.path)
+            ? try Data(contentsOf: documentURL)
+            : nil
         guard currentData != data else { return false }
         try fileManager.createDirectory(at: documentURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let currentData {
