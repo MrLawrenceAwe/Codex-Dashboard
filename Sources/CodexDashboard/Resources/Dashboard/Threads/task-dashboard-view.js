@@ -116,7 +116,7 @@ const taskDashboardView = (() => {
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const visibleThreads = taskDashboardState.filter({
+    const visibleThreads = taskDashboardQuery.filter({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,

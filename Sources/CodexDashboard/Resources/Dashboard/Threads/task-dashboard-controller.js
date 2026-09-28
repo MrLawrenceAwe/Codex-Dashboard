@@ -1,7 +1,7 @@
 function createTaskDashboard({ catalog }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
   let threads = [];
-  const storedPreferences = taskDashboardState.loadPreferences();
+  const storedPreferences = taskDashboardPreferences.loadPreferences();
   let filterMode = storedPreferences.filterMode;
   const pageSize = 10;
   let visibleLimit = pageSize;
@@ -31,7 +31,7 @@ function createTaskDashboard({ catalog }) {
   const isCompletionTickVisible = completionIndicators.isVisible;
 
   function savePreferences() {
-    taskDashboardState.savePreferences({
+    taskDashboardPreferences.savePreferences({
       filterMode,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
@@ -39,7 +39,7 @@ function createTaskDashboard({ catalog }) {
   }
 
   function deriveViewState() {
-    return taskDashboardState.summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths);
+    return taskDashboardQuery.summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths);
   }
 
   function syncInterruptedSidebarMarkers() {
