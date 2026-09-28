@@ -1,6 +1,6 @@
 const threadMarkup = (() => {
-  function formatRelativeTime(timestamp) {
-    const seconds = Math.max(0, Math.round(Date.now() / 1000 - Number(timestamp || 0)));
+  function formatRelativeTime(recencyEpochMillis) {
+    const seconds = Math.max(0, Math.round((Date.now() - Number(recencyEpochMillis || 0)) / 1000));
     if (seconds < 60) return 'just now';
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ago`;
@@ -36,12 +36,12 @@ const threadMarkup = (() => {
           ${compact
             ? `<span class="dashboard-meta">
                 ${showProject ? `<span>${domUtils.escapeHTML(thread.projectName)}</span>` : ''}
-                <span>${formatRelativeTime(Number(thread.recencyEpochMillis || 0) / 1000)}</span>
+                <span>${formatRelativeTime(thread.recencyEpochMillis)}</span>
               </span>`
             : `<span class="dashboard-thread-details">
                 <span class="dashboard-thread-preview">${domUtils.escapeHTML(thread.preview || 'No preview available')}</span>
                 <span class="dashboard-meta">
-                  <span>${formatRelativeTime(Number(thread.recencyEpochMillis || 0) / 1000)}</span>
+                  <span>${formatRelativeTime(thread.recencyEpochMillis)}</span>
                   ${thread.model ? `<span>${domUtils.escapeHTML(thread.model)}</span>` : ''}
                 </span>
               </span>`}
@@ -69,6 +69,24 @@ const threadMarkup = (() => {
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
       <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`;
+  }
+
+  function renderProjectIdentity(projectName, projectPath) {
+    return `<span class="dashboard-project-icon">${dashboardIcons.render('project')}</span>
+      <span class="dashboard-project-copy">
+        <span class="dashboard-project-name">${domUtils.escapeHTML(projectName)}</span>
+        <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
+      </span>`;
+  }
+
+  function renderChangeStatus(hasChanges, indicatorsHidden, showHiddenStatus) {
+    if (!hasChanges) return '';
+    if (indicatorsHidden) {
+      return showHiddenStatus
+        ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'
+        : '';
+    }
+    return `<span class="dashboard-git-changes"${showHiddenStatus ? ' title="This Git project has uncommitted changes"' : ''}>${dashboardIcons.render('gitChanges')}<span>Changed</span></span>`;
   }
 
   function renderThreadList(visibleThreads, {
@@ -103,12 +121,8 @@ const threadMarkup = (() => {
         return `
         <article class="dashboard-git-project" data-dashboard-git-project="${domUtils.escapeHTML(projectPath)}">
           <div class="dashboard-git-project-copy">
-            <span class="dashboard-project-icon">${dashboardIcons.render('project')}</span>
-            <span class="dashboard-project-copy">
-              <span class="dashboard-project-name">${domUtils.escapeHTML(projectName)}</span>
-              <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
-            </span>
-            ${hiddenChangeIndicatorPaths.has(projectPath) ? '' : `<span class="dashboard-git-changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>`}
+            ${renderProjectIdentity(projectName, projectPath)}
+            ${renderChangeStatus(true, hiddenChangeIndicatorPaths.has(projectPath), false)}
           </div>
           <span class="dashboard-project-summary">
             ${renderProjectActions(projectPath, projectThreads, hiddenChangeIndicatorPaths.has(projectPath))}
@@ -139,13 +153,8 @@ const threadMarkup = (() => {
           <button type="button" class="dashboard-project-toggle" data-project-toggle="${domUtils.escapeHTML(projectPath)}" aria-expanded="${String(!isCollapsed)}" aria-controls="${projectListID}">
             <span class="dashboard-project-title">
               <span class="dashboard-project-chevron">${dashboardIcons.render('chevron')}</span>
-              <span class="dashboard-project-icon">${dashboardIcons.render('project')}</span>
-              <span class="dashboard-project-copy">
-                <span class="dashboard-project-name">${domUtils.escapeHTML(project)}</span>
-                <span class="dashboard-project-path">${domUtils.escapeHTML(projectPath)}</span>
-              </span>
-              ${hasChanges && !indicatorsHidden ? `<span class="dashboard-git-changes" title="This Git project has uncommitted changes">${dashboardIcons.render('gitChanges')}<span>Changed</span></span>` : ''}
-              ${hasChanges && indicatorsHidden ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>' : ''}
+              ${renderProjectIdentity(project, projectPath)}
+              ${renderChangeStatus(hasChanges, indicatorsHidden, true)}
             </span>
           </button>
           <span class="dashboard-project-summary">

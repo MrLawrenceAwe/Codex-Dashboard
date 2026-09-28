@@ -116,34 +116,15 @@ const taskDashboardView = (() => {
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const visibleThreads = taskDashboardQuery.filter({
+    const { visibleThreads, displayedThreads, runningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
       isThreadUnread,
+      visibleThreadLimit,
     });
-    const changedProjectPaths = filterMode === 'changedProjects'
-      ? [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))]
-      : null;
-    const displayedChangedProjectPaths = changedProjectPaths?.slice(0, visibleThreadLimit);
-    const runningThreads = filterMode === 'all'
-      ? visibleThreads.filter((thread) => thread.runState === 'running')
-      : null;
-    const recentThreads = filterMode === 'all'
-      ? visibleThreads.filter((thread) => thread.runState !== 'running')
-      : null;
-    const displayedThreads = changedProjectPaths
-      ? visibleThreads.filter((thread) => displayedChangedProjectPaths
-        .includes(String(thread.projectPath).trim()))
-      : filterMode === 'all'
-        ? [...runningThreads, ...recentThreads.slice(0, visibleThreadLimit)]
-        : visibleThreads.slice(0, visibleThreadLimit);
     const loadMore = page.querySelector('[data-load-more]');
-    if (loadMore) loadMore.hidden = changedProjectPaths
-      ? visibleThreadLimit >= changedProjectPaths.length
-      : filterMode === 'all'
-        ? visibleThreadLimit >= recentThreads.length
-        : displayedThreads.length >= visibleThreads.length;
+    if (loadMore) loadMore.hidden = !hasMore;
     const list = page.querySelector('[data-thread-list]');
     list.classList.toggle('is-compact', filterMode === 'all');
     list.classList.toggle('has-sections', filterMode === 'all' && state.runningCount > 0);
@@ -158,7 +139,7 @@ const taskDashboardView = (() => {
       list,
       threadMarkup.renderThreadList(displayedThreads, {
         filterMode,
-        runningThreadCount: runningThreads?.length || 0,
+        runningThreadCount,
         collapsedProjectPaths,
         hiddenChangeIndicatorPaths,
         isUnread: isThreadUnread,

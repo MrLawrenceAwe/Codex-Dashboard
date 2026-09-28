@@ -53,7 +53,7 @@ const reviewLoopView = (() => {
         <label>Review reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
         <label>Fix model<select data-fix-model aria-label="Fix model"><option value="">Codex default</option></select></label>
         <label>Fix reasoning<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
-        <label>Speed<select data-review-speed aria-label="Review speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
+        <label>Loop speed<select data-review-speed aria-label="Loop speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         </fieldset>
         </details>
         <p class="review-availability" data-review-availability role="status" hidden></p>
