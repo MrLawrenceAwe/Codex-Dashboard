@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @MainActor
@@ -44,8 +45,12 @@ final class ReviewLoopBridge {
                let action = try? JSONDecoder().decode(ReviewLoopAction.self, from: Data(serialized.utf8)) {
                 if action.id != acknowledgedActionID {
                     do {
-                        try validateSelections(in: action)
-                        try coordinator.apply(action, projects: projects)
+                        if action.kind == .openFile {
+                            try openFile(for: action)
+                        } else {
+                            try validateSelections(in: action)
+                            try coordinator.apply(action, projects: projects)
+                        }
                         actionError = nil
                     } catch { actionError = error.localizedDescription }
                     acknowledgedActionID = action.id
@@ -55,6 +60,40 @@ final class ReviewLoopBridge {
                 try await deliver(to: window)
             }
         }
+    }
+
+    private func openFile(for action: ReviewLoopAction) throws {
+        guard let loopID = action.loopID,
+              let loop = coordinator.loops.first(where: { $0.id == loopID }),
+              let filePath = action.filePath,
+              let url = Self.reviewFileURL(filePath, projectPath: loop.project.path) else {
+            throw ReviewLoopError("This review file link is unavailable.")
+        }
+        guard NSWorkspace.shared.open(url) else {
+            throw ReviewLoopError("The review file could not be opened.")
+        }
+    }
+
+    static func reviewFileURL(_ link: String, projectPath: String) -> URL? {
+        var path: String
+        if link.hasPrefix("file://") {
+            guard let url = URL(string: link), url.isFileURL else { return nil }
+            path = url.path
+        } else {
+            path = link.removingPercentEncoding ?? link
+        }
+        if let line = path.range(of: #":\d+(?::\d+)?$"#, options: .regularExpression) {
+            path.removeSubrange(line)
+        }
+        let root = URL(fileURLWithPath: projectPath, isDirectory: true)
+            .standardizedFileURL.resolvingSymlinksInPath()
+        let candidate = (path.hasPrefix("/") ? URL(fileURLWithPath: path) : root.appendingPathComponent(path))
+            .standardizedFileURL.resolvingSymlinksInPath()
+        guard candidate.path.hasPrefix(root.path + "/") else { return nil }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else { return nil }
+        return candidate
     }
 
     private func validateSelections(in action: ReviewLoopAction) throws {

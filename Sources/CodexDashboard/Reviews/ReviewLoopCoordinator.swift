@@ -79,6 +79,8 @@ final class ReviewLoopCoordinator {
                 updated.message = "Checking the project before continuing."
             }
             try persist(updated)
+        case .openFile:
+            throw ReviewLoopError("A file link must be opened from its review card.")
         }
         error = nil
     }

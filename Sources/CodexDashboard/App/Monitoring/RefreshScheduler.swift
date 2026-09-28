@@ -7,8 +7,7 @@ final class RefreshScheduler {
         static func catalog(active: Bool) -> Duration {
             active ? .seconds(2) : .seconds(8)
         }
-        static func workingTree(active: Bool, fileEventsAvailable: Bool) -> Duration {
-            if fileEventsAvailable { return active ? .seconds(5 * 60) : .seconds(15 * 60) }
+        static func workingTree(active: Bool) -> Duration {
             return active ? .seconds(15) : .seconds(60)
         }
         static func unread(active: Bool, fileEventsAvailable: Bool) -> Duration {
@@ -66,12 +65,7 @@ final class RefreshScheduler {
             action: synchronizeDashboard
         )
         workingTreePollingTask = recurringTask(
-            interval: { [self] in
-                Schedule.workingTree(
-                    active: Self.isUserActive,
-                    fileEventsAvailable: workingTreeChanges != nil
-                )
-            },
+            interval: { Schedule.workingTree(active: Self.isUserActive) },
             action: { await updateWorkingTrees(nil) }
         )
         unreadPollingTask = recurringTask(
