@@ -71,9 +71,12 @@ green **Limit reached** status indicating that all configured rounds finished su
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 
-`Reviews/ReviewLoopCoordinator` owns the state machine, `ReviewLoopPresentation` builds the status and prompt previews, and `ReviewLoopFileStore` persists state; `ReviewLoopDriver` uses
-the desktop renderer's existing local app-server connection and reads Git state
-through argument-based subprocess calls. It uses the saved review selection for review turns and the fix selection for fix turns, or configured Codex defaults for either, and
+`Reviews/ReviewLoopCoordinator` owns the state machine, `ReviewLoopPresentation`
+builds status and prompt previews, and `ReviewLoopFileStore` persists state.
+`ReviewLoopDriver` uses the desktop renderer's existing local app-server connection;
+`ReviewRepositoryCheckpoint` verifies Git state through argument-based subprocess
+calls. The driver uses the saved review selection for review turns and the fix
+selection for fix turns, or configured Codex defaults for either, and
 does not override permission settings. The bridge polls through the native
 renderer synchronization loop and reads bounded turn/item pages. The renderer
 page queues controls and its view module renders snapshots; it does not own execution.

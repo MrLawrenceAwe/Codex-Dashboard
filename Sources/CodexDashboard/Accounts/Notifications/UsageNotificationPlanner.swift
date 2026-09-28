@@ -6,6 +6,18 @@ enum UsageNotificationPlanner {
     private static let extendedLeadTimes: [TimeInterval] = [72, 48, 36, 24, 12, 5, 1]
         .map { $0 * oneHour }
 
+    private enum UsageWindowKind {
+        case fiveHour, weekly
+
+        var displayName: String { self == .fiveHour ? "5-hour" : "Weekly" }
+        var identifier: String { self == .fiveHour ? "5-hour" : "weekly" }
+        var duration: TimeInterval { self == .fiveHour ? 5 * 60 * 60 : 7 * 24 * 60 * 60 }
+        var deadlineStyle: UsageDeadlineStyle { self == .fiveHour ? .todayOrTomorrow : .fullDate }
+        var notificationKind: ScheduledUsageNotificationKind {
+            self == .fiveHour ? .fiveHourReset : .weeklyReset
+        }
+    }
+
     struct Plan {
         let scheduled: [ScheduledUsageNotification]
         let immediate: [ImmediateUsageNotification]
@@ -53,16 +65,14 @@ enum UsageNotificationPlanner {
                 let fiveHourReminders = hasFiveHourUsageRemaining(usage)
                     ? limitNotifications(
                         for: account,
-                        windowName: "5-hour",
-                        kind: .fiveHourReset,
+                        windowKind: .fiveHour,
                         window: usage.fiveHour,
                         leadTimes: [oneHour],
                         now: now
                     ) : []
                 limitReminders = fiveHourReminders + limitNotifications(
                     for: account,
-                    windowName: "Weekly",
-                    kind: .weeklyReset,
+                    windowKind: .weekly,
                     window: usage.weekly,
                     leadTimes: extendedLeadTimes,
                     now: now
@@ -129,7 +139,7 @@ enum UsageNotificationPlanner {
             else { return [] }
             let fiveHourNotification = resetNotification(
                     for: account,
-                    windowName: "5-hour",
+                    windowKind: .fiveHour,
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     usageSummary: usageSummary(for: usage),
@@ -139,7 +149,7 @@ enum UsageNotificationPlanner {
                 fiveHourNotification,
                 resetNotification(
                     for: account,
-                    windowName: "Weekly",
+                    windowKind: .weekly,
                     current: usage.weekly,
                     previous: previous.weekly,
                     usageSummary: usageSummary(for: usage),
@@ -190,7 +200,7 @@ enum UsageNotificationPlanner {
             else { return [] }
             let fiveHourNotifications = thresholdNotifications(
                     for: account,
-                    windowName: "5-hour",
+                    windowKind: .fiveHour,
                     current: usage.fiveHour,
                     previous: previous.fiveHour,
                     thresholds: [50, 20],
@@ -201,7 +211,7 @@ enum UsageNotificationPlanner {
                 fiveHourNotifications,
                 thresholdNotifications(
                     for: account,
-                    windowName: "Weekly",
+                    windowKind: .weekly,
                     current: usage.weekly,
                     previous: previous.weekly,
                     thresholds: [80, 50, 20],
@@ -223,8 +233,7 @@ enum UsageNotificationPlanner {
 
     private static func limitNotifications(
         for account: SavedAccount,
-        windowName: String,
-        kind: ScheduledUsageNotificationKind,
+        windowKind: UsageWindowKind,
         window: CodexUsageWindow?,
         leadTimes: [TimeInterval],
         now: Date
@@ -234,16 +243,16 @@ enum UsageNotificationPlanner {
         return leadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
             let notificationDate = resetsAt.addingTimeInterval(-leadTime)
-            let deadlineStyle = deadlineStyle(for: windowName)
+            let deadlineStyle = windowKind.deadlineStyle
             return ScheduledUsageNotification(
-                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(identifierComponent(for: leadTime))",
+                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(identifierComponent(for: leadTime))",
                 accountID: account.id,
                 accountName: account.name,
-                kind: kind,
-                title: "Codex \(windowName.lowercased()) usage resets in \(leadTimeDescription)",
-                body: "\(account.name)’s \(windowName) usage resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
-                deadlineUpdateTitle: "\(windowName) reset time changed",
-                deadlineDescription: "\(account.name)’s \(windowName) reset moved",
+                kind: windowKind.notificationKind,
+                title: "Codex \(windowKind.displayName.lowercased()) usage resets in \(leadTimeDescription)",
+                body: "\(account.name)’s \(windowKind.displayName) usage resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
+                deadlineUpdateTitle: "\(windowKind.displayName) reset time changed",
+                deadlineDescription: "\(account.name)’s \(windowKind.displayName) reset moved",
                 deadlineStyle: deadlineStyle,
                 notificationDate: notificationDate,
                 deadlineDate: resetsAt
@@ -253,7 +262,7 @@ enum UsageNotificationPlanner {
 
     private static func resetNotification(
         for account: SavedAccount,
-        windowName: String,
+        windowKind: UsageWindowKind,
         current: CodexUsageWindow?,
         previous: CodexUsageWindow?,
         usageSummary: String,
@@ -267,11 +276,11 @@ enum UsageNotificationPlanner {
 
         let previousAllowance = max(0, min(100, 100 - previous.usedPercent))
         let currentAllowance = max(0, min(100, 100 - current.usedPercent))
-        let nextResetDescription = formattedDeadline(nextReset, style: deadlineStyle(for: windowName), relativeTo: now)
-        let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(Int(previousReset.timeIntervalSinceReferenceDate))"
+        let nextResetDescription = formattedDeadline(nextReset, style: windowKind.deadlineStyle, relativeTo: now)
+        let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(Int(previousReset.timeIntervalSinceReferenceDate))"
         // Usage can rise quickly after a real reset. A full new window is still
         // evidence of a reset, while a revised deadline alone is not.
-        let windowDuration: TimeInterval = windowName == "5-hour" ? 5 * oneHour : 7 * 24 * oneHour
+        let windowDuration = windowKind.duration
         let observedNewWindow = abs(nextReset.timeIntervalSince(previousReset) - windowDuration)
             <= resetTimeCorrectionTolerance
         guard previous.usedPercent > current.usedPercent || (previousReset <= now && observedNewWindow)
@@ -279,20 +288,20 @@ enum UsageNotificationPlanner {
         if previousReset > now {
             return ImmediateUsageNotification(
                 identifier: identifier,
-                title: "Codex \(windowName.lowercased()) usage reset early",
-                body: "\(account.name)’s \(windowName): \(previousAllowance)% → \(currentAllowance)% early · next \(nextResetDescription).\n\(usageSummary)"
+                title: "Codex \(windowKind.displayName.lowercased()) usage reset early",
+                body: "\(account.name)’s \(windowKind.displayName): \(previousAllowance)% → \(currentAllowance)% early · next \(nextResetDescription).\n\(usageSummary)"
             )
         }
         return ImmediateUsageNotification(
             identifier: identifier,
-            title: "Codex \(windowName.lowercased()) usage reset",
-            body: "\(account.name)’s \(windowName) reset: \(currentAllowance)% left · next \(nextResetDescription).\n\(usageSummary)"
+            title: "Codex \(windowKind.displayName.lowercased()) usage reset",
+            body: "\(account.name)’s \(windowKind.displayName) reset: \(currentAllowance)% left · next \(nextResetDescription).\n\(usageSummary)"
         )
     }
 
     private static func thresholdNotifications(
         for account: SavedAccount,
-        windowName: String,
+        windowKind: UsageWindowKind,
         current: CodexUsageWindow?,
         previous: CodexUsageWindow?,
         thresholds: [Int],
@@ -310,9 +319,9 @@ enum UsageNotificationPlanner {
         return thresholds.compactMap { threshold in
             guard previousRemaining >= threshold, currentRemaining < threshold else { return nil }
             return ImmediateUsageNotification(
-                identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowName.lowercased())-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
-                title: "Codex \(windowName): less than \(threshold)% remaining",
-                body: "\(account.name)’s \(windowName): \(currentRemaining)% left · resets \(formattedDeadline(reset, style: deadlineStyle(for: windowName), relativeTo: now)).\n\(usageSummary)"
+                identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
+                title: "Codex \(windowKind.displayName): less than \(threshold)% remaining",
+                body: "\(account.name)’s \(windowKind.displayName): \(currentRemaining)% left · resets \(formattedDeadline(reset, style: windowKind.deadlineStyle, relativeTo: now)).\n\(usageSummary)"
             )
         }
     }
@@ -419,10 +428,6 @@ enum UsageNotificationPlanner {
     private static func hasFiveHourUsageRemaining(_ usage: CodexAccountUsage) -> Bool {
         guard let fiveHour = usage.fiveHour else { return true }
         return fiveHour.usedPercent < 100
-    }
-
-    private static func deadlineStyle(for windowName: String) -> UsageDeadlineStyle {
-        windowName == "5-hour" ? .todayOrTomorrow : .fullDate
     }
 
     static func formattedDeadline(

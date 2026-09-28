@@ -16,7 +16,7 @@ final class ReviewLoopBridge {
         coordinator = ReviewLoopCoordinator(store: store)
     }
 
-    func synchronize(targets: [DevToolsTarget], threads: [RendererThread]) async throws {
+    func advanceAndSynchronize(targets: [DevToolsTarget], threads: [RendererThread]) async throws {
         guard let target = targets.first else { return }
         let driver = ReviewLoopDriver(devTools: devTools, target: target)
         if lastProjectRefresh == nil || Date.now.timeIntervalSince(lastProjectRefresh!) > 60 {
