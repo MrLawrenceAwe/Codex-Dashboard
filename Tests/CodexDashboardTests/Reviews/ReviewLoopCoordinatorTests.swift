@@ -8,17 +8,17 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     private func make(limit: Int = 5) throws -> (ReviewLoopCoordinator, ReviewTestStore, ReviewTestDriver) {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
-        try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id,
+        try coordinator.apply(ReviewLoopAction(id: "start", kind: .start, projectID: project.id,
                                               promptContext: .general, maxRounds: limit, loopID: nil), projects: [project])
         return (coordinator, store, ReviewTestDriver())
     }
 
-    private func action(_ kind: String, for coordinator: ReviewLoopCoordinator) -> ReviewLoopAction {
+    private func action(_ kind: ReviewLoopAction.Kind, for coordinator: ReviewLoopCoordinator) -> ReviewLoopAction {
         ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil, promptContext: nil, maxRounds: nil, loopID: coordinator.loops.last?.id)
     }
 
     private func stop(_ coordinator: ReviewLoopCoordinator) {
-        do { try coordinator.apply(action("stop", for: coordinator), projects: [project]) }
+        do { try coordinator.apply(action(.stop, for: coordinator), projects: [project]) }
         catch { XCTFail("Could not stop review loop: \(error)") }
     }
 
@@ -35,10 +35,15 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                        "Review project for bugs and issues (this is a project for personal use).")
     }
 
+    func testUnknownReviewActionKindDoesNotDecode() {
+        let payload = Data(#"{"id":"unknown","kind":"retry"}"#.utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(ReviewLoopAction.self, from: payload))
+    }
+
     func testConcurrentProjectsKeepIndependentControlsAndRecovery() async throws {
         let (coordinator, store, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
-        let start = ReviewLoopAction(id: "second-start", kind: "start", projectID: second.id,
+        let start = ReviewLoopAction(id: "second-start", kind: .start, projectID: second.id,
                                      promptContext: .general, maxRounds: 3, loopID: nil)
         try coordinator.apply(start, projects: [project, second])
         try coordinator.apply(start, projects: [project, second])
@@ -47,7 +52,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createCalls, 2)
         XCTAssertEqual(coordinator.loops.map(\.phase), [.running, .running])
         XCTAssertEqual(Set(coordinator.loops.compactMap { $0.rounds.last?.threadID }).count, 2)
-        try coordinator.apply(action("stop", for: coordinator), projects: [project, second])
+        try coordinator.apply(action(.stop, for: coordinator), projects: [project, second])
         XCTAssertEqual(coordinator.loops.map(\.phase), [.running, .stopped])
         let recovered = ReviewLoopCoordinator(store: store)
         XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .stopped])
@@ -57,7 +62,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testOneProjectInspectionFailureDoesNotPreventOtherLaunches() async throws {
         let (coordinator, _, driver) = try make()
         let second = ReviewProject(id: "second", name: "Second", path: "/tmp/second")
-        try coordinator.apply(ReviewLoopAction(id: "second-start", kind: "start", projectID: second.id,
+        try coordinator.apply(ReviewLoopAction(id: "second-start", kind: .start, projectID: second.id,
                                               promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.failingPath = project.path
         await coordinator.advance(using: driver, threads: [])
@@ -70,7 +75,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         let recovered = ReviewLoopCoordinator(store: store)
         let second = ReviewProject(id: "nested", name: "Nested", path: "/tmp/example/subdir")
-        try recovered.apply(ReviewLoopAction(id: "nested-start", kind: "start", projectID: second.id,
+        try recovered.apply(ReviewLoopAction(id: "nested-start", kind: .start, projectID: second.id,
                                             promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
         driver.repositoryRoot = project.path
         await recovered.advance(using: driver, threads: [])
@@ -80,10 +85,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
 
     func testOneActiveLoopPerProjectIncludingPausedAndChangedPath() throws {
         let (coordinator, _, _) = try make()
-        let start = ReviewLoopAction(id: "duplicate", kind: "start", projectID: project.id,
+        let start = ReviewLoopAction(id: "duplicate", kind: .start, projectID: project.id,
                                      promptContext: .general, maxRounds: 3, loopID: nil)
         XCTAssertThrowsError(try coordinator.apply(start, projects: [project]))
-        try coordinator.apply(action("pause", for: coordinator), projects: [project])
+        try coordinator.apply(action(.pause, for: coordinator), projects: [project])
         let moved = ReviewProject(id: project.id, name: project.name, path: "/tmp/moved")
         XCTAssertThrowsError(try coordinator.apply(start, projects: [moved]))
         stop(coordinator)
@@ -164,13 +169,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
-        try coordinator.apply(action("pause", for: coordinator), projects: [project])
+        try coordinator.apply(action(.pause, for: coordinator), projects: [project])
         XCTAssertTrue(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note.contains("resume") == true)
         driver.finish(findings: 2, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Paused")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
-        try coordinator.apply(action("stop", for: coordinator), projects: [project])
+        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Latest prompt")
     }
@@ -208,7 +213,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.failRepository = false
         await coordinator.advance(using: driver, threads: [])
         XCTAssertTrue(driver.createdThreads.isEmpty)
-        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1"])
     }
@@ -222,7 +227,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .paused)
         XCTAssertEqual(coordinator.loops.last?.rounds.last?.threadID, "thread-1")
         driver.failReadThread = false
-        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
         XCTAssertEqual(driver.prompts.count, 1)
@@ -237,7 +242,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .paused)
         XCTAssertEqual(driver.prompts.count, 1)
         driver.failRepository = false
-        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 2)
@@ -311,7 +316,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(recovered.loops.last?.phase, .paused)
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 1)
-        try recovered.apply(action("resume", for: recovered), projects: [project])
+        try recovered.apply(action(.resume, for: recovered), projects: [project])
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(recovered.loops.last?.phase, .running)
         XCTAssertEqual(driver.prompts.count, 1)
@@ -327,7 +332,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
         store.loops[store.loops.count - 1].phase = .running // Simulate process loss before the failure was saved.
         let recovered = ReviewLoopCoordinator(store: store)
-        try recovered.apply(action("resume", for: recovered), projects: [project])
+        try recovered.apply(action(.resume, for: recovered), projects: [project])
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(recovered.loops.last?.phase, .blocked)
         XCTAssertEqual(driver.createCalls, 1)
@@ -347,7 +352,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testPauseFinishesCurrentRoundAndStopDoesNotLaunchMore() async throws {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
-        try coordinator.apply(action("pause", for: coordinator), projects: [project])
+        try coordinator.apply(action(.pause, for: coordinator), projects: [project])
         XCTAssertEqual(coordinator.loops.last?.phase, .running)
         driver.review(priorities: [.p2])
         await coordinator.advance(using: driver, threads: [])
@@ -355,7 +360,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.finish(findings: 1, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .paused)
-        try coordinator.apply(action("stop", for: coordinator), projects: [project])
+        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
         XCTAssertEqual(driver.createdThreads.count, 1)
@@ -421,12 +426,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Limit reached")
         XCTAssertEqual(coordinator.loops.last?.message, "All configured review rounds completed.")
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
-        try coordinator.apply(action("resume", for: coordinator), projects: [project])
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
         XCTAssertEqual(driver.createdThreads.count, 1)
         let previousID = coordinator.loops.last?.id
-        try coordinator.apply(ReviewLoopAction(id: "new-start", kind: "start", projectID: project.id,
+        try coordinator.apply(ReviewLoopAction(id: "new-start", kind: .start, projectID: project.id,
                                                promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
         XCTAssertNotEqual(coordinator.loops.last?.id, previousID)
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
@@ -452,7 +457,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         let id = coordinator.loops.last?.id
-        try coordinator.apply(ReviewLoopAction(id: "start", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil), projects: [project])
+        try coordinator.apply(ReviewLoopAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil), projects: [project])
         XCTAssertEqual(coordinator.loops.last?.id, id)
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
     }
@@ -462,7 +467,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             for count in 0...3 {
                 let store = ReviewTestStore()
                 let coordinator = ReviewLoopCoordinator(store: store)
-                var start = ReviewLoopAction(id: UUID().uuidString, kind: "start", projectID: project.id,
+                var start = ReviewLoopAction(id: UUID().uuidString, kind: .start, projectID: project.id,
                                              promptContext: nil, maxRounds: 5, loopID: nil)
                 start.priorityLimit = limit
                 try coordinator.apply(start, projects: [project])
@@ -486,7 +491,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         for priorities: [ReviewFinding.Priority] in [[.p2], [.p1, .p2]] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = ReviewLoopAction(id: "start", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
+            var start = ReviewLoopAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
             start.priorityLimit = .p1
             try coordinator.apply(start, projects: [project])
             let driver = ReviewTestDriver()
@@ -502,7 +507,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
-        var start = ReviewLoopAction(id: "selected", kind: "start", projectID: project.id, promptContext: nil, maxRounds: 3, loopID: nil)
+        var start = ReviewLoopAction(id: "selected", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 3, loopID: nil)
         start.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: "high")
         start.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: "low")
         start.speed = .fast
@@ -536,7 +541,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         for focus in ReviewFocus.allCases {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = ReviewLoopAction(id: "focus", kind: "start", projectID: project.id,
+            var start = ReviewLoopAction(id: "focus", kind: .start, projectID: project.id,
                                          promptContext: .general, maxRounds: 3, loopID: nil)
             start.focus = focus
             try coordinator.apply(start, projects: [project])

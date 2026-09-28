@@ -58,7 +58,7 @@ final class ReviewLoopBridge {
     }
 
     private func validateSelections(in action: ReviewLoopAction) throws {
-        guard action.kind == "start" else { return }
+        guard action.kind == .start else { return }
         for selection in [action.reviewSelection, action.fixSelection].compactMap({ $0 }) {
             guard let model = models.first(where: { $0.modelID == selection.modelID }),
                   selection.reasoningEffort.map(model.supportedReasoningEfforts.contains) ?? true else {
@@ -68,7 +68,9 @@ final class ReviewLoopBridge {
     }
 
     private func deliver(to target: DevToolsTarget) async throws {
-        let snapshot = ReviewLoopSnapshot(projects: projects, models: models, loops: coordinator.loops,
+        let snapshot = ReviewLoopSnapshot(projects: projects, models: models,
+                                         reviewTypes: ReviewFocus.allCases.map(ReviewTypeOption.init),
+                                         loops: coordinator.loops,
                                          progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)

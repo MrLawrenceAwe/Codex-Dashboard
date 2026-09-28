@@ -40,6 +40,15 @@ enum ReviewFocus: String, Codable, CaseIterable, Sendable {
     case bugs, organisation, naming, performance
 
     var usesPriorities: Bool { self == .bugs || self == .performance }
+
+    var label: String {
+        switch self {
+        case .bugs: "Bugs and issues"
+        case .organisation: "Simplification and structure"
+        case .naming: "Simplification, structure and naming"
+        case .performance: "Performance and responsiveness"
+        }
+    }
 }
 
 enum ReviewSpeed: String, Codable, Sendable {

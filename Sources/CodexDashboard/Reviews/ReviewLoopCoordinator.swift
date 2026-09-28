@@ -42,7 +42,7 @@ final class ReviewLoopCoordinator {
     func apply(_ action: ReviewLoopAction, projects: [ReviewProject]) throws {
         guard !storageFailed else { throw ReviewLoopError(error ?? "Review loop storage is unavailable.") }
         switch action.kind {
-        case "start":
+        case .start:
             if loops.contains(where: { $0.startActionID == action.id }) { return }
             guard let project = projects.first(where: { $0.id == action.projectID }),
                   let limit = action.maxRounds, (1...20).contains(limit) else {
@@ -53,15 +53,15 @@ final class ReviewLoopCoordinator {
             }
             let focus = action.focus ?? .bugs
             try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: action.promptContext ?? .general, maxRounds: limit, reviewSelection: action.reviewSelection, fixSelection: action.fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
-        case "pause", "resume", "stop":
+        case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
             }
             guard ![.completed, .limitReached, .stopped, .blocked].contains(updated.phase) else { return }
-            if action.kind == "stop" {
+            if action.kind == .stop {
                 updated.phase = .stopped
                 updated.message = "Stopped scheduling reviews. Any active task can finish in its chat."
-            } else if action.kind == "pause" {
+            } else if action.kind == .pause {
                 if updated.phase == .running {
                     updated.pauseRequested = true
                     updated.message = "Will pause after the current round finishes."
@@ -75,7 +75,6 @@ final class ReviewLoopCoordinator {
                 updated.message = "Checking the project before continuing."
             }
             try persist(updated)
-        default: throw ReviewLoopError("Unknown review loop action.")
         }
         error = nil
     }

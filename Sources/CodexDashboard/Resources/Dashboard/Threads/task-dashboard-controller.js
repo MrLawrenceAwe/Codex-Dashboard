@@ -103,7 +103,7 @@ function createTaskDashboard({ catalog }) {
     const rendered = taskDashboardView.render({
       threads: currentThreads(),
       filterMode,
-      visibleThreadLimit: visibleLimit,
+      visibleItemLimit: visibleLimit,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
       commitDialogError,

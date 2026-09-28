@@ -1,8 +1,12 @@
 import Foundation
 
 struct ReviewLoopAction: Codable, Sendable {
+    enum Kind: String, Codable, Sendable {
+        case start, pause, resume, stop
+    }
+
     let id: String
-    let kind: String
+    let kind: Kind
     let projectID: String?
     let promptContext: ReviewPromptContext?
     let maxRounds: Int?
@@ -17,10 +21,23 @@ struct ReviewLoopAction: Codable, Sendable {
 struct ReviewLoopSnapshot: Codable, Sendable {
     let projects: [ReviewProject]
     let models: [ReviewModel]
+    let reviewTypes: [ReviewTypeOption]
     let loops: [ReviewLoop]
     let progress: [String: ReviewLoopProgress]
     let error: String?
     let acknowledgedActionID: String?
+}
+
+struct ReviewTypeOption: Codable, Sendable {
+    let id: ReviewFocus
+    let label: String
+    let usesPriorities: Bool
+
+    init(_ focus: ReviewFocus) {
+        id = focus
+        label = focus.label
+        usesPriorities = focus.usesPriorities
+    }
 }
 
 struct ReviewPromptPreview: Codable, Sendable {
