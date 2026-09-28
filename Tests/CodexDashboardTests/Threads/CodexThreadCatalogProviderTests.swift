@@ -43,6 +43,40 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(afterRestart.threads.count, 25)
     }
 
+    func testRunningTaskWithoutPreviewIsIncludedDuringCurrentLaunch() async throws {
+        let now: Int64 = 2_000_000_000
+        let url = try CodexTestFixtures.makeStateDatabase(
+            now: now, runningFinalResponseAtUnixSeconds: now - 40, testCase: self
+        )
+        let update = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, "UPDATE threads SET preview = '' WHERE id IN ('running', 'idle');"],
+            timeout: 3
+        )
+        XCTAssertEqual(update.terminationStatus, 0)
+
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
+        let launchDate = Date(timeIntervalSince1970: TimeInterval(now - 60))
+        let catalog = try await provider.loadCatalog(
+            codexLaunchDate: launchDate, requiredThreadIDs: []
+        )
+
+        XCTAssertEqual(catalog.threads.map(\.id), ["running", "updated"])
+        XCTAssertEqual(catalog.totalThreadCount, 2)
+        XCTAssertEqual(catalog.threads.first?.runState, .running)
+        XCTAssertEqual(catalog.threads.first?.title, "Running thread")
+
+        let bounded = try await CodexThreadCatalogProvider(
+            stateDatabaseURL: url, loadedThreadLimit: 1
+        ).loadCatalog(codexLaunchDate: launchDate, requiredThreadIDs: [])
+        XCTAssertEqual(bounded.threads.map(\.id), ["running", "updated"])
+
+        let historical = try await provider.loadCatalog(
+            codexLaunchDate: nil, requiredThreadIDs: []
+        )
+        XCTAssertEqual(historical.threads.map(\.id), ["updated"])
+    }
+
     func testLiveCatalogWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to read the local Codex thread catalog.")
