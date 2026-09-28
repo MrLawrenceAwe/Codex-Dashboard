@@ -103,7 +103,6 @@ struct ReviewFinding: Codable, Equatable, Sendable {
         case p0 = "P0", p1 = "P1", p2 = "P2", p3 = "P3"
         var rank: Int { Self.allCases.firstIndex(of: self)! }
         var rangeLabel: String { self == .p0 ? "P0" : "P0–\(rawValue)" }
-        var included: [String] { Self.allCases.filter { $0.rank <= rank }.map(\.rawValue) }
     }
     let priority: Priority?
     let title: String

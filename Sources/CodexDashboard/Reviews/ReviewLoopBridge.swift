@@ -59,7 +59,10 @@ final class ReviewLoopBridge {
 
     private func validateSelections(in action: ReviewLoopAction) throws {
         guard action.kind == .start else { return }
-        for selection in [action.reviewSelection, action.fixSelection].compactMap({ $0 }) {
+        guard let reviewSelection = action.reviewSelection, let fixSelection = action.fixSelection else {
+            throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
+        }
+        for selection in [reviewSelection, fixSelection] {
             guard let model = models.first(where: { $0.modelID == selection.modelID }),
                   selection.reasoningEffort.map(model.supportedReasoningEfforts.contains) ?? true else {
                 throw ReviewLoopError("Choose available review and fix models with supported reasoning efforts.")

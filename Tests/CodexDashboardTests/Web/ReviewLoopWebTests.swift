@@ -4,6 +4,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
+    private static let modelsJSON = "[{modelID:'model-a',displayName:'Model A',supportedReasoningEfforts:['low']}]"
     private static let reviewTypesJSON = String(
         decoding: try! JSONEncoder().encode(ReviewFocus.allCases.map(ReviewTypeOption.init)),
         as: UTF8.self
@@ -186,8 +187,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
           api.applyReviewLoop(snapshot);
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
           const select = document.querySelector('[data-review-focus]');
           const results = [];
           for (const option of select.options) {
@@ -236,19 +239,48 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null});
+          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
           window.__codexDashboard.openReviews();
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
           document.querySelector('[data-review-priority]').value = 'P1';
           document.querySelector('[data-review-prompt-context]').value = 'personal';
           document.querySelector('[data-review-start]').click();
           const first = JSON.parse(window.__codexDashboard.pendingReviewAction());
           document.querySelector('[data-review-start]').click();
           const same = first.id === JSON.parse(window.__codexDashboard.pendingReviewAction()).id;
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
+          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
           return [first.kind,first.projectID,first.maxRounds,first.promptContext.kind,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["start", "p", 5, "personal", "P1", true, true, "Dirty checkout"])
+    }
+
+    func testStartRequiresExplicitReviewAndFixModels() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
+          const review = document.querySelector('[data-review-model]');
+          const fix = document.querySelector('[data-fix-model]');
+          const options = [...review.options].map(option => option.textContent);
+          const required = review.required && fix.required;
+          const executionOptions = document.querySelector('.review-execution-options');
+          executionOptions.open = false;
+          document.querySelector('[data-review-start]').click();
+          const withoutModels = api.pendingReviewAction();
+          const reopened = executionOptions.open;
+          review.value = 'model-a';
+          document.querySelector('[data-review-start]').click();
+          const withoutFix = api.pendingReviewAction();
+          fix.value = 'model-a';
+          document.querySelector('[data-review-start]').click();
+          const action = JSON.parse(api.pendingReviewAction());
+          return [options.join(','),required,withoutModels,reopened,withoutFix,action.reviewSelection.modelID,action.fixSelection.modelID];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Choose a model,Model A", true, NSNull(), true, NSNull(), "model-a", "model-a"])
     }
 
     func testExpandedPanelFitsNarrowWindow() async throws {
