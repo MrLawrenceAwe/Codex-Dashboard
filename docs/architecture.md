@@ -10,7 +10,7 @@
 - Local thread metadata from `state_5.sqlite` and explicit turn lifecycle events from thread rollout files, reconciled against the current Codex app launch so interrupted work does not remain active forever.
 - `CodexDataChangeMonitor` watches catalog, unread, and account files; `WorkingTreeChangeMonitor` owns project and Git metadata watches, with recursive events supplied by `RecursiveProjectChangeMonitor`. Their debounce policies remain separate. These local filesystem notifications accelerate refreshes. Git metadata notifications also follow linked-worktree pointers to the metadata directory that actually changes. Authoritative catalog polling runs every two seconds and unread-state polling every 500 milliseconds while active; background cadence drops to eight seconds and one second respectively. Working-tree fallback polling runs every 15 seconds while active and every minute in the background, and returning to Codex forces an immediate status refresh. Git status checks disable optional locks so observation does not itself generate repository-change events. Silent renderer-only read-state changes retain a bounded fallback: 1.5 seconds after a native snapshot, then every three seconds while the dashboard is open, ten seconds while closed, and thirty seconds while hidden.
 - Threads are ordered by Codex's indexed recency metadata, avoiding historical rollout scans. All threads active during the current Codex process remain in the catalog and have their latest lifecycle envelope inspected, even beyond the usual 500-thread history limit. The renderer initially mounts the 10 most recent matching tasks and exposes **Load more** in 10-task pages.
-- **Home** is the default dashboard view, with all running tasks above the paged recent tasks. **Unread** and **Changed projects** are separate filters; their threads are grouped into collapsible projects.
+- **All tasks** is the default dashboard view, with all running tasks above the paged recent tasks. **Unread** and **Changed projects** are separate filters; their threads are grouped into collapsible projects.
 - Hover or keyboard-focus a native sidebar project and use its colour button to highlight the project name. Choose from seven colours or **No highlight**; reuse a colour for any number of projects (for example, green for active projects). Choices persist locally by project ID across reloads and project renames.
 - Native sidebar projects show a disclosure chevron and remain individually collapsible through Codex's own project-row interaction.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including tasks outside the recent-history limit and tasks not mounted in the sidebar. Newly unread tasks outside the loaded catalog trigger an immediate catalog refresh. Returning to Codex refreshes persisted unread state before the catalog, and opening the dashboard immediately reconciles live sidebar read state. Only matching local sidebar rows can override local state; unchanged sidebar values cannot repeatedly override newer persisted changes. Live changes survive persistence lag until acknowledged or superseded by new task activity. Opening a task does not optimistically mark it read; Codex remains the source of truth.
@@ -50,13 +50,13 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 ## Review loops
 
 The sidebar includes a dedicated **Review loop** page beside **To-dos**. Choose a local,
-single-folder project, a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**), a project type (general or personal), separate review and fix models with supported reasoning efforts (or Codex defaults for either), and a maximum of 1–20 rounds (default 5). P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout.
+single-folder project, a review type (bugs and issues, simplification and structure, simplification and naming, or performance), a project type (general or personal), Standard or Fast speed, separate review and fix models with supported reasoning efforts (or Codex defaults for either), and a maximum of 1–20 rounds (default 5). Bugs and performance reviews also have a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**); P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout. Multiple projects can have active loops, with one active loop per project and checkout.
 
-The review prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
+The review prompt follows the selected review type. The bugs prompt is **Review project for bugs and issues.** Selecting Personal project adds **(this is a project for personal use)** before the final period.
 
 The driver appends a Markdown response contract to each prompt. Reviews show a
-summary and a separate priority heading, explanation, and file link for each
-finding. The selected priority limit constrains the requested findings.
+summary and a separate explanation and file link for each finding. Bugs and
+performance findings also have priority headings and follow the selected priority limit.
 `ReviewReportContract` reads the explicit status and finding count, rejecting missing
 sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
 stops without sending a fix request. Otherwise the same chat receives
@@ -89,6 +89,6 @@ converted; start a new loop if an unfinished old turn returns that format. Malfo
 requests, dirty checkouts, or unexpected changes stop progression with an
 explanation. Pause lets the current review/fix round finish. Stop prevents new
 work without interrupting an already-running chat. Keep both Codex and Dashboard
-running; the feature is limited to one loop at a time. Avoid other edits in the
+running. Avoid other edits in the
 selected checkout while a loop is active. The desktop bridge is unofficial and
 may require maintenance after Codex updates.

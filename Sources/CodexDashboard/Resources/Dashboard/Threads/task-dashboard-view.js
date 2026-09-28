@@ -126,25 +126,25 @@ const taskDashboardView = (() => {
       ? [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))]
       : null;
     const displayedChangedProjectPaths = changedProjectPaths?.slice(0, visibleThreadLimit);
-    const recentThreads = filterMode === 'home'
+    const recentThreads = filterMode === 'all'
       ? visibleThreads.filter((thread) => thread.runState !== 'running')
       : null;
     const displayedThreads = changedProjectPaths
       ? visibleThreads.filter((thread) => displayedChangedProjectPaths
         .includes(String(thread.projectPath).trim()))
-      : filterMode === 'home'
+      : filterMode === 'all'
         ? [...visibleThreads.filter((thread) => thread.runState === 'running'),
           ...recentThreads.slice(0, visibleThreadLimit)]
         : visibleThreads.slice(0, visibleThreadLimit);
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = changedProjectPaths
       ? visibleThreadLimit >= changedProjectPaths.length
-      : filterMode === 'home'
+      : filterMode === 'all'
         ? visibleThreadLimit >= recentThreads.length
         : displayedThreads.length >= visibleThreads.length;
     const list = page.querySelector('[data-thread-list]');
-    list.classList.toggle('is-compact', filterMode === 'home');
-    list.classList.toggle('has-sections', filterMode === 'home' && state.runningCount > 0);
+    list.classList.toggle('is-compact', filterMode === 'all');
+    list.classList.toggle('has-sections', filterMode === 'all' && state.runningCount > 0);
     if (!visibleThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'

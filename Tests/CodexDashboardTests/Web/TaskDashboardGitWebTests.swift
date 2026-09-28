@@ -388,7 +388,11 @@ extension TaskDashboardWebTests {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(1500))
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.documentElement.dataset.commitOpened === 'true'",
+            in: webView,
+            timeout: .seconds(5)
+        )
         let state = try await webView.evaluateJavaScript(
             """
             [

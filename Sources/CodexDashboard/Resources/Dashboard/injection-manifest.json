@@ -39,7 +39,6 @@
     "Reviews/review-rpc-client",
     "Reviews/review-loop-view",
     "Reviews/review-loop-page",
-    "Core/dashboard-composition",
     "Core/dashboard-navigation",
     "Core/dashboard-bridge"
   ],

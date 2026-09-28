@@ -131,15 +131,11 @@ function createPromptLibrary({ findThread }) {
     const values = new FormData(form);
     const name = String(values.get('sectionName') || '').trim();
     if (!name) return;
-    const section = promptStore.resolveSection(name);
-    const nextSections = promptStore.sections.includes(section)
-      ? promptStore.sections
-      : [...promptStore.sections, section];
-    if (!stageLibraryUpdate(promptStore.prompts, nextSections)) return;
-    const nextCollapsedSections = new Set(promptStore.collapsedSections);
-    nextCollapsedSections.delete(section);
-    promptStore.saveCollapsedSections(nextCollapsedSections);
-    promptStore.collapsedSections = nextCollapsedSections;
+    const section = promptStore.createSection(name);
+    if (!section) {
+      showDialogError();
+      return;
+    }
     dialogState = { mode: 'list' };
     renderDialog();
     [...document.querySelectorAll('[data-prompt-section-toggle]')]
@@ -149,27 +145,15 @@ function createPromptLibrary({ findThread }) {
   function renamePromptSection(form) {
     const name = String(new FormData(form).get('sectionName') || '').trim();
     if (!name) return;
-    const source = dialogState.section;
-    const destination = promptStore.normalizeSection(name);
-    const conflictingSection = promptStore.sections.find((section) => (
-      section !== source
-        && section.localeCompare(destination, undefined, { sensitivity: 'accent' }) === 0
-    ));
-    if (conflictingSection) {
+    const result = promptStore.renameSection(dialogState.section, name);
+    if (result === 'conflict') {
       showDialogError('A section with that name already exists.');
       return;
     }
-    const nextPrompts = promptStore.prompts.map((prompt) => (
-      promptStore.normalizeSection(prompt.section) === source
-        ? { ...prompt, section: destination }
-        : prompt
-    ));
-    const nextSections = promptStore.sections.map((section) => (
-      section === source ? destination : section
-    ));
-    if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
-    promptStore.collapsedSections.delete(source);
-    promptStore.saveCollapsedSections();
+    if (result === 'failed') {
+      showDialogError();
+      return;
+    }
     dialogState = { mode: 'list' };
     renderDialog();
   }
@@ -207,24 +191,17 @@ function createPromptLibrary({ findThread }) {
   }
 
   function toggleSection(section) {
-    if (promptStore.collapsedSections.has(section)) promptStore.collapsedSections.delete(section);
-    else promptStore.collapsedSections.add(section);
-    promptStore.saveCollapsedSections();
+    promptStore.toggleSection(section);
     renderDialog();
     [...document.querySelectorAll('[data-prompt-section-toggle]')]
       .find((button) => button.dataset.promptSectionToggle === section)?.focus();
   }
 
   function deleteSection(section) {
-    const nextPrompts = promptStore.prompts.map((prompt) => (
-      promptStore.normalizeSection(prompt.section) === section
-        ? { ...prompt, section: promptLibraryContract.defaultSection }
-        : prompt
-    ));
-    const nextSections = promptStore.sections.filter((item) => item !== section);
-    if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
-    promptStore.collapsedSections.delete(section);
-    promptStore.saveCollapsedSections();
+    if (!promptStore.deleteSection(section)) {
+      showDialogError();
+      return;
+    }
     renderDialog();
   }
 

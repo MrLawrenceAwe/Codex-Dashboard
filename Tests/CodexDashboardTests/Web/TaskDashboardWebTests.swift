@@ -200,7 +200,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
-              document.querySelector('[data-filter="home"]').click();
+              document.querySelector('[data-filter="all"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
               return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.hiddenChangeIndicatorPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
@@ -215,7 +215,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
         XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? String, "home")
+        XCTAssertEqual(values[1] as? String, "all")
         XCTAssertEqual(values[2] as? Bool, false)
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
@@ -223,28 +223,30 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Bool, true)
     }
 
-    func testSavedRecentFilterMigratesToHome() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: """
-            <!doctype html><html><body>
-              <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-              <main>Conversation surface</main>
-            </body></html>
-            """,
-            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
-            clearLocalStorage: true
-        )
-        _ = try await webView.evaluateJavaScript("""
-        window.__codexDashboard.destroy();
-        localStorage.setItem('codex-dashboard.task-preferences', JSON.stringify({ filterMode: 'recent' }));
-        """)
-        let injection = try InjectionBundle.load()
-        _ = try await webView.evaluateJavaScript(injection.mountExpression)
-        let result = try await webView.evaluateJavaScript("""
-        [JSON.parse(localStorage.getItem('codex-dashboard.task-preferences')).filterMode,
-         document.querySelector('[data-filter="home"]').classList.contains('is-active')]
-        """) as? [AnyHashable]
-        XCTAssertEqual(result, ["home", true])
+    func testSavedAllTasksFiltersMigrateToCurrentValue() async throws {
+        for previousFilter in ["recent", "home"] {
+            let webView = try await DashboardWebTestHarness.mountedWebView(
+                html: """
+                <!doctype html><html><body>
+                  <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+                  <main>Conversation surface</main>
+                </body></html>
+                """,
+                baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+                clearLocalStorage: true
+            )
+            _ = try await webView.evaluateJavaScript("""
+            window.__codexDashboard.destroy();
+            localStorage.setItem('codex-dashboard.task-preferences', JSON.stringify({ filterMode: '\(previousFilter)' }));
+            """)
+            let injection = try InjectionBundle.load()
+            _ = try await webView.evaluateJavaScript(injection.mountExpression)
+            let result = try await webView.evaluateJavaScript("""
+            [JSON.parse(localStorage.getItem('codex-dashboard.task-preferences')).filterMode,
+             document.querySelector('[data-filter="all"]').classList.contains('is-active')]
+            """) as? [AnyHashable]
+            XCTAssertEqual(result, ["all", true])
+        }
     }
 
     func testCurrentPreferencesMigrateMutedPathsWithoutKeepingOldField() async throws {
