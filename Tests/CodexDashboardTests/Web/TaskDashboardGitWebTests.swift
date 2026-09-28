@@ -149,7 +149,7 @@ extension TaskDashboardWebTests {
 
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? [AnyHashable], ["1", 1, "Hide change indicators"])
-        XCTAssertEqual(values[1] as? [AnyHashable], ["0", true, 1, "Show change indicators", false, "Indicators hidden1", 0])
+        XCTAssertEqual(values[1] as? [AnyHashable], ["1", true, 1, "Show change indicators", false, "Indicators hidden1", 0])
         XCTAssertEqual(values[2] as? [AnyHashable], ["1", false, 1, "Hide change indicators", 1])
     }
 

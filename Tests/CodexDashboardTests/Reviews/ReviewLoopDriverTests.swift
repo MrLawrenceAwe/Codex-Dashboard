@@ -4,8 +4,10 @@ import XCTest
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
     func testSavedModelSelectionMigratesToCurrentNames() throws {
-        let saved = Data(#"{"model":"chosen","effort":"high"}"#.utf8)
-        let selection = try JSONDecoder().decode(ReviewModelSelection.self, from: saved)
+        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved["reviewSelection"] = ["model": "chosen", "effort": "high"]
+        let selection = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first?.reviewSelection)
         XCTAssertEqual(selection.modelID, "chosen")
         XCTAssertEqual(selection.reasoningEffort, "high")
         let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(selection)) as? [String: String])
@@ -16,7 +18,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         saved["selection"] = ["modelID": "previous-model", "reasoningEffort": "high"]
-        let restored = try JSONDecoder().decode(ReviewLoop.self, from: JSONSerialization.data(withJSONObject: saved))
+        let restored = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first)
         XCTAssertEqual(restored.reviewSelection?.modelID, "previous-model")
         XCTAssertEqual(restored.fixSelection?.reasoningEffort, "high")
         let rewritten = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])

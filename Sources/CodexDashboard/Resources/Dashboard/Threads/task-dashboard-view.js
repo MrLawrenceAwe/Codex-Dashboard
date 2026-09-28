@@ -119,12 +119,12 @@ const taskDashboardView = (() => {
     });
     const filterCounts = {
       unread: state.unreadCount,
-      changedProjects: state.indicatedChangedProjectPaths.size,
+      changedProjects: state.allChangedProjectPaths.size,
     };
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const { visibleThreads, displayedThreads, runningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
+    const { visibleThreads, displayedThreads, leadingRunningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
@@ -147,7 +147,7 @@ const taskDashboardView = (() => {
       list,
       threadMarkup.renderThreadList(displayedThreads, {
         filterMode,
-        runningThreadCount,
+        leadingRunningThreadCount,
         collapsedProjectPaths,
         hiddenChangeIndicatorPaths,
         isUnread: isThreadUnread,

@@ -9,31 +9,6 @@ struct ReviewModel: Codable, Sendable {
 struct ReviewModelSelection: Codable, Equatable, Sendable {
     let modelID: String
     let reasoningEffort: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case modelID, reasoningEffort
-        case savedModelID = "model"
-        case savedReasoningEffort = "effort"
-    }
-
-    init(modelID: String, reasoningEffort: String?) {
-        self.modelID = modelID
-        self.reasoningEffort = reasoningEffort
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        modelID = try values.decodeIfPresent(String.self, forKey: .modelID)
-            ?? values.decode(String.self, forKey: .savedModelID)
-        reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
-            ?? values.decodeIfPresent(String.self, forKey: .savedReasoningEffort)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(modelID, forKey: .modelID)
-        try values.encodeIfPresent(reasoningEffort, forKey: .reasoningEffort)
-    }
 }
 
 enum ReviewFocus: String, Codable, CaseIterable, Sendable {
@@ -103,6 +78,13 @@ struct ReviewProject: Codable, Equatable, Sendable {
 
 enum ReviewLoopPhase: String, Codable, Sendable {
     case waiting, running, paused, completed, limitReached, stopped, blocked
+
+    var isFinished: Bool {
+        switch self {
+        case .completed, .limitReached, .stopped, .blocked: true
+        case .waiting, .running, .paused: false
+        }
+    }
 }
 
 struct ReviewRound: Codable, Equatable, Sendable {
@@ -172,67 +154,4 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var expectedCommit: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
-}
-
-extension ReviewLoop {
-    private enum CodingKeys: String, CodingKey {
-        // Existing review-loop.json files store this field as projectType.
-        case id, startActionID, project, instructions,
-             promptContext = "projectType", maxRounds, reviewSelection, fixSelection, selection, focus, speed,
-             priorityLimit, phase, pauseRequested, branch, checkoutRoot, expectedCommit, rounds, message
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        id = try values.decode(UUID.self, forKey: .id)
-        startActionID = try values.decode(String.self, forKey: .startActionID)
-        project = try values.decode(ReviewProject.self, forKey: .project)
-        if let promptContext = try values.decodeIfPresent(ReviewPromptContext.self, forKey: .promptContext) {
-            self.promptContext = promptContext
-        } else {
-            let previousContext = try values.decode(String.self, forKey: .instructions)
-            switch previousContext {
-            case "": promptContext = .general
-            case "(this is a project for personal use)": promptContext = .personal
-            default: promptContext = .savedContext(previousContext)
-            }
-        }
-        maxRounds = try values.decode(Int.self, forKey: .maxRounds)
-        let previousSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .selection)
-        reviewSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .reviewSelection) ?? previousSelection
-        fixSelection = try values.decodeIfPresent(ReviewModelSelection.self, forKey: .fixSelection) ?? previousSelection
-        focus = try values.decodeIfPresent(ReviewFocus.self, forKey: .focus) ?? .bugs
-        speed = try values.decodeIfPresent(ReviewSpeed.self, forKey: .speed) ?? .standard
-        priorityLimit = focus.usesPriorities
-            ? try values.decodeIfPresent(ReviewFinding.Priority.self, forKey: .priorityLimit) ?? .p2
-            : nil
-        phase = try values.decode(ReviewLoopPhase.self, forKey: .phase)
-        pauseRequested = try values.decode(Bool.self, forKey: .pauseRequested)
-        branch = try values.decodeIfPresent(String.self, forKey: .branch)
-        checkoutRoot = try values.decodeIfPresent(String.self, forKey: .checkoutRoot)
-        expectedCommit = try values.decodeIfPresent(String.self, forKey: .expectedCommit)
-        rounds = try values.decode([ReviewRound].self, forKey: .rounds)
-        message = try values.decode(String.self, forKey: .message)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(id, forKey: .id)
-        try values.encode(startActionID, forKey: .startActionID)
-        try values.encode(project, forKey: .project)
-        try values.encode(promptContext, forKey: .promptContext)
-        try values.encode(maxRounds, forKey: .maxRounds)
-        try values.encodeIfPresent(reviewSelection, forKey: .reviewSelection)
-        try values.encodeIfPresent(fixSelection, forKey: .fixSelection)
-        try values.encode(focus, forKey: .focus)
-        try values.encode(speed, forKey: .speed)
-        try values.encodeIfPresent(priorityLimit, forKey: .priorityLimit)
-        try values.encode(phase, forKey: .phase)
-        try values.encode(pauseRequested, forKey: .pauseRequested)
-        try values.encodeIfPresent(branch, forKey: .branch)
-        try values.encodeIfPresent(checkoutRoot, forKey: .checkoutRoot)
-        try values.encodeIfPresent(expectedCommit, forKey: .expectedCommit)
-        try values.encode(rounds, forKey: .rounds)
-        try values.encode(message, forKey: .message)
-    }
 }

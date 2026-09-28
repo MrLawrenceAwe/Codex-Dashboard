@@ -91,7 +91,7 @@ const threadMarkup = (() => {
 
   function renderThreadList(visibleThreads, {
     filterMode,
-    runningThreadCount = 0,
+    leadingRunningThreadCount = 0,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
     isUnread,
@@ -104,9 +104,9 @@ const threadMarkup = (() => {
         isUnread: isUnread(item),
         isCompletionTickVisible,
       })).join('');
-      const running = visibleThreads.slice(0, runningThreadCount);
+      const running = visibleThreads.slice(0, leadingRunningThreadCount);
       if (!running.length) return renderRows(visibleThreads);
-      const recent = visibleThreads.slice(runningThreadCount);
+      const recent = visibleThreads.slice(leadingRunningThreadCount);
       return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running tasks">
         <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
         ${renderRows(running)}

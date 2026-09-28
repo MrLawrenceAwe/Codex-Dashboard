@@ -23,6 +23,7 @@ struct ReviewLoopSnapshot: Codable, Sendable {
     let models: [ReviewModel]
     let reviewTypes: [ReviewTypeOption]
     let loops: [ReviewLoop]
+    let finishedLoopIDs: [UUID]
     let progress: [String: ReviewLoopProgress]
     let error: String?
     let acknowledgedActionID: String?
