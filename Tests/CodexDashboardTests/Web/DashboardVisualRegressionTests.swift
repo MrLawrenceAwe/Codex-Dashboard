@@ -103,9 +103,9 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const testStyle = document.createElement('style');
-              testStyle.textContent = '#codex-dashboard-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';
+              testStyle.textContent = '#codex-dashboard-task-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';
               document.head.append(testStyle);
-              return document.getElementById('codex-dashboard-page').classList.contains('is-open');
+              return document.getElementById('codex-dashboard-task-page').classList.contains('is-open');
             })()
             """
         )

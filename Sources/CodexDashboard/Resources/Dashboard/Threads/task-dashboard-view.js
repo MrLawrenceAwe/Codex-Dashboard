@@ -126,6 +126,9 @@ const taskDashboardView = (() => {
       ? [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))]
       : null;
     const displayedChangedProjectPaths = changedProjectPaths?.slice(0, visibleThreadLimit);
+    const runningThreads = filterMode === 'all'
+      ? visibleThreads.filter((thread) => thread.runState === 'running')
+      : null;
     const recentThreads = filterMode === 'all'
       ? visibleThreads.filter((thread) => thread.runState !== 'running')
       : null;
@@ -133,8 +136,7 @@ const taskDashboardView = (() => {
       ? visibleThreads.filter((thread) => displayedChangedProjectPaths
         .includes(String(thread.projectPath).trim()))
       : filterMode === 'all'
-        ? [...visibleThreads.filter((thread) => thread.runState === 'running'),
-          ...recentThreads.slice(0, visibleThreadLimit)]
+        ? [...runningThreads, ...recentThreads.slice(0, visibleThreadLimit)]
         : visibleThreads.slice(0, visibleThreadLimit);
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = changedProjectPaths
@@ -156,6 +158,7 @@ const taskDashboardView = (() => {
       list,
       threadMarkup.renderThreadList(displayedThreads, {
         filterMode,
+        runningThreadCount: runningThreads?.length || 0,
         collapsedProjectPaths,
         hiddenChangeIndicatorPaths,
         isUnread: isThreadUnread,

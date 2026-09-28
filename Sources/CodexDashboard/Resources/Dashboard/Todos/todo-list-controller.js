@@ -40,10 +40,8 @@ function createTodoList({ threadReferencesForProject }) {
   function refreshProjects() {
     if (destroyed) return;
     projects = codexUIContracts.projects();
-    const selected = selectedProject && projects.some((project) => project.id === selectedProject.id)
-      ? selectedProject.id : '';
-    if (!selected) selectedProject = null;
-    todoListView.updateProjectOptions(projects, selected);
+    selectedProject = projects.find((project) => project.id === selectedProject?.id) || null;
+    todoListView.updateProjectOptions(projects, selectedProject?.id || '');
     refreshThreadOptions();
     updateFilterOptions();
   }

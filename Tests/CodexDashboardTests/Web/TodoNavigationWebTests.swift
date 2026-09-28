@@ -10,7 +10,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (async () => {
           const state = () => [
-            document.getElementById('codex-dashboard-page').classList.contains('is-open'),
+            document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
             document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
             document.querySelectorAll('[aria-current="page"]').length,
           ];
@@ -21,7 +21,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
           document.getElementById('codex-dashboard-todo-navigation').remove();
           window.__codexDashboard.ensureMounted();
           const remounted = state();
-          document.getElementById('codex-dashboard-navigation').click();
+          document.getElementById('codex-dashboard-task-navigation').click();
           await window.__waitForTodoSaves?.();
           const tasks = state();
           window.__codexDashboard.openTodos();
@@ -67,7 +67,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
-              const taskButton = document.getElementById('codex-dashboard-navigation');
+              const taskButton = document.getElementById('codex-dashboard-task-navigation');
               const todoButton = document.getElementById('codex-dashboard-todo-navigation');
               todoButton.click();
               await window.__waitForTodoSaves?.();

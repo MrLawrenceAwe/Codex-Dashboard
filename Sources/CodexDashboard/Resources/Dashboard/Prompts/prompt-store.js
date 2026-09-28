@@ -28,18 +28,6 @@ const promptStore = (() => {
     }
   }
 
-  function loadLegacyLibrary() {
-    const storedLibrary = readJSON(libraryStorageKey, null);
-    if (!promptLibraryContract.isValidLibrary(storedLibrary)) {
-      return { version, prompts: [], sections: [] };
-    }
-    return {
-      version,
-      prompts: normalizePrompts(storedLibrary.prompts),
-      sections: normalizeSections(storedLibrary.sections, storedLibrary.prompts),
-    };
-  }
-
   function normalizedLibrary(library) {
     if (!promptLibraryContract.isValidLibrary(library)) return null;
     return {
@@ -65,7 +53,12 @@ const promptStore = (() => {
     return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
   }
 
-  const library = pendingLibrary() || loadLegacyLibrary();
+  function loadCachedLibrary() {
+    return normalizedLibrary(readJSON(libraryStorageKey, null))
+      || { version, prompts: [], sections: [] };
+  }
+
+  const library = pendingLibrary() || loadCachedLibrary();
   const storedCollapsedSections = readJSON(collapsedSectionsStorageKey, []);
   const store = {
     prompts: library.prompts,

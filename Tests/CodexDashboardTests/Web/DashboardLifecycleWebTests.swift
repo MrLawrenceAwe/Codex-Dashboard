@@ -25,7 +25,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         """)
         let assertion = """
         (() => {
-          const ids = ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation',
+          const ids = ['codex-dashboard-task-navigation', 'codex-dashboard-todo-navigation',
             'codex-dashboard-review-navigation'];
           return ids.every((id, index) => {
             const button = document.getElementById(id);
@@ -39,7 +39,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(mounted, true)
         let opensPages = try await webView.evaluateJavaScript("""
         (() => {
-          return ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation',
+          return ['codex-dashboard-task-navigation', 'codex-dashboard-todo-navigation',
             'codex-dashboard-review-navigation'].map((id) => {
             document.getElementById(id).click();
             return document.getElementById(id).getAttribute('aria-current') === 'page';
@@ -75,7 +75,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               const tooltipTrigger = document.querySelector('span[data-state].contents');
-              return ['codex-dashboard-navigation', 'codex-dashboard-todo-navigation'].map((id) => {
+              return ['codex-dashboard-task-navigation', 'codex-dashboard-todo-navigation'].map((id) => {
                 const button = document.getElementById(id);
                 return [button.parentElement === tooltipTrigger, tooltipTrigger.contains(button)];
               });
@@ -109,7 +109,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               };
               window.__codexDashboard.applyThreads((\(payload)).threads);
               row.__reactFiber$test.memoizedProps.isUnread = true;
-              document.getElementById('codex-dashboard-navigation')
+              document.getElementById('codex-dashboard-task-navigation')
                 .append(document.createElement('span'));
               return true;
             })()
@@ -164,7 +164,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         let dashboardStyles = try await webView.evaluateJavaScript(
             """
             (() => {
-              const styles = getComputedStyle(document.getElementById('codex-dashboard-page'));
+              const styles = getComputedStyle(document.getElementById('codex-dashboard-task-page'));
               return [styles.backgroundColor, styles.color, styles.getPropertyValue('--dashboard-bg').trim()];
             })()
             """
@@ -176,8 +176,8 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             (() => {
               const root = document.documentElement.style;
               const readStyles = () => {
-                const page = getComputedStyle(document.getElementById('codex-dashboard-page'));
-                const navigation = getComputedStyle(document.getElementById('codex-dashboard-navigation'));
+                const page = getComputedStyle(document.getElementById('codex-dashboard-task-page'));
+                const navigation = getComputedStyle(document.getElementById('codex-dashboard-task-navigation'));
                 const navigationCopy = getComputedStyle(document.querySelector('.dashboard-nav-copy'));
                 const todo = getComputedStyle(document.getElementById('codex-dashboard-todo-page'));
                 return [page.backgroundColor, page.color, navigationCopy.color, navigation.color, todo.backgroundColor, todo.color];
@@ -187,7 +187,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               const light = readStyles();
               root.setProperty('--app-color-background-surface', '#212121');
               root.setProperty('--app-color-text-foreground', '#ececec');
-              document.getElementById('codex-dashboard-navigation').style.color = '#ececec';
+              document.getElementById('codex-dashboard-task-navigation').style.color = '#ececec';
               const dark = readStyles();
               return [light, dark];
             })()
@@ -236,7 +236,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');
               visibleThreads[0].click();
               return [
-                Boolean(document.getElementById('codex-dashboard-navigation')),
+                Boolean(document.getElementById('codex-dashboard-task-navigation')),
                 visibleThreads.length,
                 visibleThreads[0].dataset.threadId,
                 document.documentElement.classList.contains('codex-dashboard-open'),
@@ -286,8 +286,8 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.destroy();
               return [
                 typeof window.__codexDashboard === 'undefined'
-                  && !document.getElementById('codex-dashboard-page')
-                  && !document.getElementById('codex-dashboard-navigation'),
+                  && !document.getElementById('codex-dashboard-task-page')
+                  && !document.getElementById('codex-dashboard-task-navigation'),
                 clearedTimerCount,
               ];
             })()
