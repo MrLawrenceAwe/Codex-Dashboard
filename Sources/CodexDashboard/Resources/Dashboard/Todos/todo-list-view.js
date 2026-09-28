@@ -59,8 +59,8 @@ const todoListView = (() => {
 
   function itemPresetMarkup(item) {
     return `<details class="todo-preset" data-todo-preset-details>
-      <summary>${domUtils.escapeHTML((composerPresets.summary(item.preset).join(' · ') || 'Model preset'))}</summary>
-      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Use model preset</label>
+      <summary>${domUtils.escapeHTML((composerPresets.summary(item.preset).join(' · ') || 'Composer preset'))}</summary>
+      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Use composer preset</label>
       ${presetFields(item.preset, 'item')}
     </details>`;
   }
@@ -224,7 +224,7 @@ const todoListView = (() => {
               <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
             </div>
             <div class="todo-new-preset">
-              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Use model preset</label>
+              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Use composer preset</label>
               ${presetFields(null, 'new')}
             </div>
           </div>
@@ -232,7 +232,7 @@ const todoListView = (() => {
         </form>
         <p class="todo-image-paste-status" data-todo-new-image-status hidden></p>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
-        <p class="todo-storage-error" data-todo-composer-error role="alert" hidden>Could not apply this to-do’s model preset. The to-do was not inserted.</p>
+        <p class="todo-storage-error" data-todo-composer-error role="alert" hidden>Could not apply this to-do’s composer preset. The to-do was not inserted.</p>
         <p class="todo-storage-error" data-todo-image-error role="alert" hidden></p>
         <div class="todo-toolbar">
           <div class="todo-filters" aria-label="Filter to-dos">

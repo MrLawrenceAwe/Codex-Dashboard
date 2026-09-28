@@ -39,7 +39,7 @@ const reviewLoopPage = (() => {
         focus,
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: details.querySelector('[data-review-prompt-context]').value || 'general' },
-        priorityLimit: ['organisation', 'naming'].includes(focus) ? null : details.querySelector('[data-review-priority]').value,
+        priorityLimit: reviewLoopView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopView.renderReviewSettings());

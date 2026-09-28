@@ -19,5 +19,5 @@ function createThreadCatalog() {
     return threads.filter((thread) => String(thread.projectPath).trim() === projectPath)
       .map((thread) => ({ id: thread.id, title: thread.title }));
   }
-  return { applyThreads, clear, findThread: (id) => threadsByID.get(id), threadReferencesForProject };
+  return { applyThreads, clear, currentThreads: () => threads, findThread: (id) => threadsByID.get(id), threadReferencesForProject };
 }

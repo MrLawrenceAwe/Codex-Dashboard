@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class TodoPresetWebTests: SerializedDashboardWebTestCase {
-    func testTodoModelPresetCanBeCreatedEditedAndRemoved() async throws {
+    func testTodoComposerPresetCanBeCreatedEditedAndRemoved() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: DashboardWebTestHarness.basicTodoHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
@@ -51,7 +51,7 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[7] as? Bool, false)
     }
 
-    func testNewTaskKeepsTodoDraftVisibleWhenItsModelPresetCannotBeApplied() async throws {
+    func testNewTaskKeepsTodoDraftVisibleWhenItsComposerPresetCannotBeApplied() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><body>
@@ -93,7 +93,7 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
         """) as? [AnyHashable]
         XCTAssertEqual(result, [
             "Keep this draft",
-            "Could not apply this to-do’s model preset. Check the model, effort, and speed before sending.",
+            "Could not apply this to-do’s composer preset. Check the model, effort, and speed before sending.",
             false,
         ])
     }

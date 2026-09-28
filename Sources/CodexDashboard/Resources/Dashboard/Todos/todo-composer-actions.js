@@ -100,7 +100,7 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
       if (current && containsText(current) && (!image || current === imageComposer)) {
         if (presetFailed) showComposerWarning(
           current,
-          'Could not apply this to-do’s model preset. Check the model, effort, and speed before sending.',
+          'Could not apply this to-do’s composer preset. Check the model, effort, and speed before sending.',
         );
         return true;
       }

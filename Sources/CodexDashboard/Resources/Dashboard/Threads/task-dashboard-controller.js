@@ -1,6 +1,6 @@
 function createTaskDashboard({ catalog }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
-  let threads = [];
+  const currentThreads = catalog.currentThreads;
   const storedPreferences = taskDashboardPreferences.loadPreferences();
   let filterMode = storedPreferences.filterMode;
   const pageSize = 10;
@@ -39,12 +39,12 @@ function createTaskDashboard({ catalog }) {
   }
 
   function deriveViewState() {
-    return taskDashboardQuery.summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths);
+    return taskDashboardQuery.summarizeActivity(currentThreads(), isThreadUnread, hiddenChangeIndicatorPaths);
   }
 
   function syncInterruptedSidebarMarkers() {
     const nextInterruptedThreadIDs = new Set(
-      threads
+      currentThreads()
         .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
         .map((thread) => thread.id),
     );
@@ -81,7 +81,7 @@ function createTaskDashboard({ catalog }) {
 
   async function openCommitDialogForProject(projectPath) {
     commitDialogError = '';
-    const thread = threads.find(
+    const thread = currentThreads().find(
       (item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath,
     );
     if (!thread) {
@@ -101,7 +101,7 @@ function createTaskDashboard({ catalog }) {
     cancelScheduledRender();
     const state = deriveViewState();
     const rendered = taskDashboardView.render({
-      threads,
+      threads: currentThreads(),
       filterMode,
       visibleThreadLimit: visibleLimit,
       collapsedProjectPaths,
@@ -239,10 +239,9 @@ function createTaskDashboard({ catalog }) {
     presentationState.scheduleUnreadSync();
   }
 
-  function applyThreads(nextThreads) {
-    threads = nextThreads;
+  function applyThreads() {
     syncInterruptedSidebarMarkers();
-    presentationState.applyThreads(threads);
+    presentationState.applyThreads(currentThreads());
     // A native refresh can update the catalog, unread state, and Git state in a
     // short burst. Keep the renderer responsive by applying only the latest
     // snapshot in the next frame instead of rebuilding the task list for each
