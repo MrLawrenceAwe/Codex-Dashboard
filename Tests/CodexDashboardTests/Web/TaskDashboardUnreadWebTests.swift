@@ -5,6 +5,55 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testMarkAllAsReadAcknowledgesEveryUnreadThreadIncludingOffSidebar() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: true),
+            .fixture(id: "two", isUnread: true),
+        ])
+
+        let initial = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const threads = (\(payload)).threads;
+              window.__markedRoutes = [];
+              const readIDs = new Set();
+              window.addEventListener('message', (event) => {
+                if (event.data?.type !== 'navigate-to-route') return;
+                const id = decodeURIComponent(event.data.path.split('/').at(-1));
+                window.__markedRoutes.push(id);
+                readIDs.add(id);
+                window.__codexDashboard.applyThreads(threads.map((thread) =>
+                  readIDs.has(thread.id) ? { ...thread, isUnread: false } : thread));
+              });
+              window.__codexDashboard.applyThreads(threads);
+              window.__codexDashboard.open();
+              const button = document.querySelector('[data-mark-all-read]');
+              return [button.textContent, button.hidden, button.disabled];
+            })()
+            """
+        ) as? [Any]
+        XCTAssertEqual(initial?[0] as? String, "Mark all as read")
+        XCTAssertEqual(initial?[1] as? Bool, false)
+        XCTAssertEqual(initial?[2] as? Bool, false)
+
+        _ = try await webView.evaluateJavaScript("document.querySelector('[data-mark-all-read]').click()")
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-filter-count=\"unread\"]').textContent === '0' && document.querySelector('[data-mark-all-read]').hidden",
+            in: webView
+        )
+        let result = try await webView.evaluateJavaScript(
+            """
+            [window.__markedRoutes.join(','),
+             document.querySelector('[data-navigation-count]').hidden,
+             document.getElementById('codex-dashboard-task-page').classList.contains('is-open')]
+            """
+        ) as? [Any]
+        XCTAssertEqual(result?[0] as? String, "one,two")
+        XCTAssertEqual(result?[1] as? Bool, true)
+        XCTAssertEqual(result?[2] as? Bool, true)
+    }
+
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

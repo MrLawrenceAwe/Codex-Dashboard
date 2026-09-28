@@ -92,6 +92,8 @@ const taskDashboardView = (() => {
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
     commitDialogError,
+    markAllReadPending,
+    markAllReadError,
     isThreadUnread,
     isCompletionTickVisible,
     state,
@@ -99,10 +101,16 @@ const taskDashboardView = (() => {
     updateSidebarStatus(state);
     const page = document.getElementById(dashboardElements.elementIDs.taskPage);
     if (!page) return false;
-    const notice = page.querySelector('[data-commit-notice]');
+    const notice = page.querySelector('[data-task-notice]');
     if (notice) {
-      notice.textContent = commitDialogError;
-      notice.hidden = !commitDialogError;
+      notice.textContent = markAllReadError || commitDialogError;
+      notice.hidden = !markAllReadError && !commitDialogError;
+    }
+    const markAllRead = page.querySelector('[data-mark-all-read]');
+    if (markAllRead) {
+      markAllRead.hidden = state.unreadCount === 0 && !markAllReadPending;
+      markAllRead.disabled = markAllReadPending;
+      markAllRead.textContent = markAllReadPending ? 'Marking as read…' : 'Mark all as read';
     }
     page.querySelectorAll('[data-filter]').forEach((button) => {
       const isActive = button.dataset.filter === filterMode;

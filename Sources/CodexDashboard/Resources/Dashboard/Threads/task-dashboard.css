@@ -113,7 +113,11 @@ aside [data-codex-sidebar-interrupted] {
 #codex-dashboard-task-page .dashboard-notice[hidden] { display: none; }
 
 #codex-dashboard-task-page .dashboard-section-header { position: sticky; z-index: 4; top: -1px; margin: 18px 0 0; padding: 10px 0 13px; border-top: 1px solid var(--dashboard-line); background: var(--dashboard-bg); }
-#codex-dashboard-task-page .dashboard-toolbar { display: flex; align-items: end; }
+#codex-dashboard-task-page .dashboard-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+#codex-dashboard-task-page .dashboard-mark-all-read { min-height: 26px; padding: 4px 8px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: transparent; color: var(--dashboard-muted); font-size: 11px; cursor: pointer; white-space: nowrap; }
+#codex-dashboard-task-page .dashboard-mark-all-read:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
+#codex-dashboard-task-page .dashboard-mark-all-read:disabled { cursor: progress; opacity: .6; }
+#codex-dashboard-task-page .dashboard-mark-all-read[hidden] { display: none; }
 #codex-dashboard-task-page .dashboard-toolbar-group { display: grid; gap: 6px; }
 #codex-dashboard-task-page .dashboard-control-label { padding-left: 2px; color: var(--dashboard-dim); font-size: 10px; font-weight: 620; letter-spacing: .06em; text-transform: uppercase; }
 #codex-dashboard-task-page .dashboard-filters { display: flex; gap: 3px; padding: 0; border: 0; background: transparent; }

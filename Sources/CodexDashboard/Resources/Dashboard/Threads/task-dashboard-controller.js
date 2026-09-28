@@ -15,6 +15,9 @@ function createTaskDashboard({ catalog }) {
   });
   let viewNeedsRender = true;
   let commitDialogError = '';
+  let markAllReadPending = false;
+  let markAllReadError = '';
+  let destroyed = false;
   let presentationState;
   const completionIndicators = createThreadCompletionIndicators({
     findThread: catalog.findThread,
@@ -79,6 +82,52 @@ function createTaskDashboard({ catalog }) {
     codexHost.navigateToThread(thread);
   }
 
+  async function markAllAsRead() {
+    if (markAllReadPending) return;
+    const unreadThreads = currentThreads().filter(isThreadUnread);
+    if (!unreadThreads.length) return;
+    const previousThreadID = codexUIContracts.activeComposerThreadID();
+    let failed = 0;
+    markAllReadPending = true;
+    markAllReadError = '';
+    commitDialogError = '';
+    codexHost.keepDashboardOpenDuringRead = true;
+    renderDashboard();
+    try {
+      for (const thread of unreadThreads) {
+        if (destroyed) break;
+        if (!isThreadUnread(thread)) continue;
+        try {
+          codexHost.navigateToThread(thread);
+          const acknowledged = await domUtils.waitFor(() => {
+            presentationState.syncUnread();
+            return !isThreadUnread(thread);
+          }, { timeout: 5000, interval: 100 });
+          if (!acknowledged) failed += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+    } finally {
+      if (previousThreadID && !destroyed) {
+        try {
+          codexHost.navigateToThread({ id: previousThreadID });
+          await domUtils.waitFor(
+            () => codexUIContracts.isThreadSelected(previousThreadID), { timeout: 1500 },
+          );
+        } catch { /* Keep the dashboard usable if Codex cannot restore the prior task. */ }
+      }
+      codexHost.keepDashboardOpenDuringRead = false;
+      markAllReadPending = false;
+      if (!destroyed) {
+        markAllReadError = failed
+          ? `Codex could not confirm ${failed} ${failed === 1 ? 'task' : 'tasks'} as read. Try again.`
+          : '';
+        renderDashboard();
+      }
+    }
+  }
+
   async function openCommitDialogForProject(projectPath) {
     commitDialogError = '';
     const thread = currentThreads().find(
@@ -107,6 +156,8 @@ function createTaskDashboard({ catalog }) {
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
       commitDialogError,
+      markAllReadPending,
+      markAllReadError,
       isThreadUnread,
       isCompletionTickVisible,
       state,
@@ -173,6 +224,7 @@ function createTaskDashboard({ catalog }) {
     if (document.getElementById(dashboardElements.elementIDs.taskPage)) return true;
     viewNeedsRender = true;
     const mounted = taskDashboardPage.mount({
+      onMarkAllRead: () => { void markAllAsRead(); },
       onFilter: (nextFilterMode) => {
         if (filterMode === nextFilterMode) return;
         filterMode = nextFilterMode;
@@ -256,6 +308,8 @@ function createTaskDashboard({ catalog }) {
   }
 
   function destroy() {
+    destroyed = true;
+    codexHost.keepDashboardOpenDuringRead = false;
     pageState.close();
     cancelScheduledRender();
     presentationState.destroy();

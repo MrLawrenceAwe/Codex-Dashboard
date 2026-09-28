@@ -194,8 +194,8 @@ extension TaskDashboardWebTests {
             """
             [
               document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
-              document.querySelector('[data-commit-notice]').hidden,
-              document.querySelector('[data-commit-notice]').textContent,
+              document.querySelector('[data-task-notice]').hidden,
+              document.querySelector('[data-task-notice]').textContent,
             ]
             """
         ) as? [Any]

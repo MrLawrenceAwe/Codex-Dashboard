@@ -1,4 +1,5 @@
 const codexHost = {
+  keepDashboardOpenDuringRead: false,
   sidebar() {
     return codexUIContracts.sidebar();
   },
