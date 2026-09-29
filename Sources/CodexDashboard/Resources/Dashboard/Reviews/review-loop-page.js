@@ -1,6 +1,7 @@
 const reviewLoopPage = (() => {
   let snapshot = { projects: [], loops: [], reviewTypes: [], error: null };
   let pendingAction = null;
+  const retainedLoopIDs = new Set();
 
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.reviewPage,
@@ -57,6 +58,12 @@ const reviewLoopPage = (() => {
       }
       const control = event.target.closest('[data-review-action]');
       if (control) queue({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
+      const clear = event.target.closest('[data-review-clear]');
+      if (clear) {
+        retainedLoopIDs.delete(clear.dataset.reviewClear);
+        render();
+        return;
+      }
       const thread = event.target.closest('[data-review-thread]');
       if (thread) {
         dashboardNavigation.close();
@@ -76,19 +83,40 @@ const reviewLoopPage = (() => {
   }
 
   function render() {
-    reviewLoopView.render(snapshot, pendingAction);
+    reviewLoopView.render(snapshot, pendingAction, retainedLoopIDs);
   }
 
   function apply(next) {
     snapshot = next;
+    if (pageState.isOpen()) {
+      for (const loop of next.loops) {
+        if (!next.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
+      }
+    }
+    const knownIDs = new Set(next.loops.map(loop => loop.id));
+    for (const id of retainedLoopIDs) if (!knownIDs.has(id)) retainedLoopIDs.delete(id);
     if (next.acknowledgedActionID === pendingAction?.id) pendingAction = null;
     render();
     return true;
   }
-  function destroy() {
+  function open() {
+    if (!pageState.open()) return false;
+    for (const loop of snapshot.loops) {
+      if (!snapshot.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
+    }
+    render();
+    return true;
+  }
+  function close() {
+    if (!pageState.isOpen()) return;
     pageState.close();
+    retainedLoopIDs.clear();
+    render();
+  }
+  function destroy() {
+    close();
     pendingAction = null;
   }
 
-  return { mountPage, mountNavigation, open: pageState.open, close: pageState.close, destroy, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, apply, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
+  return { mountPage, mountNavigation, open, close, destroy, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, apply, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
 })();

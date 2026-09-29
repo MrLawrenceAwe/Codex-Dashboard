@@ -49,9 +49,9 @@ const reviewLoopView = (() => {
         <h1>Review loops</h1><span class="review-overview" data-review-overview></span>
       </header>
       <section class="review-monitor" aria-labelledby="review-active-title">
-        <div class="review-region-heading"><h2 id="review-active-title">Active loops</h2><span data-review-active-count class="review-count">0</span></div>
-        <section class="review-board" data-review-board aria-label="Active review loops"></section>
-        <div class="review-empty" data-review-empty><strong>No active loops</strong></div>
+        <div class="review-region-heading"><h2 id="review-active-title">Current loops</h2><span data-review-active-count class="review-count">0</span></div>
+        <section class="review-board" data-review-board aria-label="Current review loops"></section>
+        <div class="review-empty" data-review-empty><strong>No current loops</strong></div>
       </section>
       <form data-review-form aria-labelledby="review-setup-title">
         <div class="review-setup-heading"><h2 id="review-setup-title">New loop</h2></div>
@@ -147,7 +147,7 @@ const reviewLoopView = (() => {
     select.disabled = !model || !!pendingAction;
   }
 
-  function render(snapshot, pendingAction) {
+  function render(snapshot, pendingAction, retainedLoopIDs = new Set()) {
     finishedLoopIDs = new Set(snapshot.finishedLoopIDs || []);
     renderNavigationStatus(snapshot);
     const root = panel();
@@ -192,8 +192,9 @@ const reviewLoopView = (() => {
     renderReviewSettings();
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
-    root.querySelector('[data-review-empty]').hidden = activeCount > 0;
-    root.querySelector('[data-review-active-count]').textContent = activeCount;
+    const current = loops.filter(loop => !isFinished(loop) || retainedLoopIDs.has(loop.id));
+    root.querySelector('[data-review-empty]').hidden = current.length > 0;
+    root.querySelector('[data-review-active-count]').textContent = current.length;
     const availability = root.querySelector('[data-review-availability]');
     availability.hidden = availableProjects.length > 0;
     availability.textContent = projects.length ? 'Every project already has an active loop. Finish or stop a loop to start another.' : 'No local projects available. Add a local project in Codex to start a loop.';
@@ -201,8 +202,8 @@ const reviewLoopView = (() => {
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
-    renderCards(root.querySelector('[data-review-board]'), loops.filter(loop => !isFinished(loop)), snapshot, pendingAction);
-    const history = loops.filter(isFinished);
+    renderCards(root.querySelector('[data-review-board]'), current, snapshot, pendingAction, retainedLoopIDs);
+    const history = loops.filter(loop => isFinished(loop) && !retainedLoopIDs.has(loop.id));
     root.querySelector('[data-review-history]').hidden = !history.length;
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
@@ -220,18 +221,18 @@ const reviewLoopView = (() => {
     return loop.phase === 'limitReached' ? 'Limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
   }
 
-  function renderCards(board, loops, snapshot, pendingAction) {
+  function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs = new Set()) {
     const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
     for (const [index, loop] of loops.entries()) {
       const card = cards.get(loop.id) || createCard(loop);
       if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
-      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction);
+      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id));
       cards.delete(loop.id);
     }
     cards.forEach(card => card.remove());
   }
 
-  function renderCard(root, loop, progress, pendingAction) {
+  function renderCard(root, loop, progress, pendingAction, retained) {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
@@ -251,7 +252,7 @@ const reviewLoopView = (() => {
     meter.value = completedRounds;
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = isFinished(loop) ? '' : `${loop.phase === 'paused'
+    controls.innerHTML = isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Clear</button>` : '') : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;

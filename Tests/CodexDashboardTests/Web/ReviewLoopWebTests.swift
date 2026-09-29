@@ -387,7 +387,46 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-badge]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [false, true, "Example <project>", true, "Fixed <issue>", "Pause after round", 1, "1 of 5", true, true, "Pausing after round…", false, 0, "Completed"])
+        XCTAssertEqual(result, [false, true, "Example <project>", true, "Fixed <issue>", "Pause after round", 1, "1 of 5", true, true, "Pausing after round…", false, 1, "Completed"])
+    }
+
+    func testFinishedLoopStaysOnBoardUntilClearedOrPageCloses() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'loop-1',project,phase:'running',maxRounds:1,rounds:[],message:'Reviewing'};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null};
+          const board = () => document.querySelector('[data-review-board]');
+          const history = () => document.querySelector('[data-review-history]');
+          api.applyReviewLoop(snapshot);
+          api.openReviews();
+          loop.phase = 'completed';
+          loop.message = 'No findings remain.';
+          snapshot.finishedLoopIDs = [loop.id];
+          api.applyReviewLoop(snapshot);
+          api.applyReviewLoop(snapshot);
+          const retained = [board().children.length, board().querySelector('[data-review-status]').textContent,
+            !!board().querySelector('[data-review-clear]'), history().hidden];
+          board().querySelector('[data-review-clear]').click();
+          const cleared = [board().children.length, history().hidden, document.querySelector('[data-review-history-select]').value];
+          api.openTodos();
+          api.openReviews();
+          const reopened = [board().children.length, history().hidden];
+          loop.phase = 'running';
+          snapshot.finishedLoopIDs = [];
+          api.applyReviewLoop(snapshot);
+          loop.phase = 'limitReached';
+          snapshot.finishedLoopIDs = [loop.id];
+          api.applyReviewLoop(snapshot);
+          const retainedAgain = board().children.length;
+          api.openTodos();
+          api.openReviews();
+          return [...retained, ...cleared, ...reopened, retainedAgain, board().children.length, history().hidden];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [1, "No findings remain.", true, true, 0, false, "loop-1", 0, false, 1, 0, false])
     }
 
     func testRoundsShowFindingsAndTheirPriorities() async throws {

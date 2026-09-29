@@ -32,6 +32,21 @@ extension TaskDashboardWebTests {
                        "Codex’s read-state action is unavailable. Restart Codex and try again.")
         XCTAssertEqual(result?[1] as? String, "1")
         XCTAssertEqual(result?[2] as? Bool, false)
+
+        let updatedThread = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: false),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.applyThreads((\(updatedThread)).threads)"
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-filter-count=\"unread\"]').textContent === '0'",
+            in: webView
+        )
+        let notice = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-task-notice]').textContent"
+        ) as? String
+        XCTAssertEqual(notice, "")
     }
 
     func testMarkAllAsReadAcknowledgesEveryUnreadThreadIncludingOffSidebar() async throws {
@@ -93,6 +108,111 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(result?[1] as? Bool, false)
         XCTAssertEqual(result?[2] as? Bool, true)
         XCTAssertEqual(result?[3] as? Bool, true)
+    }
+
+    func testMarkAllAsReadAcceptsLiveReadStateWhileSnapshotLags() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: true),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const thread = (\(payload)).threads[0];
+              const row = document.createElement('button');
+              row.setAttribute('data-app-action-sidebar-thread-id', 'local:one');
+              const readState = { conversationId: 'one', isUnread: true };
+              row.__reactFiber$test = {
+                memoizedProps: readState,
+                updateQueue: { memoCache: { data: [[{
+                  markThreadAsRead: () => {
+                    readState.isUnread = false;
+                    // The native snapshot has not refreshed yet.
+                    window.__codexDashboard.applyThreads([thread]);
+                  },
+                  markThreadAsUnread: () => {},
+                }]] } },
+                return: null,
+              };
+              document.querySelector('aside').append(row);
+              window.__codexDashboard.applyThreads([thread]);
+              window.__codexDashboard.open();
+              document.querySelector('[data-mark-all-read]').click();
+            })()
+            """
+        )
+
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-filter-count=\"unread\"]').textContent === '0' && document.querySelector('[data-mark-all-read]').hidden",
+            in: webView
+        )
+        let notice = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-task-notice]').textContent"
+        ) as? String
+        XCTAssertEqual(notice, "")
+    }
+
+    func testMarkAllAsReadClearsStaleSidebarUnreadWhenSavedStateIsRead() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: false),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.createElement('button');
+              row.setAttribute('data-app-action-sidebar-thread-id', 'local:one');
+              row.__reactFiber$test = {
+                memoizedProps: { conversationId: 'one', isUnread: true },
+                updateQueue: { memoCache: { data: [[{
+                  markThreadAsRead: () => {},
+                  markThreadAsUnread: () => {},
+                }]] } },
+                return: null,
+              };
+              document.querySelector('aside').append(row);
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              document.querySelector('[data-mark-all-read]').click();
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-filter-count=\"unread\"]').textContent === '0' && document.querySelector('[data-mark-all-read]').hidden",
+            in: webView
+        )
+        let notice = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-task-notice]').textContent"
+        ) as? String
+        XCTAssertEqual(notice, "")
+    }
+
+    func testStaleSidebarUnreadObservationExpiresWithoutNewSnapshot() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: false),
+        ])
+        let counts = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const row = document.createElement('button');
+              row.setAttribute('data-app-action-sidebar-thread-id', 'local:one');
+              row.__reactFiber$test = {
+                memoizedProps: { conversationId: 'one', isUnread: true }, return: null,
+              };
+              document.querySelector('aside').append(row);
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              const before = document.querySelector('[data-filter-count="unread"]').textContent;
+              const realNow = Date.now;
+              Date.now = () => realNow() + 10_001;
+              window.__codexDashboard.open();
+              Date.now = realNow;
+              return [before, document.querySelector('[data-filter-count="unread"]').textContent];
+            })()
+            """
+        ) as? [String]
+        XCTAssertEqual(counts, ["1", "0"])
     }
 
     func testCanonicalUnreadStateIncludesThreadMissingFromSidebar() async throws {
