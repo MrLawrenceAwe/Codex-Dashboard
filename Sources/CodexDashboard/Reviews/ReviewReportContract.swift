@@ -21,7 +21,7 @@ enum ReviewReportContract {
             Brief summary.
 
             ## [P?] Short title
-            Evidence, impact, and linked file location.
+            Impact and linked file location.
 
             \(limit.rawValue)+. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
@@ -34,7 +34,7 @@ enum ReviewReportContract {
             Brief summary.
 
             ## Short title
-            Evidence, impact, and linked file location.
+            Impact and linked file location.
 
             Report all actionable findings without priority labels or rankings. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
