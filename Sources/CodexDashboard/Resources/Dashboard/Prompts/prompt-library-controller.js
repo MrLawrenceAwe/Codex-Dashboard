@@ -330,12 +330,14 @@ function createPromptLibrary({ findThread }) {
 
   function mount() {
     promptLibraryButton.mount(openLibrary);
+    window.addEventListener('storage', handleStorageChange);
     promptInteractionEventTypes.forEach((type) => {
       document.addEventListener(type, handlePromptInteraction, true);
     });
   }
 
   function unmount() {
+    window.removeEventListener('storage', handleStorageChange);
     promptInteractionEventTypes.forEach((type) => {
       document.removeEventListener(type, handlePromptInteraction, true);
     });
@@ -354,6 +356,12 @@ function createPromptLibrary({ findThread }) {
       }
       : undefined;
     renderDialog({ searchSelection });
+  }
+
+  function handleStorageChange(event) {
+    if (promptStore.isSharedStorageKey(event.key) && promptStore.refreshFromSharedStorage()) {
+      refresh();
+    }
   }
 
   return { mount, refresh, unmount };

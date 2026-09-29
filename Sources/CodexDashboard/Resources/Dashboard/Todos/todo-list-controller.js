@@ -13,6 +13,7 @@ function createTodoList({ threadReferencesForProject }) {
   let destroyed = false;
   let savedItems = items;
   let savedTags = availableTags;
+  let pendingWrites = 0;
   let expandedPresetTodoID = null;
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
@@ -129,25 +130,46 @@ function createTodoList({ threadReferencesForProject }) {
     });
   }
 
+  function refreshFromStorage() {
+    if (destroyed || pendingWrites || todoStore.writeProtectionReason()) return;
+    items = todoStore.load();
+    availableTags = todoStore.loadTags(items);
+    savedItems = items;
+    savedTags = availableTags;
+    renderTags();
+    render();
+    loadItemImages();
+  }
+
+  function handleStorageChange(event) {
+    if (event.key === todoStore.storageKey || event.key === todoStore.tagsStorageKey) {
+      refreshFromStorage();
+    }
+  }
+
+  window.addEventListener('storage', handleStorageChange);
+
   async function commitItems(nextItems, nextTags = availableTags) {
     if (destroyed) return false;
+    const baseItems = savedItems;
+    const baseTags = savedTags;
+    pendingWrites += 1;
     items = nextItems;
     availableTags = nextTags;
     renderTags();
     render();
-    const saved = await todoStore.save(nextItems, nextTags);
-    if (saved) {
-      savedItems = nextItems;
-      savedTags = nextTags;
-    }
+    const saved = await todoStore.save(nextItems, nextTags, baseItems, baseTags);
+    pendingWrites -= 1;
     if (destroyed) return saved;
     const notice = document.querySelector('[data-todo-storage-error]');
     if (notice) notice.hidden = saved;
-    if (!saved && items === nextItems) {
-      items = savedItems;
-      availableTags = savedTags;
-      renderTags();
-      render();
+    if (!pendingWrites) {
+      if (todoStore.writeProtectionReason()) {
+        items = savedItems;
+        availableTags = savedTags;
+        renderTags();
+        render();
+      } else refreshFromStorage();
     }
     return saved;
   }
@@ -356,6 +378,7 @@ function createTodoList({ threadReferencesForProject }) {
 
   function destroy() {
     destroyed = true;
+    window.removeEventListener('storage', handleStorageChange);
     projectObserver?.disconnect();
     projectObserver = undefined;
     observedProjectSidebar = undefined;

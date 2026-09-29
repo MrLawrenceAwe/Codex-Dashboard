@@ -26,6 +26,21 @@ final class PromptLibraryBridge {
         mountedDashboard: Bool
     ) async throws {
         guard let firstTarget = targets.first else { return }
+        var seededNativeLibrary = false
+        // Seed every renderer with the current native document before reading
+        // pending edits. Each queued edit can then merge against this version,
+        // including edits made before the first synchronization after launch.
+        if !nativeLibraryIsAuthoritative,
+           let currentLibrary = try store.load(),
+           currentLibrary != lastDeliveredLibrary {
+            try await evaluateAcrossTargets(
+                try RendererScript.deliverPromptLibrary(currentLibrary),
+                targets: targets,
+                failureMessage: "The prompt library was unavailable in the Codex renderer."
+            )
+            lastDeliveredLibrary = currentLibrary
+            seededNativeLibrary = true
+        }
         if !nativeLibraryIsAuthoritative,
            let pendingLibrary = await exportedLibrary(
             using: RendererScript.exportPendingPromptLibrary,
@@ -44,6 +59,7 @@ final class PromptLibraryBridge {
         let nativeLibraryChanged = storedLibrary != lastDeliveredLibrary
         let sourceTarget = healthyTargets.first ?? (storedLibrary == nil ? firstTarget : nil)
         if !nativeLibraryIsAuthoritative,
+           !seededNativeLibrary,
            !nativeLibraryChanged,
            let sourceTarget,
            let rendererLibrary = await exportedLibrary(
@@ -60,7 +76,8 @@ final class PromptLibraryBridge {
             try await discardPendingLibrary(on: targets)
         }
         guard let nativeLibrary = storedLibrary else { return }
-        guard nativeLibraryIsAuthoritative || mountedDashboard || nativeLibrary != lastDeliveredLibrary else { return }
+        guard nativeLibraryIsAuthoritative || (mountedDashboard && !seededNativeLibrary)
+            || nativeLibrary != lastDeliveredLibrary else { return }
 
         try await evaluateAcrossTargets(
             try RendererScript.deliverPromptLibrary(nativeLibrary),
