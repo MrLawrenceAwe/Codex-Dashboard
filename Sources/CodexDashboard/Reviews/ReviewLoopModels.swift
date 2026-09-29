@@ -123,7 +123,7 @@ struct ReviewReport: Codable, Equatable, Sendable {
 enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix }
 
 struct ReviewRoundResult: Codable, Equatable, Sendable {
-    enum Outcome: String, Codable, Sendable { case clean, fixed, blocked }
+    enum Outcome: String, Codable, Sendable { case clean, fixed, withdrawn, blocked }
     let outcome: Outcome
     let findingCount: Int
     let commit: String

@@ -3,6 +3,11 @@ import Foundation
 /// A readable Markdown contract. Missing or inconsistent fields stop the loop;
 /// prose alone must never be mistaken for a clean review or a committed fix.
 enum ReviewReportContract {
+    struct FixReport {
+        let result: ReviewRoundResult
+        let withdrawn: [Int]
+    }
+
     static func instructions(for kind: ReviewTurnKind) -> String {
         let format: String
         switch kind {
@@ -38,12 +43,13 @@ enum ReviewReportContract {
             format = """
             # Fixes committed
             Findings addressed: N
+            Findings withdrawn: M
             Commit: `FULL_COMMIT_ID`
 
             ## Summary
             Brief description of changes.
 
-            N is the number addressed. Use the full Git commit ID. If blocked, use # Fixes blocked, Commit: `none`, and explain why in Summary.
+            N is the number fixed; M is the number withdrawn. For each withdrawn finding, append a section headed ## Withdrawn finding K, where K is its 1-based position in the review, followed by a concrete evidence paragraph. Add no withdrawn sections when M is zero. If every finding is invalid, use # Findings withdrawn, Findings addressed: 0, and Commit: `none`. If blocked, use # Fixes blocked, Commit: `none`, and explain why in Summary.
             """
         }
         return """
@@ -87,17 +93,34 @@ enum ReviewReportContract {
         return ReviewReport(outcome: outcome, findings: findings, summary: summary)
     }
 
-    static func fix(_ text: String?) throws -> ReviewRoundResult {
+    static func fix(_ text: String?) throws -> FixReport {
         let sections = try sections(text)
         let header = lines(sections[0])
-        guard sections.count == 2, header.count == 3,
-              let outcome = ["# Fixes committed": ReviewRoundResult.Outcome.fixed, "# Fixes blocked": .blocked][header[0]],
-              let count = count(header[1], prefix: "Findings addressed: "),
-              header[2].hasPrefix("Commit: `"), header[2].hasSuffix("`") else { throw invalid() }
-        let commit = String(header[2].dropFirst(9).dropLast())
-        guard !commit.isEmpty, !commit.contains("`"), outcome != .fixed || commit != "none" else { throw invalid() }
-        return ReviewRoundResult(outcome: outcome, findingCount: count, commit: outcome == .blocked ? "" : commit,
-                                 summary: try content(sections[1], prefix: "Summary\n"))
+        guard sections.count >= 2, header.count == 4,
+              let outcome = ["# Fixes committed": ReviewRoundResult.Outcome.fixed,
+                             "# Findings withdrawn": .withdrawn,
+                             "# Fixes blocked": .blocked][header[0]],
+              let addressedCount = count(header[1], prefix: "Findings addressed: "),
+              let withdrawnCount = count(header[2], prefix: "Findings withdrawn: "),
+              header[3].hasPrefix("Commit: `"), header[3].hasSuffix("`") else { throw invalid() }
+        let commit = String(header[3].dropFirst(9).dropLast())
+        let withdrawn = try sections.dropFirst(2).map { section -> Int in
+            guard let newline = section.firstIndex(of: "\n"),
+                  let index = count(String(section[..<newline]), prefix: "Withdrawn finding "),
+                  index > 0 else { throw invalid() }
+            _ = try content(String(section[section.index(after: newline)...]), prefix: "")
+            return index
+        }
+        guard withdrawn.count == withdrawnCount,
+              Set(withdrawn).count == withdrawn.count,
+              !commit.isEmpty, !commit.contains("`"),
+              (outcome == .fixed && addressedCount > 0 && commit != "none") ||
+              (outcome == .withdrawn && addressedCount == 0 && withdrawnCount > 0 && commit == "none") ||
+              (outcome == .blocked && commit == "none") else { throw invalid() }
+        return FixReport(result: ReviewRoundResult(outcome: outcome, findingCount: addressedCount,
+                                                   commit: outcome == .fixed ? commit : "",
+                                                   summary: try content(sections[1], prefix: "Summary\n")),
+                         withdrawn: withdrawn)
     }
 
     private static func sections(_ text: String?) throws -> [String] {

@@ -238,9 +238,17 @@ final class ReviewLoopCoordinator {
         }
         if fixTurn.status == "inProgress" { return }
         try requireCompleted(fixTurn)
-        let result = try ReviewReportContract.fix(fixTurn.finalMessage)
-        guard result.outcome == .fixed else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
-        let reportedCommit = try await inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
+        let fixReport = try ReviewReportContract.fix(fixTurn.finalMessage)
+        let result = fixReport.result
+        guard result.outcome != .blocked else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
+        let findings = report.findings(upTo: updated.priorityLimit)
+        guard result.findingCount + fixReport.withdrawn.count == findings.count,
+              fixReport.withdrawn.allSatisfy({ $0 <= findings.count }) else {
+            throw ReviewLoopError("Commit checkpoint failed: the fix report accounted for \(result.findingCount + fixReport.withdrawn.count) of \(findings.count) findings.")
+        }
+        let reportedCommit = try await result.outcome == .fixed
+            ? inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
+            : round.baseCommit
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
@@ -249,20 +257,19 @@ final class ReviewLoopCoordinator {
         guard repo.commit == reportedCommit else {
             throw ReviewLoopError("Commit checkpoint failed: HEAD (\(repo.commit)) differs from the reported fix commit (\(reportedCommit)).")
         }
-        let expectedFindings = report.findings(upTo: updated.priorityLimit).count
-        guard result.findingCount == expectedFindings else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix report addressed \(result.findingCount) of \(expectedFindings) findings.")
-        }
-        guard repo.commit != round.baseCommit else {
-            throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
-        }
-        guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) }) else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
+        if result.outcome == .fixed {
+            guard repo.commit != round.baseCommit else {
+                throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
+            }
+            guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) }) else {
+                throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
+            }
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        updated.phase = updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
-        updated.message = updated.rounds.count >= updated.maxRounds
+        updated.phase = result.outcome == .withdrawn ? .completed : updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
+        updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn with explanations. No fix commit was needed."
+            : updated.rounds.count >= updated.maxRounds
             ? "All configured review rounds completed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
