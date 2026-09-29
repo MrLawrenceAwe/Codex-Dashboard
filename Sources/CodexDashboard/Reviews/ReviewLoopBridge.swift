@@ -12,6 +12,8 @@ final class ReviewLoopBridge {
     private var acknowledgedActionID: String?
     private var actionError: String?
 
+    var threadIDs: Set<String> { coordinator.threadIDs }
+
     init(devTools: any DevToolsServing, store: any ReviewLoopStoring) {
         self.devTools = devTools
         coordinator = ReviewLoopCoordinator(store: store)

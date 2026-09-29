@@ -102,6 +102,6 @@ enum ReviewLoopPresentation {
         case .performance:
             task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
         }
-        return task + ". Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit."
+        return task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
     }
 }

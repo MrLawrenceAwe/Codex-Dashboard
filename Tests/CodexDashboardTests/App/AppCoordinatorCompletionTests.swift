@@ -37,6 +37,79 @@ extension AppCoordinatorTests {
         XCTAssertEqual(runtime.openedThreadIDs, ["thread-1"])
     }
 
+    func testReviewLoopTaskCompletionDoesNotForegroundOrOpenCodex() async throws {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(id: "review-thread", runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(id: "review-thread", latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let usageProvider = RecordingAccountUsageProvider()
+        let runtime = StubDashboardRuntime(codexIsRunning: true, reviewLoopThreadIDs: ["review-thread"])
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            accountUsageProvider: usageProvider,
+            runtimeFactory: { _ in runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+        try await waitUntil { await usageProvider.count() == 1 }
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+    }
+
+    func testOrdinaryCompletionStillOpensWhenReviewLoopTaskCompletesInSameSnapshot() async {
+        let startedAt = Date().addingTimeInterval(-3)
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: startedAt)
+        let ordinaryCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(1))
+        let reviewCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(2))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [
+                    .fixture(id: "ordinary", runState: .running, latestLifecycleEvent: started),
+                    .fixture(id: "review-thread", runState: .running, latestLifecycleEvent: started),
+                ],
+                totalThreadCount: 2
+            ),
+            ThreadCatalog(
+                threads: [
+                    .fixture(id: "ordinary", latestLifecycleEvent: ordinaryCompletion),
+                    .fixture(id: "review-thread", latestLifecycleEvent: reviewCompletion),
+                ],
+                totalThreadCount: 2
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime(reviewLoopThreadIDs: ["review-thread"])
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { _ in runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 1)
+        XCTAssertEqual(runtime.openedThreadIDs, ["ordinary"])
+    }
+
     func testTaskCompletionImmediatelyRefreshesAccountUsage() async throws {
         let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
         let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))

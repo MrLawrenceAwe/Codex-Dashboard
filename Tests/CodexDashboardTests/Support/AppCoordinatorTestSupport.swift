@@ -323,6 +323,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     let codexIsRunning: Bool
     let codexLaunchDate: Date? = nil
     let maintainsDashboard: Bool
+    let reviewLoopThreadIDs: Set<String>
     private let compatibilityChecks: [CompatibilityCheck]
     private let synchronizationError: Error?
     private let restartError: Error?
@@ -338,6 +339,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     init(
         codexIsRunning: Bool = false,
         maintainsDashboard: Bool = false,
+        reviewLoopThreadIDs: Set<String> = [],
         compatibilityChecks: [CompatibilityCheck] = [],
         synchronizationError: Error? = nil,
         restartError: Error? = nil,
@@ -346,6 +348,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     ) {
         self.codexIsRunning = codexIsRunning
         self.maintainsDashboard = maintainsDashboard
+        self.reviewLoopThreadIDs = reviewLoopThreadIDs
         self.compatibilityChecks = compatibilityChecks
         self.synchronizationError = synchronizationError
         self.restartError = restartError

@@ -150,7 +150,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let prompt = ReviewLoopPresentation.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
-        XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit.")
+        XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
         XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
     }
 
@@ -163,7 +163,7 @@ final class ReviewLoopDriverTests: XCTestCase {
                 round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
                     ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
                 }, summary: "Findings")
-                XCTAssertEqual(ReviewLoopPresentation.fixPrompt(for: loop, round: round), expected + ". Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit.")
+                XCTAssertEqual(ReviewLoopPresentation.fixPrompt(for: loop, round: round), expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
             }
         }
     }

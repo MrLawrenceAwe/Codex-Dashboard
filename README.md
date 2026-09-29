@@ -52,7 +52,7 @@ local renderer storage.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
-All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion, except for chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use
+All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion, except for review loop tasks and chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use
 **Disable dashboard integration** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 

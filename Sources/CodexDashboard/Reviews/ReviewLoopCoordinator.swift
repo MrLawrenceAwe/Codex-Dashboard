@@ -14,6 +14,10 @@ final class ReviewLoopCoordinator {
     private var advancingIDs: Set<UUID> = []
     private var checkoutOwners: [String: UUID] = [:]
 
+    var threadIDs: Set<String> {
+        Set(loops.flatMap { $0.rounds.compactMap(\.threadID) })
+    }
+
     init(store: any ReviewLoopStoring) {
         self.store = store
         do {
@@ -268,7 +272,7 @@ final class ReviewLoopCoordinator {
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         updated.phase = result.outcome == .withdrawn ? .completed : updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
-        updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn with explanations. No fix commit was needed."
+        updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn. No fix commit was needed."
             : updated.rounds.count >= updated.maxRounds
             ? "All configured review rounds completed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."

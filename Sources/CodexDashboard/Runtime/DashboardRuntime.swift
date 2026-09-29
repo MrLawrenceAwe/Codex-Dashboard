@@ -10,6 +10,7 @@ protocol DashboardRuntime: AnyObject {
     var codexIsRunning: Bool { get }
     var codexLaunchDate: Date? { get }
     var maintainsDashboard: Bool { get }
+    var reviewLoopThreadIDs: Set<String> { get }
 
     func rendererTargets() async -> [DevToolsTarget]
     func prepareForRestart()
@@ -49,6 +50,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     var codexIsRunning: Bool { codex.isRunning }
     var codexLaunchDate: Date? { codex.launchDate }
     var maintainsDashboard: Bool { renderer.maintainsDashboard }
+    var reviewLoopThreadIDs: Set<String> { renderer.reviewLoopThreadIDs }
 
     func rendererTargets() async -> [DevToolsTarget] {
         let launchDate = codex.launchDate

@@ -57,7 +57,7 @@ final class ReviewReportContractTests: XCTestCase {
     }
 
     func testFixReportRequiresExplicitCountCommitAndSummary() throws {
-        let text = "# Fixes committed\n\nFindings addressed: 2\nFindings withdrawn: 0\nCommit: `abc1234`\n\n## Summary\nFixed both races."
+        let text = "# Fixes committed\n\nFindings addressed: 2\nFindings withdrawn: none\nCommit: `abc1234`\n\n## Summary\nFixed both races."
         let result = try ReviewReportContract.fix(text).result
         XCTAssertEqual(result.outcome, .fixed)
         XCTAssertEqual(result.findingCount, 2)
@@ -73,18 +73,18 @@ final class ReviewReportContractTests: XCTestCase {
         }
     }
 
-    func testFixReportRequiresEvidenceForEachWithdrawnFinding() throws {
-        let text = "# Fixes committed\nFindings addressed: 1\nFindings withdrawn: 1\nCommit: `abc1234`\n\n## Summary\nFixed one issue; the other was invalid.\n\n## Withdrawn finding 2\nThe URL parser normalizes the default HTTPS port before validation."
+    func testFixReportTracksWithdrawnFindingNumbersWithoutEvidence() throws {
+        let text = "# Fixes committed\nFindings addressed: 1\nFindings withdrawn: 2\nCommit: `abc1234`\n\n## Summary\nFixed one issue; the other was invalid."
         let report = try ReviewReportContract.fix(text)
         XCTAssertEqual(report.result.findingCount, 1)
         XCTAssertEqual(report.withdrawn, [2])
-        for invalid in [text.replacingOccurrences(of: "Findings withdrawn: 1", with: "Findings withdrawn: 0"),
-                        text.replacingOccurrences(of: "## Withdrawn finding 2\nThe URL parser normalizes the default HTTPS port before validation.", with: ""),
-                        text.replacingOccurrences(of: "## Withdrawn finding 2", with: "## Withdrawn finding 0"),
-                        text + "\n\n## Withdrawn finding 2\nDuplicate reason"] {
+        for invalid in [text.replacingOccurrences(of: "Findings withdrawn: 2", with: "Findings withdrawn: 0"),
+                        text.replacingOccurrences(of: "Findings withdrawn: 2", with: "Findings withdrawn: 2, 2"),
+                        text.replacingOccurrences(of: "Findings withdrawn: 2", with: "Findings withdrawn: "),
+                        text + "\n\n## Extra\nUnexpected"] {
             XCTAssertThrowsError(try ReviewReportContract.fix(invalid))
         }
-        let allWithdrawn = "# Findings withdrawn\nFindings addressed: 0\nFindings withdrawn: 1\nCommit: `none`\n\n## Summary\nThe finding was invalid.\n\n## Withdrawn finding 1\nThe reported case is handled by the parser."
+        let allWithdrawn = "# Findings withdrawn\nFindings addressed: 0\nFindings withdrawn: 1\nCommit: `none`\n\n## Summary\nThe finding was invalid."
         XCTAssertEqual(try ReviewReportContract.fix(allWithdrawn).result.outcome, .withdrawn)
     }
 

@@ -43,13 +43,13 @@ enum ReviewReportContract {
             format = """
             # Fixes committed
             Findings addressed: N
-            Findings withdrawn: M
+            Findings withdrawn: none or comma-separated review numbers
             Commit: `FULL_COMMIT_ID`
 
             ## Summary
             Brief description of changes.
 
-            N is the number fixed; M is the number withdrawn. For each withdrawn finding, append a section headed ## Withdrawn finding K, where K is its 1-based position in the review, followed by a concrete evidence paragraph. Add no withdrawn sections when M is zero. If every finding is invalid, use # Findings withdrawn, Findings addressed: 0, and Commit: `none`. If blocked, use # Fixes blocked, Commit: `none`, and explain why in Summary.
+            N is the number fixed. List invalid findings by their 1-based position in the review, or use none. If every finding is invalid, use # Findings withdrawn, Findings addressed: 0, and Commit: `none`. If blocked, use # Fixes blocked, Commit: `none`, and explain why in Summary.
             """
         }
         return """
@@ -96,26 +96,30 @@ enum ReviewReportContract {
     static func fix(_ text: String?) throws -> FixReport {
         let sections = try sections(text)
         let header = lines(sections[0])
-        guard sections.count >= 2, header.count == 4,
+        guard sections.count == 2, header.count == 4,
               let outcome = ["# Fixes committed": ReviewRoundResult.Outcome.fixed,
                              "# Findings withdrawn": .withdrawn,
                              "# Fixes blocked": .blocked][header[0]],
               let addressedCount = count(header[1], prefix: "Findings addressed: "),
-              let withdrawnCount = count(header[2], prefix: "Findings withdrawn: "),
+              header[2].hasPrefix("Findings withdrawn: "),
               header[3].hasPrefix("Commit: `"), header[3].hasSuffix("`") else { throw invalid() }
         let commit = String(header[3].dropFirst(9).dropLast())
-        let withdrawn = try sections.dropFirst(2).map { section -> Int in
-            guard let newline = section.firstIndex(of: "\n"),
-                  let index = count(String(section[..<newline]), prefix: "Withdrawn finding "),
-                  index > 0 else { throw invalid() }
-            _ = try content(String(section[section.index(after: newline)...]), prefix: "")
-            return index
+        let withdrawnValue = String(header[2].dropFirst("Findings withdrawn: ".count))
+        let withdrawn: [Int]
+        if withdrawnValue == "none" {
+            withdrawn = []
+        } else {
+            let numbers = withdrawnValue.components(separatedBy: ", ")
+            guard !numbers.isEmpty,
+                  numbers.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy({ (48...57).contains($0) }) }),
+                  numbers.allSatisfy({ Int($0).map({ $0 > 0 }) == true }) else { throw invalid() }
+            withdrawn = numbers.compactMap(Int.init)
         }
-        guard withdrawn.count == withdrawnCount,
+        guard !withdrawnValue.isEmpty,
               Set(withdrawn).count == withdrawn.count,
               !commit.isEmpty, !commit.contains("`"),
               (outcome == .fixed && addressedCount > 0 && commit != "none") ||
-              (outcome == .withdrawn && addressedCount == 0 && withdrawnCount > 0 && commit == "none") ||
+              (outcome == .withdrawn && addressedCount == 0 && !withdrawn.isEmpty && commit == "none") ||
               (outcome == .blocked && commit == "none") else { throw invalid() }
         return FixReport(result: ReviewRoundResult(outcome: outcome, findingCount: addressedCount,
                                                    commit: outcome == .fixed ? commit : "",

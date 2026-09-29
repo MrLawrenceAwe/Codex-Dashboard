@@ -320,8 +320,11 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> String? {
-        threadCompletionTracker.recordSnapshotAndFindNewestCompletion(in: threads)
+    func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> ThreadCompletionTracker.Result {
+        threadCompletionTracker.recordSnapshotAndFindNewestCompletion(
+            in: threads,
+            excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
+        )
     }
 
     static let incompatibleContractMessage =

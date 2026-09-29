@@ -236,7 +236,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit.")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
@@ -552,7 +552,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
                     let task = count == 1 ? "Fix the finding and commit" : count == 2 ? "Fix both findings and commit" : "Fix all findings and commit"
-                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit.")
+                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
@@ -642,7 +642,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            let fullFixPrompt = expectedFix + ". Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit."
+            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
             XCTAssertEqual(driver.prompts, [expectedReview, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
@@ -766,8 +766,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     }
     func finish(findings: Int, commit: String, withdrawn: [Int] = []) {
         if commit != "none" { self.commit = commit }
-        let sections = withdrawn.map { "## Withdrawn finding \($0)\nThe reviewed claim is invalid because the code already handles the case." }.joined(separator: "\n\n")
-        finishTurn("\(commit == "none" ? "# Findings withdrawn" : "# Fixes committed")\nFindings addressed: \(findings)\nFindings withdrawn: \(withdrawn.count)\nCommit: `\(commit)`\n\n## Summary\nChanges committed\(sections.isEmpty ? "" : "\n\n" + sections)")
+        let withdrawnList = withdrawn.isEmpty ? "none" : withdrawn.map(String.init).joined(separator: ", ")
+        finishTurn("\(commit == "none" ? "# Findings withdrawn" : "# Fixes committed")\nFindings addressed: \(findings)\nFindings withdrawn: \(withdrawnList)\nCommit: `\(commit)`\n\n## Summary\nChanges committed")
     }
     private func finishTurn(_ report: String) {
         let last = thread.turns.last!
