@@ -45,6 +45,14 @@ final class ReviewReportContractTests: XCTestCase {
         XCTAssertTrue(ReviewReportContract.instructions(for: .review(nil)).contains("without priority labels"))
     }
 
+    func testReviewInstructionsDoNotRequestEvidence() {
+        for kind in [ReviewTurnKind.review(.p2), .review(nil)] {
+            let instructions = ReviewReportContract.instructions(for: kind)
+            XCTAssertFalse(instructions.lowercased().contains("evidence"))
+            XCTAssertTrue(instructions.contains("Impact and linked file location."))
+        }
+    }
+
     func testMalformedOrIncompleteReviewsFailClosed() {
         for text: String? in [nil, "Done", "{}", review.replacingOccurrences(of: "Findings: 2", with: "Findings: 0"),
                             review.replacingOccurrences(of: "[P1]", with: "[P4]"),
