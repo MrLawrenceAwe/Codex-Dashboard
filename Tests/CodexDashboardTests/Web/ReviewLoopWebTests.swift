@@ -113,7 +113,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["A,B", "C", 4, "D", true, true, "B", "D", 5, "A", "A", "", true, "B", 0, false])
+        XCTAssertEqual(result, ["A,B", "F", 4, "D", true, true, "B", "D", 5, "F", "F", "", true, "B", 0, false])
     }
 
     func testPreviousReviewDetailsStartCollapsedAndStayOpenDuringRefresh() async throws {
@@ -210,6 +210,35 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "P2", "organisation", true, NSNull(),
                                 "naming", true, NSNull(), "performance", false, "P2"])
+    }
+
+    func testProjectContextAppearsOnlyForBugsAndPerformance() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
+          api.applyReviewLoop(snapshot);
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
+          const focus = document.querySelector('[data-review-focus]');
+          const context = document.querySelector('[data-review-prompt-context]');
+          const states = [];
+          for (const kind of ['bugs', 'organisation', 'naming', 'performance']) {
+            focus.value = kind;
+            focus.dispatchEvent(new Event('change'));
+            states.push(kind,context.parentElement.hidden,context.value);
+            if (!context.parentElement.hidden) context.value = 'personal';
+            document.querySelector('[data-review-start]').click();
+            const action = JSON.parse(api.pendingReviewAction());
+            states.push(action.promptContext.kind);
+            api.applyReviewLoop({...snapshot,acknowledgedActionID:action.id});
+          }
+          return states;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["bugs", false, "", "personal", "organisation", true, "", "general",
+                                "naming", true, "", "general", "performance", false, "", "personal"])
     }
 
     func testReviewTypeLabelsAndPriorityBehaviorComeFromSnapshot() async throws {

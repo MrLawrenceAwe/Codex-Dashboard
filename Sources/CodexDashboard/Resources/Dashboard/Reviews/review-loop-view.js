@@ -8,6 +8,7 @@ const reviewLoopView = (() => {
   const panel = () => document.querySelector('[data-review-loop]');
   const isFinished = loop => finishedLoopIDs.has(loop.id);
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
+  const supportsProjectContext = focus => reviewTypes.find(type => type.id === focus)?.supportsProjectContext === true;
 
   function findingBody(body, loopID) {
     const text = String(body || '');
@@ -33,7 +34,11 @@ const reviewLoopView = (() => {
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
-    root.querySelector('.review-priority').hidden = !usesPriorities(root.querySelector('[data-review-focus]').value);
+    const focus = root.querySelector('[data-review-focus]').value;
+    root.querySelector('.review-priority').hidden = !usesPriorities(focus);
+    const context = root.querySelector('.review-project-context');
+    context.hidden = !supportsProjectContext(focus);
+    if (context.hidden) context.querySelector('select').value = '';
   }
 
   function createPage() {
@@ -309,5 +314,5 @@ const reviewLoopView = (() => {
     reviewTypesSignature = '';
   }
 
-  return { createPage, render, renderReasoningOptions, renderReviewSettings, renderNavigationStatus, reset, usesPriorities };
+  return { createPage, render, renderReasoningOptions, renderReviewSettings, renderNavigationStatus, reset, usesPriorities, supportsProjectContext };
 })();

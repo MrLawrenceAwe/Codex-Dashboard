@@ -34,11 +34,13 @@ struct ReviewTypeOption: Codable, Sendable {
     let id: ReviewFocus
     let label: String
     let usesPriorities: Bool
+    let supportsProjectContext: Bool
 
     init(_ focus: ReviewFocus) {
         id = focus
         label = focus.label
         usesPriorities = focus.usesPriorities
+        supportsProjectContext = focus.supportsProjectContext
     }
 }
 
