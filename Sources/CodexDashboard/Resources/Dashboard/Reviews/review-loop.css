@@ -2,7 +2,7 @@
 #codex-dashboard-review-navigation .review-nav-copy { display:flex; min-width:0; align-items:center; gap:8px; }
 #codex-dashboard-review-navigation .review-nav-icon { display:flex; width:16px; height:16px; flex:0 0 16px; align-items:center; justify-content:center; }
 #codex-dashboard-review-navigation svg { width:16px; height:16px; }
-#codex-dashboard-review-navigation .review-nav-spinner { position:relative; display:inline-flex; width:16px; height:16px; flex:0 0 16px; }
+#codex-dashboard-review-navigation .review-nav-spinner { position:relative; display:inline-grid; width:16px; height:16px; flex:0 0 16px; place-items:center; color:var(--app-color-text-secondary, #999); font-size:7px; font-variant-numeric:tabular-nums; font-weight:650; line-height:1; }
 #codex-dashboard-review-navigation .review-nav-spinner::before { position:absolute; inset:0; box-sizing:border-box; content:""; border:1.5px solid var(--app-color-border-heavy, rgba(127,127,127,.25)); border-top-color:var(--app-color-decoration-added, #79c98c); border-radius:50%; animation:review-nav-spin 800ms linear infinite; }
 #codex-dashboard-review-navigation .review-nav-spinner[hidden] { display:none; }
 #codex-dashboard-review-navigation[aria-current="page"] { background:var(--item-background-color, rgba(127,127,127,.12)); }

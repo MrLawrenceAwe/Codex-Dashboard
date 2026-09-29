@@ -127,7 +127,13 @@ const reviewLoopView = (() => {
 
   function renderNavigationStatus(snapshot) {
     const spinner = document.querySelector('[data-review-navigation-running]');
-    if (spinner) spinner.hidden = !snapshot.loops.some(loop => ['waiting', 'running'].includes(loop.phase));
+    if (!spinner) return;
+    const runningCount = snapshot.loops.filter(loop => ['waiting', 'running'].includes(loop.phase)).length;
+    const label = `${runningCount} running review ${runningCount === 1 ? 'loop' : 'loops'}`;
+    spinner.hidden = runningCount === 0;
+    spinner.setAttribute('aria-label', label);
+    spinner.setAttribute('title', label);
+    spinner.querySelector('[data-review-navigation-running-count]').textContent = String(runningCount);
   }
 
   function renderReasoningOptions(snapshot, pendingAction, kind = 'review') {
