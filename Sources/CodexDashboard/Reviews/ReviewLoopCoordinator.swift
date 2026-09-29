@@ -126,7 +126,9 @@ final class ReviewLoopCoordinator {
         updated = current
         let root = Self.path(repo.root)
         if let owner = checkoutOwners[root], owner != id,
-           let other = matchingLoop(owner), !other.phase.isFinished { return }
+           let other = matchingLoop(owner), !other.phase.isFinished {
+            throw ReviewLoopError("This Git checkout already has an active review loop for \(other.project.name). Stop that loop before starting another.")
+        }
         // Reserve synchronously after inspection, before any launch can suspend.
         checkoutOwners[root] = id
         if hasOtherRunningTask(threads, root: repo.root, excluding: nil) { return }

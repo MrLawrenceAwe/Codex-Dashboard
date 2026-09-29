@@ -112,7 +112,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createCalls, 1)
     }
 
-    func testProjectsSharingCheckoutDoNotLaunchTogetherAfterRestart() async throws {
+    func testProjectsSharingCheckoutShowConflictAfterRestart() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
         let recovered = ReviewLoopCoordinator(store: store)
@@ -122,7 +122,9 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.repositoryRoot = project.path
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createCalls, 1)
-        XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .waiting])
+        XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .blocked])
+        XCTAssertEqual(recovered.loops.last?.message,
+                       "This Git checkout already has an active review loop for Example. Stop that loop before starting another.")
     }
 
     func testOneActiveLoopPerProjectIncludingPausedAndChangedPath() throws {
