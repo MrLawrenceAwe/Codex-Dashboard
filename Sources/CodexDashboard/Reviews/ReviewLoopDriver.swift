@@ -6,10 +6,12 @@ import Foundation
 final class ReviewLoopDriver: ReviewLoopDriving {
     private let devTools: any DevToolsServing
     private let target: DevToolsTarget
-    private let repositoryCheckpoint = ReviewRepositoryCheckpoint()
-    init(devTools: any DevToolsServing, target: DevToolsTarget) {
+    private let repositoryCheckpoint: any ReviewRepositoryChecking
+    init(devTools: any DevToolsServing, target: DevToolsTarget,
+         repositoryCheckpoint: any ReviewRepositoryChecking = ReviewRepositoryCheckpoint()) {
         self.devTools = devTools
         self.target = target
+        self.repositoryCheckpoint = repositoryCheckpoint
     }
 
     func projects() async throws -> [ReviewProject] {
@@ -79,7 +81,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return id
     }
 
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
+    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         var params: [String: Any] = [
             "threadId": threadID,
             "serviceTierForTurn": speed.serviceTier,
@@ -88,6 +90,12 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         if let selection {
             params["model"] = selection.modelID
             if let effort = selection.reasoningEffort { params["effort"] = effort }
+        }
+        // This is the last local checkpoint before the renderer can start a turn.
+        // It also covers the time spent creating and naming a new review thread.
+        let current = try await repositoryCheckpoint.repository(at: projectPath)
+        guard current.clean, current == expectedRepository else {
+            throw ReviewLoopError("The checkout changed before the review task started. Inspect its changes before continuing.")
         }
         let response = try await request("turn/start", params)
         guard let turn = response["turn"] as? [String: Any], let id = turn["id"] as? String else {

@@ -1,6 +1,12 @@
 import Foundation
 
-struct ReviewRepositoryCheckpoint {
+protocol ReviewRepositoryChecking: Sendable {
+    func repository(at path: String) async throws -> ReviewRepositoryState
+    func resolveCommit(_ commit: String, at path: String) async throws -> String
+    func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
+}
+
+struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
     func repository(at path: String) async throws -> ReviewRepositoryState {
         let root = try await git(["rev-parse", "--show-toplevel"], at: path)
         let branch = try await git(["symbolic-ref", "--quiet", "--short", "HEAD"], at: path)
