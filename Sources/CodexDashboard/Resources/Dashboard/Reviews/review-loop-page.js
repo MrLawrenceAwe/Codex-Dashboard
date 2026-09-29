@@ -51,6 +51,14 @@ const reviewLoopPage = (() => {
     }
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
+      const historyAction = event.target.closest('[data-review-history-action]');
+      if (historyAction) {
+        const kind = historyAction.dataset.reviewHistoryAction;
+        const loopID = details.querySelector('[data-review-history-select]').value;
+        const message = { delete: 'Delete this saved review?', deleteOlder: 'Delete all saved reviews older than this one?', deleteAll: 'Delete all saved previous reviews?' }[kind];
+        if (message && window.confirm(`${message} Review chats will remain available.`)) queue({ kind, loopID: kind === 'deleteAll' ? null : loopID });
+        return;
+      }
       const file = event.target.closest('[data-review-file]');
       if (file) {
         queue({ kind: 'openFile', loopID: file.dataset.reviewLoopId, filePath: file.dataset.reviewFile });

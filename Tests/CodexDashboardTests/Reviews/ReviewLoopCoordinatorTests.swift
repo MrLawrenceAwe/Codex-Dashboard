@@ -31,6 +31,50 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         catch { XCTFail("Could not stop review loop: \(error)") }
     }
 
+    func testDeletingPreviousReviewsPreservesActiveLoopsAndSelectedBoundary() throws {
+        let store = ReviewTestStore()
+        func loop(_ name: String, phase: ReviewLoopPhase) -> ReviewLoop {
+            var loop = ReviewLoop(id: UUID(), startActionID: name, project: project,
+                                  promptContext: .general, maxRounds: 2)
+            loop.phase = phase
+            return loop
+        }
+        let oldest = loop("oldest", phase: .completed)
+        let active = loop("active", phase: .paused)
+        let middle = loop("middle", phase: .stopped)
+        let newest = loop("newest", phase: .limitReached)
+        store.loops = [oldest, active, middle, newest]
+        let coordinator = ReviewLoopCoordinator(store: store)
+        func deletion(_ kind: ReviewLoopAction.Kind, id: UUID? = nil) -> ReviewLoopAction {
+            ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil,
+                             promptContext: nil, maxRounds: nil, loopID: id)
+        }
+
+        try coordinator.apply(deletion(.deleteOlder, id: middle.id), projects: [])
+        XCTAssertEqual(coordinator.loops.map(\.id), [active.id, middle.id, newest.id])
+        try coordinator.apply(deletion(.delete, id: newest.id), projects: [])
+        XCTAssertEqual(coordinator.loops.map(\.id), [active.id, middle.id])
+        try coordinator.apply(deletion(.deleteAll), projects: [])
+        XCTAssertEqual(coordinator.loops.map(\.id), [active.id])
+        XCTAssertEqual(store.loops.map(\.id), [active.id])
+        XCTAssertThrowsError(try coordinator.apply(deletion(.delete, id: active.id), projects: []))
+    }
+
+    func testFailedReviewDeletionKeepsSavedAndDisplayedHistory() throws {
+        let store = ReviewTestStore()
+        var finished = ReviewLoop(id: UUID(), startActionID: "old", project: project,
+                                  promptContext: .general, maxRounds: 1)
+        finished.phase = .completed
+        store.loops = [finished]
+        let coordinator = ReviewLoopCoordinator(store: store)
+        store.failSave = true
+        let action = ReviewLoopAction(id: "delete", kind: .deleteAll, projectID: nil,
+                                      promptContext: nil, maxRounds: nil, loopID: nil)
+        XCTAssertThrowsError(try coordinator.apply(action, projects: []))
+        XCTAssertEqual(coordinator.loops, [finished])
+        XCTAssertEqual(store.loops, [finished])
+    }
+
     func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {
         let payload = Data("""
         {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3,"reviewSelection":{"modelID":"review-model"},"fixSelection":{"modelID":"fix-model"}}
