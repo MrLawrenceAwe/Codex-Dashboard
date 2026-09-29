@@ -159,15 +159,61 @@ const todoStore = (() => {
 
   let saveQueue = Promise.resolve();
 
-  function save(items, tags) {
+  function mergeItems(baseItems, desiredItems, currentItems) {
+    const sameField = (key, left, right) => {
+      const comparable = (value) => key === 'image' && value
+        ? { ...value, dataURL: '' } : value;
+      return JSON.stringify(comparable(left)) === JSON.stringify(comparable(right));
+    };
+    const base = new Map(baseItems.map((item) => [item.id, item]));
+    const desired = new Map(desiredItems.map((item) => [item.id, item]));
+    const removed = new Set(baseItems.filter((item) => !desired.has(item.id)).map((item) => item.id));
+    const changed = new Map(desiredItems.filter((item) =>
+      !base.has(item.id) || Object.keys(item).some((key) =>
+        !sameField(key, base.get(item.id)[key], item[key])))
+      .map((item) => [item.id, item]));
+    const existing = currentItems.filter((item) => !removed.has(item.id))
+      .map((item) => {
+        const local = changed.get(item.id);
+        if (!local) return item;
+        const previous = base.get(item.id);
+        if (!previous) return local;
+        const merged = { ...item };
+        for (const key of Object.keys(local)) {
+          if (!sameField(key, previous[key], local[key])) {
+            merged[key] = key === 'tags'
+              ? mergeTags(previous.tags, local.tags, item.tags) : local[key];
+          }
+        }
+        return merged;
+      });
+    const existingIDs = new Set(existing.map((item) => item.id));
+    const added = desiredItems.filter((item) => changed.has(item.id) && !existingIDs.has(item.id));
+    return [...added, ...existing];
+  }
+
+  function mergeTags(baseTags, desiredTags, currentTags) {
+    const removed = new Set(baseTags.filter((tag) => !desiredTags.includes(tag)));
+    return normalizeTags([
+      ...desiredTags.filter((tag) => !baseTags.includes(tag)),
+      ...currentTags.filter((tag) => !removed.has(tag)),
+    ]);
+  }
+
+  function save(items, tags, baseItems = load(), baseTags = loadTags(baseItems)) {
     // Every write, including image pruning, completes before the next snapshot starts.
     const snapshot = items.map(normalizeItem).filter(Boolean);
-    const result = saveQueue.then(() => writeSnapshot(snapshot, tags)).catch(() => false);
+    const base = baseItems.map(normalizeItem).filter(Boolean);
+    const result = saveQueue.then(() => {
+      const write = () => writeSnapshot(snapshot, tags, base, baseTags);
+      return navigator.locks?.request
+        ? navigator.locks.request(storageKey, write) : write();
+    }).catch(() => false);
     saveQueue = result;
     return result;
   }
 
-  async function writeSnapshot(items, tags) {
+  async function writeSnapshot(items, tags, baseItems, baseTags) {
     if (writeProtectionReason()) return false;
     let includesImageData = false;
     try {
@@ -176,12 +222,20 @@ const todoStore = (() => {
       // Inline storage preserves images when IndexedDB is unavailable.
       includesImageData = true;
     }
+    // Read the shared document after the asynchronous image write, immediately
+    // before replacing it, so edits from other windows are included.
+    const currentItems = load();
+    const mergedItems = mergeItems(baseItems, items, currentItems);
+    if (includesImageData && mergedItems.some((item) => item.image && !item.image.dataURL)) {
+      return false;
+    }
+    const mergedTags = mergeTags(baseTags, normalizeTags(tags), loadTags(currentItems));
     const previousTags = localStorage.getItem(tagsStorageKey);
     try {
       if (writeProtectionReason()) return false;
-      localStorage.setItem(tagsStorageKey, JSON.stringify(normalizeTags(tags)));
-      localStorage.setItem(storageKey, documentData(items, includesImageData));
-      await todoImageStore.prune(items).catch(() => {});
+      localStorage.setItem(tagsStorageKey, JSON.stringify(mergedTags));
+      localStorage.setItem(storageKey, documentData(mergedItems, includesImageData));
+      await todoImageStore.prune(mergedItems).catch(() => {});
       return true;
     } catch (_) {
       try {
@@ -205,5 +259,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, load, loadTags, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
+  return { create, load, loadTags, storageKey, tagsStorageKey, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
 })();

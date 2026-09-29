@@ -1,7 +1,9 @@
 const promptStore = (() => {
   const libraryStorageKey = 'codex-dashboard.prompt-library';
   const pendingLibraryStorageKey = 'codex-dashboard.pending-prompt-library';
+  const pendingChangePrefix = 'codex-dashboard.pending-prompt-change.';
   const collapsedSectionsStorageKey = 'codex-dashboard.collapsed-prompt-sections';
+  let lastChangeMillis = 0;
 
   const {
     normalizePrompts,
@@ -37,10 +39,6 @@ const promptStore = (() => {
     };
   }
 
-  function pendingLibrary() {
-    return normalizedLibrary(readJSON(pendingLibraryStorageKey, null));
-  }
-
   function canonicalize(value) {
     if (Array.isArray(value)) return value.map(canonicalize);
     if (value && typeof value === 'object') {
@@ -56,6 +54,68 @@ const promptStore = (() => {
   function loadCachedLibrary() {
     return normalizedLibrary(readJSON(libraryStorageKey, null))
       || { version, prompts: [], sections: [] };
+  }
+
+  function pendingChangeKeys() {
+    const keys = [];
+    try {
+      for (let index = 0; index < (localStorage.length || 0); index += 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(pendingChangePrefix)) keys.push(key);
+      }
+    } catch (_) { return []; }
+    return keys.sort();
+  }
+
+  function mergeLibrary(base, desired, current) {
+    const basePrompts = new Map(base.prompts.map(prompt => [prompt.id, prompt]));
+    const desiredPrompts = new Map(desired.prompts.map(prompt => [prompt.id, prompt]));
+    const removed = new Set(base.prompts.filter(prompt => !desiredPrompts.has(prompt.id)).map(prompt => prompt.id));
+    const changed = new Map(desired.prompts.filter(prompt =>
+      !basePrompts.has(prompt.id) || !librariesMatch(basePrompts.get(prompt.id), prompt))
+      .map(prompt => [prompt.id, prompt]));
+    const prompts = current.prompts.filter(prompt => !removed.has(prompt.id))
+      .map(prompt => {
+        const local = changed.get(prompt.id);
+        if (!local) return prompt;
+        const previous = basePrompts.get(prompt.id);
+        if (!previous) return local;
+        const merged = { ...prompt };
+        for (const key of new Set([...Object.keys(previous), ...Object.keys(local)])) {
+          if (librariesMatch(previous[key], local[key])) continue;
+          if (Object.prototype.hasOwnProperty.call(local, key)) merged[key] = local[key];
+          else delete merged[key];
+        }
+        return merged;
+      });
+    const present = new Set(prompts.map(prompt => prompt.id));
+    prompts.push(...desired.prompts.filter(prompt => changed.has(prompt.id) && !present.has(prompt.id)));
+    if (!librariesMatch(base.prompts.map(prompt => prompt.id), desired.prompts.map(prompt => prompt.id))) {
+      const order = new Map(desired.prompts.map((prompt, index) => [prompt.id, index]));
+      prompts.sort((left, right) => (order.get(left.id) ?? Infinity) - (order.get(right.id) ?? Infinity));
+    }
+
+    const removedSections = new Set(base.sections.filter(section => !desired.sections.includes(section)));
+    const sections = current.sections.filter(section => !removedSections.has(section));
+    sections.push(...desired.sections.filter(section => !sections.includes(section)));
+    if (!librariesMatch(base.sections, desired.sections)) {
+      const order = new Map(desired.sections.map((section, index) => [section, index]));
+      sections.sort((left, right) => (order.get(left) ?? Infinity) - (order.get(right) ?? Infinity));
+    }
+    return normalizedLibrary({ version, prompts, sections });
+  }
+
+  function pendingLibrary(keys = pendingChangeKeys()) {
+    const legacy = normalizedLibrary(readJSON(pendingLibraryStorageKey, null));
+    if (!legacy && !keys.length) return null;
+    let current = legacy || loadCachedLibrary();
+    for (const key of keys) {
+      const change = readJSON(key, null);
+      const base = normalizedLibrary(change?.base);
+      const desired = normalizedLibrary(change?.desired);
+      if (base && desired) current = mergeLibrary(base, desired, current);
+    }
+    return current;
   }
 
   const library = pendingLibrary() || loadCachedLibrary();
@@ -122,8 +182,12 @@ const promptStore = (() => {
     // Queue a renderer edit; PromptLibraryBridge persists and acknowledges it.
     stageLibraryUpdate(nextPrompts = store.prompts, nextSections = store.sections) {
       const sections = normalizeSections(nextSections, nextPrompts);
-      const library = { version, prompts: nextPrompts, sections };
-      if (!writeJSON(pendingLibraryStorageKey, library)) return false;
+      const desired = { version, prompts: nextPrompts, sections };
+      const base = store.exportLibrary();
+      lastChangeMillis = Math.max(Date.now(), lastChangeMillis + 1);
+      const uniqueID = globalThis.crypto?.randomUUID?.() || `${performance.now()}-${Math.random()}`;
+      const key = `${pendingChangePrefix}${String(lastChangeMillis).padStart(13, '0')}.${uniqueID}`;
+      if (!writeJSON(key, { base, desired })) return false;
       store.prompts = nextPrompts;
       store.sections = sections;
       return true;
@@ -149,25 +213,49 @@ const promptStore = (() => {
     pendingLibrary,
 
     discardPendingLibrary() {
-      try { localStorage.removeItem(pendingLibraryStorageKey); } catch (_) { return false; }
+      try {
+        for (const key of pendingChangeKeys()) localStorage.removeItem(key);
+        localStorage.removeItem(pendingLibraryStorageKey);
+      } catch (_) { return false; }
       return true;
     },
 
     acknowledgePendingLibrary(library) {
-      const pending = pendingLibrary();
+      const keys = pendingChangeKeys();
+      const pending = pendingLibrary(keys);
       if (!pending) return true;
-      if (!librariesMatch(pending, library)) return false;
-      try { localStorage.removeItem(pendingLibraryStorageKey); } catch (_) { return false; }
+      // A new edit may have arrived while native storage was being written.
+      // Leave it queued for the next synchronization.
+      if (!librariesMatch(pending, library)) return true;
+      try {
+        for (const key of keys) localStorage.removeItem(key);
+        localStorage.removeItem(pendingLibraryStorageKey);
+      } catch (_) { return false; }
       return true;
+    },
+
+    refreshFromSharedStorage() {
+      const library = pendingLibrary() || loadCachedLibrary();
+      if (store.matchesLibrary(library)) return false;
+      store.prompts = library.prompts;
+      store.sections = library.sections;
+      return true;
+    },
+
+    isSharedStorageKey(key) {
+      return key === libraryStorageKey || key === pendingLibraryStorageKey
+        || key?.startsWith(pendingChangePrefix);
     },
 
     applyLibrary(library) {
       if (!promptLibraryContract.isValidLibrary(library)) return false;
-      if (!store.matchesLibrary(library)) {
-        store.prompts = normalizePrompts(library.prompts);
-        store.sections = normalizeSections(library.sections, library.prompts);
+      const queued = pendingLibrary();
+      if (!writeJSON(libraryStorageKey, normalizedLibrary(library)) && queued) return false;
+      const current = pendingLibrary() || normalizedLibrary(library);
+      if (!store.matchesLibrary(current)) {
+        store.prompts = current.prompts;
+        store.sections = current.sections;
       }
-      try { localStorage.removeItem(libraryStorageKey); } catch (_) {}
       return true;
     },
   };
