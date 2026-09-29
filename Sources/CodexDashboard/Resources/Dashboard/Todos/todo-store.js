@@ -226,15 +226,20 @@ const todoStore = (() => {
     // before replacing it, so edits from other windows are included.
     const currentItems = load();
     const mergedItems = mergeItems(baseItems, items, currentItems);
-    if (includesImageData && mergedItems.some((item) => item.image && !item.image.dataURL)) {
-      return false;
-    }
+    // Inline data that is still in memory; keep unresolved image keys for later loading.
+    const availableImageData = new Map(items.filter((item) => item.image?.dataURL)
+      .map((item) => [item.image.storageKey, item.image.dataURL]));
+    const persistedItems = includesImageData ? mergedItems.map((item) => {
+      if (!item.image || item.image.dataURL) return item;
+      const dataURL = availableImageData.get(item.image.storageKey);
+      return dataURL ? { ...item, image: { ...item.image, dataURL } } : item;
+    }) : mergedItems;
     const mergedTags = mergeTags(baseTags, normalizeTags(tags), loadTags(currentItems));
     const previousTags = localStorage.getItem(tagsStorageKey);
     try {
       if (writeProtectionReason()) return false;
       localStorage.setItem(tagsStorageKey, JSON.stringify(mergedTags));
-      localStorage.setItem(storageKey, documentData(mergedItems, includesImageData));
+      localStorage.setItem(storageKey, documentData(persistedItems, includesImageData));
       await todoImageStore.prune(mergedItems).catch(() => {});
       return true;
     } catch (_) {
