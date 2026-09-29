@@ -28,6 +28,7 @@ final class DashboardRenderer {
     private let now: () -> Date
 
     private(set) var maintainsDashboard = true
+    var reviewLoopThreadIDs: Set<String> { reviewLoopBridge?.threadIDs ?? [] }
 
     init(
         devTools: any DevToolsServing = DevToolsClient(),
