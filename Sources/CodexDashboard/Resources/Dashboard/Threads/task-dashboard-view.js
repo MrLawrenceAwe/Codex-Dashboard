@@ -108,7 +108,7 @@ const taskDashboardView = (() => {
     }
     const markAllRead = page.querySelector('[data-mark-all-read]');
     if (markAllRead) {
-      markAllRead.hidden = state.unreadCount === 0 && !markAllReadPending;
+      markAllRead.hidden = filterMode !== 'unread' || (state.unreadCount === 0 && !markAllReadPending);
       markAllRead.disabled = markAllReadPending;
       markAllRead.textContent = markAllReadPending ? 'Marking as read…' : 'Mark all as read';
     }

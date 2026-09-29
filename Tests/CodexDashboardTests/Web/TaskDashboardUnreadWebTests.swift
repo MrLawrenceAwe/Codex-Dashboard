@@ -5,6 +5,30 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testMarkAllAsReadAppearsOnlyOnUnreadFilter() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "one", isUnread: true),
+        ])
+        let visibility = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.open();
+              const button = document.querySelector('[data-mark-all-read]');
+              document.querySelector('[data-filter="all"]').click();
+              const onAll = button.hidden;
+              document.querySelector('[data-filter="unread"]').click();
+              const onUnread = button.hidden;
+              document.querySelector('[data-filter="changedProjects"]').click();
+              const onChangedProjects = button.hidden;
+              return [onAll, onUnread, onChangedProjects];
+            })()
+            """
+        ) as? [Bool]
+        XCTAssertEqual(visibility, [true, false, true])
+    }
+
     func testMarkAllAsReadReportsUnavailableHostActionWithoutOpeningTasks() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -19,6 +43,7 @@ extension TaskDashboardWebTests {
               });
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
               return [
                 document.querySelector('[data-task-notice]').textContent,
@@ -82,6 +107,7 @@ extension TaskDashboardWebTests {
               });
               window.__codexDashboard.applyThreads(threads);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               const button = document.querySelector('[data-mark-all-read]');
               return [button.textContent, button.hidden, button.disabled];
             })()
@@ -137,6 +163,7 @@ extension TaskDashboardWebTests {
               document.querySelector('aside').append(row);
               window.__codexDashboard.applyThreads([thread]);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
             })()
             """
@@ -173,6 +200,7 @@ extension TaskDashboardWebTests {
               document.querySelector('aside').append(row);
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
+              document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
             })()
             """
