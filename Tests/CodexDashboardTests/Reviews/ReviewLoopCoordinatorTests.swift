@@ -713,7 +713,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         onCreateThread?()
         return id
     }
-    func startTurn(threadID: String, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
+    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState,
+                   prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         prompts.append(prompt)
         selections.append(selection)
         speeds.append(speed)

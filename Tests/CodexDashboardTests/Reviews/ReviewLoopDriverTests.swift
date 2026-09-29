@@ -59,10 +59,14 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testTurnsRequestMarkdownWithoutForcingJSON() async throws {
         let connection = ReviewReportDevTools()
-        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+        let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", commit: "base", clean: true)
+        let driver = ReviewLoopDriver(devTools: connection,
+                                      target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
+                                      repositoryCheckpoint: ReviewFixedRepositoryCheckpoint(state: repository))
         let cases: [(ReviewTurnKind, ReviewSpeed)] = [(.review(.p1), .standard), (.fix, .fast)]
         for (kind, speed) in cases {
-            let id = try await driver.startTurn(threadID: "thread", prompt: "Do the work", kind: kind,
+            let id = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project",
+                                                expectedRepository: repository, prompt: "Do the work", kind: kind,
                                                 selection: ReviewModelSelection(modelID: "chosen", reasoningEffort: "high"), speed: speed)
             XCTAssertEqual(id, "turn")
             let expression = await connection.expression
@@ -163,6 +167,14 @@ final class ReviewLoopDriverTests: XCTestCase {
             }
         }
     }
+}
+
+private struct ReviewFixedRepositoryCheckpoint: ReviewRepositoryChecking {
+    let state: ReviewRepositoryState
+
+    func repository(at path: String) async throws -> ReviewRepositoryState { state }
+    func resolveCommit(_ commit: String, at path: String) async throws -> String { commit }
+    func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { true }
 }
 
 private actor ReviewListDevTools: DevToolsServing {
