@@ -276,6 +276,37 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertTrue(refreshed?.body.contains("⏱ 5-hour 60% · 📅 Weekly 17% · 🎟 Banked 1") == true)
     }
 
+    func testOmitsEmptyBankedResetsFromUsageNotifications() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let account = account(named: "Personal")
+        let fiveHourReset = now.addingTimeInterval(5 * 60 * 60)
+        let weeklyReset = now.addingTimeInterval(48 * 60 * 60)
+        let current = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(
+                fiveHour: CodexUsageWindow(usedPercent: 60, resetsAt: fiveHourReset),
+                weekly: CodexUsageWindow(usedPercent: 30, resetsAt: weeklyReset),
+                bankedResets: CodexBankedResetSummary(availableCount: 0, nextExpiration: nil)
+            ),
+            fetchedAt: now
+        )
+        let reminder = try XCTUnwrap(UsageNotificationPlanner.deliverableNotifications(
+            for: [account], usageByAccountID: [account.id: current], now: now
+        ).first { $0.kind == .weeklyReset })
+        let refreshed = UsageNotificationPlanner.refreshedContent(for: reminder, using: current, now: now)
+        XCTAssertTrue(refreshed?.body.hasSuffix("⏱ 5-hour 40% · 📅 Weekly 70%") == true)
+
+        let previous = UsageObservation(usage: CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: fiveHourReset),
+            weekly: current.usage.weekly
+        ))
+        let thresholds = UsageNotificationPlanner.usageThresholdNotifications(
+            for: [account], usageByAccountID: [account.id: current],
+            previousObservations: [account.id: previous], now: now
+        )
+        XCTAssertEqual(thresholds.count, 1)
+        XCTAssertTrue(thresholds[0].body.hasSuffix("⏱ 5-hour 40% · 📅 Weekly 70%"))
+    }
+
     func testRejectsDeliveryTimeSnapshotForChangedDeadline() throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")

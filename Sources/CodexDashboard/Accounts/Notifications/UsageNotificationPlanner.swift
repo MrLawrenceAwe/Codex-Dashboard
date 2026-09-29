@@ -394,8 +394,11 @@ enum UsageNotificationPlanner {
     private static func usageSummary(for usage: CodexAccountUsage) -> String {
         let fiveHour = remainingUsage(for: usage.fiveHour)
         let weekly = remainingUsage(for: usage.weekly)
-        let bankedResets = usage.bankedResets.map { String(max(0, $0.availableCount)) } ?? "unavailable"
-        return "⏱ 5-hour \(fiveHour) · 📅 Weekly \(weekly) · 🎟 Banked \(bankedResets)"
+        var summary = "⏱ 5-hour \(fiveHour) · 📅 Weekly \(weekly)"
+        if let bankedResets = usage.bankedResets, bankedResets.availableCount > 0 {
+            summary += " · 🎟 Banked \(bankedResets.availableCount)"
+        }
+        return summary
     }
 
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {
