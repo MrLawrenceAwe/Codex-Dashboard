@@ -93,13 +93,15 @@ enum ReviewLoopPresentation {
         case 2: findings = "both findings"
         default: findings = "all findings"
         }
+        let task: String
         switch loop.focus {
         case .bugs:
-            return "Fix \(findings) and commit"
+            task = "Fix \(findings) and commit"
         case .organisation, .naming:
-            return "Address \(findings) and commit"
+            task = "Address \(findings) and commit"
         case .performance:
-            return "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
+            task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
         }
+        return task + ". Verify each finding first. If a finding is invalid, explain why with concrete evidence; if all are invalid, make no commit."
     }
 }

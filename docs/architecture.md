@@ -63,9 +63,12 @@ performance findings also have priority headings and follow the selected priorit
 sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
 stops without sending a fix request. Otherwise the same chat receives
 **Fix the finding and commit**, **Fix both findings and commit**, or **Fix all findings and commit**,
-according to the number of qualifying findings. The workflow does not request
+according to the number of qualifying findings, followed by instructions to verify each
+finding and explain any withdrawal. The workflow does not request
 tests or require a test result. A Markdown fix report identifies the addressed
-finding count and commit. No JSON output schema is sent to Codex.
+fixed count, withdrawn finding numbers with evidence, and commit. A fully withdrawn
+review ends without a commit; a partial withdrawal continues after the fix commit.
+No JSON output schema is sent to Codex.
 Dashboard independently verifies a clean working tree, unchanged branch,
 matching HEAD, and ancestry from the round's starting commit before scheduling
 the next fresh review. Reaching the round limit ends the loop with a distinct
