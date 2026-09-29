@@ -153,7 +153,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
                                 "P0–P3 · All priorities"])
     }
 
-    func testSidebarSpinnerTracksActiveLoopAndNavigationRemount() async throws {
+    func testSidebarSpinnerCountsActiveLoopsAndNavigationRemount() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let states = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -164,22 +164,25 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const spinner = () => document.querySelector('[data-review-navigation-running]');
           const states = [spinner().hidden];
           api.applyReviewLoop(snapshot);
-          states.push(spinner().hidden, spinner().getAttribute('aria-label'));
+          states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'));
           loop.phase = 'running'; api.applyReviewLoop(snapshot);
           states.push(spinner().hidden);
           document.getElementById('codex-dashboard-review-navigation').remove();
           api.ensureMounted();
-          states.push(spinner().hidden);
-          loop.phase = 'paused'; api.applyReviewLoop(snapshot);
-          states.push(spinner().hidden);
-          loop.phase = 'completed'; api.applyReviewLoop(snapshot);
-          states.push(spinner().hidden);
+          states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
+          const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Waiting'};
+          api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          states.push(spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'), spinner().getAttribute('title'));
+          loop.phase = 'paused'; api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
+          secondLoop.phase = 'completed'; api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
           api.applyReviewLoop({...snapshot,loops:[]});
           states.push(spinner().hidden);
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(states, [true, false, "Review loops running", false, false, true, true, true])
+        XCTAssertEqual(states, [true, false, "1", "1 running review loop", false, false, "1", "2", "2 running review loops", "2 running review loops", false, "1", true, "0", true])
     }
 
     func testReviewTypesQueueSelectedFocusAndKeepPromptContextOptional() async throws {
