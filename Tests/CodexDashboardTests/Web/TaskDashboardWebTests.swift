@@ -655,4 +655,24 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["0", true])
     }
 
+    func testCompletionRouteNavigatesWhenDashboardIsClosed() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))
+
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              let route;
+              window.addEventListener('message', (event) => {
+                if (event.data?.type === 'navigate-to-route') route = event.data.path;
+              });
+              \(expression);
+              return [route, window.__codexDashboard.isOpen()];
+            })()
+            """
+        ) as? [Any]
+
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["/local/completed-thread", false])
+    }
+
 }
