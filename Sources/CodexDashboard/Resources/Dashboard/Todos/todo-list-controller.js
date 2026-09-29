@@ -111,15 +111,21 @@ function createTodoList({ threadReferencesForProject }) {
   function loadItemImages() {
     todoImageStore.load(items).then((hydratedItems) => {
       if (destroyed) return;
-      const hydratedImages = new Map(hydratedItems.map((item) => [item.id, item.image?.dataURL]));
-      let changed = false;
+      const hydratedImages = new Map(hydratedItems.map((item) => [item.id, item.image]));
+      const hydrate = (item) => {
+        const image = hydratedImages.get(item.id);
+        if (!item.image || item.image.dataURL || !image?.dataURL
+          || item.image.storageKey !== image.storageKey) return item;
+        return { ...item, image: { ...item.image, dataURL: image.dataURL } };
+      };
+      const updatedImages = [];
       items = items.map((item) => {
-        const dataURL = hydratedImages.get(item.id);
-        if (!item.image || item.image.dataURL || !dataURL) return item;
-        changed = true;
-        return { ...item, image: { ...item.image, dataURL } };
+        const updated = hydrate(item);
+        if (updated !== item) updatedImages.push(updated);
+        return updated;
       });
-      if (changed) render();
+      savedItems = savedItems.map(hydrate);
+      todoListView.showHydratedImages(updatedImages);
     });
   }
 

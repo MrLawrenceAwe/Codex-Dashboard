@@ -196,6 +196,20 @@ const todoListView = (() => {
     list.querySelectorAll('[data-todo-title]').forEach(sizeTitle);
   }
 
+  function showHydratedImages(items) {
+    const page = document.getElementById(dashboardElements.elementIDs.todoPage);
+    if (!page) return;
+    for (const item of items) {
+      const row = [...page.querySelectorAll('[data-todo-id]')]
+        .find((candidate) => candidate.dataset.todoId === item.id);
+      const copy = row?.querySelector('.todo-item-copy');
+      if (!copy || copy.querySelector('.todo-image')) continue;
+      const actions = copy.querySelector('.todo-image-actions');
+      if (actions) actions.insertAdjacentHTML('beforebegin', imageMarkup(item));
+      else copy.insertAdjacentHTML('beforeend', imageMarkup(item));
+    }
+  }
+
   function createPage() {
     document.getElementById(dashboardElements.elementIDs.todoDialogHost)?.remove();
     const page = document.createElement('section');
@@ -384,5 +398,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, ensureDialogHost, updateTopInset, render, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
+  return { createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
 })();
