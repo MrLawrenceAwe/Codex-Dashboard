@@ -89,7 +89,7 @@ function createTaskDashboard({ catalog }) {
   function unconfirmedReadIDs(ids) {
     return ids.filter((id) => {
       const thread = catalog.findThread(id);
-      return !thread || thread.isUnread === true || isThreadUnread(thread);
+      return !thread || isThreadUnread(thread);
     });
   }
 
@@ -129,8 +129,9 @@ function createTaskDashboard({ catalog }) {
         markAllReadError = 'Codex’s read-state action is unavailable. Restart Codex and try again.';
         return;
       }
-      presentationState.syncUnread();
       const submittedIDs = unreadIDs.filter((id) => !failedIDs.includes(id));
+      presentationState.markReadRequested(submittedIDs);
+      presentationState.syncUnread();
       const unconfirmedIDs = submittedIDs.length
         ? await waitForReadConfirmation(submittedIDs) : [];
       const failed = failedIDs.length + unconfirmedIDs.length;
@@ -166,6 +167,7 @@ function createTaskDashboard({ catalog }) {
   function renderDashboard() {
     cancelScheduledRender();
     const state = deriveViewState();
+    if (state.unreadCount === 0) markAllReadError = '';
     const rendered = taskDashboardView.render({
       threads: currentThreads(),
       filterMode,

@@ -1,5 +1,7 @@
 function createThreadUnreadState({ findThread, isOpen, onChange, completionIndicators }) {
+  const sidebarOverrideLifetimeMillis = 10_000;
   let unreadThreadIDs = new Set();
+  let persistedUnreadThreadIDs = new Set();
   const sidebarUnreadOverrides = new Map();
   const observedSidebarReadStates = new Map();
   let unreadSyncTimer;
@@ -11,7 +13,20 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
     ]);
   }
 
-  function syncUnreadFromSidebar(nextUnreadThreadIDs = new Set(unreadThreadIDs)) {
+  function expireSidebarOverrides() {
+    const now = Date.now();
+    sidebarUnreadOverrides.forEach((override, id) => {
+      if (override.expiresAt <= now) sidebarUnreadOverrides.delete(id);
+    });
+  }
+
+  function syncUnreadFromSidebar() {
+    expireSidebarOverrides();
+    const nextUnreadThreadIDs = new Set(persistedUnreadThreadIDs);
+    sidebarUnreadOverrides.forEach((override, id) => {
+      if (override.isUnread) nextUnreadThreadIDs.add(id);
+      else nextUnreadThreadIDs.delete(id);
+    });
     const readStates = codexHost.threadReadStates();
     observedSidebarReadStates.forEach((_, id) => {
       if (!readStates.has(id) || !findThread(id)) observedSidebarReadStates.delete(id);
@@ -23,7 +38,11 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
       observedSidebarReadStates.set(id, isUnread);
       if (isUnread === (thread.isUnread === true)) sidebarUnreadOverrides.delete(id);
       else if (isNewObservation) {
-        sidebarUnreadOverrides.set(id, { isUnread, revision: unreadRevision(thread) });
+        sidebarUnreadOverrides.set(id, {
+          isUnread,
+          revision: unreadRevision(thread),
+          expiresAt: Date.now() + sidebarOverrideLifetimeMillis,
+        });
       }
       // An unchanged mounted row is not a new observation. Once its override
       // expires or is acknowledged, it must not mask a later persisted change.
@@ -75,7 +94,8 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
   }
 
   function applyThreads(threads) {
-    const nextUnreadThreadIDs = new Set(
+    expireSidebarOverrides();
+    persistedUnreadThreadIDs = new Set(
       threads.filter((thread) => thread.isUnread === true).map((thread) => thread.id),
     );
     sidebarUnreadOverrides.forEach((override, id) => {
@@ -87,12 +107,16 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
         sidebarUnreadOverrides.delete(id);
         return;
       }
-      if (override.isUnread) nextUnreadThreadIDs.add(id);
-      else nextUnreadThreadIDs.delete(id);
     });
     completionIndicators.pruneMissingThreads();
-    syncUnreadFromSidebar(nextUnreadThreadIDs);
+    syncUnreadFromSidebar();
     scheduleUnreadSync(1500);
+  }
+
+  function markReadRequested(ids) {
+    ids.forEach((id) => {
+      if (sidebarUnreadOverrides.get(id)?.isUnread === true) sidebarUnreadOverrides.delete(id);
+    });
   }
 
   function startMonitoring() {
@@ -109,6 +133,7 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
     sidebarUnreadOverrides.clear();
     observedSidebarReadStates.clear();
     unreadThreadIDs.clear();
+    persistedUnreadThreadIDs.clear();
     unreadMonitoringStarted = false;
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   }
@@ -117,6 +142,7 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
     applyThreads,
     destroy,
     isThreadUnread,
+    markReadRequested,
     scheduleUnreadSync,
     startMonitoring,
     syncUnread: syncUnreadFromSidebar,
