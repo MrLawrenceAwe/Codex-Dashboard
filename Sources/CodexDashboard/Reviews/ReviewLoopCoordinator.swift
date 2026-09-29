@@ -85,6 +85,21 @@ final class ReviewLoopCoordinator {
             try persist(updated)
         case .openFile:
             throw ReviewLoopError("A file link must be opened from its review card.")
+        case .delete, .deleteOlder, .deleteAll:
+            let next: [ReviewLoop]
+            if action.kind == .deleteAll {
+                next = loops.filter { !$0.phase.isFinished }
+            } else {
+                guard let id = action.loopID,
+                      let index = loops.firstIndex(where: { $0.id == id && $0.phase.isFinished }) else {
+                    throw ReviewLoopError("This previous review is unavailable. Refresh the list.")
+                }
+                next = loops.enumerated().compactMap { offset, loop in
+                    let shouldDelete = loop.phase.isFinished && (action.kind == .delete ? offset == index : offset < index)
+                    return shouldDelete ? nil : loop
+                }
+            }
+            try persistAll(next)
         }
         error = nil
     }
@@ -313,14 +328,17 @@ final class ReviewLoopCoordinator {
     }
 
     private func persist(_ updated: ReviewLoop) throws {
+        var next = loops
+        if let index = next.firstIndex(where: { $0.id == updated.id }) { next[index] = updated }
+        else { next.append(updated) }
+        try persistAll(next)
+    }
+
+    private func persistAll(_ next: [ReviewLoop]) throws {
         do {
-            var next = loops
-            if let index = next.firstIndex(where: { $0.id == updated.id }) { next[index] = updated }
-            else { next.append(updated) }
             try store.save(next)
             loops = next
-        }
-        catch {
+        } catch {
             storageFailed = true
             self.error = "Review loop stopped because its state could not be saved. \(error.localizedDescription)"
             throw ReviewLoopError(self.error!)

@@ -88,6 +88,11 @@ const reviewLoopView = (() => {
       <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
         <div class="review-region-heading"><h2 id="review-history-title">Previous loops</h2><span data-review-history-count class="review-count"></span></div>
         <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
+        <div class="review-history-actions">
+          <button type="button" data-review-history-action="delete">Delete selected</button>
+          <button type="button" data-review-history-action="deleteOlder">Delete older</button>
+          <button type="button" data-review-history-action="deleteAll">Delete all</button>
+        </div>
         <details class="review-history-details" data-review-history-details>
           <summary>Review details</summary>
           <div data-review-history-card></div>
@@ -203,7 +208,7 @@ const reviewLoopView = (() => {
     notice.hidden = !error;
     notice.textContent = error || '';
     renderCards(root.querySelector('[data-review-board]'), current, snapshot, pendingAction, retainedLoopIDs);
-    const history = loops.filter(loop => isFinished(loop) && !retainedLoopIDs.has(loop.id));
+    const history = loops.filter(loop => isFinished(loop) && !retainedLoopIDs.has(loop.id)).reverse();
     root.querySelector('[data-review-history]').hidden = !history.length;
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
@@ -214,6 +219,10 @@ const reviewLoopView = (() => {
       historySelect.dataset.options = options;
       historySelect.value = history.some(loop => loop.id === selectedID) ? selectedID : history[0]?.id || '';
     }
+    const selectedIndex = history.findIndex(loop => loop.id === historySelect.value);
+    root.querySelectorAll('[data-review-history-action]').forEach(button => {
+      button.disabled = !!pendingAction || (button.dataset.reviewHistoryAction === 'deleteOlder' && selectedIndex >= history.length - 1);
+    });
     renderCards(root.querySelector('[data-review-history-card]'), history.filter(loop => loop.id === historySelect.value), snapshot, pendingAction);
   }
 
