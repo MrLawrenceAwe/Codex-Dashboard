@@ -400,7 +400,6 @@ final class DashboardRendererTests: XCTestCase {
         let expression = try XCTUnwrap(expressions.last)
         XCTAssertTrue(expression.contains("navigate-to-route"))
         XCTAssertTrue(expression.contains("encodeURIComponent"))
-        XCTAssertTrue(expression.contains("isOpen"))
         XCTAssertTrue(expression.contains("thread"))
     }
 

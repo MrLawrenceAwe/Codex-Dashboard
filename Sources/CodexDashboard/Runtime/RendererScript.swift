@@ -16,7 +16,6 @@ enum RendererScript {
         else { return nil }
         return """
         (() => {
-          if (window.__codexDashboard?.isOpen?.()) return true;
           window.dispatchEvent(new MessageEvent('message', {
             data: { type: 'navigate-to-route', path: `/local/${encodeURIComponent(\(encodedThreadID))}` },
             source: null,
