@@ -60,7 +60,8 @@ final class ReviewLoopCoordinator {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let focus = action.focus ?? .bugs
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: action.promptContext ?? .general, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
+            let promptContext = focus.supportsProjectContext ? action.promptContext ?? .general : .general
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")

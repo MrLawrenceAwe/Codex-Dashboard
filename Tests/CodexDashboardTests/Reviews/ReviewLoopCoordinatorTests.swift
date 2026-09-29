@@ -653,6 +653,24 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                        "Review project for performance and responsiveness (this is a project for personal use).")
     }
 
+    func testSimplificationReviewsIgnoreProjectContext() throws {
+        for focus in [ReviewFocus.organisation, .naming] {
+            let store = ReviewTestStore()
+            let coordinator = ReviewLoopCoordinator(store: store)
+            var action = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
+                                     promptContext: .personal, maxRounds: 3, loopID: nil)
+            action.focus = focus
+            try coordinator.apply(action, projects: [project])
+            XCTAssertEqual(store.loops.first?.promptContext, .general)
+            XCTAssertFalse(ReviewLoopPresentation.reviewPrompt(for: store.loops[0]).contains("personal use"))
+
+            let savedLoop = ReviewLoop(id: store.loops[0].id, startActionID: action.id,
+                                       project: project, promptContext: .personal,
+                                       maxRounds: 3, focus: focus)
+            XCTAssertFalse(ReviewLoopPresentation.reviewPrompt(for: savedLoop).contains("personal use"))
+        }
+    }
+
     func testReviewFocusPersistsAndDrivesBothTurnsAndNextRound() async throws {
         for focus in ReviewFocus.allCases {
             let store = ReviewTestStore()
