@@ -21,6 +21,26 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
                 <button data-app-action-sidebar-thread-id="local:uncatalogued">Uncatalogued chat</button>
               </aside>
               <main>Conversation surface</main>
+              <script>
+                document.addEventListener('contextmenu', (event) => {
+                  if (!event.target.closest('[data-app-action-sidebar-thread-id]')) return;
+                  event.preventDefault();
+                  document.querySelector('[role="menu"]')?.remove();
+                  const menu = document.createElement('div');
+                  menu.setAttribute('role', 'menu');
+                  menu.innerHTML = '<button role="menuitem">Rename</button><button role="menuitem">Archive</button>';
+                  menu.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') menu.remove();
+                  });
+                  document.body.append(menu);
+                });
+                window.__openTodoMenu = async (id) => {
+                  document.querySelector(`[data-app-action-sidebar-thread-id="local:${id}"]`)
+                    .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
+                  await new Promise(resolve => setTimeout(resolve, 0));
+                  return document.querySelector('[data-codex-thread-todo-menu-item]');
+                };
+              </script>
             </body></html>
             """,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
@@ -39,13 +59,14 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
           const row = document.querySelector('[data-app-action-sidebar-thread-id="local:linked"]');
           window.__rowClicks = 0;
           row.addEventListener('click', () => window.__rowClicks++);
-          const button = row.querySelector('[data-codex-thread-todo]');
+          const button = await window.__openTodoMenu('linked');
           button.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
           button.click();
           await window.__waitForTodoSaves();
           const items = window.__todoStoreForTests.load();
+          const savedButton = await window.__openTodoMenu('linked');
           return [items.length, items[0].title, items[0].thread.id, items[0].thread.title,
-            items[0].project.id, window.__rowClicks, button.disabled, button.title,
+            items[0].project.id, window.__rowClicks, savedButton.disabled, savedButton.textContent,
             window.__codexDashboard.isOpen()];
         })()
         """) as? [AnyHashable]
@@ -57,7 +78,7 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
           window.__codexDashboard.openTodos();
           document.querySelector('[data-todo-completed]').click();
           await window.__waitForTodoSaves();
-          return document.querySelector('[data-codex-thread-todo]').disabled;
+          return (await window.__openTodoMenu('linked')).disabled;
         })()
         """) as? Bool
         XCTAssertEqual(completed, false)
@@ -67,7 +88,7 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
         (async () => {
-          document.querySelector('[data-app-action-sidebar-thread-id="local:uncatalogued"] [data-codex-thread-todo]').click();
+          (await window.__openTodoMenu('uncatalogued')).click();
           await window.__waitForTodoSaves();
           const item = window.__todoStoreForTests.load()[0];
           const replacement = document.createElement('aside');
@@ -76,13 +97,14 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
           document.querySelector('aside').replaceWith(replacement);
           window.__codexDashboard.ensureMounted();
           window.__codexDashboard.ensureMounted();
-          const count = replacement.querySelectorAll('[data-codex-thread-todo]').length;
-          replacement.querySelector('[data-codex-thread-todo]').click();
+          const laterButton = await window.__openTodoMenu('later');
+          const count = document.querySelectorAll('[data-codex-thread-todo-menu-item]').length;
+          laterButton.click();
           await window.__waitForTodoSaves();
           const titles = window.__todoStoreForTests.load().map(item => item.title);
           window.__codexDashboard.destroy();
           return [item.title, item.thread.id, item.project === null, count, titles,
-            document.querySelectorAll('[data-codex-thread-todo], [data-codex-thread-todo-notice]').length];
+            document.querySelectorAll('[data-codex-thread-todo-menu-item], [data-codex-thread-todo-notice]').length];
         })()
         """) as? [Any]
         let values = try XCTUnwrap(result)
@@ -103,18 +125,48 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
             if (key === 'codex-dashboard.todos') throw new Error('Storage full');
             return original.call(this, key, value);
           };
-          const button = document.querySelector('[data-codex-thread-todo]');
+          let button = await window.__openTodoMenu('linked');
           button.click();
           await window.__waitForTodoSaves();
           await new Promise(resolve => setTimeout(resolve, 20));
+          button = await window.__openTodoMenu('linked');
           const failed = [button.disabled, document.querySelector('[data-codex-thread-todo-notice]').getAttribute('role'),
             window.__todoStoreForTests.load().length];
           Storage.prototype.setItem = original;
           button.click();
           await window.__waitForTodoSaves();
-          return [...failed, window.__todoStoreForTests.load().length, button.disabled];
+          return [...failed, window.__todoStoreForTests.load().length, (await window.__openTodoMenu('linked')).disabled];
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, [false, "alert", 0, 1, true])
     }
+    func testMenuKeepsOriginalTaskWhenRowIsReusedAndLeavesOtherMenusAlone() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const button = await window.__openTodoMenu('linked');
+          const menu = button.closest('[role="menu"]');
+          menu.querySelector('[role="menuitem"]').focus();
+          document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
+          const keyboardReachedAction = document.activeElement === button;
+          const row = document.querySelector('[data-app-action-sidebar-thread-id="local:linked"]');
+          row.setAttribute('data-app-action-sidebar-thread-id', 'local:reused');
+          row.querySelector('[data-thread-title-trigger]').textContent = 'Reused title';
+          button.click();
+          await window.__waitForTodoSaves();
+          const item = window.__todoStoreForTests.load()[0];
+          document.querySelector('main').dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}));
+          const unrelated = document.createElement('div');
+          unrelated.setAttribute('role', 'menu');
+          unrelated.innerHTML = '<button role="menuitem">Unrelated</button>';
+          document.body.append(unrelated);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          return [keyboardReachedAction, item.thread.id, item.title,
+            Boolean(unrelated.querySelector('[data-codex-thread-todo-menu-item]')),
+            Boolean(document.querySelector('aside [data-codex-thread-todo-menu-item]'))];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "linked", "Sidebar title", false, false])
+    }
+
 }

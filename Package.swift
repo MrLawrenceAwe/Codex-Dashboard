@@ -6,8 +6,11 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "CodexDashboard", targets: ["CodexDashboard"]),
+        .executable(name: "CodexDashboardKeychainHelper", targets: ["CodexDashboardKeychainHelper"]),
     ],
     targets: [
+        .target(name: "DashboardKeychain"),
+        .executableTarget(name: "CodexDashboardKeychainHelper", dependencies: ["DashboardKeychain"]),
         .executableTarget(
             name: "CodexDashboard",
             resources: [.copy("Resources/Dashboard")]

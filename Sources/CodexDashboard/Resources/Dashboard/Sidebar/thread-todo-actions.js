@@ -1,7 +1,8 @@
 function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
   const selector = '[data-app-action-sidebar-thread-id]';
-  const events = ['pointerdown', 'mousedown', 'click', 'keydown'];
-  let sidebar;
+  const events = ['contextmenu', 'pointerdown', 'mousedown', 'click', 'keydown'];
+  let menuContext;
+  let observedBody;
   let observer;
   let started = false;
   let destroyed = false;
@@ -17,7 +18,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     const title = String(thread?.title
       || row.querySelector('[data-thread-title-trigger], [data-marquee-text]')?.textContent
       || [...row.childNodes].filter((node) => !(node instanceof Element)
-        || !node.matches('[data-codex-thread-todo], button, svg'))
+        || !node.matches('button, svg'))
         .map((node) => node.textContent).join('')).trim();
     return id && title ? { id, title, projectPath: thread?.projectPath } : null;
   }
@@ -27,29 +28,51 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
   }
 
   function refresh() {
-    const writeProtected = Boolean(todoStore.writeProtectionReason());
-    sidebar?.querySelectorAll(selector).forEach((row) => {
-      const thread = reference(row);
-      let button = row.querySelector('[data-codex-thread-todo]');
-      if (!thread) { button?.remove(); return; }
-      if (!button) {
-        button = document.createElement('button');
-        button.type = 'button';
-        button.dataset.codexThreadTodo = '';
-        row.append(button);
-      }
-      const added = alreadyAdded(thread.id);
-      const label = pending.has(thread.id) ? 'Adding to To-dos…'
-        : added ? 'Already in To-dos' : 'Add to To-dos';
-      for (const attribute of ['aria-label', 'title']) {
-        if (button.getAttribute(attribute) !== label) button.setAttribute(attribute, label);
-      }
-      if (button.dataset.added !== String(added)) {
-        button.dataset.added = String(added);
-        button.innerHTML = dashboardIcons.render(added ? 'completed' : 'addTodo');
-      }
-      button.disabled = added || pending.has(thread.id) || writeProtected;
-    });
+    if (!menuContext || destroyed) return;
+    if (menuContext.menu && (!menuContext.menu.isConnected || !domUtils.isVisible(menuContext.menu))) {
+      menuContext = null;
+      return;
+    }
+    const menu = menuContext.menu || [...document.querySelectorAll('[role="menu"]')]
+      .find((candidate) => !menuContext.previousMenus.has(candidate) && domUtils.isVisible(candidate));
+    if (!menu || (!menuContext.menu && Date.now() > menuContext.expiresAt)) return;
+    menuContext.menu = menu;
+    let button = menu.querySelector('[data-codex-thread-todo-menu-item]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('role', 'menuitem');
+      button.dataset.codexThreadTodoMenuItem = '';
+      button.innerHTML = `${dashboardIcons.render('addTodo')}<span></span>`;
+      menu.append(button);
+    }
+    const id = menuContext.draft.thread.id;
+    const added = alreadyAdded(id);
+    const label = pending.has(id) ? 'Adding to To-dos…'
+      : added ? 'Already in To-dos' : 'Add to To-dos';
+    if (button.textContent !== label) button.querySelector('span').textContent = label;
+    const disabled = added || pending.has(id) || Boolean(todoStore.writeProtectionReason());
+    button.disabled = disabled;
+    if (button.getAttribute('aria-disabled') !== String(disabled)) {
+      button.setAttribute('aria-disabled', String(disabled));
+    }
+  }
+
+  function prepareMenu(row) {
+    document.querySelectorAll('[data-codex-thread-todo-menu-item]').forEach((item) => item.remove());
+    const thread = reference(row);
+    if (!thread) { menuContext = null; return; }
+    const projects = codexUIContracts.projects();
+    const projectRow = row.closest('[data-app-action-sidebar-project-id]');
+    const project = projects.find((candidate) => candidate.id === projectRow?.getAttribute('data-app-action-sidebar-project-id'))
+      || projects.find((candidate) => candidate.path && candidate.path === thread.projectPath)
+      || null;
+    menuContext = {
+      draft: { title: thread.title, thread, project },
+      previousMenus: new Set([...document.querySelectorAll('[role="menu"]')].filter(domUtils.isVisible)),
+      expiresAt: Date.now() + 1500,
+      menu: null,
+    };
   }
 
   function showNotice(message, failed) {
@@ -67,18 +90,17 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     }, 4000);
   }
 
-  async function addFromRow(row) {
-    const thread = reference(row);
-    if (!thread || pending.has(thread.id) || alreadyAdded(thread.id)) return;
-    const projects = codexUIContracts.projects();
-    const projectRow = row.closest('[data-app-action-sidebar-project-id]');
-    const project = projects.find((candidate) => candidate.id === projectRow?.getAttribute('data-app-action-sidebar-project-id'))
-      || projects.find((candidate) => candidate.path && candidate.path === thread.projectPath)
-      || null;
+  async function addFromMenu(context) {
+    const { thread } = context.draft;
+    if (pending.has(thread.id) || alreadyAdded(thread.id)) return;
     pending.add(thread.id);
     refresh();
+    // Ask the host menu to close through its normal Escape handler.
+    context.menu.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape', bubbles: true, cancelable: true,
+    }));
     let saved = false;
-    try { saved = await addTodo({ title: thread.title, thread, project }); }
+    try { saved = await addTodo(context.draft); }
     catch (_) {}
     pending.delete(thread.id);
     if (destroyed) return;
@@ -88,18 +110,45 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
 
   function handle(event) {
     const target = event.target instanceof Element ? event.target : null;
-    const button = target?.closest('[data-codex-thread-todo]');
-    if (!button) return;
-    event.stopImmediatePropagation();
-    if (event.type === 'keydown') {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        button.click();
-      }
+    const row = target?.closest(selector);
+    if (event.type === 'contextmenu') {
+      if (row && codexHost.sidebar()?.contains(row)) prepareMenu(row);
+      else menuContext = null;
       return;
     }
+    if (row && codexHost.sidebar()?.contains(row)
+      && ((event.type === 'click' && target.closest('[aria-haspopup="menu"]'))
+        || (event.type === 'keydown' && (event.key === 'ContextMenu'
+          || (event.shiftKey && event.key === 'F10'))))) {
+      prepareMenu(row);
+      return;
+    }
+    const button = target?.closest('[data-codex-thread-todo-menu-item]');
+    const menu = menuContext?.menu;
+    if (event.type === 'pointerdown' && !button && !menu?.contains(target)) {
+      menuContext = null;
+    }
+    // Include the injected item in keyboard navigation, since the host menu's
+    // React collection only knows about its own items.
+    if (event.type === 'keydown' && menu?.contains(target)
+      && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      const items = [...menu.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]')]
+        .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true' && domUtils.isVisible(item));
+      if (!items.length) return;
+      const current = items.indexOf(document.activeElement);
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+        : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      items[index].focus();
+      return;
+    }
+    if (!button) return;
+    if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+    event.stopImmediatePropagation();
     event.preventDefault();
-    if (event.type === 'click' && !button.disabled) void addFromRow(button.closest(selector));
+    if (event.type === 'keydown') button.click();
+    if (event.type === 'click' && !button.disabled && menuContext) void addFromMenu(menuContext);
   }
 
   function mount() {
@@ -108,13 +157,12 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
       events.forEach((type) => document.addEventListener(type, handle, true));
       started = true;
     }
-    const nextSidebar = codexHost.sidebar();
-    if (sidebar !== nextSidebar) {
+    if (observedBody !== document.body) {
       observer?.disconnect();
-      sidebar = nextSidebar;
+      observedBody = document.body;
       observer = new MutationObserver(refresh);
-      if (sidebar) observer.observe(sidebar, { childList: true, subtree: true, characterData: true,
-        attributes: true, attributeFilter: ['data-app-action-sidebar-thread-id', 'data-thread-title-trigger'] });
+      if (observedBody) observer.observe(observedBody, { childList: true, subtree: true,
+        attributes: true, attributeFilter: ['role', 'data-state', 'hidden'] });
     }
     refresh();
   }
@@ -123,7 +171,8 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     destroyed = true;
     observer?.disconnect();
     events.forEach((type) => document.removeEventListener(type, handle, true));
-    document.querySelectorAll('[data-codex-thread-todo]').forEach((button) => button.remove());
+    document.querySelectorAll('[data-codex-thread-todo-menu-item]').forEach((button) => button.remove());
+    menuContext = null;
     if (noticeTimer !== undefined) clearTimeout(noticeTimer);
     notice?.remove();
   }

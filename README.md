@@ -37,9 +37,18 @@ new build, or `--skip-tests` during local iteration. `--no-launch` is the
 default and is also accepted explicitly.
 
 Local installs create and reuse a **Codex Dashboard Local Development** signing
-certificate in your login Keychain. This keeps the app's identity stable across
-rebuilds so **Always Allow** Keychain approvals can persist. macOS may ask for one
-final approval when switching from an older ad-hoc build. The certificate is trusted
+certificate in your login Keychain. This keeps the app's designated signing
+requirement stable, but does not prevent Keychain prompts after changed builds:
+macOS still assigns self-signed apps a build-specific Keychain partition identity.
+Saved-account credentials are accessed by a separately signed Keychain helper.
+Dashboard code and UI rebuilds leave this helper's build hash unchanged, allowing
+its approvals to persist without Xcode or an Apple Developer account. Approve the
+helper with **Always Allow** when macOS first asks to access an existing saved
+account; each account is a separate Keychain item. Changes to the helper itself
+or the signing certificate may require approval again.
+An Apple-issued development or Developer ID Application certificate can also be
+selected via `SIGNING_IDENTITY`.
+The local certificate is trusted
 only for code signing; its private key is available to `/usr/bin/codesign`.
 To use an existing signing certificate, set `SIGNING_IDENTITY` to its name or SHA-1
 fingerprint when running the installer. The installer stops if signing fails.
@@ -57,7 +66,7 @@ It moves the installed app to the Trash.
 
 Select **To-dos** in the same sidebar area to keep a personal task list in Codex's
 local renderer storage.
-Hover or focus a sidebar chat/task and select **Add to To-dos** to save its title
+Right-click a sidebar chat/task and select **Add to To-dos** to save its title
 and link, including its project when available. Chats with an open linked to-do
 show **Already in To-dos**.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
