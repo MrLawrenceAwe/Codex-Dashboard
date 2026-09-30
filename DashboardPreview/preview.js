@@ -7,7 +7,7 @@ const threads = [
     projectPath: '/Users/example/Codex Dashboard',
     recencyEpochMillis: Date.now() - 3_000,
     isPinned: true,
-    model: 'gpt-6-sol',
+    model: 'gpt-6.1-sol',
     runState: 'running',
     workingTreeStatus: 'hasChanges',
   },

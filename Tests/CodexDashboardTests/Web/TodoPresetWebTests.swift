@@ -17,7 +17,7 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
           const form = document.querySelector('[data-todo-form]');
           const enabled = form.querySelector('[data-todo-new-preset-enabled]');
           enabled.click();
-          form.querySelector('[data-todo-new-preset-model]').value = 'gpt-6-sol';
+          form.querySelector('[data-todo-new-preset-model]').value = 'gpt-6.1-sol';
           form.querySelector('[data-todo-new-preset-effort]').value = 'high';
           form.querySelector('[data-todo-new-preset-speed]').value = 'fast';
           form.querySelector('[data-todo-new-title]').value = 'Review release';
@@ -41,10 +41,10 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? String, "gpt-6-sol")
+        XCTAssertEqual(values[0] as? String, "gpt-6.1-sol")
         XCTAssertEqual(values[1] as? String, "high")
         XCTAssertEqual(values[2] as? String, "fast")
-        XCTAssertEqual(values[3] as? String, "GPT-6 Sol · High · Fast")
+        XCTAssertEqual(values[3] as? String, "GPT-6.1 Sol · High · Fast")
         XCTAssertEqual(values[4] as? String, "max")
         XCTAssertEqual(values[5] as? Bool, true)
         XCTAssertTrue(values[6] is NSNull)

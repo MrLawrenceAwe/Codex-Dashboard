@@ -70,6 +70,10 @@ Right-click a sidebar chat/task and select **Add to To-dos** to save its title
 and link, including its project when available. Chats with an open linked to-do
 show **Already in To-dos**.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
+New prompt-library and to-do composer presets default to **GPT-6.1 Sol**.
+The shared model selector also offers the other models; saved presets keep their
+selected model. Review-loop model and reasoning choices come from Codex's live
+model list, including GPT-6.1 Sol when available to the signed-in account.
 For an open to-do with a project assigned, select **Paste in chat/task** to choose
 a chat from an inline dropdown and insert the to-do into its draft. Linked tasks
 are labelled in the dropdown. Pasting includes the title, details, image, and composer preset when
