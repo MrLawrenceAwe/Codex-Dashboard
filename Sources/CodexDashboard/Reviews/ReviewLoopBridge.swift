@@ -23,7 +23,7 @@ final class ReviewLoopBridge {
         guard let target = targets.first else { return }
         let driver = ReviewLoopDriver(devTools: devTools, target: target)
         await refreshChoicesIfNeeded(using: driver)
-        try await handleActions(in: targets)
+        try await handleActions(in: targets, using: driver)
         if lastAdvance == nil || Date.now.timeIntervalSince(lastAdvance!) >= 5 {
             await coordinator.advance(using: driver, threads: threads)
             lastAdvance = .now
@@ -41,7 +41,7 @@ final class ReviewLoopBridge {
         } catch { actionError = error.localizedDescription }
     }
 
-    private func handleActions(in targets: [DevToolsTarget]) async throws {
+    private func handleActions(in targets: [DevToolsTarget], using driver: any ReviewLoopDriving) async throws {
         for window in targets {
             if let serialized = try await devTools.evaluateString(RendererScript.pendingReviewAction, in: window),
                let action = try? JSONDecoder().decode(ReviewLoopAction.self, from: Data(serialized.utf8)) {
@@ -52,6 +52,9 @@ final class ReviewLoopBridge {
                         } else {
                             try validateSelections(in: action)
                             try coordinator.apply(action, projects: projects)
+                            if action.kind == .stop, let id = action.loopID {
+                                try await coordinator.stopRunningTask(for: id, using: driver)
+                            }
                         }
                         actionError = nil
                     } catch { actionError = error.localizedDescription }

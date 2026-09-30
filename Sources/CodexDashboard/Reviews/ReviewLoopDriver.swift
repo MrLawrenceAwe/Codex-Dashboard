@@ -104,6 +104,24 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return id
     }
 
+    func stopThread(_ threadID: String) async throws {
+        // Read only the latest turn metadata so stopping also works while the task
+        // is waiting for approval or input, without loading its report.
+        let page = try await request("thread/turns/list", [
+            "threadId": threadID, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
+        ])
+        guard let turns = page["data"] as? [[String: Any]] else {
+            throw ReviewLoopError("Codex returned invalid review turn metadata.")
+        }
+        guard let turn = turns.first else { return }
+        guard let id = turn["id"] as? String, let status = turn["status"] as? String else {
+            throw ReviewLoopError("Codex returned an invalid review turn.")
+        }
+        if status == "inProgress" {
+            _ = try await request("turn/interrupt", ["threadId": threadID, "turnId": id])
+        }
+    }
+
     func readThread(_ threadID: String) async throws -> ReviewThreadState {
         let response = try await request("thread/read", ["threadId": threadID, "includeTurns": false])
         guard var thread = response["thread"] as? [String: Any] else { throw ReviewLoopError("Codex returned no review task.") }

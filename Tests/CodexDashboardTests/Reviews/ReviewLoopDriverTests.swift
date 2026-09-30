@@ -85,6 +85,29 @@ final class ReviewLoopDriverTests: XCTestCase {
         }
     }
 
+    func testStopReadsLatestMetadataAndInterruptsOnlyRunningTurns() async throws {
+        for status in ["inProgress", "completed", "interrupted", "empty"] {
+            let connection = ReviewStopDevTools(status: status)
+            let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+            try await driver.stopThread("thread")
+            let expressions = await connection.expressions
+            let prefix = "window.__codexDashboard.reviewRequest("
+            let requests = try expressions.map {
+                try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any])
+            }
+            XCTAssertEqual(requests.map { $0["method"] as? String }, status == "inProgress" ? ["thread/turns/list", "turn/interrupt"] : ["thread/turns/list"])
+            let read = try XCTUnwrap(requests.first?["params"] as? [String: Any])
+            XCTAssertEqual(read["threadId"] as? String, "thread")
+            XCTAssertEqual(read["limit"] as? Int, 1)
+            XCTAssertEqual(read["sortDirection"] as? String, "desc")
+            XCTAssertEqual(read["itemsView"] as? String, "notLoaded")
+            if status == "inProgress" {
+                let interrupt = try XCTUnwrap(requests.last?["params"] as? [String: String])
+                XCTAssertEqual(interrupt, ["threadId": "thread", "turnId": "latest-turn"])
+            }
+        }
+    }
+
     func testReadsTwoTurnsWithOptionalMessagePhaseAndRejectsExtraTurns() throws {
         let turn: [String: Any] = ["id": "review", "status": "completed", "items": [
             ["type": "agentMessage", "phase": "commentary", "text": "Working"],
@@ -222,5 +245,23 @@ private actor ReviewReportDevTools: DevToolsServing {
             return "{\"result\":{\"thread\":{\"id\":\"thread\"}}}"
         }
         return "{\"result\":{\"turn\":{\"id\":\"turn\"}}}"
+    }
+}
+
+private actor ReviewStopDevTools: DevToolsServing {
+    let status: String
+    var expressions: [String] = []
+    init(status: String) { self.status = status }
+    func mainRendererTargets() async -> [DevToolsTarget] { [] }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
+        let prefix = "window.__codexDashboard.reviewRequest("
+        let request = try JSONSerialization.jsonObject(with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as! [String: Any]
+        expressions.append(expression)
+        if request["method"] as? String == "thread/turns/list" {
+            let turns: [[String: String]] = status == "empty" ? [] : [["id": "latest-turn", "status": status]]
+            return String(data: try JSONSerialization.data(withJSONObject: ["result": ["data": turns]]), encoding: .utf8)
+        }
+        return "{\"result\":{}}"
     }
 }

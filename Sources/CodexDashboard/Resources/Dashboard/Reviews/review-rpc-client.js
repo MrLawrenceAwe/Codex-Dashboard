@@ -1,6 +1,6 @@
 const reviewRPCClient = (() => {
   const pending = new Map();
-  const methods = new Set(['model/list', 'project/list', 'thread/start', 'thread/name/set', 'turn/start', 'thread/read', 'thread/turns/list', 'thread/items/list']);
+  const methods = new Set(['model/list', 'project/list', 'thread/start', 'thread/name/set', 'turn/start', 'turn/interrupt', 'thread/read', 'thread/turns/list', 'thread/items/list']);
   function receive(event) {
     const message = event.data;
     if (message?.type !== 'mcp-response' || message.hostId !== 'local') return;
