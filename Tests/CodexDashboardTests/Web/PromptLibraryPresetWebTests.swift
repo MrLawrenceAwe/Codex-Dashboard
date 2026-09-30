@@ -57,7 +57,7 @@ extension PromptLibraryWebTests {
     }
 
     func testPromptPresetUsesAssociatedSpeedFlyout() async throws {
-        try await checkPresetApplication(speedFlyout: true, model: "gpt-6-sol", label: "GPT-6 Sol")
+        try await checkPresetApplication(speedFlyout: true, model: "gpt-6.1-sol", label: "GPT-6.1 Sol")
     }
 
     func testLockedModelDoesNotOpenAccessOptionsOrInsertPrompt() async throws {
@@ -124,7 +124,7 @@ extension PromptLibraryWebTests {
                 viewToggle.textContent = 'Select model';
                 viewToggle.addEventListener('click', () => showView('advanced'));
                 compact.append(viewToggle);
-                ['GPT-6 Astra', 'GPT-6 Sol', 'GPT-6 Luna', 'GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna'].forEach((label) => {
+                ['GPT-6.1 Sol', 'GPT-6 Astra', 'GPT-6 Sol', 'GPT-6 Luna', 'GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna'].forEach((label) => {
                   const option = document.createElement('div');
                   option.setAttribute('role', 'menuitemradio');
                   const name = document.createElement('span');
@@ -265,7 +265,7 @@ extension PromptLibraryWebTests {
         }
 
         XCTAssertEqual(values["version"] as? Int, 3)
-        XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-6-astra")
+        XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-6.1-sol")
         XCTAssertEqual(presetDefaults["effortValue"] as? String, "medium")
         XCTAssertEqual(presetDefaults["speedValue"] as? String, "standard")
         XCTAssertEqual(presetDefaults["hasPresetChecked"] as? Bool, false)
