@@ -7,6 +7,17 @@ followed by a release build. The WebKit tests require Safari 26.4 or newer's
 CSS zoom coordinate behavior; older WebKit versions report unscaled rectangles.
 Use Xcode 26.6 for development; the application's deployment target remains macOS 14.
 
+## Local signing
+
+`install.sh` resolves its signing certificate through `Packaging/signing-identity.sh`.
+The first local install creates a dedicated self-signed certificate in the login
+Keychain, trusted for code signing. Later installs reuse that certificate; they do
+not fall back to ad-hoc signing. Set `SIGNING_IDENTITY` to use an existing certificate.
+An invalid existing local identity fails installation so an unexpected certificate
+replacement cannot silently invalidate saved Keychain approvals. The certificate
+and non-extractable private key stay in Keychain; temporary key files are removed.
+This is a local development identity, not a Developer ID distribution identity.
+
 ## Preview
 
 Run `./DashboardPreview/generate.sh`, then open `DashboardPreview/index.html` in a
@@ -30,7 +41,9 @@ writes finish before metadata is committed; obsolete images are pruned after a
 successful commit. `todo-image-store.js` owns IndexedDB image persistence;
 `todo-image-controller.js` owns image validation, draft state, and
 reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
-controller coordinates these with persistence. To-dos can save a model, effort, and
+controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
+linked to-dos from sidebar rows, reconciles controls after host DOM changes, and
+uses the list controller’s persistence and rollback flow. To-dos can save a model, effort, and
 speed preset; both new-task and linked-task actions apply it before inserting content
 through `insertTodoIntoComposer`. Image formats are validated through the store’s
 `isAcceptedImageType`, and `todoImageStore.load` retrieves deferred image data. Teardown disconnects project

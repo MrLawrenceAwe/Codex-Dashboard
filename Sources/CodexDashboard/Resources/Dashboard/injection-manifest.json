@@ -34,6 +34,7 @@
     "Todos/todo-tag-controller",
     "Todos/todo-composer-actions",
     "Todos/todo-item-interactions",
+    "Sidebar/thread-todo-actions",
     "Todos/todo-list-controller",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
@@ -47,6 +48,7 @@
   "stylesheets": [
     "Threads/task-dashboard",
     "Sidebar/project-highlights",
+    "Sidebar/thread-todo-actions",
     "Todos/todo-list",
     "Prompts/prompt-library",
     "Accounts/account-popover",

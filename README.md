@@ -31,10 +31,18 @@ Run:
 ./install.sh
 ```
 
-This runs the test suite, builds and ad-hoc signs `Codex Dashboard.app`, then
+This runs the test suite, builds and signs `Codex Dashboard.app`, then
 atomically installs it in `$HOME/Applications`, preserving the previous bundle until the replacement is verified. Use `./install.sh --relaunch` to open the
 new build, or `--skip-tests` during local iteration. `--no-launch` is the
 default and is also accepted explicitly.
+
+Local installs create and reuse a **Codex Dashboard Local Development** signing
+certificate in your login Keychain. This keeps the app's identity stable across
+rebuilds so **Always Allow** Keychain approvals can persist. macOS may ask for one
+final approval when switching from an older ad-hoc build. The certificate is trusted
+only for code signing; its private key is available to `/usr/bin/codesign`.
+To use an existing signing certificate, set `SIGNING_IDENTITY` to its name or SHA-1
+fingerprint when running the installer. The installer stops if signing fails.
 
 To uninstall without permanently deleting the bundle, run `./uninstall.sh`.
 It moves the installed app to the Trash.
@@ -49,6 +57,9 @@ It moves the installed app to the Trash.
 
 Select **To-dos** in the same sidebar area to keep a personal task list in Codex's
 local renderer storage.
+Hover or focus a sidebar chat/task and select **Add to To-dos** to save its title
+and link, including its project when available. Chats with an open linked to-do
+show **Already in To-dos**.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
