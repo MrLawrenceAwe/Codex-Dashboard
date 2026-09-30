@@ -28,6 +28,8 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   const composerActions = createTodoComposerActions({
     isDestroyed: () => destroyed,
     pageState,
+    threadReferencesForProject,
+    getItems: () => items,
   });
   const tagController = createTodoTagController({
     isDestroyed: () => destroyed,
@@ -399,6 +401,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     projectObserver = undefined;
     observedProjectSidebar = undefined;
     imageController.destroy();
+    composerActions.destroy();
     sidebarActions.destroy();
     pageState.close();
   }

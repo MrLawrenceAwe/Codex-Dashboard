@@ -207,6 +207,15 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-thread-action { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-item:hover .todo-thread-action, #codex-dashboard-todo-page .todo-item:focus-within .todo-thread-action, #codex-dashboard-todo-page .todo-thread-action:focus-visible { opacity: 1; }
 #codex-dashboard-todo-page .todo-thread-action:hover { background: var(--todo-active); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-thread-action:disabled { cursor: default; opacity: .45; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog form { display: grid; gap: 12px; margin-top: 20px; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog label { font-size: 12px; color: var(--todo-muted); }
+#codex-dashboard-todo-dialogs .todo-thread-dialog select { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--todo-line-strong); border-radius: 8px; background: var(--todo-surface); color: var(--todo-text); font: inherit; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog select:focus-visible { outline: 2px solid var(--app-color-border-focus, var(--todo-text)); outline-offset: 2px; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog p { font-size: 12px; color: var(--todo-muted); }
+#codex-dashboard-todo-dialogs .todo-thread-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog-actions button { padding: 8px 12px; border: 1px solid var(--todo-line-strong); border-radius: 8px; background: var(--todo-active); color: var(--todo-text); cursor: pointer; }
+#codex-dashboard-todo-dialogs .todo-thread-dialog-actions button:disabled { opacity: .45; cursor: default; }
 #codex-dashboard-todo-page .todo-item:hover .todo-delete,
 #codex-dashboard-todo-page .todo-item:focus-within .todo-delete,
 #codex-dashboard-todo-page .todo-delete:focus-visible,

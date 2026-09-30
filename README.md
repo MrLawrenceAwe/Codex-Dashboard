@@ -70,6 +70,10 @@ Right-click a sidebar chat/task and select **Add to To-dos** to save its title
 and link, including its project when available. Chats with an open linked to-do
 show **Already in To-dos**.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
+For an open to-do with a project assigned, select **Paste in chat/task** to choose
+a chat from that project and insert the to-do into its draft. Linked tasks are
+preselected. Pasting includes the title, details, image, and composer preset when
+present; it does not send the message.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
 All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion, except for review loop tasks and chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use

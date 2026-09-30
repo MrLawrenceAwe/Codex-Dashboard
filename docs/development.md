@@ -67,8 +67,11 @@ controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` 
 an action to the sidebar chat/task context menu, snapshots the selected task
 before the menu opens, supports keyboard navigation, and
 uses the list controller’s persistence and rollback flow. To-dos can save a model, effort, and
-speed preset; both new-task and linked-task actions apply it before inserting content
-through `insertTodoIntoComposer`. Image formats are validated through the store’s
+speed preset; both new-task and selected-task actions apply it before inserting content
+through `insertTodoIntoComposer`. The paste picker resolves the saved project ID
+against current sidebar projects, lists threads with that project's exact path,
+and rechecks project membership before navigation. Choosing a destination does
+not change the saved task link or submit the chat draft. Image formats are validated through the store’s
 `isAcceptedImageType`, and `todoImageStore.load` retrieves deferred image data. Teardown disconnects project
 observation, aborts image readers, and prevents pending callbacks from changing a
 replacement UI.
