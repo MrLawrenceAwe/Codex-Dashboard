@@ -69,6 +69,14 @@ enum DashboardWebTestHarness {
           await Promise.resolve();
         };
         function createTodoList({ threadReferencesForProject, findThread }) {
+        """).replacingOccurrences(of: "async function commitItems(nextItems, nextTags = availableTags) {", with: """
+        function commitItems(nextItems, nextTags = availableTags) {
+          const save = commitTodoItems(nextItems, nextTags);
+          pendingTodoSaves.add(save);
+          void save.finally(() => pendingTodoSaves.delete(save));
+          return save;
+        }
+        async function commitTodoItems(nextItems, nextTags) {
         """)
     }
 

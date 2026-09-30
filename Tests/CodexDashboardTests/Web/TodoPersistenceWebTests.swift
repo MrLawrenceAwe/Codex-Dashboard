@@ -124,6 +124,108 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(state, [true, true, true, true])
     }
 
+    func testQueuedCompletionUndoKeepsTheLatestAction() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Undo completion';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          document.querySelector('[data-todo-filter="all"]').click();
+          const images = window.__todoImageStoreForTests;
+          const originalPersist = images.persist;
+          let release;
+          const gate = new Promise(resolve => { release = resolve; });
+          images.persist = async items => { await gate; return originalPersist(items); };
+          const complete = document.querySelector('[data-todo-completed]');
+          complete.checked = true;
+          complete.dispatchEvent(new Event('change', { bubbles: true }));
+          const undo = document.querySelector('[data-todo-completed]');
+          undo.checked = false;
+          undo.dispatchEvent(new Event('change', { bubbles: true }));
+          release();
+          await window.__waitForTodoSaves();
+          images.persist = originalPersist;
+          return [window.__todoStoreForTests.load()[0].completed,
+            document.querySelector('[data-todo-completed]').checked,
+            document.querySelector('[data-todo-storage-error]').hidden];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [false, false, true])
+    }
+
+    func testQueuedEditRetainsEarlierChangesWhenTheFirstWriteFails() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Original';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          const storage = window.localStorage;
+          let failed = false;
+          Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+            getItem: storage.getItem.bind(storage), removeItem: storage.removeItem.bind(storage),
+            setItem(key, value) {
+              if (key === 'codex-dashboard.todos' && !failed) {
+                failed = true;
+                throw new Error('First write failed');
+              }
+              storage.setItem(key, value);
+            },
+          }});
+          const title = document.querySelector('[data-todo-title]');
+          title.value = 'Edited title';
+          title.dispatchEvent(new Event('change', { bubbles: true }));
+          const body = document.querySelector('[data-todo-body]');
+          body.value = 'Later notes';
+          body.dispatchEvent(new Event('change', { bubbles: true }));
+          await window.__waitForTodoSaves();
+          Object.defineProperty(window, 'localStorage', { configurable: true, value: storage });
+          const [saved] = window.__todoStoreForTests.load();
+          return [failed, saved.title, saved.body,
+            document.querySelector('[data-todo-storage-error]').hidden];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "Edited title", "Later notes", true])
+    }
+
+    func testMergedInlineImageSurvivesAnUnrelatedSave() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const images = window.__todoImageStoreForTests;
+          const originalPersist = images.persist;
+          let started, release;
+          const startedGate = new Promise(resolve => { started = resolve; });
+          const gate = new Promise(resolve => { release = resolve; });
+          images.persist = async items => {
+            started();
+            await gate;
+            return originalPersist(items);
+          };
+          const local = store.create('Local addition');
+          const saving = store.save([local], [], [], []);
+          await startedGate;
+          // Another window falls back to inline storage while this save is pending.
+          const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'inline.png' };
+          const external = store.create('Other window image', '', image);
+          localStorage.setItem(store.storageKey, JSON.stringify({ version: 8, items: [external] }));
+          release();
+          const saved = await saving;
+          images.persist = originalPersist;
+          const loaded = await images.load(store.load());
+          return [saved, loaded.length,
+            loaded.find(item => item.id === external.id).image.dataURL];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, 2, "data:image/png;base64,aA=="])
+    }
+
     func testQueuedImageAndTextSavesKeepOrderAndRecoverAfterFailure() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
