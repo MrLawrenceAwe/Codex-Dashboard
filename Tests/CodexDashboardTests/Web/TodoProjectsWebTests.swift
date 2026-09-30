@@ -283,7 +283,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[0] as? String, "dashboard-chat")
         XCTAssertEqual(values[1] as? String, "other")
         XCTAssertTrue(values[2] is NSNull)
-        XCTAssertEqual(values[3] as? Bool, false)
+        XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertEqual(values[4] as? Bool, true)
     }
 
@@ -526,10 +526,13 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             })()
             """
         ) as? [AnyHashable]
-        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste into task", true, 1])
+        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat/task", true, 1])
 
         _ = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-todo-paste-in-thread]').click()"
+            """
+            document.querySelector('[data-todo-paste-in-thread]').click();
+            document.querySelector('[data-todo-thread-confirm]').click();
+            """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('textarea[placeholder=\"Do anything\"]')?.value === 'Finish linked work'",
@@ -546,5 +549,100 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [AnyHashable]
         XCTAssertEqual(pasteState, ["page", "Finish linked work", 0, false])
+    }
+
+    func testAddedTodoCanChooseAChatFromItsAssignedProjectWithoutSending() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation">
+                <button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="/tmp/project"
+                  data-app-action-sidebar-project-label="Project"></div>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="/tmp/empty"
+                  data-app-action-sidebar-project-label="Empty"></div>
+                <button class="sidebar-item" data-app-action-sidebar-thread-id="local:chosen">Chosen chat</button>
+              </aside>
+              <main><textarea placeholder="Do anything">Existing draft</textarea></main>
+              <script>
+                document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', (event) => {
+                  event.currentTarget.setAttribute('aria-current', 'page');
+                  window.__navigationCount = (window.__navigationCount || 0) + 1;
+                });
+                document.addEventListener('submit', () => { window.__submitCount = (window.__submitCount || 0) + 1; });
+              </script>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "chosen", title: "Chosen chat", projectPath: "/tmp/project"),
+            .fixture(id: "other", title: "Other project chat", projectPath: "/tmp/other"),
+        ])
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              for (const path of ['/tmp/project', '/tmp/empty']) {
+                document.querySelector(`[data-app-action-sidebar-project-id="${path}"]`)['__reactFiber$test'] = {
+                  memoizedProps: { group: { projectId: path, projectKind: 'local', path } },
+                };
+              }
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Todo title';
+              form.querySelector('[data-todo-new-body]').value = 'Todo details';
+              form.requestSubmit();
+              await window.__waitForTodoSaves?.();
+              const noProjectDisabled = document.querySelector('[data-todo-paste-in-thread]').disabled;
+              const assign = async (id) => {
+                const project = document.querySelector('[data-todo-project]');
+                project.value = id;
+                project.dispatchEvent(new Event('change', { bubbles: true }));
+                await window.__waitForTodoSaves?.();
+              };
+              await assign('/tmp/empty');
+              document.querySelector('[data-todo-paste-in-thread]').click();
+              const empty = [document.querySelector('[data-todo-paste-thread]').disabled,
+                document.querySelector('[data-todo-thread-confirm]').disabled,
+                !document.querySelector('[data-todo-thread-empty]').hidden];
+              document.querySelector('[data-todo-thread-cancel]').click();
+              await assign('/tmp/project');
+              document.querySelector('[data-todo-paste-in-thread]').click();
+              const choices = [...document.querySelector('[data-todo-paste-thread]').options].map(option => option.value);
+              document.querySelector('[data-todo-thread-cancel]').click();
+              const cancelled = [window.__navigationCount || 0,
+                document.querySelector('textarea[placeholder="Do anything"]').value];
+              document.querySelector('[data-todo-paste-in-thread]').click();
+              const picker = document.querySelector('[data-todo-paste-thread]');
+              picker.value = 'chosen';
+              picker.dispatchEvent(new Event('change', { bubbles: true }));
+              const composer = document.querySelector('textarea[placeholder="Do anything"]');
+              composer.setSelectionRange(composer.value.length, composer.value.length);
+              window.__submitCount = 0;
+              document.querySelector('[data-todo-thread-confirm]').click();
+              return [noProjectDisabled, empty, choices, cancelled];
+            })()
+            """
+        ) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? [Bool], [true, true, true])
+        XCTAssertEqual(values[2] as? [String], ["", "chosen"])
+        XCTAssertEqual(values[3] as? [AnyHashable], [0, "Existing draft"])
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('textarea[placeholder=\"Do anything\"]').value.includes('Todo details')",
+            in: webView
+        )
+        let pasted = try await webView.evaluateJavaScript(
+            """
+            [document.querySelector('textarea[placeholder="Do anything"]').value,
+              window.__navigationCount, window.__submitCount,
+              document.querySelector('[data-todo-thread-dialog]').open,
+              JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].thread === null]
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(pasted, ["Existing draft\n\nTodo title\n\nTodo details", 1, 1, false, true])
     }
 }

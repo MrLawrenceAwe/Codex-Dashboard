@@ -1,5 +1,56 @@
-function createTodoComposerActions({ isDestroyed, pageState }) {
+function createTodoComposerActions({ isDestroyed, pageState, threadReferencesForProject, getItems }) {
   const activeComposer = () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
+  let pickerDialog;
+  let transferring = false;
+
+  function threadsForTodo(item) {
+    const project = codexUIContracts.projects().find((candidate) => candidate.id === item.project?.id);
+    return project ? threadReferencesForProject(project) : [];
+  }
+
+  function showTransferError(message) {
+    pageState.open();
+    const notice = document.querySelector('[data-todo-composer-error]');
+    if (notice) {
+      notice.textContent = message;
+      notice.hidden = false;
+    }
+  }
+
+  function chooseTodoThread(item) {
+    if (isDestroyed() || transferring || !item?.project) return;
+    const dialog = todoListView.ensureDialogHost().querySelector('[data-todo-thread-dialog]');
+    if (dialog.open) return;
+    pickerDialog = dialog;
+    const select = dialog.querySelector('[data-todo-paste-thread]');
+    const submit = dialog.querySelector('[data-todo-thread-confirm]');
+    const threads = threadsForTodo(item);
+    dialog.querySelector('[data-todo-thread-project]').textContent = `Choose a chat/task in ${item.project.name}.`;
+    select.replaceChildren(new Option('Choose a chat/task…', ''), ...threads.map((thread) => new Option(thread.title, thread.id)));
+    select.value = threads.some((thread) => thread.id === item.thread?.id) ? item.thread.id : '';
+    select.disabled = threads.length === 0;
+    submit.disabled = !select.value;
+    dialog.querySelector('[data-todo-thread-empty]').hidden = threads.length > 0;
+    select.onchange = () => { submit.disabled = !select.value; };
+    const close = () => dialog.close();
+    dialog.querySelector('[data-todo-thread-dialog-close]').onclick = close;
+    dialog.querySelector('[data-todo-thread-cancel]').onclick = close;
+    dialog.onclick = (event) => { if (event.target === dialog) close(); };
+    dialog.querySelector('[data-todo-thread-form]').onsubmit = (event) => {
+      event.preventDefault();
+      const currentItem = getItems().find((candidate) => candidate.id === item.id);
+      const thread = currentItem?.project?.id === item.project.id && !currentItem.completed
+        ? threadsForTodo(currentItem).find((candidate) => candidate.id === select.value)
+        : null;
+      close();
+      if (!thread || isDestroyed()) {
+        if (!isDestroyed()) showTransferError('This chat/task is no longer available in the to-do’s project. Choose a chat/task again.');
+        return;
+      }
+      void pasteTodoInThread(currentItem, thread);
+    };
+    dialog.showModal();
+  }
 
   function showComposerWarning(composer, message) {
     document.querySelector('[data-todo-preset-warning]')?.remove();
@@ -115,16 +166,32 @@ function createTodoComposerActions({ isDestroyed, pageState }) {
     await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, waitForStableComposer: true });
   }
 
-  async function pasteTodoInThread(item) {
-    if (isDestroyed() || !item?.thread) return;
-    pageState.close();
-    codexHost.navigateToThread(item.thread);
-    const selected = await domUtils.waitFor(
-      () => isDestroyed() || codexUIContracts.isThreadSelected(item.thread.id),
-      { timeout: 5000, interval: 25 },
-    );
-    if (selected && !isDestroyed()) await insertTodoIntoComposer(item);
+  async function pasteTodoInThread(item, thread) {
+    if (isDestroyed() || transferring) return;
+    transferring = true;
+    try {
+      pageState.close();
+      codexHost.navigateToThread(thread);
+      const selected = await domUtils.waitFor(
+        () => isDestroyed() || codexUIContracts.isThreadSelected(thread.id),
+        { timeout: 5000, interval: 25 },
+      );
+      if (isDestroyed()) return;
+      if (!selected) {
+        showTransferError('Could not open the selected chat/task. Choose a chat/task again.');
+        return;
+      }
+      if (!await insertTodoIntoComposer(item, { waitForStableComposer: true })) {
+        if (!isDestroyed()) showTransferError('Could not paste this to-do. Check the chat/task editor and composer preset, then try again.');
+      }
+    } finally {
+      transferring = false;
+    }
   }
 
-  return { openTodoInNewThread, pasteTodoInThread };
+  function destroy() {
+    if (pickerDialog?.open) pickerDialog.close();
+  }
+
+  return { openTodoInNewThread, chooseTodoThread, destroy };
 }

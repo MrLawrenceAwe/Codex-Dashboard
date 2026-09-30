@@ -59,7 +59,7 @@ function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, com
       }
       const pasteInThreadButton = event.target.closest('[data-todo-paste-in-thread]');
       if (pasteInThreadButton) {
-        void composerActions.pasteTodoInThread(item);
+        composerActions.chooseTodoThread(item);
         return;
       }
       const removeImageButton = event.target.closest('[data-todo-image-remove]');
