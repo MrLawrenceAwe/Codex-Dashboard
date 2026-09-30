@@ -169,4 +169,49 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, "linked", "Sidebar title", false, false])
     }
 
+    func testNativeContextMenuIncludesTodoAndPreservesHostActions() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const row = document.querySelector('[data-app-action-sidebar-thread-id="local:linked"]');
+          const items = [
+            {id: 'rename', message: {defaultMessage: 'Rename'}, onSelect: () => window.__renamed = true},
+            {id: 'copy', message: {defaultMessage: 'Copy'}, submenu: [
+              {id: 'copy-link', message: {defaultMessage: 'Copy link'}, onSelect: () => window.__copied = true},
+            ]},
+          ];
+          const formatter = message => message.defaultMessage;
+          row['__reactFiber$test'] = {memoizedProps: {getItems: () => items},
+            updateQueue: {memoCache: {data: [[null, null, formatter, [], []]]}}};
+          window.__nativeSelection = 'codex-dashboard-add-thread-todo';
+          window.electronBridge = Object.freeze({showContextMenu: async (menu, position) => {
+            window.__nativeItems = menu;
+            window.__nativePosition = position;
+            return {id: window.__nativeSelection};
+          }});
+          window.__hostContextMenuCount = 0;
+          row.addEventListener('contextmenu', () => window.__hostContextMenuCount++);
+          await window.__openTodoMenu('linked');
+          await window.__waitForTodoSaves();
+          const addedItems = window.__todoStoreForTests.load();
+          const menuLabels = window.__nativeItems.map(item => item.label);
+          window.__nativeSelection = 'copy-link';
+          await window.__openTodoMenu('linked');
+          const disabledAfterAdd = window.__nativeItems[0].enabled === false;
+          window.__nativeSelection = 'rename';
+          await window.__openTodoMenu('linked');
+          return [addedItems.length, addedItems[0].thread.id, menuLabels,
+            disabledAfterAdd, window.__copied, window.__renamed, window.__hostContextMenuCount];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 1)
+        XCTAssertEqual(values[1] as? String, "linked")
+        XCTAssertEqual(values[2] as? [String], ["Add to To-dos", "", "Rename", "Copy"])
+        XCTAssertEqual(values[3] as? Bool, true)
+        XCTAssertEqual(values[4] as? Bool, true)
+        XCTAssertEqual(values[5] as? Bool, true)
+        XCTAssertEqual(values[6] as? Int, 0)
+    }
+
 }

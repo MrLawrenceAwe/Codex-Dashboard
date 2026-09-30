@@ -185,9 +185,12 @@ const todoListView = (() => {
           ${!item.completed && item.image ? `<div class="todo-image-actions">
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
+          ${!item.completed ? `<div class="todo-item-actions">
+            <button type="button" class="todo-thread-action" data-todo-paste-in-thread aria-expanded="false" aria-label="Choose a chat/task to paste this to-do into" title="${item.project ? 'Choose a chat/task from this project' : 'Assign a project to choose a chat/task'}"${item.project ? '' : ' disabled'}>Paste in chat/task</button>
+            ${!item.thread && item.project ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="Start a new task for ${domUtils.escapeHTML(item.project.name)}" title="Start a new task">New task</button>` : ''}
+            <select class="todo-paste-thread-picker" data-todo-paste-thread aria-label="Chat/task to paste this to-do into" hidden disabled></select>
+          </div>` : ''}
         </div>
-        ${!item.completed ? `<button type="button" class="todo-thread-action" data-todo-paste-in-thread aria-label="Choose a chat/task to paste this to-do into" title="${item.project ? 'Choose a chat/task from this project' : 'Assign a project to choose a chat/task'}"${item.project ? '' : ' disabled'}>Paste in chat/task</button>` : ''}
-        ${!item.completed && !item.thread && item.project ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="Start a new task for ${domUtils.escapeHTML(item.project.name)}" title="Start a new task">New task</button>` : ''}
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>
@@ -314,21 +317,6 @@ const todoListView = (() => {
         <div class="todo-tag-list-heading"><strong>Your tags</strong><span data-todo-tag-count></span></div>
         <div class="todo-tags" data-todo-managed-tags aria-label="Available tags"></div>
         <p class="todo-tag-dialog-note">Deleting a tag removes it from every to-do.</p>
-      </dialog>
-      <dialog class="todo-tag-dialog todo-thread-dialog" data-todo-thread-dialog aria-label="Paste in chat/task">
-        <header class="todo-tag-dialog-header">
-          <div><h2>Paste in chat/task</h2><p data-todo-thread-project></p></div>
-          <button type="button" data-todo-thread-dialog-close aria-label="Close chat/task picker">&times;</button>
-        </header>
-        <form data-todo-thread-form>
-          <label for="todo-paste-thread">Chat/task</label>
-          <select id="todo-paste-thread" data-todo-paste-thread required></select>
-          <p data-todo-thread-empty hidden>No chats/tasks in this project yet. Create a new task first.</p>
-          <div class="todo-thread-dialog-actions">
-            <button type="button" data-todo-thread-cancel>Cancel</button>
-            <button type="submit" data-todo-thread-confirm>Paste into draft</button>
-          </div>
-        </form>
       </dialog>`;
     document.body.append(dialogHost);
     const imageDialog = dialogHost.querySelector('[data-todo-image-dialog]');

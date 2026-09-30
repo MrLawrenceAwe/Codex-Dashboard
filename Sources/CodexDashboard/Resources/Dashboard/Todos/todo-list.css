@@ -106,7 +106,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-attribute-filters select option { background: var(--todo-bg); color: var(--todo-text); }
 
 #codex-dashboard-todo-page .todo-list { display: grid; }
-#codex-dashboard-todo-page .todo-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; min-height: 64px; padding: 12px 10px; border-radius: 8px; border-bottom: 1px solid var(--todo-line); }
+#codex-dashboard-todo-page .todo-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 64px; padding: 12px 10px; border-radius: 8px; border-bottom: 1px solid var(--todo-line); }
 #codex-dashboard-todo-page .todo-item:hover { background: color-mix(in srgb, var(--todo-hover) 70%, transparent); }
 #codex-dashboard-todo-page .todo-check { display: grid; width: 28px; height: 28px; cursor: pointer; place-items: center; }
 #codex-dashboard-todo-page .todo-check input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
@@ -204,18 +204,14 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
   #codex-dashboard-todo-dialogs .todo-managed-tag-actions { margin-left: -8px; }
 }
 #codex-dashboard-todo-page .todo-delete { display: grid; width: 32px; height: 32px; border: 0; border-radius: 5px; background: transparent; color: var(--todo-dim); cursor: pointer; opacity: 0; place-items: center; }
-#codex-dashboard-todo-page .todo-thread-action { padding: 5px 8px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; opacity: 0; white-space: nowrap; }
-#codex-dashboard-todo-page .todo-item:hover .todo-thread-action, #codex-dashboard-todo-page .todo-item:focus-within .todo-thread-action, #codex-dashboard-todo-page .todo-thread-action:focus-visible { opacity: 1; }
+#codex-dashboard-todo-page .todo-item-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+#codex-dashboard-todo-page .todo-thread-action { padding: 6px 9px; border: 1px solid var(--todo-line-strong); border-radius: 6px; background: var(--todo-surface); color: var(--todo-text); font-size: 11px; cursor: pointer; white-space: nowrap; }
 #codex-dashboard-todo-page .todo-thread-action:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-thread-action:disabled { cursor: default; opacity: .45; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog form { display: grid; gap: 12px; margin-top: 20px; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog label { font-size: 12px; color: var(--todo-muted); }
-#codex-dashboard-todo-dialogs .todo-thread-dialog select { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--todo-line-strong); border-radius: 8px; background: var(--todo-surface); color: var(--todo-text); font: inherit; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog select:focus-visible { outline: 2px solid var(--app-color-border-focus, var(--todo-text)); outline-offset: 2px; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog p { font-size: 12px; color: var(--todo-muted); }
-#codex-dashboard-todo-dialogs .todo-thread-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog-actions button { padding: 8px 12px; border: 1px solid var(--todo-line-strong); border-radius: 8px; background: var(--todo-active); color: var(--todo-text); cursor: pointer; }
-#codex-dashboard-todo-dialogs .todo-thread-dialog-actions button:disabled { opacity: .45; cursor: default; }
+#codex-dashboard-todo-page .todo-paste-thread-picker { flex-basis: 100%; width: 100%; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--todo-line-strong); border-radius: 6px; background: var(--todo-bg); color: var(--todo-text); font: inherit; font-size: 12px; }
+#codex-dashboard-todo-page .todo-paste-thread-picker option { background: var(--todo-bg); color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-paste-thread-picker:focus-visible,
+#codex-dashboard-todo-page .todo-thread-action:focus-visible { outline: 2px solid var(--app-color-border-focus, var(--todo-text)); outline-offset: 2px; }
 #codex-dashboard-todo-page .todo-item:hover .todo-delete,
 #codex-dashboard-todo-page .todo-item:focus-within .todo-delete,
 #codex-dashboard-todo-page .todo-delete:focus-visible,
