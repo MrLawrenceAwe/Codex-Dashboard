@@ -132,7 +132,15 @@ function createTodoList({ threadReferencesForProject }) {
 
   function refreshFromStorage() {
     if (destroyed || pendingWrites || todoStore.writeProtectionReason()) return;
-    items = todoStore.load();
+    const loadedItems = todoStore.load();
+    const imagesByID = new Map(items.filter((item) => item.image?.dataURL)
+      .map((item) => [item.id, item.image]));
+    items = loadedItems.map((item) => {
+      const image = imagesByID.get(item.id);
+      return item.image && !item.image.dataURL && image?.storageKey === item.image.storageKey
+        ? { ...item, image: { ...item.image, dataURL: image.dataURL } }
+        : item;
+    });
     availableTags = todoStore.loadTags(items);
     savedItems = items;
     savedTags = availableTags;

@@ -193,10 +193,9 @@ const todoStore = (() => {
   }
 
   function mergeTags(baseTags, desiredTags, currentTags) {
-    const removed = new Set(baseTags.filter((tag) => !desiredTags.includes(tag)));
     return normalizeTags([
-      ...desiredTags.filter((tag) => !baseTags.includes(tag)),
-      ...currentTags.filter((tag) => !removed.has(tag)),
+      ...desiredTags,
+      ...currentTags.filter((tag) => !baseTags.includes(tag)),
     ]);
   }
 
