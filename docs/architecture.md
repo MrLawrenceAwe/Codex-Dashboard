@@ -93,7 +93,9 @@ reconciles known tasks first. Responses from older JSON-format turns are not
 converted; start a new loop if an unfinished old turn returns that format. Malformed reports, failed/interrupted turns, approval
 requests, dirty checkouts, or unexpected changes stop progression with an
 explanation. Pause lets the current review/fix round finish. Stop prevents new
-work without interrupting an already-running chat. Keep both Codex and Dashboard
+work and interrupts the latest running turn in the loop’s review or fix chat. A stop
+during prompt submission also interrupts the turn once its launch is acknowledged.
+Interruption failures remain visible on the stopped loop. Keep both Codex and Dashboard
 running. Avoid other edits in the
 selected checkout while a loop is active. The desktop bridge is unofficial and
 may require maintenance after Codex updates.

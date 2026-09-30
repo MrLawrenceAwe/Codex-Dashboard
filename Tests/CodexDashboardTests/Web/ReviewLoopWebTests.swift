@@ -582,11 +582,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             window.dispatchEvent(new MessageEvent('message',{data:{type:'mcp-response',hostId:'local',message:{id:request.request.id,result:{method:request.request.method,host:request.hostId}}}}));
           }};
           const response = JSON.parse(await window.__codexDashboard.reviewRequest({method:'project/list',params:{limit:100}}));
-          const rejected = JSON.parse(await window.__codexDashboard.reviewRequest({method:'turn/interrupt',params:{}}));
-          return [response.result.method,response.result.host,!!rejected.error];
+          const interrupted = JSON.parse(await window.__codexDashboard.reviewRequest({method:'turn/interrupt',params:{threadId:'thread',turnId:'turn'}}));
+          const rejected = JSON.parse(await window.__codexDashboard.reviewRequest({method:'thread/archive',params:{}}));
+          return [response.result.method,response.result.host,interrupted.result.method,!!rejected.error];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["project/list", "local", true])
+        XCTAssertEqual(result, ["project/list", "local", "turn/interrupt", true])
     }
 
     func testTeardownSettlesPendingRequestWithoutRetry() async throws {

@@ -481,6 +481,51 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1)
     }
 
+    func testStopInterruptsRunningReviewAndFixTasks() async throws {
+        for fixing in [false, true] {
+            let (coordinator, store, driver) = try make()
+            await coordinator.advance(using: driver, threads: [])
+            if fixing {
+                driver.review(priorities: [.p1])
+                await coordinator.advance(using: driver, threads: [])
+                await coordinator.advance(using: driver, threads: [])
+            }
+            try coordinator.apply(action(.stop, for: coordinator), projects: [project])
+            try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
+            XCTAssertEqual(driver.interruptedTurns, [fixing ? "turn-2" : "turn-1"])
+            XCTAssertEqual(driver.thread.turns.last?.status, "interrupted")
+            XCTAssertEqual(store.loops.last?.message, "Stopped loop and its running task.")
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(driver.prompts.count, fixing ? 2 : 1)
+        }
+    }
+
+    func testStopWithoutRunningTaskDoesNotInterruptCompletedTurn() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
+        try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
+        XCTAssertTrue(driver.interruptedTurns.isEmpty)
+        XCTAssertEqual(driver.thread.turns.last?.status, "completed")
+    }
+
+    func testInterruptFailureKeepsLoopStoppedAndCanBeRetried() async throws {
+        let (coordinator, store, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.failStopThread = true
+        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
+        do {
+            try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
+            XCTFail("Expected interrupt failure")
+        } catch { }
+        XCTAssertEqual(store.loops.last?.phase, .stopped)
+        XCTAssertTrue(store.loops.last!.message.contains("could not stop its task"))
+        driver.failStopThread = false
+        try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
+        XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
+    }
+
     func testStopDuringRepositoryCheckPreventsReviewLaunch() async throws {
         let (coordinator, _, driver) = try make()
         driver.onRepository = { self.stop(coordinator) }
@@ -504,6 +549,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
         XCTAssertEqual(store.loops[store.loops.count - 1].rounds.last?.reviewTurnID, "turn-1")
+        XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 1)
     }
@@ -527,6 +573,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
         XCTAssertEqual(store.loops[store.loops.count - 1].rounds.last?.fixTurnID, "turn-2")
+        XCTAssertEqual(driver.interruptedTurns, ["turn-2"])
     }
 
     func testRoundLimitFinishesConfiguredWorkWithoutLaunchingAnotherTask() async throws {
@@ -772,6 +819,8 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var failingPath: String?
     var repositoryRoot: String?
     var failReadThread = false
+    var failStopThread = false
+    var interruptedTurns: [String] = []
     var createCalls = 0
     var createdThreads: [String] = []
     var prompts: [String] = []
@@ -813,6 +862,14 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
         onStartTurn?()
         return id
+    }
+    func stopThread(_ threadID: String) async throws {
+        if failStopThread { throw ReviewLoopError("Connection timed out") }
+        guard let last = thread.turns.last, last.status == "inProgress" else { return }
+        interruptedTurns.append(last.id)
+        thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
+            ReviewTurnState(id: last.id, status: "interrupted", finalMessage: nil)
+        ])
     }
     func readThread(_ threadID: String) async throws -> ReviewThreadState {
         onReadThread?()

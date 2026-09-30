@@ -69,7 +69,7 @@ final class ReviewLoopCoordinator {
             guard !updated.phase.isFinished else { return }
             if action.kind == .stop {
                 updated.phase = .stopped
-                updated.message = "Stopped scheduling reviews. Any active task can finish in its chat."
+                updated.message = "Stopped loop. Stopping its running task."
             } else if action.kind == .pause {
                 if updated.phase == .running {
                     updated.pauseRequested = true
@@ -103,6 +103,24 @@ final class ReviewLoopCoordinator {
             try persistAll(next)
         }
         error = nil
+    }
+
+    func stopRunningTask(for id: UUID, using driver: any ReviewLoopDriving) async throws {
+        guard let loop = matchingLoop(id), loop.phase == .stopped else { return }
+        do {
+            if let round = loop.rounds.last, round.result == nil, let threadID = round.threadID {
+                try await driver.stopThread(threadID)
+            }
+        } catch {
+            if var updated = matchingLoop(id), updated.phase == .stopped {
+                updated.message = "Stopped loop, but could not stop its task. Open its chat to stop it: \(error.localizedDescription)"
+                try persist(updated)
+            }
+            throw error
+        }
+        guard var updated = matchingLoop(id), updated.phase == .stopped else { return }
+        updated.message = "Stopped loop and its running task."
+        try persist(updated)
     }
 
     func advance(using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
@@ -176,7 +194,10 @@ final class ReviewLoopCoordinator {
         updated = current
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
-        guard updated.phase == .running else { return }
+        guard updated.phase == .running else {
+            try await stopRunningTask(for: updated.id, using: driver)
+            return
+        }
         let turnID = try await driver.startTurn(threadID: threadID, projectPath: updated.project.path,
                                                expectedRepository: repo,
                                                prompt: ReviewLoopPresentation.reviewPrompt(for: updated),
@@ -189,6 +210,7 @@ final class ReviewLoopCoordinator {
             updated.message = "Review \(round.number) is running in a fresh chat."
         }
         try persist(updated)
+        try await stopRunningTask(for: updated.id, using: driver)
     }
 
     private func reconcile(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
@@ -250,6 +272,7 @@ final class ReviewLoopCoordinator {
             updated = current
             updated.rounds[updated.rounds.count - 1].fixTurnID = id
             try persist(updated)
+            try await stopRunningTask(for: updated.id, using: driver)
             return
         }
         guard thread.turns.count == 2, let fixTurn = thread.turns.last,
