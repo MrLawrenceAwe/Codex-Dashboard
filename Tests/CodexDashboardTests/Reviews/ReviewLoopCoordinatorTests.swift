@@ -696,7 +696,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                 expectedFix = "Address the finding and commit"
             case .performance:
                 expectedReview = "Review project for performance and responsiveness."
-                expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
+                expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate and verify the improvements, then commit"
             }
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])

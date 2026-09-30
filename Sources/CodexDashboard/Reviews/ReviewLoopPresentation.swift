@@ -100,7 +100,7 @@ enum ReviewLoopPresentation {
         case .organisation, .naming:
             task = "Address \(findings) and commit"
         case .performance:
-            task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate, preserve behaviour, and verify the improvements, then commit"
+            task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate and verify the improvements, then commit"
         }
         return task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
     }
