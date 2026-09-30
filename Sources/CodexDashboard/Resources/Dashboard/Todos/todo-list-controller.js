@@ -14,6 +14,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   let savedItems = items;
   let savedTags = availableTags;
   let pendingWrites = 0;
+  let storageRefreshPending = false;
   let commitQueue = Promise.resolve();
   let expandedPresetTodoID = null;
   const pageState = createPageVisibilityController({
@@ -140,8 +141,23 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     });
   }
 
+  function hasActiveTextDraft() {
+    const editor = document.activeElement;
+    if (!editor?.matches('[data-todo-title], [data-todo-body]')) return false;
+    const item = items.find((candidate) => candidate.id === editor.closest('[data-todo-id]')?.dataset.todoId);
+    const field = editor.matches('[data-todo-title]') ? 'title' : 'body';
+    return item && editor.value !== item[field];
+  }
+
   function refreshFromStorage() {
     if (destroyed || pendingWrites || todoStore.writeProtectionReason()) return;
+    // Text edits commit on change (usually blur). Keep the editor and its
+    // selection intact until then, retaining the baseline for the save's merge.
+    if (hasActiveTextDraft()) {
+      storageRefreshPending = true;
+      return;
+    }
+    storageRefreshPending = false;
     const loadedItems = todoStore.load();
     const imagesByID = new Map(items.filter((item) => item.image?.dataURL)
       .map((item) => [item.id, item.image]));
@@ -368,6 +384,12 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     bindDraftAssignments(page);
     tagController.bindManagement(page);
     bindFilters(page);
+    page.addEventListener('focusout', () => {
+      // Let change handlers and the next focus target settle before refreshing.
+      queueMicrotask(() => {
+        if (storageRefreshPending) refreshFromStorage();
+      });
+    });
     bindTodoItemInteractions(page, {
       getItems: () => items,
       updateItem,
