@@ -66,9 +66,13 @@ reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The
 controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
 an action to the sidebar chat/task context menu, snapshots the selected task
 before the menu opens, supports keyboard navigation, and
-uses the list controller’s persistence and rollback flow. To-dos can save a model, effort, and
+uses the list controller’s persistence and rollback flow. Codex's installed
+ContextMenu uses `electronBridge.showContextMenu` on macOS. The to-do controller
+reads the host menu provider and its Intl formatter from the row's React fiber,
+adds a native menu entry, and retains the host callbacks and submenus. Browser
+previews use the DOM menu path. Regression tests cover both menu implementations. To-dos can save a model, effort, and
 speed preset; both new-task and selected-task actions apply it before inserting content
-through `insertTodoIntoComposer`. The paste picker resolves the saved project ID
+through `insertTodoIntoComposer`. The inline paste dropdown resolves the saved project ID
 against current sidebar projects, lists threads with that project's exact path,
 and rechecks project membership before navigation. Choosing a destination does
 not change the saved task link or submit the chat draft. Image formats are validated through the store’s

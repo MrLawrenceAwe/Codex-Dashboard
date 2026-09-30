@@ -75,6 +75,95 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     };
   }
 
+  function nativeMenuContract(row) {
+    const bridge = window.electronBridge;
+    if (typeof bridge?.showContextMenu !== 'function') return null;
+    let node = row;
+    while (node && node !== document.body) {
+      const key = Object.keys(node).find((name) => name.startsWith('__reactFiber$'));
+      let fiber = key ? node[key] : null;
+      while (fiber) {
+        const props = fiber.memoizedProps;
+        if (typeof props?.getItems === 'function' && props.disableNative !== true) {
+          // Codex's ContextMenu compiler cache retains its Intl formatter and
+          // normalized static items. Validate that shape before using it.
+          const cache = fiber.updateQueue?.memoCache?.data?.find((values) =>
+            typeof values?.[2] === 'function' && Array.isArray(values[3])
+              && Array.isArray(values[4]));
+          if (cache) return { props, formatMessage: cache[2], bridge };
+        }
+        fiber = fiber.return;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function nativeItems(items, formatMessage) {
+    return items.map((item) => {
+      const label = item.type === 'separator' ? '' : item.message
+        ? formatMessage(item.message, item.messageValues) : item.id;
+      let icon = item.nativeIcon ?? item.icon;
+      if (typeof icon === 'function' && typeof icon.createElement === 'function') {
+        const svg = new XMLSerializer().serializeToString(icon.createElement(document));
+        icon = `data:image/svg+xml;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(svg)))}`;
+      }
+      return {
+        id: item.id,
+        type: ['separator', 'radio'].includes(item.type) ? item.type : undefined,
+        checked: item.type === 'radio' ? item.checked === true : undefined,
+        label: item.type !== 'radio' && item.checked === true ? `✓ ${label}` : label,
+        icon: typeof icon === 'string' ? icon : undefined,
+        accelerator: item.accelerator,
+        enabled: item.type === 'label' ? false : item.enabled ?? true,
+        toolTip: item.tooltipMessage ? formatMessage(item.tooltipMessage, item.tooltipMessageValues) : undefined,
+        submenu: item.submenu ? nativeItems(item.submenu, formatMessage) : undefined,
+      };
+    });
+  }
+
+  function selectedNativeItem(items, id) {
+    for (const item of items) {
+      if (item.id === id) return item;
+      const nested = item.submenu && selectedNativeItem(item.submenu, id);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  async function openNativeMenu(contract, context, position, focusTarget) {
+    const actionID = 'codex-dashboard-add-thread-todo';
+    try {
+      document.dispatchEvent(new PointerEvent('pointercancel'));
+      await contract.props.onBeforeOpen?.();
+      const items = await contract.props.getItems();
+      if (destroyed || !Array.isArray(items)) return;
+      const added = alreadyAdded(context.draft.thread.id);
+      const enabled = !added && !pending.has(context.draft.thread.id) && !todoStore.writeProtectionReason();
+      contract.props.onOpenChange?.(true);
+      const selection = await contract.bridge.showContextMenu([
+        { id: actionID, label: added ? 'Already in To-dos' : 'Add to To-dos', enabled },
+        { type: 'separator', id: 'codex-dashboard-todo-separator', label: '' },
+        ...nativeItems(items, contract.formatMessage),
+      ], position);
+      if (destroyed) return;
+      contract.props.onOpenChange?.(false);
+      const selected = selection?.id === actionID ? null : selectedNativeItem(items, selection?.id);
+      const closeEvent = new Event('closeAutoFocus', { cancelable: true });
+      if (selected?.selectAfterClose) closeEvent.preventDefault();
+      contract.props.onCloseAutoFocus?.(closeEvent);
+      if (!closeEvent.defaultPrevented && focusTarget?.isConnected) focusTarget.focus();
+      contract.props.onAfterClose?.();
+      if (selection?.id === actionID && enabled) await addFromMenu(context);
+      else if (selected && selected.enabled !== false) selected.onSelect?.();
+    } catch (_) {
+      if (!destroyed) {
+        contract.props.onOpenChange?.(false);
+        showNotice('Could not open task actions. Try again.', true);
+      }
+    }
+  }
+
   function showNotice(message, failed) {
     notice?.remove();
     if (noticeTimer !== undefined) clearTimeout(noticeTimer);
@@ -96,7 +185,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     pending.add(thread.id);
     refresh();
     // Ask the host menu to close through its normal Escape handler.
-    context.menu.dispatchEvent(new KeyboardEvent('keydown', {
+    context.menu?.dispatchEvent(new KeyboardEvent('keydown', {
       key: 'Escape', bubbles: true, cancelable: true,
     }));
     let saved = false;
@@ -112,7 +201,15 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     const target = event.target instanceof Element ? event.target : null;
     const row = target?.closest(selector);
     if (event.type === 'contextmenu') {
-      if (row && codexHost.sidebar()?.contains(row)) prepareMenu(row);
+      if (row && codexHost.sidebar()?.contains(row)) {
+        prepareMenu(row);
+        const contract = nativeMenuContract(row);
+        if (contract && menuContext) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          void openNativeMenu(contract, menuContext, { x: event.clientX, y: event.clientY }, document.activeElement);
+        }
+      }
       else menuContext = null;
       return;
     }
@@ -121,6 +218,13 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
         || (event.type === 'keydown' && (event.key === 'ContextMenu'
           || (event.shiftKey && event.key === 'F10'))))) {
       prepareMenu(row);
+      const contract = nativeMenuContract(row);
+      if (event.type === 'keydown' && contract && menuContext) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const rect = row.getBoundingClientRect();
+        void openNativeMenu(contract, menuContext, { x: rect.left, y: rect.bottom }, document.activeElement);
+      }
       return;
     }
     const button = target?.closest('[data-codex-thread-todo-menu-item]');

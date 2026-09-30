@@ -401,7 +401,6 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     projectObserver = undefined;
     observedProjectSidebar = undefined;
     imageController.destroy();
-    composerActions.destroy();
     sidebarActions.destroy();
     pageState.close();
   }

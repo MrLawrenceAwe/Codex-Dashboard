@@ -531,7 +531,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             document.querySelector('[data-todo-paste-in-thread]').click();
-            document.querySelector('[data-todo-thread-confirm]').click();
+            const picker = document.querySelector('[data-todo-paste-thread]');
+            picker.value = 'linked-chat';
+            picker.dispatchEvent(new Event('change', { bubbles: true }));
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
@@ -554,7 +556,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
     func testAddedTodoCanChooseAChatFromItsAssignedProjectWithoutSending() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
-            <!doctype html><html><head><meta charset="utf-8"></head><body>
+            <!doctype html><html><head><meta charset="utf-8"><style>aside { width: 200px; }</style></head><body>
               <aside role="navigation">
                 <button class="sidebar-item">New chat</button>
                 <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="/tmp/project"
@@ -576,6 +578,8 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
+        webView.frame = CGRect(x: 0, y: 0, width: 900, height: 900)
+        try await DashboardWebTestHarness.waitForJavaScript("window.innerWidth === 900", in: webView)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "chosen", title: "Chosen chat", projectPath: "/tmp/project"),
             .fixture(id: "other", title: "Other project chat", projectPath: "/tmp/other"),
@@ -605,24 +609,34 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               await assign('/tmp/empty');
               document.querySelector('[data-todo-paste-in-thread]').click();
               const empty = [document.querySelector('[data-todo-paste-thread]').disabled,
-                document.querySelector('[data-todo-thread-confirm]').disabled,
-                !document.querySelector('[data-todo-thread-empty]').hidden];
-              document.querySelector('[data-todo-thread-cancel]').click();
+                !document.querySelector('[data-todo-paste-thread]').hidden,
+                document.querySelector('[data-todo-paste-thread]').options[0].textContent === 'No chats/tasks in this project'];
+              document.querySelector('[data-todo-paste-in-thread]').click();
               await assign('/tmp/project');
               document.querySelector('[data-todo-paste-in-thread]').click();
               const choices = [...document.querySelector('[data-todo-paste-thread]').options].map(option => option.value);
-              document.querySelector('[data-todo-thread-cancel]').click();
+              const select = document.querySelector('[data-todo-paste-thread]');
+              const optionStyle = getComputedStyle(select.options[1]);
+              const selectStyle = getComputedStyle(select);
+              const bounds = select.getBoundingClientRect();
+              const rowBounds = select.closest('[data-todo-id]').getBoundingClientRect();
+              const visibility = [optionStyle.color === selectStyle.color,
+                optionStyle.backgroundColor === selectStyle.backgroundColor,
+                optionStyle.color !== optionStyle.backgroundColor,
+                getComputedStyle(document.querySelector('[data-todo-paste-in-thread]')).opacity === '1',
+                bounds.width > 0 && bounds.left >= rowBounds.left && bounds.right <= rowBounds.right,
+                !document.querySelector('dialog[open]')];
+              document.querySelector('[data-todo-paste-in-thread]').click();
               const cancelled = [window.__navigationCount || 0,
                 document.querySelector('textarea[placeholder="Do anything"]').value];
               document.querySelector('[data-todo-paste-in-thread]').click();
               const picker = document.querySelector('[data-todo-paste-thread]');
-              picker.value = 'chosen';
-              picker.dispatchEvent(new Event('change', { bubbles: true }));
               const composer = document.querySelector('textarea[placeholder="Do anything"]');
               composer.setSelectionRange(composer.value.length, composer.value.length);
               window.__submitCount = 0;
-              document.querySelector('[data-todo-thread-confirm]').click();
-              return [noProjectDisabled, empty, choices, cancelled];
+              picker.value = 'chosen';
+              picker.dispatchEvent(new Event('change', { bubbles: true }));
+              return [noProjectDisabled, empty, choices, cancelled, visibility, JSON.stringify({bounds: bounds.toJSON(), rowBounds: rowBounds.toJSON()})];
             })()
             """
         ) as? [Any]
@@ -631,6 +645,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[1] as? [Bool], [true, true, true])
         XCTAssertEqual(values[2] as? [String], ["", "chosen"])
         XCTAssertEqual(values[3] as? [AnyHashable], [0, "Existing draft"])
+        XCTAssertEqual(values[4] as? [Bool], [true, true, true, true, true, true], values[5] as? String ?? "")
         try await DashboardWebTestHarness.waitForJavaScript(
             "document.querySelector('textarea[placeholder=\"Do anything\"]').value.includes('Todo details')",
             in: webView
@@ -639,10 +654,10 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             """
             [document.querySelector('textarea[placeholder="Do anything"]').value,
               window.__navigationCount, window.__submitCount,
-              document.querySelector('[data-todo-thread-dialog]').open,
+              Boolean(document.querySelector('dialog[open]')),
               JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].thread === null]
             """
         ) as? [AnyHashable]
-        XCTAssertEqual(pasted, ["Existing draft\n\nTodo title\n\nTodo details", 1, 1, false, true])
+        XCTAssertEqual(pasted, ["Existing draft\n\nTodo title\n\nTodo details", 1, 0, false, true])
     }
 }

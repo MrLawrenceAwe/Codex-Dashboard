@@ -1,6 +1,5 @@
 function createTodoComposerActions({ isDestroyed, pageState, threadReferencesForProject, getItems }) {
   const activeComposer = () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
-  let pickerDialog;
   let transferring = false;
 
   function threadsForTodo(item) {
@@ -17,39 +16,44 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     }
   }
 
-  function chooseTodoThread(item) {
+  function chooseTodoThread(item, row) {
     if (isDestroyed() || transferring || !item?.project) return;
-    const dialog = todoListView.ensureDialogHost().querySelector('[data-todo-thread-dialog]');
-    if (dialog.open) return;
-    pickerDialog = dialog;
-    const select = dialog.querySelector('[data-todo-paste-thread]');
-    const submit = dialog.querySelector('[data-todo-thread-confirm]');
+    const select = row.querySelector('[data-todo-paste-thread]');
+    const button = row.querySelector('[data-todo-paste-in-thread]');
+    if (!select.hidden) {
+      select.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      return;
+    }
     const threads = threadsForTodo(item);
-    dialog.querySelector('[data-todo-thread-project]').textContent = `Choose a chat/task in ${item.project.name}.`;
-    select.replaceChildren(new Option('Choose a chat/task…', ''), ...threads.map((thread) => new Option(thread.title, thread.id)));
-    select.value = threads.some((thread) => thread.id === item.thread?.id) ? item.thread.id : '';
+    select.replaceChildren(
+      new Option(threads.length ? 'Choose a chat/task to paste into…' : 'No chats/tasks in this project', ''),
+      ...threads.map((thread) => new Option(`${thread.title}${thread.id === item.thread?.id ? ' (linked task)' : ''}`, thread.id)),
+    );
     select.disabled = threads.length === 0;
-    submit.disabled = !select.value;
-    dialog.querySelector('[data-todo-thread-empty]').hidden = threads.length > 0;
-    select.onchange = () => { submit.disabled = !select.value; };
-    const close = () => dialog.close();
-    dialog.querySelector('[data-todo-thread-dialog-close]').onclick = close;
-    dialog.querySelector('[data-todo-thread-cancel]').onclick = close;
-    dialog.onclick = (event) => { if (event.target === dialog) close(); };
-    dialog.querySelector('[data-todo-thread-form]').onsubmit = (event) => {
-      event.preventDefault();
+    select.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    select.onkeydown = (event) => {
+      if (event.key !== 'Escape') return;
+      select.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      button.focus();
+    };
+    select.onchange = () => {
+      if (!select.value) return;
       const currentItem = getItems().find((candidate) => candidate.id === item.id);
       const thread = currentItem?.project?.id === item.project.id && !currentItem.completed
         ? threadsForTodo(currentItem).find((candidate) => candidate.id === select.value)
         : null;
-      close();
+      select.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
       if (!thread || isDestroyed()) {
         if (!isDestroyed()) showTransferError('This chat/task is no longer available in the to-do’s project. Choose a chat/task again.');
         return;
       }
       void pasteTodoInThread(currentItem, thread);
     };
-    dialog.showModal();
+    if (!select.disabled) select.focus();
   }
 
   function showComposerWarning(composer, message) {
@@ -189,9 +193,5 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     }
   }
 
-  function destroy() {
-    if (pickerDialog?.open) pickerDialog.close();
-  }
-
-  return { openTodoInNewThread, chooseTodoThread, destroy };
+  return { openTodoInNewThread, chooseTodoThread };
 }
