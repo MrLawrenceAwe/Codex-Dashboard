@@ -34,14 +34,19 @@ swift build -c release
 RESOLVED_SIGNING_IDENTITY="$(/bin/zsh "$PROJECT_ROOT/Packaging/signing-identity.sh")"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Dashboard"
+mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Dashboard" "$APP_BUNDLE/Contents/Helpers"
 cp "$BUILD_ROOT/release/CodexDashboard" "$APP_BUNDLE/Contents/MacOS/CodexDashboard"
 cp "$PROJECT_ROOT/Packaging/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$PROJECT_ROOT/Packaging/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_VERSION" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD" "$APP_BUNDLE/Contents/Info.plist"
 ditto "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard" "$APP_BUNDLE/Contents/Resources/Dashboard"
-codesign --force --deep --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE"
+cp "$BUILD_ROOT/release/CodexDashboardKeychainHelper" "$APP_BUNDLE/Contents/Helpers/CodexDashboardKeychainHelper"
+codesign --force --sign "$RESOLVED_SIGNING_IDENTITY" \
+  --identifier local.lawrenceawe.codex-dashboard.keychain-helper \
+  "$APP_BUNDLE/Contents/Helpers/CodexDashboardKeychainHelper"
+# Sign the containing bundle without re-signing the already signed helper.
+codesign --force --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 
 mkdir -p "$INSTALL_ROOT"

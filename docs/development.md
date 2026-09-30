@@ -14,9 +14,31 @@ The first local install creates a dedicated self-signed certificate in the login
 Keychain, trusted for code signing. Later installs reuse that certificate; they do
 not fall back to ad-hoc signing. Set `SIGNING_IDENTITY` to use an existing certificate.
 An invalid existing local identity fails installation so an unexpected certificate
-replacement cannot silently invalidate saved Keychain approvals. The certificate
+replacement cannot silently change the app’s designated signing requirement. The certificate
 and non-extractable private key stay in Keychain; temporary key files are removed.
 This is a local development identity, not a Developer ID distribution identity.
+Its stable designated requirement does not imply a stable Keychain partition:
+macOS uses `cdhash:` for self-signed apps and an Apple-verified `teamid:` for
+Apple development/Developer ID apps. Changed resources alter the code hash, so
+self-signed rebuilds can still prompt. An unchanged rebuild is not a valid test
+of approval persistence across code or resource changes.
+
+`CodexDashboardKeychainHelper` owns all saved-account Keychain operations. Its
+native vault lives in the independent `DashboardKeychain` target so dashboard code
+and resource changes do not change its executable. The installer signs the helper
+individually, then signs the containing app without recursively re-signing it.
+The helper checks the calling process's Dashboard identifier and certificate against
+its own certificate before accepting a single JSON request on stdin. Credential
+bytes travel over pipes, never argv or environment variables. Background calls
+retain their no-interaction policy. Existing Keychain items and their UUIDs stay
+in place; previous protected items retain their recovery path to avoid data loss.
+Helper or toolchain changes can change its code hash and require reauthorization.
+
+After `swift build -c release`, run `python3 Packaging/verify-keychain-helper.py`
+to exercise a disposable item under a fixed probe service. The test changes the
+calling app's resources, verifies its code hash changed while the helper's did not,
+then reads and writes without interaction. It also rejects an unsigned caller
+and removes its disposable item. It never accesses saved-account credentials.
 
 ## Preview
 
@@ -42,7 +64,8 @@ successful commit. `todo-image-store.js` owns IndexedDB image persistence;
 `todo-image-controller.js` owns image validation, draft state, and
 reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
 controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
-linked to-dos from sidebar rows, reconciles controls after host DOM changes, and
+an action to the sidebar chat/task context menu, snapshots the selected task
+before the menu opens, supports keyboard navigation, and
 uses the list controller’s persistence and rollback flow. To-dos can save a model, effort, and
 speed preset; both new-task and linked-task actions apply it before inserting content
 through `insertTodoIntoComposer`. Image formats are validated through the store’s

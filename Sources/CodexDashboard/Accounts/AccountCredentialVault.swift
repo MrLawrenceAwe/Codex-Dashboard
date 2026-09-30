@@ -1,5 +1,4 @@
 import Foundation
-import LocalAuthentication
 import Security
 
 protocol AccountCredentialVault: Sendable {
@@ -11,180 +10,85 @@ protocol AccountCredentialVault: Sendable {
 }
 
 struct KeychainAccountCredentialVault: AccountCredentialVault {
-    private let service = "com.lawrenceawe.CodexDashboard.accounts"
-    private let previousUserPresenceService =
-        "com.lawrenceawe.CodexDashboard.accounts.user-presence-v1"
-    private let authenticationPrompt = "Use Touch ID to switch Codex accounts"
-
     func credential(for accountID: UUID) throws -> Data? {
-        try credential(for: accountID, interactionAllowed: true)
+        try request("read", accountID, interactionAllowed: true)
     }
 
     func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data? {
-        try credential(for: accountID, interactionAllowed: false)
-    }
-
-    private func credential(
-        for accountID: UUID,
-        interactionAllowed: Bool
-    ) throws -> Data? {
-        let currentCredential: Data?
-        do {
-            currentCredential = try readCredential(
-                for: accountID,
-                service: service,
-                authenticationContext: interactionAllowed
-                    ? nil
-                    : authenticationContext(interactionAllowed: false),
-                interactionAllowed: interactionAllowed
-            )
-        } catch CodexAccountError.keychain(let status)
-            where !interactionAllowed && Self.requiresUserInteraction(status)
-        {
-            throw CodexAccountError.keychainAuthorizationRequired
-        }
-        if let credential = currentCredential {
-            return credential
-        }
-
-        // A prior build stored credentials in the data-protection Keychain. Keep a
-        // recovery path so a properly entitled build can move those secrets without
-        // losing saved accounts. Ad-hoc local builds cannot access that Keychain and
-        // report errSecMissingEntitlement, which must not break the ordinary vault.
-        let previousCredential: Data?
-        do {
-            previousCredential = try readCredential(
-                for: accountID,
-                service: previousUserPresenceService,
-                authenticationContext: authenticationContext(
-                    interactionAllowed: interactionAllowed
-                ),
-                interactionAllowed: interactionAllowed
-            )
-        } catch CodexAccountError.keychain(let status) where status == errSecMissingEntitlement {
-            return nil
-        } catch CodexAccountError.keychain(let status)
-            where !interactionAllowed && Self.requiresUserInteraction(status)
-        {
-            throw CodexAccountError.keychainAuthorizationRequired
-        }
-        guard let previousCredential else {
-            if !interactionAllowed {
-                throw CodexAccountError.keychainAuthorizationRequired
-            }
-            return nil
-        }
-        try store(previousCredential, for: accountID)
-        deletePreviousCredentialWithoutPrompt(for: accountID)
-        return previousCredential
-    }
-
-    private static func requiresUserInteraction(_ status: OSStatus) -> Bool {
-        status == errSecInteractionNotAllowed
-            || status == errSecAuthFailed
-            || status == errSecUserCanceled
+        try request("read", accountID, interactionAllowed: false)
     }
 
     func store(_ credential: Data, for accountID: UUID) throws {
-        try store(credential, for: accountID, interactionAllowed: true)
+        _ = try request("store", accountID, credential: credential, interactionAllowed: true)
     }
 
     func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) throws {
-        try store(credential, for: accountID, interactionAllowed: false)
-    }
-
-    private func store(
-        _ credential: Data,
-        for accountID: UUID,
-        interactionAllowed: Bool
-    ) throws {
-        var updateQuery = baseQuery(for: accountID, service: service)
-        configureAuthentication(in: &updateQuery, interactionAllowed: interactionAllowed)
-        let updateStatus = SecItemUpdate(
-            updateQuery as CFDictionary,
-            [kSecValueData as String: credential] as CFDictionary
-        )
-        if updateStatus == errSecSuccess {
-            return
-        }
-        guard updateStatus == errSecItemNotFound else {
-            throw CodexAccountError.keychain(updateStatus)
-        }
-
-        var addition = baseQuery(for: accountID, service: service)
-        configureAuthentication(in: &addition, interactionAllowed: interactionAllowed)
-        addition[kSecValueData as String] = credential
-        let addStatus = SecItemAdd(addition as CFDictionary, nil)
-        guard addStatus == errSecSuccess else { throw CodexAccountError.keychain(addStatus) }
+        _ = try request("store", accountID, credential: credential, interactionAllowed: false)
     }
 
     func deleteCredential(for accountID: UUID) throws {
-        let status = SecItemDelete(baseQuery(for: accountID, service: service) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw CodexAccountError.keychain(status)
-        }
-        deletePreviousCredentialWithoutPrompt(for: accountID)
+        _ = try request("delete", accountID, interactionAllowed: true)
     }
 
-    private func readCredential(
-        for accountID: UUID,
-        service: String,
-        authenticationContext: LAContext?,
+    private func request(
+        _ operation: String,
+        _ accountID: UUID,
+        credential: Data? = nil,
         interactionAllowed: Bool
     ) throws -> Data? {
-        var query = baseQuery(for: accountID, service: service)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        if let authenticationContext {
-            query[kSecUseAuthenticationContext as String] = authenticationContext
+        let executable: URL
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            executable = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/CodexDashboardKeychainHelper")
+        } else {
+            executable = URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0])
+                .deletingLastPathComponent().appendingPathComponent("CodexDashboardKeychainHelper")
         }
-        configureAuthentication(
-            in: &query,
-            interactionAllowed: interactionAllowed,
-            skipsProtectedItems: true
-        )
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw CodexAccountError.keychain(status) }
-        return result as? Data
-    }
-
-    private func deletePreviousCredentialWithoutPrompt(for accountID: UUID) {
-        var query = baseQuery(for: accountID, service: previousUserPresenceService)
-        query[kSecUseAuthenticationContext as String] = authenticationContext(
-            interactionAllowed: false
-        )
-        configureAuthentication(in: &query, interactionAllowed: false)
-        _ = SecItemDelete(query as CFDictionary)
-    }
-
-    private func configureAuthentication(
-        in query: inout [String: Any],
-        interactionAllowed: Bool,
-        skipsProtectedItems: Bool = false
-    ) {
-        guard !interactionAllowed else { return }
-        query[kSecUseAuthenticationContext as String] = authenticationContext(
-            interactionAllowed: false
-        )
-        if skipsProtectedItems {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
+        let input = Pipe()
+        let output = Pipe()
+        let process = Process()
+        process.executableURL = executable
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        let request = HelperRequest(operation: operation, accountID: accountID,
+            credential: credential, interactionAllowed: interactionAllowed)
+        do { try process.run() }
+        catch { throw CodexAccountError.keychain(errSecNotAvailable) }
+        try output.fileHandleForWriting.close()
+        try input.fileHandleForReading.close()
+        let timeout = DispatchWorkItem {
+            if process.isRunning { process.terminate() }
         }
+        DispatchQueue.global().asyncAfter(deadline: .now() + (interactionAllowed ? 180 : 10), execute: timeout)
+        defer {
+            timeout.cancel()
+            if process.isRunning { process.terminate() }
+            try? input.fileHandleForWriting.close()
+            try? output.fileHandleForReading.close()
+        }
+        try input.fileHandleForWriting.write(contentsOf: JSONEncoder().encode(request))
+        try input.fileHandleForWriting.close()
+        let data = try output.fileHandleForReading.readToEnd() ?? Data()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0,
+            let response = try? JSONDecoder().decode(HelperResponse.self, from: data) else {
+            throw CodexAccountError.keychain(errSecNotAvailable)
+        }
+        if response.authorizationRequired { throw CodexAccountError.keychainAuthorizationRequired }
+        if response.status != errSecSuccess { throw CodexAccountError.keychain(response.status) }
+        return response.credential
     }
 
-    private func authenticationContext(interactionAllowed: Bool = true) -> LAContext {
-        let context = LAContext()
-        context.localizedReason = authenticationPrompt
-        context.interactionNotAllowed = !interactionAllowed
-        return context
+    private struct HelperRequest: Encodable {
+        let operation: String
+        let accountID: UUID
+        let credential: Data?
+        let interactionAllowed: Bool
     }
 
-    private func baseQuery(for accountID: UUID, service: String) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: accountID.uuidString,
-        ]
+    private struct HelperResponse: Decodable {
+        let status: OSStatus
+        let authorizationRequired: Bool
+        let credential: Data?
     }
 }

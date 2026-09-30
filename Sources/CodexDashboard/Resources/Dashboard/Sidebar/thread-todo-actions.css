@@ -1,21 +1,25 @@
-aside [data-codex-thread-todo] {
-  flex: 0 0 22px;
-  width: 22px;
-  height: 24px;
-  padding: 3px;
+[data-codex-thread-todo-menu-item] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  opacity: 0;
 }
-aside [data-codex-thread-todo] svg { width: 16px; height: 16px; }
-aside [data-app-action-sidebar-thread-id]:hover [data-codex-thread-todo],
-aside [data-app-action-sidebar-thread-id]:focus-within [data-codex-thread-todo] { opacity: 1; }
-aside [data-codex-thread-todo][data-added="true"] { opacity: .5; }
-aside [data-codex-thread-todo]:disabled { cursor: default; }
-aside [data-codex-thread-todo]:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+[data-codex-thread-todo-menu-item] svg { flex: 0 0 16px; width: 16px; height: 16px; }
+[data-codex-thread-todo-menu-item]:hover,
+[data-codex-thread-todo-menu-item]:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  outline: none;
+}
+[data-codex-thread-todo-menu-item]:disabled { opacity: .5; cursor: default; }
 [data-codex-thread-todo-notice] {
   position: fixed;
   bottom: 24px;
