@@ -1,6 +1,6 @@
 const threadCatalog = createThreadCatalog();
 const taskDashboard = createTaskDashboard({ catalog: threadCatalog });
-const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject });
+const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject, findThread: threadCatalog.findThread });
 const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
 const dashboardPages = [
   { controller: taskDashboard, pageID: dashboardElements.elementIDs.taskPage,
@@ -32,6 +32,7 @@ window.__codexDashboard = {
     threadCatalog.applyThreads(nextThreads);
     taskDashboard.applyThreads();
     todoList.refreshThreadOptions();
+    todoList.refreshSidebarActions();
     return true;
   },
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,

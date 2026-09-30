@@ -1,4 +1,4 @@
-function createTodoList({ threadReferencesForProject }) {
+function createTodoList({ threadReferencesForProject, findThread }) {
   let items = todoStore.load();
   let availableTags = todoStore.loadTags(items);
   let projects = [];
@@ -36,6 +36,12 @@ function createTodoList({ threadReferencesForProject }) {
     commitChange: (nextTags, transformTag) => commitItems(items.map((item) => ({
       ...item, tags: item.tags.map(transformTag).filter(Boolean),
     })), nextTags),
+  });
+
+  const sidebarActions = createSidebarThreadTodoActions({
+    findThread,
+    getItems: () => items,
+    addTodo,
   });
 
   function refreshProjects() {
@@ -91,6 +97,7 @@ function createTodoList({ threadReferencesForProject }) {
 
   function render() {
     if (destroyed) return;
+    sidebarActions.refresh();
     const selectableProjects = collectFilterProjects();
     if (projectFilter !== '__none__'
       && projectFilter
@@ -334,6 +341,7 @@ function createTodoList({ threadReferencesForProject }) {
   }
 
   function mountPage() {
+    sidebarActions.mount();
     const existingPage = document.getElementById(dashboardElements.elementIDs.todoPage);
     if (existingPage) {
       todoListView.updateTopInset(existingPage);
@@ -391,6 +399,7 @@ function createTodoList({ threadReferencesForProject }) {
     projectObserver = undefined;
     observedProjectSidebar = undefined;
     imageController.destroy();
+    sidebarActions.destroy();
     pageState.close();
   }
 
@@ -403,5 +412,6 @@ function createTodoList({ threadReferencesForProject }) {
     open,
     applyVisibility: pageState.applyVisibility,
     refreshThreadOptions,
+    refreshSidebarActions: sidebarActions.refresh,
   };
 }
