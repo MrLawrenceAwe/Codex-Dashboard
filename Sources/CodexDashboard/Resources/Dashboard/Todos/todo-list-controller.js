@@ -14,6 +14,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   let savedItems = items;
   let savedTags = availableTags;
   let pendingWrites = 0;
+  let commitQueue = Promise.resolve();
   let expandedPresetTodoID = null;
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.todoPage,
@@ -168,14 +169,24 @@ function createTodoList({ threadReferencesForProject, findThread }) {
 
   async function commitItems(nextItems, nextTags = availableTags) {
     if (destroyed) return false;
-    const baseItems = savedItems;
-    const baseTags = savedTags;
     pendingWrites += 1;
     items = nextItems;
     availableTags = nextTags;
     renderTags();
     render();
-    const saved = await todoStore.save(nextItems, nextTags, baseItems, baseTags);
+    // Resolve the baseline only after earlier commits finish. Advance it on
+    // success so an undo remains a change; retain it on failure so later edits
+    // retry all changes still present in the optimistic snapshot.
+    const saving = commitQueue.then(async () => {
+      const saved = await todoStore.save(nextItems, nextTags, savedItems, savedTags);
+      if (saved) {
+        savedItems = nextItems;
+        savedTags = nextTags;
+      }
+      return saved;
+    }).catch(() => false);
+    commitQueue = saving;
+    const saved = await saving;
     pendingWrites -= 1;
     if (destroyed) return saved;
     const notice = document.querySelector('[data-todo-storage-error]');

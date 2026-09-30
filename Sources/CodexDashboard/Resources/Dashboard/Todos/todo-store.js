@@ -228,17 +228,20 @@ const todoStore = (() => {
     // Inline data that is still in memory; keep unresolved image keys for later loading.
     const availableImageData = new Map(items.filter((item) => item.image?.dataURL)
       .map((item) => [item.image.storageKey, item.image.dataURL]));
-    const persistedItems = includesImageData ? mergedItems.map((item) => {
-      if (!item.image || item.image.dataURL) return item;
-      const dataURL = availableImageData.get(item.image.storageKey);
-      return dataURL ? { ...item, image: { ...item.image, dataURL } } : item;
-    }) : mergedItems;
+    const persistedItems = mergedItems.map((item) => {
+      if (!item.image) return item;
+      // Only strip data for images this save actually wrote to IndexedDB.
+      // Inline images merged from other windows must keep their fallback data.
+      const dataURL = !includesImageData && availableImageData.has(item.image.storageKey)
+        ? '' : item.image.dataURL || availableImageData.get(item.image.storageKey) || '';
+      return { ...item, image: { ...item.image, dataURL } };
+    });
     const mergedTags = mergeTags(baseTags, normalizeTags(tags), loadTags(currentItems));
     const previousTags = localStorage.getItem(tagsStorageKey);
     try {
       if (writeProtectionReason()) return false;
       localStorage.setItem(tagsStorageKey, JSON.stringify(mergedTags));
-      localStorage.setItem(storageKey, documentData(persistedItems, includesImageData));
+      localStorage.setItem(storageKey, documentData(persistedItems, true));
       await todoImageStore.prune(mergedItems).catch(() => {});
       return true;
     } catch (_) {
