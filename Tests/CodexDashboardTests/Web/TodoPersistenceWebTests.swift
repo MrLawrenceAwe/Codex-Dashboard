@@ -18,6 +18,76 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         )
     }
 
+    func testSharedStorageUpdatesPreserveActiveTodoEditsAndMergeOnCommit() async throws {
+        for field in ["title", "body"] {
+            let view = try await webView()
+            let result = try await view.evaluateAsyncJavaScript("""
+            (async () => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Saved title';
+              form.querySelector('[data-todo-new-body]').value = 'Saved body';
+              form.requestSubmit();
+              await window.__waitForTodoSaves();
+              const field = '\(field)';
+              const otherField = field === 'title' ? 'body' : 'title';
+              const editor = document.querySelector(`[data-todo-${field}]`);
+              editor.focus();
+              editor.value = 'Draft being typed';
+              editor.setSelectionRange(5, 10);
+              editor.dispatchEvent(new Event('input', { bubbles: true }));
+              const key = 'codex-dashboard.todos';
+              const oldValue = localStorage.getItem(key);
+              const doc = JSON.parse(oldValue);
+              doc.items[0][otherField] = 'Updated in another window';
+              const newValue = JSON.stringify(doc);
+              localStorage.setItem(key, newValue);
+              window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue }));
+              localStorage.setItem('codex-dashboard.todo-tags', JSON.stringify(['Remote tag']));
+              window.dispatchEvent(new StorageEvent('storage', { key: 'codex-dashboard.todo-tags' }));
+              const preserved = editor.isConnected && document.activeElement === editor
+                && editor.value === 'Draft being typed'
+                && editor.selectionStart === 5 && editor.selectionEnd === 10;
+              editor.dispatchEvent(new Event('change', { bubbles: true }));
+              editor.blur();
+              await window.__waitForTodoSaves();
+              const saved = window.__todoStoreForTests.load()[0];
+              return [preserved, saved[field], saved[otherField],
+                document.querySelector(`[data-todo-${field}]`).value,
+                window.__todoStoreForTests.loadTags().includes('Remote tag')];
+            })()
+            """) as? [AnyHashable]
+            XCTAssertEqual(result, [true, "Draft being typed", "Updated in another window", "Draft being typed", true], field)
+        }
+    }
+
+    func testDeferredStorageRefreshRunsWhenTodoEditorLosesFocusWithoutAChange() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Saved title';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          const editor = document.querySelector('[data-todo-title]');
+          editor.focus();
+          editor.value = 'Temporary draft';
+          const key = 'codex-dashboard.todos';
+          const doc = JSON.parse(localStorage.getItem(key));
+          doc.items[0].body = 'Remote notes';
+          localStorage.setItem(key, JSON.stringify(doc));
+          window.dispatchEvent(new StorageEvent('storage', { key }));
+          const preserved = editor.isConnected && editor.value === 'Temporary draft';
+          editor.value = 'Saved title';
+          editor.blur();
+          await Promise.resolve();
+          return [preserved, document.querySelector('[data-todo-body]').value];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "Remote notes"])
+    }
+
     func testLegacyTodoDocumentsMigrateWithoutLosingProjectsTagsOrImages() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
