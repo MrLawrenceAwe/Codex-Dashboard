@@ -108,7 +108,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         }
     }
 
-    func testReadsTwoTurnsWithOptionalMessagePhaseAndRejectsExtraTurns() throws {
+    func testReadsFollowupTurnsWithOptionalMessagePhaseAndBoundsHistory() throws {
         let turn: [String: Any] = ["id": "review", "status": "completed", "items": [
             ["type": "agentMessage", "phase": "commentary", "text": "Working"],
             ["type": "agentMessage", "text": "{\"findings\":[]}"],
@@ -116,7 +116,8 @@ final class ReviewLoopDriverTests: XCTestCase {
         let state = try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": [turn, turn]]])
         XCTAssertEqual(state.turns.count, 2)
         XCTAssertEqual(state.turns.first?.finalMessage, "{\"findings\":[]}")
-        XCTAssertThrowsError(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": [turn, turn, turn]]]))
+        XCTAssertEqual(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": [turn, turn, turn]]]).turns.count, 3)
+        XCTAssertThrowsError(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": Array(repeating: turn, count: 101)]]))
     }
 
     func testApprovalAndStaleInProgressTurnNeedAttention() throws {

@@ -24,7 +24,7 @@ final class ReviewLoopCoordinator {
             loops = try store.load()
             for index in loops.indices {
                 if loops[index].phase == .paused,
-                   loops[index].rounds.count >= loops[index].maxRounds,
+                   loops[index].completedRoundCount >= loops[index].maxRounds,
                    loops[index].rounds.last?.result?.outcome == .fixed {
                     loops[index].phase = .limitReached
                 }
@@ -70,7 +70,26 @@ final class ReviewLoopCoordinator {
             if action.kind == .stop {
                 updated.phase = .stopped
                 updated.message = "Stopped loop. Stopping its running chat."
-            } else if action.kind == .pause {
+            } else if action.kind == .resume, updated.phase == .blocked {
+                guard !loops.contains(where: { $0.id != id && !$0.phase.isFinished &&
+                    ($0.project.id == updated.project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(updated.project.path))
+                }) else {
+                    throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
+                }
+                updated.pauseRequested = false
+                if let round = updated.rounds.last, round.result == nil || round.result?.outcome == .blocked {
+                    guard round.threadID != nil else {
+                        throw ReviewLoopError("The previous chat launch was not confirmed. Inspect recent chats before starting a new loop; it will not be sent twice.")
+                    }
+                    updated.rounds[updated.rounds.count - 1].continuationRequested = true
+                    updated.rounds[updated.rounds.count - 1].result = nil
+                    updated.phase = .running
+                    updated.message = "Checking the review chat after your follow-up."
+                } else {
+                    updated.phase = .waiting
+                    updated.message = "Checking the project before continuing."
+                }
+            } else if action.kind == .pause, updated.phase != .blocked {
                 if updated.phase == .running {
                     updated.pauseRequested = true
                     updated.message = "Will pause after the current round finishes."
@@ -174,7 +193,7 @@ final class ReviewLoopCoordinator {
         guard !repo.branch.isEmpty else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
         if let branch = updated.branch, branch != repo.branch { throw ReviewLoopError("The checkout changed branch. Start a new loop for the new branch.") }
         if let head = updated.expectedCommit, head != repo.commit { throw ReviewLoopError("HEAD changed outside the review loop. Inspect the changes before starting a new loop.") }
-        guard updated.rounds.count < updated.maxRounds else {
+        guard updated.completedRoundCount < updated.maxRounds else {
             updated.phase = .limitReached
             updated.message = "All configured review rounds completed."
             try persist(updated)
@@ -186,7 +205,7 @@ final class ReviewLoopCoordinator {
         let round = ReviewRound(number: updated.rounds.count + 1, baseCommit: repo.commit)
         updated.rounds.append(round)
         updated.phase = .running
-        updated.message = "Starting review \(round.number) of \(updated.maxRounds)."
+        updated.message = "Starting review \(round.number). \(updated.completedRoundCount) of \(updated.maxRounds) rounds completed."
         // Record intent before any remote side effect. A crash here must not launch twice.
         try persist(updated)
         let threadID = try await driver.createThread(project: updated.project, title: "Review loop · round \(round.number)", speed: updated.speed)
@@ -222,13 +241,13 @@ final class ReviewLoopCoordinator {
         guard let currentRound = updated.rounds.last else { return }
         round = currentRound
         guard Self.canonicalPath(thread.cwd) == Self.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
-        guard let reviewTurn = thread.turns.first,
+        guard let reviewTurn = round.reviewTurnID.flatMap({ id in thread.turns.first { $0.id == id } }) ?? thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
-              thread.turns.count <= (round.fixRequested ? 2 : 1) else {
+              round.continuationRequested == true || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
             throw ReviewLoopError("The review chat has an unexpected turn. Inspect it before starting a new loop.")
         }
         if round.review == nil {
-            try await acceptReviewReport(reviewTurn, loop: updated, round: round,
+            try await acceptReviewReport(round.continuationRequested == true ? thread.turns.last! : reviewTurn, loop: updated, round: round,
                                          using: driver, threads: threads, threadID: threadID)
         } else if !round.fixRequested {
             try await submitFixTurn(loop: updated, round: round,
@@ -307,8 +326,9 @@ final class ReviewLoopCoordinator {
         guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
             throw ReviewLoopError("The review has no findings to fix.")
         }
-        guard thread.turns.count == 2, let fixTurn = thread.turns.last,
-              round.fixTurnID == nil || round.fixTurnID == fixTurn.id else {
+        guard let fixTurn = thread.turns.last,
+              (round.continuationRequested == true && thread.turns.count >= 2) ||
+                (thread.turns.count == 2 && (round.fixTurnID == nil || round.fixTurnID == fixTurn.id)) else {
             throw ReviewLoopError("The fix prompt was not acknowledged. Inspect the chat; it will not be sent twice.")
         }
         if fixTurn.status == "inProgress" { return }
@@ -342,9 +362,9 @@ final class ReviewLoopCoordinator {
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        updated.phase = result.outcome == .withdrawn ? .completed : updated.rounds.count >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
+        updated.phase = result.outcome == .withdrawn ? .completed : updated.completedRoundCount + 1 >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
         updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn. No fix commit was needed."
-            : updated.rounds.count >= updated.maxRounds
+            : updated.completedRoundCount + 1 >= updated.maxRounds
             ? "All configured review rounds completed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
