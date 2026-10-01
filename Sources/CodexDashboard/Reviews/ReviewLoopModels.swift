@@ -12,10 +12,10 @@ struct ReviewModelSelection: Codable, Equatable, Sendable {
 }
 
 enum ReviewFocus: String, Codable, CaseIterable, Sendable {
-    case bugs, organisation, naming, performance
+    case bugs, organisation, naming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .performance }
-    var supportsProjectContext: Bool { self == .bugs || self == .performance }
+    var supportsProjectContext: Bool { self == .bugs || self == .performance || self == .content }
 
     var label: String {
         switch self {
@@ -23,6 +23,7 @@ enum ReviewFocus: String, Codable, CaseIterable, Sendable {
         case .organisation: "Simplification and structure"
         case .naming: "Simplification, structure and naming"
         case .performance: "Performance and responsiveness"
+        case .content: "Content and quality"
         }
     }
 }
