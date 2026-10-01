@@ -32,6 +32,12 @@ final class NoopPhoneUsageNotifier: PhoneUsageNotifying {
 
 @MainActor
 final class NtfyUsageNotifier: PhoneUsageNotifying {
+    private struct Delivery {
+        let notification: ScheduledUsageNotification
+        var task: Task<Void, Never>
+        var retryAttempt = 0
+    }
+
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
 
@@ -42,9 +48,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     private let now: () -> Date
     private let retryDelay: (Int) -> Duration
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
-    private var tasksByIdentifier: [String: Task<Void, Never>] = [:]
-    private var scheduledByIdentifier: [String: ScheduledUsageNotification] = [:]
-    private var retryAttemptsByIdentifier: [String: Int] = [:]
+    private var deliveriesByIdentifier: [String: Delivery] = [:]
 
     private static let maximumDeliveryAttempts = 6
 
@@ -67,7 +71,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     }
 
     deinit {
-        tasksByIdentifier.values.forEach { $0.cancel() }
+        deliveriesByIdentifier.values.forEach { $0.task.cancel() }
     }
 
     var isEnabled: Bool {
@@ -129,11 +133,11 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
                 result[notification.sourceIdentifier] = notification.deadlineDate
             }
 
-        for identifier in Set(tasksByIdentifier.keys).subtracting(desired.keys) {
+        for identifier in Set(deliveriesByIdentifier.keys).subtracting(desired.keys) {
             // A due alert stays eligible while it is being delivered or retried.
             // Cancel it if its reset deadline changed or the alert became ineligible.
-            if scheduledByIdentifier[identifier].map({
-                eligibleDeadlines[$0.sourceIdentifier] != $0.deadlineDate
+            if deliveriesByIdentifier[identifier].map({
+                eligibleDeadlines[$0.notification.sourceIdentifier] != $0.notification.deadlineDate
             }) != false {
                 cancelTask(identifier)
             }
@@ -146,20 +150,20 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             // A planner-visible alert (notably a revised deadline) can be
             // retried immediately on this refresh instead of waiting for its
             // delivery backoff. Due alerts absent from the plan retain theirs.
-            if retryAttemptsByIdentifier[notification.identifier] != nil {
+            if let delivery = deliveriesByIdentifier[notification.identifier], delivery.retryAttempt > 0 {
                 cancelTask(notification.identifier)
             }
-            if scheduledByIdentifier[notification.identifier] == notification { continue }
+            if deliveriesByIdentifier[notification.identifier]?.notification == notification { continue }
             cancelTask(notification.identifier)
-            scheduledByIdentifier[notification.identifier] = notification
             let delay = max(0, notification.notificationDate.timeIntervalSince(currentDate))
-            tasksByIdentifier[notification.identifier] = Task { [weak self] in
+            let task = Task { [weak self] in
                 if delay > 0 {
                     try? await Task.sleep(for: .seconds(delay))
                 }
                 guard !Task.isCancelled else { return }
                 await self?.deliver(notification)
             }
+            deliveriesByIdentifier[notification.identifier] = Delivery(notification: notification, task: task)
         }
         let immediateNotifications = plan.immediate.filter {
             !history.deliveredImmediateIdentifiers().contains($0.identifier)
@@ -185,23 +189,23 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     }
 
     private func deliver(_ notification: ScheduledUsageNotification) async {
-        guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+        guard isEnabled, deliveriesByIdentifier[notification.identifier]?.notification == notification else { return }
         guard let deadlineUsageRefresh,
               let snapshot = await deadlineUsageRefresh(notification.accountID)
         else {
-            if isEnabled, scheduledByIdentifier[notification.identifier] == notification {
+            if isEnabled, deliveriesByIdentifier[notification.identifier]?.notification == notification {
                 scheduleRetry(for: notification)
             }
             return
         }
-        guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+        guard isEnabled, deliveriesByIdentifier[notification.identifier]?.notification == notification else { return }
         guard let refreshed = UsageNotificationPlanner.refreshedContent(
             for: notification, using: snapshot, now: now()
         ) else {
             cancelTask(notification.identifier)
             return
         }
-        guard isEnabled, scheduledByIdentifier[notification.identifier] == notification else { return }
+        guard isEnabled, deliveriesByIdentifier[notification.identifier]?.notification == notification else { return }
         do {
             try await publisher.publish(
                 topic: topic,
@@ -220,32 +224,29 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     }
 
     private func cancelTask(_ identifier: String) {
-        tasksByIdentifier[identifier]?.cancel()
-        tasksByIdentifier[identifier] = nil
-        scheduledByIdentifier[identifier] = nil
-        retryAttemptsByIdentifier[identifier] = nil
+        deliveriesByIdentifier.removeValue(forKey: identifier)?.task.cancel()
     }
 
     private func cancelAllTasks() {
-        tasksByIdentifier.values.forEach { $0.cancel() }
-        tasksByIdentifier = [:]
-        scheduledByIdentifier = [:]
-        retryAttemptsByIdentifier = [:]
+        deliveriesByIdentifier.values.forEach { $0.task.cancel() }
+        deliveriesByIdentifier = [:]
     }
 
     private func scheduleRetry(for notification: ScheduledUsageNotification) {
         let identifier = notification.identifier
-        let attempt = (retryAttemptsByIdentifier[identifier] ?? 0) + 1
+        guard var delivery = deliveriesByIdentifier[identifier], delivery.notification == notification else { return }
+        let attempt = delivery.retryAttempt + 1
         guard attempt < Self.maximumDeliveryAttempts else {
             cancelTask(identifier)
             return
         }
-        retryAttemptsByIdentifier[identifier] = attempt
-        tasksByIdentifier[identifier] = Task { [weak self] in
+        delivery.retryAttempt = attempt
+        delivery.task = Task { [weak self] in
             try? await Task.sleep(for: self?.retryDelay(attempt) ?? .seconds(0))
             guard !Task.isCancelled else { return }
             await self?.deliver(notification)
         }
+        deliveriesByIdentifier[identifier] = delivery
     }
 
     private static func makeTopic() -> String {

@@ -1,7 +1,6 @@
-const dashboardLifecycle = (() => {
+function createDashboardLifecycle(hooks) {
   const navigationEvents = ['pointerdown', 'mousedown', 'click', 'keydown'];
   const routeEvents = ['message', 'popstate', 'hashchange'];
-  let hooks;
   let structureObserver;
   let sidebarObserver;
   let composerObserver;
@@ -122,8 +121,7 @@ const dashboardLifecycle = (() => {
       observeSidebarSize();
       if (shouldRebindHosts) {
         observeHosts();
-        sidebarProjectHighlights.mount();
-        promptLibraryButton.scheduleSync();
+        hooks.rebindFeatures();
       }
       if (shouldSyncUnread) {
         hooks.syncInterruptedSidebarMarkers();
@@ -171,19 +169,17 @@ const dashboardLifecycle = (() => {
       scheduleRepair({ rebindHosts: true });
       return;
     }
-    promptLibraryButton.scheduleSync();
+    hooks.syncComposer();
   }
 
   function mountPagesAndNavigation() {
     // Feature mount methods are idempotent and own their element-presence checks.
-    hooks.mountPage();
-    hooks.mountNavigation();
+    hooks.mountPages();
     attachPage();
-    hooks.applyVisibility();
+    hooks.pages.forEach(({ controller }) => controller.applyVisibility());
   }
 
-  function ensureMounted(nextHooks) {
-    hooks = nextHooks;
+  function ensureMounted() {
     if (!document.body) return false;
     if (!document.getElementById(dashboardElements.elementIDs.style)) {
       const style = document.createElement('style');
@@ -196,9 +192,7 @@ const dashboardLifecycle = (() => {
     // when the catalog itself has not changed.
     hooks.syncInterruptedSidebarMarkers();
     syncContentInset();
-    sidebarProjectHighlights.start();
-    promptLibrary.mount();
-    accountPopover.mount();
+    hooks.mountFeatures();
     if (!structureObserver) {
       structureObserver = new MutationObserver(handleStructureMutations);
       sidebarObserver = new MutationObserver(handleSidebarMutations);
@@ -217,7 +211,7 @@ const dashboardLifecycle = (() => {
   }
 
   function destroy() {
-    sidebarProjectHighlights.destroy();
+    hooks.destroyFeatures();
     structureObserver?.disconnect();
     sidebarObserver?.disconnect();
     composerObserver?.disconnect();
@@ -236,12 +230,10 @@ const dashboardLifecycle = (() => {
     repairFrame = undefined;
     pendingUnreadSync = false;
     pendingHostRebind = false;
-    promptLibrary.unmount();
-    accountPopover.unmount();
     document.documentElement.classList.remove('codex-dashboard-open');
     document.documentElement.style.removeProperty('--codex-dashboard-content-left');
     Object.values(dashboardElements.elementIDs).forEach((id) => document.getElementById(id)?.remove());
   }
 
   return { destroy, ensureMounted };
-})();
+}

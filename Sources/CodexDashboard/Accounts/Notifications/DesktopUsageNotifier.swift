@@ -91,6 +91,11 @@ struct NoopDesktopUsageNotifier: DesktopUsageNotifying {
 
 @MainActor
 final class DesktopUsageNotifier: DesktopUsageNotifying {
+    private struct Delivery {
+        let notification: ScheduledUsageNotification
+        let task: Task<Void, Never>
+    }
+
     private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
     private static let fallbackDelay: TimeInterval = 30
 
@@ -98,8 +103,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     private let updateContext: UsageNotificationUpdateCoordinator
     private var history: UsageNotificationHistory { updateContext.history }
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
-    private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
-    private var liveNotificationsByIdentifier: [String: ScheduledUsageNotification] = [:]
+    private var liveDeliveriesByIdentifier: [String: Delivery] = [:]
 
     init(
         notificationCenter: any DesktopNotificationCenter = SystemDesktopNotificationCenter(),
@@ -110,7 +114,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     }
 
     deinit {
-        liveTasksByIdentifier.values.forEach { $0.cancel() }
+        liveDeliveriesByIdentifier.values.forEach { $0.task.cancel() }
     }
 
     func setDeadlineUsageRefreshHandler(_ handler: @escaping DeadlineUsageRefreshHandler) {
@@ -230,31 +234,31 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         now: Date
     ) {
         let desired = Dictionary(uniqueKeysWithValues: notifications.map { ($0.identifier, $0) })
-        for identifier in Set(liveTasksByIdentifier.keys).subtracting(desired.keys) {
+        for identifier in Set(liveDeliveriesByIdentifier.keys).subtracting(desired.keys) {
             cancelLiveTask(identifier)
         }
         for notification in notifications {
-            if liveNotificationsByIdentifier[notification.identifier] == notification { continue }
+            if liveDeliveriesByIdentifier[notification.identifier]?.notification == notification { continue }
             cancelLiveTask(notification.identifier)
-            liveNotificationsByIdentifier[notification.identifier] = notification
             let delay = max(0, notification.notificationDate.timeIntervalSince(now))
-            liveTasksByIdentifier[notification.identifier] = Task { [weak self] in
+            let task = Task { [weak self] in
                 if delay > 0 {
                     try? await Task.sleep(for: .seconds(delay))
                 }
                 guard !Task.isCancelled else { return }
                 await self?.deliverFresh(notification)
             }
+            liveDeliveriesByIdentifier[notification.identifier] = Delivery(notification: notification, task: task)
         }
     }
 
     private func deliverFresh(_ notification: ScheduledUsageNotification) async {
-        guard liveNotificationsByIdentifier[notification.identifier] == notification,
+        guard liveDeliveriesByIdentifier[notification.identifier]?.notification == notification,
               !wasDelivered(notification),
               let deadlineUsageRefresh,
               let snapshot = await deadlineUsageRefresh(notification.accountID),
               !Task.isCancelled,
-              liveNotificationsByIdentifier[notification.identifier] == notification,
+              liveDeliveriesByIdentifier[notification.identifier]?.notification == notification,
               !wasDelivered(notification)
         else { return }
         guard let refreshed = UsageNotificationPlanner.refreshedContent(
@@ -331,14 +335,11 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     }
 
     private func cancelLiveTask(_ identifier: String) {
-        liveTasksByIdentifier[identifier]?.cancel()
-        liveTasksByIdentifier[identifier] = nil
-        liveNotificationsByIdentifier[identifier] = nil
+        liveDeliveriesByIdentifier.removeValue(forKey: identifier)?.task.cancel()
     }
 
     private func cancelAllLiveTasks() {
-        liveTasksByIdentifier.values.forEach { $0.cancel() }
-        liveTasksByIdentifier = [:]
-        liveNotificationsByIdentifier = [:]
+        liveDeliveriesByIdentifier.values.forEach { $0.task.cancel() }
+        liveDeliveriesByIdentifier = [:]
     }
 }
