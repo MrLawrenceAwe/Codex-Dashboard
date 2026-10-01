@@ -13,7 +13,7 @@ enum ReviewPrompts {
         case .performance:
             return "Review project for performance and responsiveness\(context)."
         case .content:
-            return "Review project for content accuracy, clarity, wording, consistency, and completeness\(context)."
+            return "Review project for content accuracy, clarity, wording, consistency, completeness, and presentation\(context)."
         }
     }
 
