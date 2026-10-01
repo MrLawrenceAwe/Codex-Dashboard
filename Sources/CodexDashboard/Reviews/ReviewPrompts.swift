@@ -8,9 +8,9 @@ enum ReviewPrompts {
         case .bugs:
             task = "Review project for bugs and issues\(context)."
         case .organisation:
-            task = "Do a code and content minimisation and organisation review\(context). Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
+            task = "Do a code and content minimisation and organisation review\(context)."
         case .naming:
-            task = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context). Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
+            task = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
         case .performance:
             task = "Review project for performance and responsiveness\(context)."
         case .content:
