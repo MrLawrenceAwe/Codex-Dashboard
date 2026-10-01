@@ -151,6 +151,12 @@ enum CodexTestFixtures {
               ('empty', '\(escapedCompletedRollout)', NULL, 'Empty thread', '', '/tmp/empty', \(now), \(now), 0, NULL, 0, \(now * 1000)),
               ('archived', '\(escapedCompletedRollout)', NULL, 'Archived thread', 'Archived preview', '/tmp/archived', \(now), \(now), 0, NULL, 1, \(now * 1000));
             \(additionalRows)
+            ALTER TABLE threads ADD COLUMN project_id TEXT;
+            CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE project_roots (project_id TEXT NOT NULL, path TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO projects (id, name) SELECT DISTINCT cwd, 'Project' FROM threads;
+            UPDATE projects SET name = 'running' WHERE id = '/tmp/running';
+            INSERT INTO project_roots (project_id, path) SELECT id, id FROM projects;
             """,
             testCase: testCase
         )

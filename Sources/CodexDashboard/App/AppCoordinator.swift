@@ -318,7 +318,7 @@ final class AppCoordinator: ObservableObject {
         }
         var paths: Set<String> = []
         for thread in prioritizedThreads where paths.count < Self.maximumLiveMonitoredProjectCount {
-            paths.insert(thread.projectPath)
+            if let path = thread.registeredProjectPath { paths.insert(path) }
         }
         return paths
     }

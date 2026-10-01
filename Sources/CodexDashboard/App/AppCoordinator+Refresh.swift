@@ -99,7 +99,7 @@ extension AppCoordinator {
         guard !isPerformingAction, generation == refreshGeneration else { return }
         applyThreadSnapshot(threads.map { thread in
             var updatedThread = thread
-            if let status = statusByProjectPath[updatedThread.projectPath] {
+            if let status = statusByProjectPath[updatedThread.registeredProjectPath ?? ""] {
                 updatedThread.workingTreeStatus = status
             }
             return updatedThread

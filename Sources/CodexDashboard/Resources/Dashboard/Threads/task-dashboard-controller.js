@@ -117,7 +117,7 @@ function createTaskDashboard({ catalog }) {
   async function openCommitDialogForProject(projectPath) {
     commitDialogError = '';
     const thread = currentThreads().find(
-      (item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath,
+      (item) => item.runState !== 'running' && String(item.registeredProjectPath || '').trim() === projectPath,
     );
     if (!thread) {
       commitDialogError = 'No idle chat is available for this project.';

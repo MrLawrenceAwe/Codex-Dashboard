@@ -28,19 +28,38 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     static let defaultLoadedThreadLimit = 500
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
-        "model", "rollout_path", "archived", "recency_at_ms",
+        "model", "rollout_path", "archived", "recency_at_ms", "project_id",
     ]
 
     private struct StoredThread: Decodable, Equatable, Sendable {
         let id: String
         let title: String
         let preview: String
+        let projectID: String?
         let projectPath: String
         let pinnedValue: Int
         let model: String?
         let totalCount: Int
         let rolloutPath: String
         let recencyAtMilliseconds: Int64
+    }
+
+    private struct ProjectRoot: Decodable, Sendable {
+        let id: String
+        let name: String
+        let path: String
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private func registeredRoot(for thread: StoredThread, in roots: [ProjectRoot]) -> ProjectRoot? {
+        let cwd = Self.canonicalPath(thread.projectPath)
+        let assigned = roots.filter { $0.id == thread.projectID }
+        let candidates = thread.projectID == nil ? roots : assigned
+        return candidates.filter { cwd == $0.path || cwd.hasPrefix($0.path + "/") }
+            .max { $0.path.count < $1.path.count } ?? assigned.first
     }
 
     private struct FileSignature: Equatable {
@@ -59,6 +78,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private var cachedDatabaseSignature: DatabaseSignature?
     private var cachedLaunchMilliseconds: Int64?
     private var cachedRequiredThreadIDs: Set<String>?
+    private var cachedProjectRoots: [ProjectRoot] = []
     private var cachedStoredThreads: [StoredThread]?
     private let subprocessTimeout: TimeInterval
 
@@ -97,6 +117,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
+               project_id AS projectID,
                cwd AS projectPath,
                is_pinned AS pinnedValue,
                model,
@@ -122,6 +143,12 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             threads = cachedStoredThreads
         } else {
             threads = try await query(databaseURL: stateDatabaseURL, sql: threadSQL)
+            let roots: [ProjectRoot] = try await query(databaseURL: stateDatabaseURL, sql: """
+                SELECT projects.id, projects.name, project_roots.path
+                FROM projects JOIN project_roots ON project_roots.project_id = projects.id
+                ORDER BY projects.position, project_roots.position
+                """)
+            cachedProjectRoots = roots.map { ProjectRoot(id: $0.id, name: $0.name, path: Self.canonicalPath($0.path)) }
             cachedDatabaseSignature = databaseSignature
             cachedRequiredThreadIDs = requiredThreadIDs
             cachedLaunchMilliseconds = launchMilliseconds
@@ -132,7 +159,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         // Any loaded task can be resumed or hit a usage limit without a database
         // write. The reader checks file signatures and only parses changed rollouts.
         let candidates: [ThreadSummary] = threads.map { thread in
-            let directoryName = URL(fileURLWithPath: thread.projectPath).lastPathComponent
+            let root = registeredRoot(for: thread, in: cachedProjectRoots)
             let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
             let isCurrentEvent = recordedEvent.map { event in
                 codexLaunchDate.map { event.timestamp >= $0 } ?? false
@@ -149,11 +176,11 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             let runState: ThreadRunState = isCurrentEvent && recordedEvent?.kind == .started
                 ? .running
                 : .idle
-            let summary = ThreadSummary(
+            var summary = ThreadSummary(
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                projectName: directoryName.isEmpty ? thread.projectPath : directoryName,
+                projectName: root?.name ?? "Other chats",
                 projectPath: thread.projectPath,
                 recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
@@ -162,6 +189,11 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 latestLifecycleEvent: latestLifecycleEvent,
                 workingTreeStatus: .notRepository
             )
+            if let root {
+                let cwd = Self.canonicalPath(thread.projectPath)
+                // Worktree chats can be assigned to a project outside its saved root.
+                summary.registeredProjectPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
+            }
             return summary
         }
         let threadSummaries = candidates.filter { $0.preview != "" || $0.runState == .running }.sorted { left, right in
@@ -200,7 +232,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         return FileSignature(size: size, modifiedAt: modifiedAt)
     }
 
-    private func query(databaseURL: URL, sql: String) async throws -> [StoredThread] {
+    private func query<Row: Decodable>(databaseURL: URL, sql: String) async throws -> [Row] {
         do {
             let result = try await Subprocess.run(
                 executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
@@ -216,7 +248,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             }
             if result.standardOutput.isEmpty { return [] }
             do {
-                return try JSONDecoder().decode([StoredThread].self, from: result.standardOutput)
+                return try JSONDecoder().decode([Row].self, from: result.standardOutput)
             } catch {
                 throw ThreadCatalogError.invalidResponse(databaseURL)
             }

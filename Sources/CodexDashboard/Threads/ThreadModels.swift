@@ -38,6 +38,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEvent: ThreadLifecycleEvent?
+    var registeredProjectPath: String? = nil
     var workingTreeStatus: WorkingTreeStatus
 
     var originatesFromChromeExtension: Bool {
@@ -62,6 +63,7 @@ struct RendererThread: Codable, Equatable, Sendable {
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEventKind: ThreadLifecycleEventKind?
+    let registeredProjectPath: String?
     let workingTreeStatus: WorkingTreeStatus
 
     init(_ thread: ThreadSummary) {
@@ -76,6 +78,7 @@ struct RendererThread: Codable, Equatable, Sendable {
         model = thread.model
         runState = thread.runState
         latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
+        registeredProjectPath = thread.registeredProjectPath
         workingTreeStatus = thread.workingTreeStatus
     }
 }

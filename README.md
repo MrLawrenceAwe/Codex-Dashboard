@@ -14,6 +14,8 @@ This is an independent personal project and is not affiliated with OpenAI.
 - **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
 - **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
 
+Chat overview groups chats using Codex’s current saved projects, combining symlink aliases. Chats from removed projects remain under **Other chats**, without project change indicators.
+
 Chat overview’s **Local changes** filter includes uncommitted files and unpushed commits, with separate status labels. Unpushed status uses local remote-tracking refs without fetching; a branch without an upstream is compared with all known remote refs. Repositories without a remote show only uncommitted changes.
 
 The project explores reliable desktop workflow automation, including file-change

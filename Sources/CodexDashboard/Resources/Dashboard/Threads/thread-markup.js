@@ -56,7 +56,7 @@ const threadMarkup = (() => {
   function groupThreadsByProject(threads) {
     const groups = new Map();
     threads.forEach((thread) => {
-      const path = String(thread.projectPath).trim();
+      const path = String(thread.registeredProjectPath || '').trim();
       if (!groups.has(path)) groups.set(path, { path, name: thread.projectName, threads: [] });
       groups.get(path).threads.push(thread);
     });

@@ -268,7 +268,7 @@ final class ReviewLoopCoordinator {
         try requireCompleted(reviewTurn)
         let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
         guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
-        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID, reviewOnly: true)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
@@ -383,10 +383,13 @@ final class ReviewLoopCoordinator {
     }
 
     private func validateCheckout(using driver: any ReviewLoopDriving, loop: ReviewLoop,
-                            threads: [RendererThread], threadID: String) async throws -> ReviewRepositoryState {
+                            threads: [RendererThread], threadID: String, reviewOnly: Bool = false) async throws -> ReviewRepositoryState {
         let repo = try await inspect { try await driver.repository(at: loop.project.path) }
         guard !hasOtherRunningTask(threads, root: repo.root, excluding: threadID) else {
             throw ReviewLoopError("Another chat is running in this checkout. Inspect its changes before continuing.")
+        }
+        if reviewOnly, !repo.clean {
+            throw ReviewLoopError("Uncommitted changes appeared during the review. The review must leave files unchanged. Inspect the changes in its chat before resuming; no fix prompt or push was sent.")
         }
         guard repo.clean, repo.branch == loop.branch else {
             throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")

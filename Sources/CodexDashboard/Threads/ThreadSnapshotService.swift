@@ -54,7 +54,7 @@ actor ThreadSnapshotService {
         hasLoadedSnapshot = true
         let threads = catalog.threads.map { source in
             var thread = source
-            thread.workingTreeStatus = workingTreeStatuses[thread.projectPath] ?? .notRepository
+            thread.workingTreeStatus = workingTreeStatuses[thread.registeredProjectPath ?? ""] ?? .notRepository
             return thread
         }
         return ThreadSnapshotResult(
@@ -97,7 +97,7 @@ actor ThreadSnapshotService {
         in threads: [ThreadSummary],
         projectPaths requestedPaths: Set<String>? = nil
     ) async -> [String: WorkingTreeStatus]? {
-        let allProjectPaths = Set(threads.map(\.projectPath))
+        let allProjectPaths = Set(threads.compactMap(\.registeredProjectPath))
         // WorkingTreeChangeMonitor already coalesces bursts. Do not discard the final event:
         // it may be the commit that clears the project's change indicator.
         let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
