@@ -3,18 +3,20 @@ import Foundation
 enum ReviewPrompts {
     static func reviewPrompt(for loop: ReviewLoop) -> String {
         let context = loop.focus.supportsProjectContext ? loop.promptContext.promptSuffix : ""
+        let task: String
         switch loop.focus {
         case .bugs:
-            return "Review project for bugs and issues\(context)."
+            task = "Review project for bugs and issues\(context)."
         case .organisation:
-            return "Do a code and content minimisation and organisation review\(context). Remove duplication and unnecessary complexity while preserving clarity and useful information."
+            task = "Do a code and content minimisation and organisation review\(context). Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
         case .naming:
-            return "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context). Remove duplication and unnecessary complexity while preserving clarity and useful information."
+            task = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context). Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
         case .performance:
-            return "Review project for performance and responsiveness\(context)."
+            task = "Review project for performance and responsiveness\(context)."
         case .content:
-            return "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
+            task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
+        return task + "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {

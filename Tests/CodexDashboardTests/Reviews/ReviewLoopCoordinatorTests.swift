@@ -3,6 +3,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopCoordinatorTests: XCTestCase {
+    private let reviewBoundary = "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
     private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
@@ -85,7 +86,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try coordinator.apply(action, projects: [project])
         XCTAssertEqual(coordinator.loops.first?.promptContext, .personal)
         XCTAssertEqual(ReviewPrompts.reviewPrompt(for: try XCTUnwrap(coordinator.loops.first)),
-                       "Review project for bugs and issues (this is a project for personal use).")
+                       "Review project for bugs and issues (this is a project for personal use)." + reviewBoundary)
     }
 
     func testUnknownReviewActionKindDoesNotDecode() {
@@ -245,7 +246,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1, "Do not launch in the same checkpoint observation")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1", "thread-2"])
-        XCTAssertEqual(driver.prompts[2], "Review project for bugs and issues.")
+        XCTAssertEqual(driver.prompts[2], "Review project for bugs and issues." + reviewBoundary)
         XCTAssertFalse(driver.prompts[2].contains("last round's findings"))
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
@@ -314,7 +315,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     func testProgressTracksSubmittedAndConditionalPrompts() async throws {
         let (coordinator, _, driver) = try make()
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Reviewing")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
@@ -325,13 +326,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         try coordinator.apply(action(.pause, for: coordinator), projects: [project])
         XCTAssertTrue(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note.contains("resume") == true)
         driver.finish(findings: 2, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Paused")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues.")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Latest prompt")
@@ -523,6 +524,19 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.createdThreads.count, 1, failure)
         }
+    }
+
+    func testReviewEditsBlockBeforeAnyFixPromptOrPush() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        driver.clean = false
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        XCTAssertTrue(coordinator.loops.last?.message.contains("Uncommitted changes appeared during the review") == true)
+        XCTAssertEqual(driver.prompts.count, 1)
+        XCTAssertTrue(driver.pushedCommits.isEmpty)
+        XCTAssertFalse(coordinator.loops.last?.rounds.last?.fixRequested ?? true)
     }
 
     func testReviewMustNotChangeCheckoutAndP3OnlyDoesNotTriggerFix() async throws {
@@ -829,7 +843,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                               promptContext: .personal, maxRounds: 3)
         loop.focus = .performance
         XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
-                       "Review project for performance and responsiveness (this is a project for personal use).")
+                       "Review project for performance and responsiveness (this is a project for personal use)." + reviewBoundary)
     }
 
     func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
@@ -868,10 +882,10 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                 expectedReview = "Review project for bugs and issues."
                 expectedFix = "Fix the finding and commit"
             case .organisation:
-                expectedReview = "Do a code and content minimisation and organisation review. Remove duplication and unnecessary complexity while preserving clarity and useful information."
+                expectedReview = "Do a code and content minimisation and organisation review. Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
                 expectedFix = "Address the finding and commit"
             case .naming:
-                expectedReview = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading. Remove duplication and unnecessary complexity while preserving clarity and useful information."
+                expectedReview = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading. Identify opportunities to remove duplication and unnecessary complexity while preserving clarity and useful information."
                 expectedFix = "Address the finding and commit"
             case .content:
                 expectedReview = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose."
@@ -887,11 +901,11 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
-            XCTAssertEqual(driver.prompts, [expectedReview, fullFixPrompt])
+            XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts, [expectedReview, fullFixPrompt, expectedReview])
+            XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
         }
     }
 

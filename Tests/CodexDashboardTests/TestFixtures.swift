@@ -30,6 +30,7 @@ extension ThreadSummary {
             latestLifecycleEvent: latestLifecycleEvent,
             workingTreeStatus: workingTreeStatus
         )
+        thread.registeredProjectPath = projectPath
         thread.isUnread = isUnread
         return thread
     }

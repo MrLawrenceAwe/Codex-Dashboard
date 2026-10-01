@@ -5,6 +5,33 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testRemovedProjectHasNoChangeIndicatorAndAliasesShareOneGroup() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        var removed = ThreadSummary.fixture(id: "removed", projectName: "Other chats", projectPath: "/tmp/removed", isUnread: true, workingTreeStatus: .hasChanges)
+        removed.registeredProjectPath = nil
+        var alias = ThreadSummary.fixture(id: "alias", projectName: "Mail Verify", projectPath: "/tmp/old-name", isUnread: true, workingTreeStatus: .hasChanges)
+        alias.registeredProjectPath = "/tmp/mail"
+        let current = ThreadSummary.fixture(id: "current", projectName: "Mail Verify", projectPath: "/tmp/mail", isUnread: true, workingTreeStatus: .hasChanges)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [removed, alias, current])
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyThreads((\(payload)).threads);
+          window.__codexDashboard.open();
+          document.querySelector('[data-filter="changedProjects"]').click();
+          const changed = [document.querySelector('[data-filter-count="changedProjects"]').textContent,
+            [...document.querySelectorAll('[data-dashboard-git-project]')].map(row => row.dataset.dashboardGitProject)];
+          document.querySelector('[data-filter="unread"]').click();
+          return [...changed, [...document.querySelectorAll('[data-dashboard-project-group]')].map(row => row.dataset.dashboardProjectGroup),
+            document.querySelectorAll('[data-thread-id]').length];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "1")
+        XCTAssertEqual(values[1] as? [String], ["/tmp/mail"])
+        XCTAssertEqual(values[2] as? [String], ["", "/tmp/mail"])
+        XCTAssertEqual(values[3] as? Int, 3)
+    }
+
     func testUnpushedCommitsAppearInLocalChangesWithPushAction() async throws {
         let webView = try await DashboardWebTestHarness.taskDashboardWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [

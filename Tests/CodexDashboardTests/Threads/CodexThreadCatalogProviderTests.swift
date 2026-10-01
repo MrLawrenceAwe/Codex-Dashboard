@@ -3,6 +3,39 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testSavedProjectsGroupAliasesAndRemovalDoesNotHideChats() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let project = url.deletingLastPathComponent().appendingPathComponent("Mail-Verify")
+        let alias = url.deletingLastPathComponent().appendingPathComponent("Yahoo-Code-Fill")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
+        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
+        let setup = """
+        DELETE FROM project_roots;
+        DELETE FROM projects;
+        INSERT INTO projects (id, name) VALUES ('mail', 'Mail Verify');
+        INSERT INTO project_roots (project_id, path) VALUES ('mail', \(sql(project.path)));
+        UPDATE threads SET cwd = \(sql(alias.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sql(project.path)) WHERE id = 'updated';
+        """
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, setup], timeout: 3)
+        XCTAssertEqual(result.terminationStatus, 0)
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
+        let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        let grouped = initial.threads.filter { ["running", "updated"].contains($0.id) }
+        XCTAssertEqual(grouped.map(\.projectName), ["Mail Verify", "Mail Verify"])
+        XCTAssertEqual(Set(grouped.compactMap(\.registeredProjectPath)), [project.resolvingSymlinksInPath().path])
+        XCTAssertEqual(initial.threads.first { $0.id == "running" }?.projectPath, alias.path, "Keep the original chat checkout for review-loop isolation")
+        XCTAssertNil(initial.threads.first { $0.id == "idle" }?.registeredProjectPath)
+        let removal = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, "DELETE FROM projects; DELETE FROM project_roots;"], timeout: 3)
+        XCTAssertEqual(removal.terminationStatus, 0)
+        let removed = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        XCTAssertEqual(removed.threads.map(\.id), initial.threads.map(\.id))
+        XCTAssertTrue(removed.threads.allSatisfy { $0.registeredProjectPath == nil && $0.projectName == "Other chats" })
+    }
+
     func testEmptyCatalogReturnsEmptySnapshotAfterArchivingAllThreads() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
