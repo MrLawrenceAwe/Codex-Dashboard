@@ -18,7 +18,7 @@ const taskDashboardPage = (() => {
               <div class="dashboard-filters" aria-label="Filter chats">
                 <button type="button" data-filter="all" class="is-active">All chats</button>
                 <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
-                <button type="button" data-filter="changedProjects" aria-label="Uncommitted changes"><span class="dashboard-filter-label">Uncommitted changes</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Projects with uncommitted changes">0</span></button>
+                <button type="button" data-filter="changedProjects" aria-label="Local changes"><span class="dashboard-filter-label">Local changes</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Projects with uncommitted changes or unpushed commits">0</span></button>
               </div>
             </div>
             <button type="button" class="dashboard-mark-all-read" data-mark-all-read hidden>Mark all as read</button>

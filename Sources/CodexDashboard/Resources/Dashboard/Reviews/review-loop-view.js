@@ -73,6 +73,8 @@ const reviewLoopView = (() => {
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
+        <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
+        <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
         <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits fixes when findings are found. Stops when no findings remain or the limit is reached.</p>
         </fieldset>
@@ -256,7 +258,7 @@ const reviewLoopView = (() => {
     badge.dataset.phase = loop.phase;
     const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const focusLabel = reviewTypes.find(type => type.id === loop.focus)?.label || loop.focus || '';
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -279,7 +281,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-rounds]').innerHTML = (loop?.rounds || []).map(round => `<li>
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(({ clean: 'No findings', fixed: 'Fixes committed', withdrawn: 'Findings withdrawn', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.length} findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
+      <span>${escape(({ clean: 'No findings', fixed: loop.pushToRemote ? 'Fixes committed & pushed' : 'Fixes committed', withdrawn: 'Findings withdrawn', blocked: 'Blocked' }[round.result?.outcome]) || (round.fixRequested ? 'Addressing findings' : round.review ? `${round.review.findings.length} findings` : 'Reviewing'))}${round.result?.commit ? ` · ${escape(round.result.commit.slice(0, 8))}` : ''}</span></div>
       ${round.review?.findings?.length ? `<ul class="review-round-findings" aria-label="Findings from review ${round.number}">${round.review.findings.map(finding => `<li>
         <div class="review-finding-heading">${finding.priority ? `<span class="review-finding-priority" data-priority="${escape(finding.priority)}">${escape(finding.priority)}</span>` : ''}<strong>${escape(finding.title)}</strong></div>
         <p>${findingBody(finding.body, loop.id)}</p>

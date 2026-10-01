@@ -22,6 +22,8 @@ enum WorkingTreeStatus: String, Codable, Equatable, Sendable {
     case unavailable
     case clean
     case hasChanges
+    case unpushedCommits
+    case hasChangesAndUnpushedCommits
 }
 
 struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {

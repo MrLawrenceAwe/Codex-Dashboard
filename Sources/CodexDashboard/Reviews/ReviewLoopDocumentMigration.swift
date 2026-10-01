@@ -3,7 +3,7 @@ import Foundation
 /// Converts the unversioned single-loop and array formats into the current document.
 enum ReviewLoopDocumentMigration {
     struct Document: Codable {
-        static let currentVersion = 1
+        static let currentVersion = 2
         let version: Int
         let loops: [ReviewLoop]
     }
@@ -11,10 +11,14 @@ enum ReviewLoopDocumentMigration {
     static func decode(_ data: Data) throws -> [ReviewLoop] {
         let value = try JSONSerialization.jsonObject(with: data)
         if let document = value as? [String: Any], let version = document["version"] as? Int {
-            guard version == Document.currentVersion else {
+            guard (1...Document.currentVersion).contains(version) else {
                 throw ReviewLoopError("Unsupported review-loop document version \(version).")
             }
-            return try JSONDecoder().decode(Document.self, from: data).loops
+            if version == Document.currentVersion {
+                return try JSONDecoder().decode(Document.self, from: data).loops
+            }
+            guard let saved = document["loops"] as? [[String: Any]] else { throw ReviewLoopError("Invalid review-loop document.") }
+            return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map(migrate)))
         }
         let savedLoops = value as? [[String: Any]] ?? (value as? [String: Any]).map { [$0] }
         guard let savedLoops else { throw ReviewLoopError("Invalid review-loop document.") }
@@ -24,6 +28,7 @@ enum ReviewLoopDocumentMigration {
 
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
+        if loop["pushToRemote"] == nil { loop["pushToRemote"] = false }
         if loop["promptContext"] == nil {
             if let context = loop["projectType"] {
                 loop["promptContext"] = context

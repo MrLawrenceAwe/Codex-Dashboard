@@ -1,4 +1,6 @@
 const taskDashboardQuery = (() => {
+  const hasLocalChanges = thread => ['hasChanges', 'unpushedCommits', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus);
+
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
     const indicatedChangedProjectPaths = new Set();
@@ -8,7 +10,7 @@ const taskDashboardQuery = (() => {
     threads.forEach((thread) => {
       if (thread.runState === 'running') runningCount += 1;
       if (isThreadUnread(thread)) unreadCount += 1;
-      if (thread.workingTreeStatus === 'hasChanges') {
+      if (hasLocalChanges(thread)) {
         const projectPath = String(thread.projectPath).trim();
         allChangedProjectPaths.add(projectPath);
         if (!hiddenChangeIndicatorPaths.has(projectPath)) indicatedChangedProjectPaths.add(projectPath);
@@ -57,5 +59,5 @@ const taskDashboardQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads };
+  return { summarizeActivity, selectThreads, hasLocalChanges };
 })();

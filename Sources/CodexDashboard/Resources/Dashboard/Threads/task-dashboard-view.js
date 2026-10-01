@@ -78,7 +78,7 @@ const taskDashboardView = (() => {
       const changedProjectNames = [...indicatedChangedProjectPaths]
         .map((path) => path.split('/').filter(Boolean).at(-1) || path)
         .slice(0, 3);
-      const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
+      const changedProjectLabel = `${changedProjectCount} ${changedProjectCount === 1 ? 'project has' : 'projects have'} uncommitted changes or unpushed commits${changedProjectNames.length ? `: ${changedProjectNames.join(', ')}` : ''}`;
       changes.hidden = changedProjectCount === 0;
       changes.setAttribute('aria-label', changedProjectLabel);
       changes.setAttribute('title', changedProjectLabel);

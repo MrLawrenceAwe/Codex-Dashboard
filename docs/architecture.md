@@ -15,7 +15,7 @@
 - Native sidebar projects show a disclosure chevron and remain individually collapsible through Codex's own project-row interaction.
 - Persisted unread status is scoped to the active authenticated principal (Codex’s hash of the account and user IDs). Account changes invalidate the unread cache even when the global-state file is unchanged; saved identities never contribute unread flags to the current account.
 - Unread dots and the Unread filter use Codex's complete persisted local unread set, including tasks outside the recent-history limit and tasks not mounted in the sidebar. Newly unread tasks outside the loaded catalog trigger an immediate catalog refresh. Returning to Codex refreshes persisted unread state before the catalog, and opening the dashboard immediately reconciles live sidebar read state. Only matching local sidebar rows can override local state; unchanged sidebar values cannot repeatedly override newer persisted changes. Live changes survive persistence lag until acknowledged or superseded by new task activity. Opening a task does not optimistically mark it read; Codex remains the source of truth.
-- Grouped projects show a quiet marker when their Git working tree has uncommitted changes, and the **Uncommitted changes** filter isolates those projects. Running changed projects remain visible there, while Commit or push waits for an idle project thread.
+- Grouped projects show separate markers for uncommitted changes and unpushed commits, and the **Local changes** filter isolates those projects. Unpushed status compares HEAD with local upstream refs, or all remote refs when no upstream exists; it never fetches. A repository without a remote only reports uncommitted changes. Running changed projects remain visible there, while Commit or push waits for an idle project thread.
 - Changed project groups expose **Hide change indicators** and **Commit or push**. Hide change indicators suppresses that project's visual change indicators and groups it under **Indicators hidden** until restored. **Commit or push** remains available while indicators are hidden; Commit or push opens the most recent idle thread and selects **Commit** from Codex's **Git actions** menu to open the native dialog.
 - A **Prompts** button sits beside the composer’s **Add** button for one-click access to the local prompt library. Saved prompts can be global or limited to the active project, organised into named collapsible sections, reordered or moved between sections with drag and drop, created, edited, deleted, and inserted into the current chat without leaving Codex. Renderer edits are staged locally until the native bridge persists and acknowledges them. The canonical library is stored at `~/Library/Application Support/Codex Dashboard/prompt-library.json`, with rolling backups and import/export controls in Diagnostics.
 - Prompt search, keyboard and pointer reordering, section rename/deletion, and `{{selection}}` and `{{clipboard}}` placeholders speed up reusable prompt workflows. Prompts can optionally apply saved model, reasoning-effort (including Max and Ultra), and Standard/Fast speed settings through Codex's model list, Power slider, and speed controls before insertion. Unavailable or locked selections stop insertion; saved model identifiers remain intact and editable when Codex's model list changes. Deleting a section moves its prompts to **General** rather than deleting them.
@@ -76,7 +76,13 @@ review ends without a commit; a partial withdrawal continues after the fix commi
 No JSON output schema is sent to Codex.
 Dashboard independently verifies a clean working tree, unchanged branch,
 matching HEAD, and ancestry from the round's starting commit before scheduling
-the next fresh review. Reaching the round limit ends the loop with a distinct
+the next fresh review. The optional **Remote push** setting defaults to **Keep commits local**.
+When enabled, Dashboard pushes the verified fix commit after each round to the configured
+upstream branch, or to the current branch on `origin` (or the sole remote) when no upstream
+is configured. New branch pushes record an upstream. Pushes are never forced; a failure
+blocks the loop, and Resume retries the existing verified fix without another fix prompt.
+A restart during a push also reconciles and retries that same commit.
+Reaching the round limit ends the loop with a distinct
 green **Limit reached** status indicating that all configured rounds finished successfully.
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.

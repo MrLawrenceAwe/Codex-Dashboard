@@ -64,7 +64,7 @@ const threadMarkup = (() => {
   }
 
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
-    if (!projectThreads.some((thread) => thread.workingTreeStatus === 'hasChanges')) return '';
+    if (!projectThreads.some(taskDashboardQuery.hasLocalChanges)) return '';
     const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
@@ -79,14 +79,17 @@ const threadMarkup = (() => {
       </span>`;
   }
 
-  function renderChangeStatus(hasChanges, indicatorsHidden, showHiddenStatus) {
-    if (!hasChanges) return '';
+  function renderChangeStatus(projectThreads, indicatorsHidden, showHiddenStatus) {
+    if (!projectThreads.some(taskDashboardQuery.hasLocalChanges)) return '';
     if (indicatorsHidden) {
       return showHiddenStatus
         ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'
         : '';
     }
-    return `<span class="dashboard-git-changes"${showHiddenStatus ? ' title="This Git project has uncommitted changes"' : ''}>${dashboardIcons.render('gitChanges')}<span>Changed</span></span>`;
+    const dirty = projectThreads.some(thread => ['hasChanges', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus));
+    const unpushed = projectThreads.some(thread => ['unpushedCommits', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus));
+    const label = dirty && unpushed ? 'Uncommitted · Unpushed' : unpushed ? 'Unpushed' : 'Uncommitted';
+    return `<span class="dashboard-git-changes" title="${label}">${dashboardIcons.render('gitChanges')}<span>${label}</span></span>`;
   }
 
   function renderThreadList(displayedThreads, {
@@ -122,7 +125,7 @@ const threadMarkup = (() => {
         <article class="dashboard-git-project" data-dashboard-git-project="${domUtils.escapeHTML(projectPath)}">
           <div class="dashboard-git-project-copy">
             ${renderProjectIdentity(projectName, projectPath)}
-            ${renderChangeStatus(true, hiddenChangeIndicatorPaths.has(projectPath), false)}
+            ${renderChangeStatus(projectThreads, hiddenChangeIndicatorPaths.has(projectPath), false)}
           </div>
           <span class="dashboard-project-summary">
             ${renderProjectActions(projectPath, projectThreads, hiddenChangeIndicatorPaths.has(projectPath))}
@@ -145,7 +148,6 @@ const threadMarkup = (() => {
     return groupThreadsByProject(displayedThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
-      const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');
       const indicatorsHidden = hiddenChangeIndicatorPaths.has(projectPath);
       return `
       <section class="dashboard-project-group${isCollapsed ? ' is-collapsed' : ''}" data-dashboard-project-group="${domUtils.escapeHTML(projectPath)}" aria-label="${domUtils.escapeHTML(project)} project">
@@ -154,7 +156,7 @@ const threadMarkup = (() => {
             <span class="dashboard-project-title">
               <span class="dashboard-project-chevron">${dashboardIcons.render('chevron')}</span>
               ${renderProjectIdentity(project, projectPath)}
-              ${renderChangeStatus(hasChanges, indicatorsHidden, true)}
+              ${renderChangeStatus(projectThreads, indicatorsHidden, true)}
             </span>
           </button>
           <span class="dashboard-project-summary">

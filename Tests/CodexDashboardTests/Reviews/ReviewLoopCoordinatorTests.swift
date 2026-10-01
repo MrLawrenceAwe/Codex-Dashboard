@@ -185,6 +185,47 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.loops.map(\.phase), [.stopped, .waiting])
     }
 
+    func testPushPreferenceAndFailureRetryPreserveVerifiedFix() async throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "push", kind: .start, projectID: project.id,
+                                promptContext: .general, maxRounds: 1, loopID: nil)
+        start.pushToRemote = true
+        try coordinator.apply(start, projects: [project])
+        let driver = ReviewTestDriver()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        driver.failPush = true
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        XCTAssertEqual(coordinator.loops.last?.message, "Remote push failed")
+        XCTAssertNil(coordinator.loops.last?.rounds.last?.result)
+        XCTAssertEqual(coordinator.loops.last?.completedRoundCount, 0)
+        XCTAssertEqual(store.loops.last?.pushToRemote, true)
+        driver.failPush = false
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.pushedCommits, ["fixed"])
+        XCTAssertEqual(driver.prompts.count, 2, "Retry the push without creating another fix turn")
+        XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
+        XCTAssertEqual(coordinator.loops.last?.completedRoundCount, 1)
+        XCTAssertTrue(coordinator.loops.last?.message.contains("pushed to remote") == true)
+    }
+
+    func testVersionOneSavedLoopsMigrateWithPushingDisabled() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: project,
+                              promptContext: .general, maxRounds: 1)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "pushToRemote")
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "loops": [saved]])
+        let restored = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+        XCTAssertEqual(restored.id, loop.id)
+        XCTAssertFalse(restored.pushToRemote)
+    }
+
     func testFixCommitThenFreshReviewThenCleanStops() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
@@ -200,6 +241,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.finish(findings: 2, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
+        XCTAssertTrue(driver.pushedCommits.isEmpty)
         XCTAssertEqual(driver.createdThreads.count, 1, "Do not launch in the same checkpoint observation")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1", "thread-2"])
@@ -861,7 +903,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try store.save(coordinator.loops)
         XCTAssertEqual(try store.load(), coordinator.loops)
         let currentDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual(currentDocument["version"] as? Int, 1)
+        XCTAssertEqual(currentDocument["version"] as? Int, ReviewLoopDocumentMigration.Document.currentVersion)
         XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
@@ -878,7 +920,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: [olderLoop]).write(to: url)
         XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
         var futureDocument = currentDocument
-        futureDocument["version"] = 2
+        futureDocument["version"] = ReviewLoopDocumentMigration.Document.currentVersion + 1
         try JSONSerialization.data(withJSONObject: futureDocument).write(to: url)
         XCTAssertThrowsError(try store.load())
         try Data("broken".utf8).write(to: url)
@@ -901,6 +943,8 @@ private final class ReviewTestStore: ReviewLoopStoring {
 
 @MainActor
 private final class ReviewTestDriver: ReviewLoopDriving {
+    var pushedCommits: [String] = []
+    var failPush = false
     var clean = true
     var commit = "base"
     var branch = "main"
@@ -925,6 +969,10 @@ private final class ReviewTestDriver: ReviewLoopDriving {
     var onStartTurn: (() -> Void)?
     var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
+    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
+        if failPush { throw ReviewLoopError("Remote push failed") }
+        pushedCommits.append(expectedRepository.commit)
+    }
     func repository(at path: String) async throws -> ReviewRepositoryState {
         await Task.yield()
         onRepository?()

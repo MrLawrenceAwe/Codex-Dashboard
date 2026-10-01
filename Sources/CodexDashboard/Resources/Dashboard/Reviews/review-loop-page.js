@@ -38,6 +38,7 @@ const reviewLoopPage = (() => {
       const focus = details.querySelector('[data-review-focus]').value;
       queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
+        pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: reviewLoopView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
         priorityLimit: reviewLoopView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,

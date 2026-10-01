@@ -2,6 +2,7 @@ import Foundation
 
 protocol ReviewRepositoryChecking: Sendable {
     func repository(at path: String) async throws -> ReviewRepositoryState
+    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws
     func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
 }
@@ -17,6 +18,60 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
             throw ReviewLoopError("HEAD changed while checking the commit checkpoint.")
         }
         return ReviewRepositoryState(root: root, branch: branch, commit: head, clean: status.isEmpty)
+    }
+
+    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
+        guard try await repository(at: path) == expectedRepository, expectedRepository.clean else {
+            throw ReviewLoopError("The checkout changed before pushing. Inspect it before resuming.")
+        }
+        let remotes = try await git(["remote"], at: path).split(separator: "\n").map(String.init)
+        let branch = expectedRepository.branch
+        let configuredRemote = try await configuration("branch.\(branch).remote", at: path)
+        let configuredMerge = try await configuration("branch.\(branch).merge", at: path)
+        let remote: String
+        let destination: String
+        let needsUpstream: Bool
+        if let configuredRemote, let configuredMerge {
+            remote = configuredRemote
+            destination = configuredMerge
+            needsUpstream = false
+        } else {
+            guard let selected = remotes.contains("origin") ? "origin" : remotes.count == 1 ? remotes.first : nil else {
+                throw ReviewLoopError("Push needs a remote: configure a branch upstream, origin, or a single remote, then resume the loop.")
+            }
+            remote = selected
+            destination = "refs/heads/" + branch
+            needsUpstream = true
+        }
+        guard remotes.contains(remote), destination.hasPrefix("refs/heads/") else {
+            throw ReviewLoopError("Push needs a configured remote branch upstream. Inspect the branch settings before resuming.")
+        }
+        // Push only the verified commit to one branch, regardless of push.default,
+        // followTags, mirror, or force settings. Git rejects non-fast-forward updates.
+        let result: SubprocessOutput
+        do {
+            result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+                arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                            "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
+                            "--", remote, expectedRepository.commit + ":" + destination], timeout: 60)
+        } catch {
+            throw ReviewLoopError("Remote push failed: \(error.localizedDescription) Inspect the remote and resume to retry.")
+        }
+        guard result.terminationStatus == 0 else {
+            throw ReviewLoopError("Remote push failed: " + String(decoding: result.standardError, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines) + " Resume after resolving the error.")
+        }
+        if needsUpstream {
+            _ = try await git(["config", "branch.\(branch).remote", remote], at: path)
+            _ = try await git(["config", "branch.\(branch).merge", destination], at: path)
+        }
+    }
+
+    private func configuration(_ key: String, at path: String) async throws -> String? {
+        let result = try await runGit(["config", "--get", key], at: path)
+        if result.terminationStatus == 1 { return nil }
+        guard result.terminationStatus == 0 else { throw ReviewLoopError("Could not read the branch push configuration.") }
+        return String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func resolveCommit(_ commit: String, at path: String) async throws -> String {

@@ -5,6 +5,29 @@ import XCTest
 
 @MainActor
 extension TaskDashboardWebTests {
+    func testUnpushedCommitsAppearInLocalChangesWithPushAction() async throws {
+        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "unpushed", projectPath: "/tmp/unpushed", workingTreeStatus: .unpushedCommits),
+            .fixture(id: "both", projectPath: "/tmp/both", workingTreeStatus: .hasChangesAndUnpushedCommits),
+            .fixture(id: "clean", projectPath: "/tmp/clean", workingTreeStatus: .clean),
+        ])
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyThreads((\(payload)).threads);
+          window.__codexDashboard.open();
+          document.querySelector('[data-filter="changedProjects"]').click();
+          return [document.querySelector('[data-filter-count="changedProjects"]').textContent,
+            [...document.querySelectorAll('[data-thread-list] .dashboard-git-changes')].map(item => item.textContent.trim()),
+            document.querySelectorAll('[data-thread-list] [data-project-commit]').length];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "2")
+        XCTAssertEqual(values[1] as? [String], ["Unpushed", "Uncommitted · Unpushed"])
+        XCTAssertEqual(values[2] as? Int, 2)
+    }
+
     func testChangedProjectsFilterShowsOneCommitActionPerChangedProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -65,7 +88,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[1] as? Int, 1)
         XCTAssertEqual(values[2] as? Int, 1)
         XCTAssertEqual(values[3] as? String, "1")
-        XCTAssertEqual(values[4] as? String, "Uncommitted changes 1")
+        XCTAssertEqual(values[4] as? String, "Local changes 1")
     }
 
     func testChangedProjectsDoesNotOfferLoadMoreForAdditionalTasksInOneProject() async throws {
