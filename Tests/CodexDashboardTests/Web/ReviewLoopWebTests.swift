@@ -10,6 +10,25 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testBlockedLoopOffersResumeAndDoesNotCountBlockedAttempts() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'blocked',project,phase:'blocked',maxRounds:1,
+            rounds:[{number:1,result:{outcome:'blocked',summary:'Missing evidence'}}]};
+          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null});
+          const count = document.querySelector('[data-review-round-count]').textContent;
+          const stop = !!document.querySelector('[data-review-action="stop"]');
+          document.querySelector('[data-review-action="resume"]').click();
+          const action = JSON.parse(api.pendingReviewAction());
+          return [count,stop,action.kind,action.loopID];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["0 of 1", true, "resume", "blocked"])
+    }
+
     func testConcurrentCardsTargetControlsAndExcludeBusyProjects() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

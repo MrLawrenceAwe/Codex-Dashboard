@@ -83,8 +83,8 @@ enum ReviewLoopPhase: String, Codable, Sendable {
 
     var isFinished: Bool {
         switch self {
-        case .completed, .limitReached, .stopped, .blocked: true
-        case .waiting, .running, .paused: false
+        case .completed, .limitReached, .stopped: true
+        case .waiting, .running, .paused, .blocked: false
         }
     }
 }
@@ -96,6 +96,7 @@ struct ReviewRound: Codable, Equatable, Sendable {
     var reviewTurnID: String?
     var fixTurnID: String?
     var fixRequested = false
+    var continuationRequested: Bool? = nil
     var review: ReviewReport?
     var result: ReviewRoundResult?
 }
@@ -155,4 +156,8 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var expectedCommit: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
+
+    var completedRoundCount: Int {
+        rounds.filter { $0.result.map { $0.outcome != .blocked } == true }.count
+    }
 }

@@ -311,6 +311,96 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertNil(clean.progress[clean.loops.last!.id.uuidString]?.upcoming)
     }
 
+    func testBlockedFixResumesAfterChatAnswerWithoutNewChatOrRound() async throws {
+        let (coordinator, store, driver) = try make(limit: 1)
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.blockFix()
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        XCTAssertFalse(try XCTUnwrap(coordinator.loops.last).phase.isFinished)
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertThrowsError(try coordinator.apply(startAction(id: "other", kind: .start,
+            projectID: project.id, promptContext: .general, maxRounds: 1, loopID: nil), projects: [project]))
+
+        driver.userFollowup()
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .running)
+        // Follow-up authorization survives a Dashboard restart.
+        let recovered = ReviewLoopCoordinator(store: store)
+        driver.finish(findings: 1, commit: "fixed-by-codex")
+        try recovered.apply(action(.resume, for: recovered), projects: [project])
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.createdThreads, ["thread-1"])
+        XCTAssertEqual(driver.prompts.count, 2, "Resume never repeats a fix prompt")
+        XCTAssertEqual(recovered.loops.last?.phase, .limitReached)
+        XCTAssertEqual(recovered.loops.last?.completedRoundCount, 1)
+        XCTAssertEqual(recovered.loops.last?.rounds.count, 1)
+        XCTAssertEqual(recovered.loops.last?.rounds.last?.fixTurnID, "followup-3")
+    }
+
+    func testBlockedResumeStillRequiresCleanOriginalBranchAndValidCommit() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.blockFix()
+        await coordinator.advance(using: driver, threads: [])
+        driver.userFollowup()
+        driver.finish(findings: 1, commit: "fixed")
+        driver.clean = false
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        driver.clean = true
+        driver.branch = "other"
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        driver.branch = "main"
+        driver.ancestor = false
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        driver.ancestor = true
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
+        XCTAssertEqual(driver.createdThreads.count, 1)
+        XCTAssertEqual(driver.prompts.count, 2)
+    }
+
+    func testResumeWithoutResolvingBlockedChatDoesNotRepeatWork() async throws {
+        let (coordinator, _, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.blockFix()
+        await coordinator.advance(using: driver, threads: [])
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        XCTAssertEqual(driver.createdThreads.count, 1)
+        XCTAssertEqual(driver.prompts.count, 2)
+        driver.userFollowup()
+        driver.blockFix()
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
+        driver.userFollowup()
+        driver.finish(findings: 1, commit: "fixed")
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
+        XCTAssertEqual(driver.createdThreads.count, 1)
+    }
+
     func testDirtyCheckoutDoesNotLaunchOrCommit() async throws {
         let (coordinator, _, driver) = try make()
         driver.clean = false
@@ -890,6 +980,14 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         if commit != "none" { self.commit = commit }
         let withdrawnList = withdrawn.isEmpty ? "none" : withdrawn.map(String.init).joined(separator: ", ")
         finishTurn("\(commit == "none" ? "# Findings withdrawn" : "# Fixes committed")\nFindings addressed: \(findings)\nFindings withdrawn: \(withdrawnList)\nCommit: `\(commit)`\n\n## Summary\nChanges committed")
+    }
+    func userFollowup() {
+        thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns + [
+            ReviewTurnState(id: "followup-\(thread.turns.count + 1)", status: "inProgress", finalMessage: nil)
+        ])
+    }
+    func blockFix() {
+        finishTurn("# Fixes blocked\nFindings addressed: 0\nFindings withdrawn: none\nCommit: `none`\n\n## Summary\nMissing evidence")
     }
     private func finishTurn(_ report: String) {
         let last = thread.turns.last!

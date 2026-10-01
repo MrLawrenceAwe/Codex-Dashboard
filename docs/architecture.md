@@ -94,7 +94,7 @@ page queues controls and its view module renders snapshots; it does not own exec
 State is atomically persisted to `~/Library/Application Support/Codex Dashboard/review-loop.json`.
 Intent is saved before each task or follow-up launch. Unknown launches are never
 resent automatically. Relaunching Dashboard pauses unfinished loops; Resume
-reconciles known tasks first. Responses from older JSON-format turns are not
+reconciles known tasks first for paused loops. Blocked loops remain active and offer Resume and Stop. Open the review chat and answer its question or resolve its blocker, then Resume. Resume inspects the existing chat, including user follow-up turns, and accepts its latest final report only after the usual finding counts, clean checkout, original branch, and commit ancestry checks. Codex handles edits and commits; users do not need to create evidence files or commits. Follow-ups remain in the same round and do not use extra rounds. Unknown chat launches are never duplicated. A blocker before any round launches retries checkout verification. Responses from older JSON-format turns are not
 converted; start a new loop if an unfinished old turn returns that format. Malformed reports, failed/interrupted turns, approval
 requests, dirty checkouts, or unexpected changes stop progression with an
 explanation. Pause lets the current review/fix round finish. Stop prevents new

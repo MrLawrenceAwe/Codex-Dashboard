@@ -126,12 +126,12 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         let response = try await request("thread/read", ["threadId": threadID, "includeTurns": false])
         guard var thread = response["thread"] as? [String: Any] else { throw ReviewLoopError("Codex returned no review chat.") }
         // Bounded metadata reads avoid hydrating a long tool transcript on every poll.
-        let page = try await request("thread/turns/list", ["threadId": threadID, "limit": 3, "sortDirection": "asc", "itemsView": "notLoaded"])
-        guard var turns = page["data"] as? [[String: Any]], turns.count <= 2,
+        let page = try await request("thread/turns/list", ["threadId": threadID, "limit": 100, "sortDirection": "asc", "itemsView": "notLoaded"])
+        guard var turns = page["data"] as? [[String: Any]], turns.count <= 100,
               page["nextCursor"] == nil || page["nextCursor"] is NSNull else {
-            throw ReviewLoopError("The review chat contains unexpected additional turns.")
+            throw ReviewLoopError("The review chat history exceeds the supported inspection limit.")
         }
-        for index in turns.indices where turns[index]["status"] as? String == "completed" {
+        for index in Set([turns.startIndex, turns.count - 1]).sorted() where turns.indices.contains(index) && turns[index]["status"] as? String == "completed" {
             guard let turnID = turns[index]["id"] as? String else { throw ReviewLoopError("Missing review turn ID.") }
             var cursor: String?
             for _ in 0..<20 {
@@ -155,7 +155,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
 
     static func threadState(_ response: [String: Any]) throws -> ReviewThreadState {
         guard let thread = response["thread"] as? [String: Any], let cwd = thread["cwd"] as? String,
-              let turns = thread["turns"] as? [[String: Any]], turns.count <= 2 else {
+              let turns = thread["turns"] as? [[String: Any]], turns.count <= 100 else {
             throw ReviewLoopError("The review chat changed or its history could not be verified.")
         }
         let threadStatus = thread["status"] as? [String: Any]

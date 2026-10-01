@@ -220,7 +220,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
     const selectedID = historySelect.value;
-    const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(phaseLabel(loop))} · ${loop.rounds.filter(round => round.result).length} of ${loop.maxRounds} rounds</option>`).join('');
+    const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(phaseLabel(loop))} · ${loop.rounds.filter(round => round.result && round.result.outcome !== 'blocked').length} of ${loop.maxRounds} rounds</option>`).join('');
     if (historySelect.dataset.options !== options) {
       historySelect.innerHTML = options;
       historySelect.dataset.options = options;
@@ -260,7 +260,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
-    const completedRounds = loop.rounds.filter(round => round.result).length;
+    const completedRounds = loop.rounds.filter(round => round.result && round.result.outcome !== 'blocked').length;
     root.querySelector('[data-review-round-progress]').hidden = false;
     root.querySelector('[data-review-round-count]').textContent = `${completedRounds} of ${loop.maxRounds}`;
     const meter = root.querySelector('[data-review-meter]');
@@ -268,7 +268,7 @@ const reviewLoopView = (() => {
     meter.value = completedRounds;
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'paused'
+    controls.innerHTML = isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${['paused', 'blocked'].includes(loop.phase)
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;

@@ -48,6 +48,9 @@ enum ReviewLoopPresentation {
     ) -> (ReviewPromptPreview?, String) {
         let noNextPrompt = "No further prompts scheduled."
         if loop.phase.isFinished { return (nil, noNextPrompt) }
+        if loop.phase == .blocked {
+            return (nil, "Open the review chat and provide the missing information or resolve its blocker, then Resume. The loop checks that chat's latest report and commit.")
+        }
         if let round, unfinished, !round.fixRequested {
             return (ReviewPromptPreview(
                 title: "Fix & commit · round \(round.number)",
@@ -57,7 +60,7 @@ enum ReviewLoopPresentation {
                     : "After the checkout passes verification."
             ), noNextPrompt)
         }
-        guard loop.rounds.count < loop.maxRounds else {
+        guard loop.completedRoundCount + (unfinished ? 1 : 0) < loop.maxRounds else {
             return (nil, "Round limit reached. No next review scheduled.")
         }
         let note: String
