@@ -96,4 +96,6 @@ renderer previews, resource organisation, migrations, and visual baselines.
 2. Choose **Sign In to Another Account…**. Codex restarts signed out; complete the normal OpenAI sign-in in Codex.
 3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Chat overview**.
 
+If an account request cannot reach the dashboard within 15 seconds, it expires and the Accounts panel enables retry. Expired requests cannot switch accounts later. The dashboard reconnects after renderer timeouts and rediscovers unavailable windows. Finish or cancel running Codex chats before switching accounts.
+
 Codex still uses one active account at a time. The switcher does not merge accounts, transfer subscriptions or usage, or rotate accounts automatically. Do not commit, export, or manually copy `~/.codex/auth.json`.

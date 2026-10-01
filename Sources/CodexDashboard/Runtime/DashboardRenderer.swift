@@ -274,7 +274,8 @@ final class DashboardRenderer {
             do {
                 guard let serialized = try await devTools.evaluateString(
                     RendererScript.takeNextAccountPopoverAction,
-                    in: target
+                    in: target,
+                    timeout: .seconds(1)
                 ), serialized != RendererScript.accountPopoverUnavailable else { continue }
                 foundAvailableRenderer = true
                 if serialized == "null" { continue }
@@ -286,6 +287,10 @@ final class DashboardRenderer {
                 // A closed or unavailable window must not starve the other windows.
                 continue
             }
+        }
+        if !foundAvailableRenderer {
+            // Rediscover closed/replaced windows on the next poll.
+            lastTargetRefresh = nil
         }
         return foundAvailableRenderer ? .empty : .unavailable
     }

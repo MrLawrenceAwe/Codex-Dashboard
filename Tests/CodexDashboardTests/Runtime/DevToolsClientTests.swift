@@ -148,3 +148,43 @@ final class DevToolsClientTests: XCTestCase {
         XCTAssertEqual(value, .null)
     }
 }
+
+private actor HangingDevToolsConnection: DevToolsConnectionServing {
+    private var cancelled = false
+    func evaluate(_ expression: String) async throws -> DevToolsEvaluationValue {
+        try await Task.sleep(for: .seconds(60))
+        return .string("null")
+    }
+    func cancel() { cancelled = true }
+    func wasCancelled() -> Bool { cancelled }
+}
+
+private final class RecoveringConnectionFactory: @unchecked Sendable {
+    let hanging = HangingDevToolsConnection()
+    let healthy = ReusableDevToolsConnection()
+    private let lock = NSLock()
+    private var count = 0
+    func make(session: URLSession, url: URL) -> any DevToolsConnectionServing {
+        lock.withLock {
+            count += 1
+            return count == 1 ? hanging : healthy
+        }
+    }
+}
+
+extension DevToolsClientTests {
+    func testTimedOutConnectionIsReplacedAndNextRequestSucceeds() async throws {
+        let factory = RecoveringConnectionFactory()
+        let client = DevToolsClient(connectionFactory: factory.make)
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html",
+                                   webSocketURL: "ws://127.0.0.1/main")
+        do {
+            _ = try await client.evaluateString("poll", in: target, timeout: .milliseconds(10))
+            XCTFail("Expected timeout")
+        } catch DashboardError.devToolsTimedOut {}
+        let cancelled = await factory.hanging.wasCancelled()
+        XCTAssertTrue(cancelled)
+        let recovered = try await client.evaluateBoolean("true", in: target)
+        XCTAssertTrue(recovered)
+    }
+}

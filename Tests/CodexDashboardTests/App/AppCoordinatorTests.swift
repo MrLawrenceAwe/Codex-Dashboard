@@ -6,14 +6,14 @@ import XCTest
 final class AppCoordinatorTests: XCTestCase {
     enum AccountTestError: Error { case mountFailed }
 
-    func testUnavailableAccountPopoverUsesSlowRetry() {
+    func testUnavailableAccountPopoverRetriesPromptly() {
         XCTAssertEqual(
             AccountPopoverActionListener.Schedule.unavailableRetry(active: true),
-            .seconds(10)
+            .seconds(1)
         )
         XCTAssertEqual(
             AccountPopoverActionListener.Schedule.unavailableRetry(active: false),
-            .seconds(60)
+            .seconds(10)
         )
     }
 

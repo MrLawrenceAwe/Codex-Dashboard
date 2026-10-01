@@ -4,7 +4,7 @@ import Foundation
 final class AccountPopoverActionListener {
     enum Schedule {
         static func unavailableRetry(active: Bool) -> Duration {
-            active ? .seconds(10) : .seconds(60)
+            active ? .seconds(1) : .seconds(10)
         }
     }
 
