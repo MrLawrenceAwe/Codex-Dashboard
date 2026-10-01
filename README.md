@@ -80,7 +80,7 @@ are labelled in the dropdown. Pasting includes the title, details, image, and mo
 present; it does not send the message.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
-All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed chat when its response finishes, except for review loop chats and chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use
+All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed chat when its response finishes, except for review loop chats and chats started in the ChatGPT Chrome extension; automatic focus changes are suppressed during typing, voice chat, and dictation (including startup and transcription). Suppressed completions are not opened later. This can be disabled from the menu bar. Use
 **Disable dashboard integration** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 

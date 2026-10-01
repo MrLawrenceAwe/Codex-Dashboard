@@ -23,6 +23,7 @@ protocol DashboardRuntime: AnyObject {
     func disableIntegration() async throws -> DashboardDisableOutcome
     func openTaskDashboard() async
     func openThread(_ threadID: String) async
+    func hasActiveSpeechInput() async -> Bool
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
     func useStoredPromptLibraryOnNextSync()
@@ -96,6 +97,10 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
 
     func openTaskDashboard() async {
         await renderer.open()
+    }
+
+    func hasActiveSpeechInput() async -> Bool {
+        await renderer.hasActiveSpeechInput()
     }
 
     func openThread(_ threadID: String) async {

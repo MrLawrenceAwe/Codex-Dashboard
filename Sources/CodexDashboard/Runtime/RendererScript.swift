@@ -9,6 +9,29 @@ enum RendererScript {
     (() => { window.__codexDashboard?.open?.(); return true; })()
     """
 
+    // Current Codex renderer contracts: dictation footer and realtime orb, plus
+    // speech controller props for startup/transcription before those views mount.
+    // Inspect props rather than translated button labels.
+    static let hasActiveSpeechInput = """
+    (() => {
+      if (document.querySelector('[data-dictation-view], [data-realtime-voice-orb]')) return true;
+      const visited = new Set();
+      for (const element of document.querySelectorAll('button, [data-composer-body]')) {
+        const key = Object.keys(element).find(key => key.startsWith('__reactFiber$'));
+        for (let fiber = key && element[key]; fiber && !visited.has(fiber); fiber = fiber.return) {
+          visited.add(fiber);
+          const props = fiber.memoizedProps;
+          if (!props || typeof props !== 'object') continue;
+          if (props.isDictating === true || props.isDictationStarting === true || props.isTranscribing === true) return true;
+          if (typeof props.startDictation === 'function' && (props.isStarting === true || props.isPreparing === true)) return true;
+          const phase = props.realtimeSession?.thread?.phase;
+          if (typeof phase === 'string' && phase !== 'inactive') return true;
+        }
+      }
+      return false;
+    })()
+    """
+
     static func openThread(_ threadID: String) -> String? {
         guard
             let data = try? JSONSerialization.data(withJSONObject: threadID, options: .fragmentsAllowed),

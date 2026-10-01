@@ -335,6 +335,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     private(set) var accountPopoverSynchronizationCount = 0
     private(set) var lastAccountPopoverSnapshot: AccountPopoverSnapshot?
     private(set) var openedThreadIDs: [String] = []
+    var speechInputIsActive = false
 
     init(
         codexIsRunning: Bool = false,
@@ -385,6 +386,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     func disableIntegration() async throws -> DashboardDisableOutcome { .rendererUnavailable }
     func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
+    func hasActiveSpeechInput() async -> Bool { speechInputIsActive }
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
         accountPopoverActionWaitResult
     }

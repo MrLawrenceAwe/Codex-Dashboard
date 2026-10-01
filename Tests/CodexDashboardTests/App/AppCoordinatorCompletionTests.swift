@@ -173,6 +173,32 @@ extension AppCoordinatorTests {
         XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
     }
 
+    func testCompletionDuringSpeechDoesNotActivateOrOpenLater() async {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-3))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-2))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(threads: [.fixture(id: "speaking", runState: .running, latestLifecycleEvent: started)], totalThreadCount: 1),
+            ThreadCatalog(threads: [.fixture(id: "speaking", latestLifecycleEvent: completed)], totalThreadCount: 1),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime(codexIsRunning: true)
+        runtime.speechInputIsActive = true
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            runtimeFactory: { _ in runtime }
+        )
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+        runtime.speechInputIsActive = false
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+    }
+
     func testNewestSimultaneousCompletionIsOpened() async {
         let startedAt = Date().addingTimeInterval(-3)
         let olderCompletion = ThreadLifecycleEvent(kind: .completed, timestamp: startedAt.addingTimeInterval(1))

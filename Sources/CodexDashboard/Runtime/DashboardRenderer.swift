@@ -247,6 +247,20 @@ final class DashboardRenderer {
         }
     }
 
+    func hasActiveSpeechInput() async -> Bool {
+        for target in await targets(forceRefresh: true) {
+            // If a renderer cannot be inspected, avoid automatic focus changes.
+            do {
+                if try await devTools.evaluateBoolean(RendererScript.hasActiveSpeechInput, in: target) {
+                    return true
+                }
+            } catch {
+                return true
+            }
+        }
+        return false
+    }
+
     func openThread(_ threadID: String) async {
         guard let expression = RendererScript.openThread(threadID) else { return }
         for target in await targets(forceRefresh: true) {

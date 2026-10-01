@@ -127,6 +127,9 @@ extension AppCoordinator {
             if foregroundOnTaskCompletion,
                completedThread?.originatesFromChromeExtension != true,
                !keyboardActivityDetector.hasRecentKeyboardActivity {
+                guard await dashboardRuntime?.hasActiveSpeechInput() != true,
+                      !Task.isCancelled,
+                      !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)
             }
