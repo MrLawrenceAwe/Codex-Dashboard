@@ -7,9 +7,9 @@ enum ReviewPrompts {
         case .bugs:
             return "Review project for bugs and issues\(context)."
         case .organisation:
-            return "Do a code minimisation and organisation review\(context)."
+            return "Do a code and content minimisation and organisation review\(context). Remove duplication and unnecessary complexity while preserving clarity and useful information."
         case .naming:
-            return "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
+            return "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context). Remove duplication and unnecessary complexity while preserving clarity and useful information."
         case .performance:
             return "Review project for performance and responsiveness\(context)."
         case .content:
