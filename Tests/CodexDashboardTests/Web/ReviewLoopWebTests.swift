@@ -527,6 +527,33 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [3, 3, "Broken <link>|Stale confirmation|Unranked issue", "P1|P2|", "Fails on the first click.", true, false, true])
     }
 
+    func testFindingsStartVisibleAndPreservePerRoundVisibilityDuringRefresh() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]},result:{outcome:'fixed',summary:'Fixed'}});
+          const loop = {id:'loop',project,phase:'running',maxRounds:3,rounds:[round(1),round(2)]};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
+          api.applyReviewLoop(snapshot); api.openReviews();
+          const findings = () => [...document.querySelectorAll('.review-findings-details')];
+          const visible = details => details.querySelector('ul').getBoundingClientRect().height > 0;
+          const initial = findings().every(details => details.open && visible(details));
+          findings()[0].querySelector('summary').click();
+          document.querySelector('.review-round-details').open = true;
+          loop.rounds.push(round(3));
+          api.applyReviewLoop(snapshot);
+          const refreshed = [findings()[0].open,visible(findings()[0]),findings()[1].open,findings()[2].open,
+            document.querySelector('.review-round-details').open];
+          findings()[0].querySelector('summary').click();
+          api.applyReviewLoop(snapshot);
+          return [initial,...refreshed,findings()[0].open,visible(findings()[0])];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, false, false, true, true, true, true, true])
+    }
+
     func testFindingFileLinksOpenThroughReviewActionAndUnsafeSchemesStayText() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
