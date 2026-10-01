@@ -256,7 +256,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(coordinator.accounts.activeUsageStatus, .unavailable)
     }
 
-    func testRestoresCachedUsageForActiveAccountAfterRelaunch() throws {
+    func testRestoresCachedUsageForActiveAccountAfterRelaunch() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorUsageRestoreTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -292,6 +292,7 @@ extension AppCoordinatorTests {
             runtimeFactory: { _ in StubDashboardRuntime(codexIsRunning: false) }
         )
 
+        await coordinator.refreshAccountState()
         XCTAssertEqual(coordinator.accounts.usageByAccountID[account.id], snapshot)
         XCTAssertEqual(coordinator.accounts.activeUsageStatus, .stale(snapshot))
     }

@@ -144,7 +144,10 @@ final class AppCoordinator: ObservableObject {
         accountPopoverActionListener.start { [weak self] in
             await self?.handleAccountPopoverAction() ?? .unavailable
         }
-        Task { await updateAccountUsageNotifications() }
+        Task {
+            await refreshAccountState()
+            await updateAccountUsageNotifications()
+        }
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,

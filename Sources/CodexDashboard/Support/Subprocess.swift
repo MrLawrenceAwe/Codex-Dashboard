@@ -22,6 +22,10 @@ struct SubprocessOutput: Sendable {
 }
 
 enum Subprocess {
+    private enum Event: Sendable {
+        case exited(Int32), output(Data), error(Data)
+    }
+
     static func run(
         executableURL: URL,
         arguments: [String],
@@ -37,48 +41,105 @@ enum Subprocess {
         process.standardError = errorPipe
         let runningProcess = RunningSubprocess(process: process)
         try runningProcess.start()
+        defer { runningProcess.terminate() }
         try outputPipe.fileHandleForWriting.close()
         try errorPipe.fileHandleForWriting.close()
-        let outputTask = Task.detached {
-            try outputPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let errorTask = Task.detached {
-            try errorPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let terminationStatus: Int32
-        do {
-            terminationStatus = try await withThrowingTaskGroup(
-                of: Int32.self,
-                returning: Int32.self
-            ) { group in
-                group.addTask { await runningProcess.waitForExit() }
-                group.addTask {
-                    try await Task.sleep(for: .seconds(timeout))
-                    throw SubprocessError.timedOut(executableURL)
-                }
-                defer {
-                    group.cancelAll()
-                    if process.isRunning { runningProcess.terminate() }
-                }
-                guard let status = try await group.next() else {
-                    throw SubprocessError.missingTerminationStatus(executableURL)
-                }
-                return status
+        let outputReader = try SubprocessPipeReader(handle: outputPipe.fileHandleForReading)
+        let errorReader = try SubprocessPipeReader(handle: errorPipe.fileHandleForReading)
+        return try await withThrowingTaskGroup(of: Event.self) { group in
+            group.addTask { .exited(await runningProcess.waitForExit()) }
+            group.addTask { .output(try await outputReader.read()) }
+            group.addTask { .error(try await errorReader.read()) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(timeout))
+                throw SubprocessError.timedOut(executableURL)
             }
-        } catch {
-            runningProcess.terminate()
-            _ = try? await outputTask.value
-            _ = try? await errorTask.value
-            throw error
+            defer {
+                group.cancelAll()
+                runningProcess.terminate()
+                outputReader.cancel()
+                errorReader.cancel()
+            }
+            var status: Int32?
+            var output: Data?
+            var error: Data?
+            for try await event in group {
+                switch event {
+                case .exited(let value): status = value
+                case .output(let value): output = value
+                case .error(let value): error = value
+                }
+                if let status, let output, let error {
+                    return SubprocessOutput(standardOutput: output, standardError: error,
+                                            terminationStatus: status)
+                }
+            }
+            throw SubprocessError.missingTerminationStatus(executableURL)
         }
+    }
+}
 
-        let standardOutput = try await outputTask.value
-        let standardError = try await errorTask.value
-        return SubprocessOutput(
-            standardOutput: standardOutput,
-            standardError: standardError,
-            terminationStatus: terminationStatus
-        )
+/// Nonblocking reads let cancellation close a pipe even when a descendant retains
+/// its write end. All reader state and descriptor access belong to this queue.
+private final class SubprocessPipeReader: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "codex-dashboard.subprocess-pipe")
+    private let source: any DispatchSourceRead
+    private let descriptor: Int32
+    private var data = Data()
+    private var result: Result<Data, any Error>?
+    private var continuation: CheckedContinuation<Data, any Error>?
+
+    init(handle: FileHandle) throws {
+        descriptor = handle.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: queue)
+        source.setEventHandler { [weak self] in self?.drain() }
+        source.setCancelHandler { try? handle.close() }
+        source.resume()
+    }
+
+    deinit { source.cancel() }
+
+    func read() async throws -> Data {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    if let result = self.result { continuation.resume(with: result) }
+                    else { self.continuation = continuation }
+                }
+            }
+        } onCancel: { self.cancel() }
+    }
+
+    func cancel() {
+        queue.async { self.finish(.failure(CancellationError())) }
+    }
+
+    private func drain() {
+        guard result == nil else { return }
+        var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+        // Yield periodically so a continuously writing process cannot starve cancellation.
+        for _ in 0..<16 {
+            let count = Darwin.read(descriptor, &buffer, buffer.count)
+            if count > 0 { data.append(contentsOf: buffer.prefix(count)) }
+            else if count == 0 { finish(.success(data)); return }
+            else if errno == EAGAIN { return }
+            else if errno != EINTR {
+                finish(.failure(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)))
+                return
+            }
+        }
+    }
+
+    private func finish(_ result: Result<Data, any Error>) {
+        guard self.result == nil else { return }
+        self.result = result
+        source.cancel()
+        continuation?.resume(with: result)
+        continuation = nil
     }
 }
 

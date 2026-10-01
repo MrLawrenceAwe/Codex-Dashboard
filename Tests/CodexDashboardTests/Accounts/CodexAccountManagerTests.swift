@@ -70,6 +70,34 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
 }
 
 final class CodexAccountManagerTests: XCTestCase {
+    func testUnidentifiedActiveCredentialDoesNotOverwriteSavedLogin() throws {
+        let original = credential(accountID: "saved-account")
+        try original.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        let unidentified = Data(#"{"OPENAI_API_KEY":"synthetic-key"}"#.utf8)
+        try unidentified.write(to: authenticationURL)
+
+        XCTAssertNil(try manager.loadDocument().activeAccountID)
+        _ = try manager.beginAddingAccount()
+        XCTAssertEqual(vault.credential(for: account.id), original)
+    }
+
+    func testSwitchFromUnidentifiedCredentialPreservesSavedLoginAndRollback() throws {
+        let original = credential(accountID: "saved-account")
+        try original.write(to: authenticationURL)
+        let account = try manager.saveCurrentAccount()
+        let unidentified = Data(#"{"OPENAI_API_KEY":"synthetic-key"}"#.utf8)
+        try unidentified.write(to: authenticationURL)
+
+        let transition = try manager.activate(accountID: account.id)
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), original)
+        XCTAssertEqual(vault.credential(for: account.id), original)
+        try manager.rollback(transition)
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), unidentified)
+        XCTAssertNil(try manager.loadDocument().activeAccountID)
+        XCTAssertEqual(vault.credential(for: account.id), original)
+    }
+
     func testSavedAccountRetainsStoredIdentityKey() throws {
         let account = SavedAccount(id: UUID(), name: "Personal", createdAt: .now,
                                    lastUsedAt: .now, codexAccountID: "codex-123")
