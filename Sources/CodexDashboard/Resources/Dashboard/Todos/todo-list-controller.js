@@ -2,9 +2,6 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   let items = todoStore.load();
   let availableTags = todoStore.loadTags(items);
   let projects = [];
-  let selectedProject = null;
-  let projectThreads = [];
-  let selectedThread = null;
   let projectObserver;
   let observedProjectSidebar;
   let filterMode = 'open';
@@ -42,6 +39,14 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     })), nextTags),
   });
 
+  const createForm = createTodoCreateForm({
+    imageController,
+    tagController,
+    threadReferencesForProject,
+    isDestroyed: () => destroyed,
+    onSubmit: addTodo,
+  });
+
   const sidebarActions = createSidebarThreadTodoActions({
     findThread,
     getItems: () => items,
@@ -51,17 +56,8 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   function refreshProjects() {
     if (destroyed) return;
     projects = codexUIContracts.projects();
-    selectedProject = projects.find((project) => project.id === selectedProject?.id) || null;
-    todoListView.updateProjectOptions(projects, selectedProject?.id || '');
-    refreshThreadOptions();
+    createForm.updateProjects(projects);
     updateFilterOptions();
-  }
-
-  function refreshThreadOptions() {
-    if (destroyed) return;
-    projectThreads = selectedProject ? threadReferencesForProject(selectedProject) : [];
-    if (!projectThreads.some((thread) => thread.id === selectedThread?.id)) selectedThread = null;
-    todoListView.updateThreadOptions(projectThreads, Boolean(selectedProject), selectedThread?.id || '');
   }
 
   function startProjectObserver() {
@@ -257,98 +253,6 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     return true;
   }
 
-  function readTodoDraft(page) {
-    return {
-      title: page.querySelector('[data-todo-new-title]').value,
-      body: page.querySelector('[data-todo-new-body]').value,
-      imageDraft: imageController.draft(),
-      tags: tagController.draft(),
-      project: selectedProject,
-      thread: selectedThread,
-      preset: draftPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]')),
-    };
-  }
-
-  function draftStillMatches(page, submitted) {
-    const current = readTodoDraft(page);
-    return current.title === submitted.title && current.body === submitted.body
-      && current.imageDraft === submitted.imageDraft && current.tags === submitted.tags
-      && current.project?.id === submitted.project?.id
-      && current.thread?.id === submitted.thread?.id
-      && JSON.stringify(current.preset) === JSON.stringify(submitted.preset);
-  }
-
-  function bindAddForm(page) {
-    let addPending = false;
-    page.querySelector('[data-todo-form]').addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (addPending) return;
-      const imageDraft = imageController.draft();
-      if (imageDraft.status === 'invalid') {
-        imageController.reset();
-        return;
-      }
-      if (imageDraft.status === 'loading') {
-        imageDraft.submitWhenReady = true;
-        const imageStatus = page.querySelector('[data-todo-new-image-status]');
-        imageStatus.textContent = 'Preparing image…';
-        imageStatus.hidden = false;
-        return;
-      }
-      imageController.setError();
-      const title = page.querySelector('[data-todo-new-title]');
-      const body = page.querySelector('[data-todo-new-body]');
-      const submit = page.querySelector('[data-todo-form] button[type="submit"]');
-      const submitted = readTodoDraft(page);
-      addPending = true;
-      submit.disabled = true;
-      const finish = (saved) => {
-        addPending = false;
-        if (destroyed) return;
-        submit.disabled = false;
-        if (!saved || !draftStillMatches(page, submitted)) return;
-        title.value = '';
-        body.value = '';
-        imageController.reset();
-        tagController.reset();
-        selectedProject = null;
-        selectedThread = null;
-        page.querySelector('[data-todo-new-preset-enabled]').checked = false;
-        page.querySelector('[data-todo-new-preset-fields]').hidden = true;
-        todoListView.updateProjectOptions(projects);
-        refreshThreadOptions();
-        title.focus();
-      };
-      const saved = addTodo({ ...submitted, image: imageDraft.image });
-      void saved.then(finish, () => finish(false));
-    });
-  }
-
-  function draftPreset(toggle, fields) {
-    if (!toggle.checked) return null;
-    return composerPresets.normalize({
-      model: fields.querySelector('[data-todo-new-preset-model], [data-todo-item-preset-model]').value,
-      reasoningEffort: fields.querySelector('[data-todo-new-preset-effort], [data-todo-item-preset-effort]').value,
-      speed: fields.querySelector('[data-todo-new-preset-speed], [data-todo-item-preset-speed]').value,
-    }) || null;
-  }
-
-  function bindDraftAssignments(page) {
-    page.querySelector('[data-todo-new-preset-enabled]').addEventListener('change', (event) => {
-      page.querySelector('[data-todo-new-preset-fields]').hidden = !event.target.checked;
-    });
-    const projectInput = page.querySelector('[data-todo-new-project]');
-    projectInput.addEventListener('change', () => {
-      selectedProject = projects.find((project) => project.id === projectInput.value) || null;
-      selectedThread = null;
-      refreshThreadOptions();
-    });
-    page.querySelector('[data-todo-new-thread-picker]').addEventListener('change', (event) => {
-      selectedThread = projectThreads.find((thread) => thread.id === event.target.value) || null;
-    });
-    tagController.bindDraft(page);
-  }
-
   function bindFilters(page) {
     page.querySelectorAll('[data-todo-filter]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -379,9 +283,8 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
-    bindAddForm(page);
+    createForm.bind(page);
     imageController.bind(page);
-    bindDraftAssignments(page);
     tagController.bindManagement(page);
     bindFilters(page);
     page.addEventListener('focusout', () => {
@@ -395,7 +298,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
       updateItem,
       commitItems,
       composerActions,
-      draftPreset,
+      readPreset: todoListView.readPreset,
       render,
       setExpandedPresetTodoID: (id) => { expandedPresetTodoID = id; },
     });
@@ -446,7 +349,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     mountPage,
     open,
     applyVisibility: pageState.applyVisibility,
-    refreshThreadOptions,
+    refreshThreadOptions: createForm.refreshThreadOptions,
     refreshSidebarActions: sidebarActions.refresh,
   };
 }

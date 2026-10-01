@@ -401,5 +401,14 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
+  function readPreset(toggle, fields) {
+    if (!toggle.checked) return null;
+    return composerPresets.normalize({
+      model: fields.querySelector('[data-todo-new-preset-model], [data-todo-item-preset-model]').value,
+      reasoningEffort: fields.querySelector('[data-todo-new-preset-effort], [data-todo-item-preset-effort]').value,
+      speed: fields.querySelector('[data-todo-new-preset-speed], [data-todo-item-preset-speed]').value,
+    }) || null;
+  }
+
+  return { readPreset, createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
 })();

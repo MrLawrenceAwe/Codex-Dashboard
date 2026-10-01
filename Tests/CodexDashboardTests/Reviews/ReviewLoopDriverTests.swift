@@ -170,7 +170,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testFixPromptDoesNotAskForTesting() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
-        let prompt = ReviewLoopPresentation.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
+        let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
         XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
@@ -186,7 +186,7 @@ final class ReviewLoopDriverTests: XCTestCase {
                 round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
                     ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
                 }, summary: "Findings")
-                XCTAssertEqual(ReviewLoopPresentation.fixPrompt(for: loop, round: round), expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+                XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round), expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
             }
         }
     }

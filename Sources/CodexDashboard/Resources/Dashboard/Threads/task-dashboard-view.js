@@ -124,7 +124,7 @@ const taskDashboardView = (() => {
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const { visibleThreads, displayedThreads, leadingRunningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
+    const { matchingThreads, displayedThreads, leadingRunningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
@@ -136,7 +136,7 @@ const taskDashboardView = (() => {
     const list = page.querySelector('[data-thread-list]');
     list.classList.toggle('is-compact', filterMode === 'all');
     list.classList.toggle('has-sections', filterMode === 'all' && state.runningCount > 0);
-    if (!visibleThreads.length) {
+    if (!matchingThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
         : 'No tasks found';

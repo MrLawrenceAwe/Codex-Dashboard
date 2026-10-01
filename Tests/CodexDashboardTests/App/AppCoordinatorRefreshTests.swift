@@ -5,6 +5,23 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testDisableWithoutRendererPreservesCodexProcessState() async {
+        for isRunning in [false, true] {
+            let runtime = StubDashboardRuntime(codexIsRunning: isRunning)
+            let coordinator = makeAppCoordinator(
+                observeFileChanges: false,
+                runtimeFactory: { _ in runtime }
+            )
+            coordinator.connectionState = .dashboardMounted
+
+            await coordinator.disableIntegration()
+
+            XCTAssertEqual(coordinator.connectionState,
+                           isRunning ? .codexRunningWithoutRenderer : .codexClosed)
+            XCTAssertNil(coordinator.connectionError)
+        }
+    }
+
     func testLiveCoordinatorSynchronizationWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to synchronize with the live Codex renderer.")

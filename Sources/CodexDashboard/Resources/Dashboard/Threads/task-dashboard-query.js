@@ -24,36 +24,36 @@ const taskDashboardQuery = (() => {
     isThreadUnread,
     visibleItemLimit,
   }) {
-    const visibleThreads = threads.filter((thread) =>
+    const matchingThreads = threads.filter((thread) =>
       filterMode === 'all'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectPath).trim())));
     if (filterMode === 'changedProjects') {
-      const projectPaths = [...new Set(visibleThreads.map((thread) => String(thread.projectPath).trim()))];
+      const projectPaths = [...new Set(matchingThreads.map((thread) => String(thread.projectPath).trim()))];
       const displayedProjectPaths = new Set(projectPaths.slice(0, visibleItemLimit));
       return {
-        visibleThreads,
-        displayedThreads: visibleThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectPath).trim())),
+        matchingThreads,
+        displayedThreads: matchingThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectPath).trim())),
         leadingRunningThreadCount: 0,
         hasMore: visibleItemLimit < projectPaths.length,
       };
     }
     if (filterMode === 'all') {
-      const runningThreads = visibleThreads.filter((thread) => thread.runState === 'running');
-      const recentThreads = visibleThreads.filter((thread) => thread.runState !== 'running');
+      const runningThreads = matchingThreads.filter((thread) => thread.runState === 'running');
+      const recentThreads = matchingThreads.filter((thread) => thread.runState !== 'running');
       return {
-        visibleThreads,
+        matchingThreads,
         displayedThreads: [...runningThreads, ...recentThreads.slice(0, visibleItemLimit)],
         leadingRunningThreadCount: runningThreads.length,
         hasMore: visibleItemLimit < recentThreads.length,
       };
     }
     return {
-      visibleThreads,
-      displayedThreads: visibleThreads.slice(0, visibleItemLimit),
+      matchingThreads,
+      displayedThreads: matchingThreads.slice(0, visibleItemLimit),
       leadingRunningThreadCount: 0,
-      hasMore: visibleItemLimit < visibleThreads.length,
+      hasMore: visibleItemLimit < matchingThreads.length,
     };
   }
 

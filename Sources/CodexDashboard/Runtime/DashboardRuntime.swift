@@ -1,8 +1,8 @@
 import Foundation
 
-enum DashboardDisableOutcome {
-    case codexClosed
-    case rendererAvailable
+enum DashboardDisableOutcome: Equatable {
+    case disabled
+    case rendererUnavailable
 }
 
 @MainActor
@@ -91,7 +91,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     }
 
     func disableIntegration() async throws -> DashboardDisableOutcome {
-        try await renderer.disable() ? .rendererAvailable : .codexClosed
+        try await renderer.disable()
     }
 
     func openTaskDashboard() async {

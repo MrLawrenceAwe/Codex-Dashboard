@@ -72,7 +72,7 @@ extension DashboardRendererTests {
 
         try await synchronization.value
         let disabled = try await disable.value
-        XCTAssertTrue(disabled)
+        XCTAssertEqual(disabled, .disabled)
         let expressions = await devTools.expressions()
         XCTAssertEqual(expressions.first, "mount")
         XCTAssertTrue(expressions.last?.contains("destroy") == true)

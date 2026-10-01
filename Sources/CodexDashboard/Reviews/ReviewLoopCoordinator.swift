@@ -34,7 +34,7 @@ final class ReviewLoopCoordinator {
                 }
             }
             for loop in loops where !loop.phase.isFinished {
-                if let root = loop.checkoutRoot { checkoutOwners[Self.path(root)] = loop.id }
+                if let root = loop.checkoutRoot { checkoutOwners[Self.canonicalPath(root)] = loop.id }
             }
             try store.save(loops)
         } catch {
@@ -56,7 +56,7 @@ final class ReviewLoopCoordinator {
                   let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
                 throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
             }
-            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.path($0.project.path) == Self.path(project.path)) }) else {
+            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let focus = action.focus ?? .bugs
@@ -162,7 +162,7 @@ final class ReviewLoopCoordinator {
         let repo = try await inspect { try await driver.repository(at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
         updated = current
-        let root = Self.path(repo.root)
+        let root = Self.canonicalPath(repo.root)
         if let owner = checkoutOwners[root], owner != id,
            let other = matchingLoop(owner), !other.phase.isFinished {
             throw ReviewLoopError("This Git checkout already has an active review loop for \(other.project.name). Stop that loop before starting another.")
@@ -200,7 +200,7 @@ final class ReviewLoopCoordinator {
         }
         let turnID = try await driver.startTurn(threadID: threadID, projectPath: updated.project.path,
                                                expectedRepository: repo,
-                                               prompt: ReviewLoopPresentation.reviewPrompt(for: updated),
+                                               prompt: ReviewPrompts.reviewPrompt(for: updated),
                                                kind: .review(updated.priorityLimit), selection: updated.reviewSelection,
                                                speed: updated.speed)
         guard let current = matchingLoop(updated.id) else { return }
@@ -221,59 +221,91 @@ final class ReviewLoopCoordinator {
         updated = current
         guard let currentRound = updated.rounds.last else { return }
         round = currentRound
-        guard Self.path(thread.cwd) == Self.path(updated.project.path) else { throw ReviewLoopError("The review task moved to a different checkout.") }
+        guard Self.canonicalPath(thread.cwd) == Self.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review task moved to a different checkout.") }
         guard let reviewTurn = thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
               thread.turns.count <= (round.fixRequested ? 2 : 1) else {
             throw ReviewLoopError("The review task has an unexpected turn. Inspect it before starting a new loop.")
         }
         if round.review == nil {
-            if reviewTurn.status == "inProgress" { return }
-            try requireCompleted(reviewTurn)
-            let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
-            guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
-            let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
-            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
-            updated = current
-            guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
-            let findings = report.findings(upTo: updated.priorityLimit)
-            if !findings.isEmpty, findings.count != report.findings.count {
-                throw ReviewLoopError("The review included findings outside the selected priority limit. Inspect its report before asking to address all.")
-            }
-            round.reviewTurnID = reviewTurn.id
-            round.review = report
-            if findings.isEmpty {
-                round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
-                                                 commit: repo.commit, summary: report.summary)
-                updated.phase = .completed
-                updated.message = "Review \(round.number) found no \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. No fix prompt was sent."
-            } else {
-                updated.message = "Review \(round.number) found \(findings.count) \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. Preparing the fix prompt."
-            }
-            updated.rounds[updated.rounds.count - 1] = round
-            try persist(updated)
-            return
+            try await acceptReviewReport(reviewTurn, loop: updated, round: round,
+                                         using: driver, threads: threads, threadID: threadID)
+        } else if !round.fixRequested {
+            try await submitFixTurn(loop: updated, round: round,
+                                    using: driver, threads: threads, threadID: threadID)
+        } else {
+            try await completeRound(thread: thread, loop: updated, round: round,
+                                    using: driver, threads: threads, threadID: threadID)
         }
-        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else { throw ReviewLoopError("The review has no findings to fix.") }
-        if !round.fixRequested {
-            let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
-            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
-            updated = current
-            guard repo.commit == round.baseCommit else { throw ReviewLoopError("HEAD changed after the review. Start a new review of the current commit.") }
-            round.fixRequested = true
-            updated.rounds[updated.rounds.count - 1] = round
-            updated.message = "Addressing the \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings in review \(round.number), then committing."
-            try persist(updated)
-            let id = try await driver.startTurn(threadID: threadID, projectPath: updated.project.path,
-                                                expectedRepository: repo,
-                                                prompt: ReviewLoopPresentation.fixPrompt(for: updated, round: round),
-                                                kind: .fix, selection: updated.fixSelection, speed: updated.speed)
-            guard let current = matchingLoop(updated.id) else { return }
-            updated = current
-            updated.rounds[updated.rounds.count - 1].fixTurnID = id
-            try persist(updated)
-            try await stopRunningTask(for: updated.id, using: driver)
-            return
+    }
+
+    private func acceptReviewReport(
+        _ reviewTurn: ReviewTurnState, loop: ReviewLoop, round: ReviewRound,
+        using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
+    ) async throws {
+        var updated = loop
+        var round = round
+        if reviewTurn.status == "inProgress" { return }
+        try requireCompleted(reviewTurn)
+        let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
+        guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
+        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
+        guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
+        let findings = report.findings(upTo: updated.priorityLimit)
+        if !findings.isEmpty, findings.count != report.findings.count {
+            throw ReviewLoopError("The review included findings outside the selected priority limit. Inspect its report before asking to address all.")
+        }
+        round.reviewTurnID = reviewTurn.id
+        round.review = report
+        if findings.isEmpty {
+            round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
+                                             commit: repo.commit, summary: report.summary)
+            updated.phase = .completed
+            updated.message = "Review \(round.number) found no \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. No fix prompt was sent."
+        } else {
+            updated.message = "Review \(round.number) found \(findings.count) \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. Preparing the fix prompt."
+        }
+        updated.rounds[updated.rounds.count - 1] = round
+        try persist(updated)
+    }
+
+    private func submitFixTurn(
+        loop: ReviewLoop, round: ReviewRound,
+        using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
+    ) async throws {
+        var updated = loop
+        var round = round
+        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
+            throw ReviewLoopError("The review has no findings to fix.")
+        }
+        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+        guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+        updated = current
+        guard repo.commit == round.baseCommit else { throw ReviewLoopError("HEAD changed after the review. Start a new review of the current commit.") }
+        round.fixRequested = true
+        updated.rounds[updated.rounds.count - 1] = round
+        updated.message = "Addressing the \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings in review \(round.number), then committing."
+        try persist(updated)
+        let id = try await driver.startTurn(threadID: threadID, projectPath: updated.project.path,
+                                            expectedRepository: repo,
+                                            prompt: ReviewPrompts.fixPrompt(for: updated, round: round),
+                                            kind: .fix, selection: updated.fixSelection, speed: updated.speed)
+        guard let current = matchingLoop(updated.id) else { return }
+        updated = current
+        updated.rounds[updated.rounds.count - 1].fixTurnID = id
+        try persist(updated)
+        try await stopRunningTask(for: updated.id, using: driver)
+    }
+
+    private func completeRound(
+        thread: ReviewThreadState, loop: ReviewLoop, round: ReviewRound,
+        using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
+    ) async throws {
+        var updated = loop
+        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
+            throw ReviewLoopError("The review has no findings to fix.")
         }
         guard thread.turns.count == 2, let fixTurn = thread.turns.last,
               round.fixTurnID == nil || round.fixTurnID == fixTurn.id else {
@@ -382,13 +414,13 @@ final class ReviewLoopCoordinator {
 
     private func hasOtherRunningTask(_ threads: [RendererThread], root: String, excluding: String?) -> Bool {
         threads.contains { thread in
-            let cwd = Self.path(thread.projectPath)
-            let root = Self.path(root)
+            let cwd = Self.canonicalPath(thread.projectPath)
+            let root = Self.canonicalPath(root)
             return thread.id != excluding && thread.runState == .running && (cwd == root || cwd.hasPrefix(root + "/"))
         }
     }
 
-    private static func path(_ path: String) -> String {
+    private static func canonicalPath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 

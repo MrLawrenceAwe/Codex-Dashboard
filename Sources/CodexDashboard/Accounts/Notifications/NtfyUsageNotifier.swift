@@ -35,7 +35,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
     static let enabledKey = "ntfyResetNotificationsEnabled"
     static let topicKey = "ntfyResetNotificationTopic"
 
-    private let updateContext: UsageNotificationUpdateContext
+    private let updateContext: UsageNotificationUpdateCoordinator
     private var history: UsageNotificationHistory { updateContext.history }
     private let userDefaults: UserDefaults
     private let publisher: any NtfyPublishing
@@ -56,7 +56,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             .seconds(min(30 * 60, 60 * (1 << min(attempt - 1, 5))))
         }
     ) {
-        updateContext = UsageNotificationUpdateContext(userDefaults: userDefaults, channel: .phone)
+        updateContext = UsageNotificationUpdateCoordinator(userDefaults: userDefaults, channel: .phone)
         self.userDefaults = userDefaults
         self.publisher = publisher
         self.now = now

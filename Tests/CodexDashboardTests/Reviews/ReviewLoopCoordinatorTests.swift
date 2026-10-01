@@ -84,7 +84,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let coordinator = ReviewLoopCoordinator(store: store)
         try coordinator.apply(action, projects: [project])
         XCTAssertEqual(coordinator.loops.first?.promptContext, .personal)
-        XCTAssertEqual(ReviewLoopPresentation.reviewPrompt(for: try XCTUnwrap(coordinator.loops.first)),
+        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: try XCTUnwrap(coordinator.loops.first)),
                        "Review project for bugs and issues (this is a project for personal use).")
     }
 
@@ -696,7 +696,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
                               promptContext: .personal, maxRounds: 3)
         loop.focus = .performance
-        XCTAssertEqual(ReviewLoopPresentation.reviewPrompt(for: loop),
+        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
                        "Review project for performance and responsiveness (this is a project for personal use).")
     }
 
@@ -709,12 +709,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             action.focus = focus
             try coordinator.apply(action, projects: [project])
             XCTAssertEqual(store.loops.first?.promptContext, .general)
-            XCTAssertFalse(ReviewLoopPresentation.reviewPrompt(for: store.loops[0]).contains("personal use"))
+            XCTAssertFalse(ReviewPrompts.reviewPrompt(for: store.loops[0]).contains("personal use"))
 
             let savedLoop = ReviewLoop(id: store.loops[0].id, startActionID: action.id,
                                        project: project, promptContext: .personal,
                                        maxRounds: 3, focus: focus)
-            XCTAssertFalse(ReviewLoopPresentation.reviewPrompt(for: savedLoop).contains("personal use"))
+            XCTAssertFalse(ReviewPrompts.reviewPrompt(for: savedLoop).contains("personal use"))
         }
     }
 

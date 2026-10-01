@@ -250,9 +250,9 @@ final class AppCoordinator: ObservableObject {
 
         do {
             switch try await dashboardRuntime.disableIntegration() {
-            case .codexClosed:
-                connectionState = .codexClosed
-            case .rendererAvailable:
+            case .rendererUnavailable:
+                connectionState = dashboardRuntime.codexIsRunning ? .codexRunningWithoutRenderer : .codexClosed
+            case .disabled:
                 connectionState = .rendererAvailable
             }
             connectionError = nil
