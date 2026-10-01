@@ -154,7 +154,7 @@ extension TaskDashboardWebTests {
         ) as? [Any]
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? String, "3")
-        XCTAssertEqual(values[1] as? String, "3 running tasks")
+        XCTAssertEqual(values[1] as? String, "3 running chats")
         XCTAssertEqual(
             values[2] as? [String],
             ["project-a-running-one", "project-a-running-two", "project-b-running", "project-a-idle"]

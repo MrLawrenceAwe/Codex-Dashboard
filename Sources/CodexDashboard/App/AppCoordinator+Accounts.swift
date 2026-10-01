@@ -92,7 +92,7 @@ extension AppCoordinator {
             try await loadThreadSnapshot()
         } catch {
             accounts.setStatusMessage(
-                "Account change cancelled because active tasks could not be checked. "
+                "Account change cancelled because active chats could not be checked. "
                     + error.localizedDescription
             )
             accounts.restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
@@ -160,7 +160,7 @@ extension AppCoordinator {
         }
 
         do {
-            // The preflight snapshot is fresh and contains no running tasks.
+            // The preflight snapshot is fresh and contains no running chats.
             // Mount it immediately; normal polling refreshes the new process state.
             try await dashboardRuntime.synchronizeDashboard(
                 with: dashboardSnapshotPayload(), on: targets, forceRemount: true

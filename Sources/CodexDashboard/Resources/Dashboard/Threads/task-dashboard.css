@@ -216,8 +216,6 @@ aside [data-codex-sidebar-interrupted] {
   #codex-dashboard-task-page .dashboard-header { align-items: flex-start; flex-direction: column; gap: 18px; }
   #codex-dashboard-task-page .dashboard-account-area { width: 100%; justify-items: start; }
   #codex-dashboard-task-page .dashboard-project-path { display: none; }
-  #codex-dashboard-task-page [data-filter="changedProjects"] .dashboard-filter-label { display: none; }
-  #codex-dashboard-task-page [data-filter="changedProjects"]::before { content: "Changed projects"; }
 }
 
 @container dashboard-page (max-width: 560px) {

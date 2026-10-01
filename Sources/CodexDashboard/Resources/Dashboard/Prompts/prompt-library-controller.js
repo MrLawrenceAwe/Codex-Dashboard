@@ -184,7 +184,7 @@ function createPromptLibrary({ findThread }) {
     }
     hideDialog();
     if (!await composerModelPicker.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
-      restoreDialog('Could not apply this prompt’s composer preset. The prompt was not inserted.');
+      restoreDialog('Could not apply this prompt’s model settings. The prompt was not inserted.');
       return false;
     }
     return insert(clipboardText);

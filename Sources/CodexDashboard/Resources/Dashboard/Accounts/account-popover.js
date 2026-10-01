@@ -48,8 +48,8 @@ const accountPopover = (() => {
       ${account.errorMessage ? `<div class="codex-accounts-error">${domUtils.escapeHTML(account.errorMessage)}</div>` : ''}
       <div class="codex-accounts-actions">
         ${account.isActive ? '' : `<button class="is-primary" data-account-action="${account.requiresSignIn ? 'sign-in' : 'switch'}"${disabled}>${account.requiresSignIn ? 'Sign in' : 'Switch'}</button>`}
-        <button data-account-action="update"${disabled}>${account.isRefreshing ? 'Updating…' : 'Refresh'}</button>
-        <button class="is-danger" data-account-action="forget"${disabled}>Forget</button>
+        <button data-account-action="update"${disabled}>${account.isRefreshing ? 'Refreshing usage…' : 'Refresh usage'}</button>
+        <button class="is-danger" data-account-action="forget"${disabled}>Remove saved account</button>
       </div>
     </section>`;
   }
@@ -94,7 +94,7 @@ const accountPopover = (() => {
       <footer>
         <button data-account-global="save"${disabled}><span>✓</span>Save current account</button>
         <button data-account-global="add"${disabled}><span>＋</span>Add another account</button>
-        ${snapshot.accounts.length > 1 ? `<button data-account-global="update-all"${disabled}><span>↻</span>Refresh other accounts</button>` : ''}
+        ${snapshot.accounts.length > 1 ? `<button data-account-global="update-all"${disabled}><span>↻</span>Refresh other accounts’ usage</button>` : ''}
       </footer>`;
     panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);
     panel.querySelectorAll('[data-account-action]').forEach((button) => {
@@ -104,7 +104,7 @@ const accountPopover = (() => {
         if (button.dataset.accountHandled === 'true') return;
         const id = button.closest('[data-account-id]')?.dataset.accountId;
         const action = button.dataset.accountAction;
-        if (action === 'forget' && !window.confirm('Forget this saved account?')) return;
+        if (action === 'forget' && !window.confirm('Remove this saved account from this device?')) return;
         button.dataset.accountHandled = 'true';
         queue(action === 'update'
           ? 'updateUsage'

@@ -44,12 +44,12 @@ const promptLibraryView = (() => {
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${domUtils.escapeHTML(prompt?.name || '')}" required /></label>
         <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${domUtils.escapeHTML(promptLibraryContract.defaultSection)}" value="${domUtils.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${domUtils.escapeHTML(section)}"></option>`).join('')}</datalist></label>
-        <label>Scope<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${composerProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${domUtils.escapeHTML(composerProject.name)}</option>` : ''}</select></label>
-        <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save a composer preset</label>
+        <label>Available in<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${composerProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${domUtils.escapeHTML(composerProject.name)}</option>` : ''}</select></label>
+        <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save model settings</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
-          <legend>Composer preset</legend>
+          <legend>Model settings</legend>
           <label>Model<select name="presetModel">${composerPresets.selectOptions(composerPresets.models, prompt?.preset?.model || composerPresets.defaults.model)}</select></label>
-          <label>Effort<select name="presetReasoningEffort">${composerPresets.selectOptions(composerPresets.reasoningEfforts, prompt?.preset?.reasoningEffort || composerPresets.defaults.reasoningEffort)}</select></label>
+          <label>Reasoning effort<select name="presetReasoningEffort">${composerPresets.selectOptions(composerPresets.reasoningEfforts, prompt?.preset?.reasoningEffort || composerPresets.defaults.reasoningEffort)}</select></label>
           <label>Speed<select name="presetSpeed">${composerPresets.selectOptions(composerPresets.speeds, prompt?.preset?.speed || composerPresets.defaults.speed)}</select></label>
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${domUtils.escapeHTML(prompt?.content || '')}</textarea></label>
@@ -78,7 +78,7 @@ const promptLibraryView = (() => {
             <span>${domUtils.escapeHTML(prompt.content)}</span>
             ${presetSummary.length ? `<span class="dashboard-prompt-preset-summary">${presetSummary.map((item) => `<em>${domUtils.escapeHTML(item)}</em>`).join('')}</span>` : ''}
           </button>
-          <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Use composer preset</label>
+          <label class="dashboard-prompt-use-preset"><input type="checkbox" data-prompt-use-preset="${domUtils.escapeHTML(prompt.id)}"${prompt.usePreset ? ' checked' : ''}${prompt.preset ? '' : ' disabled'} />Apply model settings</label>
         </div>
         <div class="dashboard-prompt-row-actions">
           <button type="button" data-prompt-move-up="${domUtils.escapeHTML(prompt.id)}" aria-label="Move ${domUtils.escapeHTML(prompt.name)} up">↑</button>
@@ -101,7 +101,7 @@ const promptLibraryView = (() => {
       });
     }
     scopeGroups.push({
-      title: 'Global',
+      title: 'All projects',
       scope: { type: 'global' },
       prompts: matchingPrompts.filter((prompt) => promptMatchesScope(prompt, { type: 'global' })),
       includeEmptySections: true,

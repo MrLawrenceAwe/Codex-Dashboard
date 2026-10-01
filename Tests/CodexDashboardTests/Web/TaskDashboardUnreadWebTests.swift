@@ -301,7 +301,7 @@ extension TaskDashboardWebTests {
             """
         ) as? String
 
-        XCTAssertEqual(accessibleName, "Unread. Open task: Needs review")
+        XCTAssertEqual(accessibleName, "Unread. Open chat: Needs review")
     }
 
     func testUnreadFallbackDetectsSilentReactStateChange() async throws {

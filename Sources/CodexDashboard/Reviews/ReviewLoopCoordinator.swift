@@ -69,7 +69,7 @@ final class ReviewLoopCoordinator {
             guard !updated.phase.isFinished else { return }
             if action.kind == .stop {
                 updated.phase = .stopped
-                updated.message = "Stopped loop. Stopping its running task."
+                updated.message = "Stopped loop. Stopping its running chat."
             } else if action.kind == .pause {
                 if updated.phase == .running {
                     updated.pauseRequested = true
@@ -113,13 +113,13 @@ final class ReviewLoopCoordinator {
             }
         } catch {
             if var updated = matchingLoop(id), updated.phase == .stopped {
-                updated.message = "Stopped loop, but could not stop its task. Open its chat to stop it: \(error.localizedDescription)"
+                updated.message = "Stopped loop, but could not stop its chat. Open its chat to stop it: \(error.localizedDescription)"
                 try persist(updated)
             }
             throw error
         }
         guard var updated = matchingLoop(id), updated.phase == .stopped else { return }
-        updated.message = "Stopped loop and its running task."
+        updated.message = "Stopped loop and its running chat."
         try persist(updated)
     }
 
@@ -215,17 +215,17 @@ final class ReviewLoopCoordinator {
 
     private func reconcile(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
         guard var updated = matchingLoop(id), var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
-        guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its task ID was saved. Inspect recent tasks before starting a new loop; it will not be sent twice.") }
+        guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its chat ID was saved. Inspect recent chats before starting a new loop; it will not be sent twice.") }
         let thread = try await inspect { try await driver.readThread(threadID) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard let currentRound = updated.rounds.last else { return }
         round = currentRound
-        guard Self.canonicalPath(thread.cwd) == Self.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review task moved to a different checkout.") }
+        guard Self.canonicalPath(thread.cwd) == Self.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
         guard let reviewTurn = thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
               thread.turns.count <= (round.fixRequested ? 2 : 1) else {
-            throw ReviewLoopError("The review task has an unexpected turn. Inspect it before starting a new loop.")
+            throw ReviewLoopError("The review chat has an unexpected turn. Inspect it before starting a new loop.")
         }
         if round.review == nil {
             try await acceptReviewReport(reviewTurn, loop: updated, round: round,
@@ -309,7 +309,7 @@ final class ReviewLoopCoordinator {
         }
         guard thread.turns.count == 2, let fixTurn = thread.turns.last,
               round.fixTurnID == nil || round.fixTurnID == fixTurn.id else {
-            throw ReviewLoopError("The fix prompt was not acknowledged. Inspect the task; it will not be sent twice.")
+            throw ReviewLoopError("The fix prompt was not acknowledged. Inspect the chat; it will not be sent twice.")
         }
         if fixTurn.status == "inProgress" { return }
         try requireCompleted(fixTurn)
@@ -358,7 +358,7 @@ final class ReviewLoopCoordinator {
                             threads: [RendererThread], threadID: String) async throws -> ReviewRepositoryState {
         let repo = try await inspect { try await driver.repository(at: loop.project.path) }
         guard !hasOtherRunningTask(threads, root: repo.root, excluding: threadID) else {
-            throw ReviewLoopError("Another task is running in this checkout. Inspect its changes before continuing.")
+            throw ReviewLoopError("Another chat is running in this checkout. Inspect its changes before continuing.")
         }
         guard repo.clean, repo.branch == loop.branch else {
             throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")
@@ -368,7 +368,7 @@ final class ReviewLoopCoordinator {
 
     private func requireCompleted(_ turn: ReviewTurnState) throws {
         guard turn.status == "completed" else {
-            throw ReviewLoopError("The task was interrupted, failed, or did not start. Open its chat to resolve the issue.")
+            throw ReviewLoopError("The chat was interrupted, failed, or did not start. Open its chat to resolve the issue.")
         }
     }
 

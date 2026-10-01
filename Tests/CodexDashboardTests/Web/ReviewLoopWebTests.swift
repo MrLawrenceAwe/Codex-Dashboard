@@ -148,9 +148,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return [select.getAttribute('aria-label'), ...[...select.options].map(option => option.textContent)];
         })()
         """) as? [String]
-        XCTAssertEqual(labels, ["Review and fix priority limit", "P0 only · Critical",
-                                "P0–P1 · High and critical", "P0–P2 · Medium and higher",
-                                "P0–P3 · All priorities"])
+        XCTAssertEqual(labels, ["Review and fix priority limit", "Critical only · P0",
+                                "High and critical · P0–P1", "Medium and higher · P0–P2",
+                                "All priorities · P0–P3"])
     }
 
     func testSidebarSpinnerCountsActiveLoopsAndNavigationRemount() async throws {
@@ -521,7 +521,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
-            progress:{[loop.id]:{step:'Limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
+            progress:{[loop.id]:{step:'Round limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
           const badge = document.querySelector('[data-review-badge]');
@@ -537,7 +537,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             limitColor === successColor];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Limit reached", "Limit reached", 0, false, "All configured review rounds completed.", true])
+        XCTAssertEqual(result, ["Round limit reached", "Round limit reached", 0, false, "All configured review rounds completed.", true])
     }
 
     func testLivePromptsStayVisibleAfterRefreshAndRenderAsText() async throws {

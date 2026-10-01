@@ -219,7 +219,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Bool, true)
-        XCTAssertEqual(values[3] as? [String], ["No linked task", "Newest dashboard chat", "Older dashboard chat"])
+        XCTAssertEqual(values[3] as? [String], ["No linked chat", "Newest dashboard chat", "Older dashboard chat"])
         XCTAssertEqual(values[4] as? String, "dashboard")
         XCTAssertEqual(values[5] as? String, "dashboard-old")
         XCTAssertEqual(values[6] as? String, "Older dashboard chat")
@@ -529,7 +529,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             })()
             """
         ) as? [AnyHashable]
-        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste in chat/task", true, 1])
+        XCTAssertEqual(taggedState, ["linked-chat", "Finish linked work", "#Finish linked work", "Paste into chat…", true, 1])
 
         _ = try await webView.evaluateJavaScript(
             """
@@ -616,7 +616,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               document.querySelector('[data-todo-paste-in-thread]').click();
               const empty = [document.querySelector('[data-todo-paste-thread]').disabled,
                 !document.querySelector('[data-todo-paste-thread]').hidden,
-                document.querySelector('[data-todo-paste-thread]').options[0].textContent === 'No chats/tasks in this project'];
+                document.querySelector('[data-todo-paste-thread]').options[0].textContent === 'No chats in this project'];
               document.querySelector('[data-todo-paste-in-thread]').click();
               await assign('/tmp/project');
               document.querySelector('[data-todo-paste-in-thread]').click();

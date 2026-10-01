@@ -104,7 +104,7 @@ function createTaskDashboard({ catalog }) {
         ? await waitForReadConfirmation(submittedIDs) : [];
       const failed = failedIDs.length + unconfirmedIDs.length;
       markAllReadError = failed
-        ? `Codex could not confirm ${failed} ${failed === 1 ? 'task' : 'tasks'} as read. Try again.`
+        ? `Codex could not confirm ${failed} ${failed === 1 ? 'chat' : 'chats'} as read. Try again.`
         : '';
     } catch {
       markAllReadError = 'Codex’s read-state action failed. Try again.';
@@ -120,7 +120,7 @@ function createTaskDashboard({ catalog }) {
       (item) => item.runState !== 'running' && String(item.projectPath).trim() === projectPath,
     );
     if (!thread) {
-      commitDialogError = 'No idle task is available for this project.';
+      commitDialogError = 'No idle chat is available for this project.';
       renderDashboard();
       return;
     }
@@ -190,16 +190,16 @@ function createTaskDashboard({ catalog }) {
     if (document.getElementById(dashboardElements.elementIDs.taskNavButton)) return true;
     if (!mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.taskNavButton,
-      label: 'Task Dashboard',
+      label: 'Chat overview',
       markup: `
       <div class="dashboard-nav-copy">
         <span class="dashboard-nav-icon">${dashboardIcons.render('threads')}</span>
-        <span class="dashboard-nav-label">Task Dashboard</span>
+        <span class="dashboard-nav-label">Chat overview</span>
       </div>
       <div class="dashboard-nav-status">
-        <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running tasks" title="0 running tasks" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
+        <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running chats" title="0 running chats" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
         <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${dashboardIcons.render('gitChanges')}</span>
-        <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread tasks" hidden>0</strong>
+        <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread chats" hidden>0</strong>
       </div>`,
     })) return false;
     taskDashboardView.updateSidebarStatus(deriveViewState());

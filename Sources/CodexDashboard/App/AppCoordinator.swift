@@ -201,12 +201,12 @@ final class AppCoordinator: ObservableObject {
             try await loadThreadSnapshot()
         } catch {
             connectionError =
-                "Codex was not restarted because active tasks could not be checked. "
+                "Codex was not restarted because active chats could not be checked. "
                     + error.localizedDescription
             return
         }
         guard !threads.contains(where: { $0.runState == .running }) else {
-            connectionNotice = "Finish or cancel active Codex tasks before restarting."
+            connectionNotice = "Finish or cancel active Codex chats before restarting."
             return
         }
         await checkCompatibility()

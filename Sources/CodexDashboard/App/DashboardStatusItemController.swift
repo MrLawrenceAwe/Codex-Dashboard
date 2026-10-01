@@ -104,7 +104,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         launchItem.state = launchAtLogin.isEnabled ? .on : .off
         menu.addItem(launchItem)
         let foregroundItem = actionItem(
-            "Bring Codex to Front on Task Completion",
+            "Bring Codex to Front on Chat Completion",
             action: #selector(toggleForegroundOnTaskCompletion)
         )
         foregroundItem.state = coordinator.foregroundOnTaskCompletion ? .on : .off

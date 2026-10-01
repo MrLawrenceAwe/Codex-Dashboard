@@ -240,7 +240,7 @@ struct DiagnosticsWindowView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Codex Dashboard \(dashboardVersion) · Codex \(codexVersion)")
                 Text("\(coordinator.rendererTargetCount) renderer target(s)")
-                Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total tasks")
+                Text("\(coordinator.threads.count) loaded · \(coordinator.totalThreadCount) total chats")
                 if let refreshed = coordinator.lastSuccessfulRefresh {
                     Text("Last refresh \(refreshed.formatted(date: .omitted, time: .standard))")
                 }
@@ -275,7 +275,7 @@ struct DiagnosticsWindowView: View {
                 )
             }
 
-            Text("The app runs from the menu bar. The Task Dashboard reads local Codex task metadata and activity logs; the signed Codex application bundle is never modified.")
+            Text("The app runs from the menu bar. The Chat overview reads local Codex chat metadata and activity logs; the signed Codex application bundle is never modified.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

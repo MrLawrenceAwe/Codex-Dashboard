@@ -34,7 +34,7 @@ extension AppCoordinatorTests {
 
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertNil(coordinator.connectionError)
-        XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex tasks before restarting.")
+        XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex chats before restarting.")
     }
 
     func testMountedDashboardFailureIsReportedAsANotice() {
@@ -56,7 +56,7 @@ extension AppCoordinatorTests {
             coordinator.connectionNotice,
             "Dashboard enablement failed: A background snapshot could not be delivered."
         )
-        XCTAssertEqual(coordinator.statusPresentation.title, "Task Dashboard is live")
+        XCTAssertEqual(coordinator.statusPresentation.title, "Chat overview is live")
     }
 
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {

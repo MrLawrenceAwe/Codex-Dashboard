@@ -27,8 +27,8 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     }
     const threads = threadsForTodo(item);
     select.replaceChildren(
-      new Option(threads.length ? 'Choose a chat/task to paste into…' : 'No chats/tasks in this project', ''),
-      ...threads.map((thread) => new Option(`${thread.title}${thread.id === item.thread?.id ? ' (linked task)' : ''}`, thread.id)),
+      new Option(threads.length ? 'Choose a chat to paste into…' : 'No chats in this project', ''),
+      ...threads.map((thread) => new Option(`${thread.title}${thread.id === item.thread?.id ? ' (linked chat)' : ''}`, thread.id)),
     );
     select.disabled = threads.length === 0;
     select.hidden = false;
@@ -48,7 +48,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       select.hidden = true;
       button.setAttribute('aria-expanded', 'false');
       if (!thread || isDestroyed()) {
-        if (!isDestroyed()) showTransferError('This chat/task is no longer available in the to-do’s project. Choose a chat/task again.');
+        if (!isDestroyed()) showTransferError('This chat is no longer available in the to-do’s project. Choose a chat again.');
         return;
       }
       void pasteTodoInThread(currentItem, thread);
@@ -97,7 +97,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     if (!composer || !isDestination()) {
       if (!isDestroyed()) {
         if (keepDraftOnPresetFailure) {
-          showComposerWarning(activeComposer(), 'Could not find the new task editor. Return to To-dos and try again.');
+          showComposerWarning(activeComposer(), 'Could not find the new chat editor. Return to To-dos and try again.');
         } else {
           pageState.open();
           const notice = document.querySelector('[data-todo-composer-error]');
@@ -133,7 +133,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     const reportTransferFailure = () => {
       if (keepDraftOnPresetFailure && activeComposer()) showComposerWarning(
         activeComposer(),
-        'Could not insert this to-do in the new task. Return to To-dos and try again.',
+        'Could not insert this to-do in the new chat. Return to To-dos and try again.',
       );
     };
     let imageComposer = null;
@@ -161,7 +161,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       if (current && containsText(current) && (!image || current === imageComposer)) {
         if (presetFailed) showComposerWarning(
           current,
-          'Could not apply this to-do’s composer preset. Check the model, effort, and speed before sending.',
+          'Could not apply this to-do’s model settings. Check the model, reasoning effort, and speed before sending.',
         );
         return true;
       }
@@ -188,11 +188,11 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       );
       if (isDestroyed()) return;
       if (!selected) {
-        showTransferError('Could not open the selected chat/task. Choose a chat/task again.');
+        showTransferError('Could not open the selected chat. Choose a chat again.');
         return;
       }
       if (!await insertTodoIntoComposer(item, { waitForStableComposer: true, threadID: thread.id })) {
-        if (!isDestroyed()) showTransferError('Could not paste this to-do. Check the chat/task editor and composer preset, then try again.');
+        if (!isDestroyed()) showTransferError('Could not paste this to-do. Check the chat editor and model settings, then try again.');
       }
     } finally {
       transferring = false;

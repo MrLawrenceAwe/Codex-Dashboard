@@ -66,7 +66,7 @@ extension AppCoordinator {
             updatedThread.isUnread = unreadThreadIDs.contains(updatedThread.id)
             return updatedThread
         })
-        // A newly unread task may be outside the loaded history. Include it now
+        // A newly unread chat may be outside the loaded history. Include it now
         // rather than waiting for the next catalog poll.
         let loadedIDs = Set(threads.map(\.id))
         if !unreadThreadIDs.isSubset(of: loadedIDs) {
@@ -157,6 +157,6 @@ extension AppCoordinator {
 
     var connectionSummary: String {
         let runningCount = threads.count { $0.runState == .running }
-        return "\(runningCount) running · \(totalThreadCount) available tasks"
+        return "\(runningCount) running · \(totalThreadCount) available chats"
     }
 }

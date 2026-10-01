@@ -159,7 +159,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     } catch (_) {
       if (!destroyed) {
         contract.props.onOpenChange?.(false);
-        showNotice('Could not open task actions. Try again.', true);
+        showNotice('Could not open chat actions. Try again.', true);
       }
     }
   }

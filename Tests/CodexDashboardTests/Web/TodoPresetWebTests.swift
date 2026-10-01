@@ -93,7 +93,7 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
         """) as? [AnyHashable]
         XCTAssertEqual(result, [
             "Keep this draft",
-            "Could not apply this to-do’s composer preset. Check the model, effort, and speed before sending.",
+            "Could not apply this to-do’s model settings. Check the model, reasoning effort, and speed before sending.",
             false,
         ])
     }

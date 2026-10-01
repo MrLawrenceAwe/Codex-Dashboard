@@ -87,10 +87,10 @@ const codexHost = {
         ? composerThreadID === thread.id
         : codexUIContracts.isThreadSelected(thread.id);
     });
-    if (!selected) return { opened: false, reason: 'Codex did not select the project task.' };
+    if (!selected) return { opened: false, reason: 'Codex did not select the project chat.' };
 
     const gitActions = await waitFor(() => codexUIContracts.gitActionsButton());
-    if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project task.' };
+    if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
     if (gitActions.getAttribute('aria-expanded') !== 'true') {
       gitActions.dispatchEvent(new PointerEvent('pointerdown', {
         bubbles: true, button: 0, pointerType: 'mouse',

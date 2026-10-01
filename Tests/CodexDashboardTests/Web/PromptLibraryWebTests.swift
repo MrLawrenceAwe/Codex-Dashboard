@@ -140,7 +140,7 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         ) as? [String: Any]
         let values = try XCTUnwrap(result)
 
-        XCTAssertEqual(values["headings"] as? [String], ["This project · Project A", "Global"])
+        XCTAssertEqual(values["headings"] as? [String], ["This project · Project A", "All projects"])
         XCTAssertEqual(values["scopeOptions"] as? [String], ["All projects", "This project · Project A"])
         XCTAssertEqual(
             values["scope"] as? [String: String],

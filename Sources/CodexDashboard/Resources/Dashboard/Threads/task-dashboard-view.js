@@ -60,12 +60,12 @@ const taskDashboardView = (() => {
       unreadBadge.hidden = unreadCount === 0;
       unreadBadge.setAttribute(
         'aria-label',
-        `${unreadCount} unread ${unreadCount === 1 ? 'task' : 'tasks'}`,
+        `${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`,
       );
     }
     const spinner = document.querySelector('[data-navigation-running]');
     if (spinner) {
-      const runningLabel = `${runningCount} running ${runningCount === 1 ? 'task' : 'tasks'}`;
+      const runningLabel = `${runningCount} running ${runningCount === 1 ? 'chat' : 'chats'}`;
       spinner.hidden = runningCount === 0;
       spinner.setAttribute('aria-label', runningLabel);
       spinner.setAttribute('title', runningLabel);
@@ -139,7 +139,7 @@ const taskDashboardView = (() => {
     if (!matchingThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
-        : 'No tasks found';
+        : 'No chats found';
       updateMarkup(list, `<div class="dashboard-empty" data-dashboard-empty><strong>${emptyMessage}</strong></div>`);
       return true;
     }

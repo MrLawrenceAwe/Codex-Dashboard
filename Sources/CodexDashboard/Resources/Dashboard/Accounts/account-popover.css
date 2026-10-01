@@ -21,7 +21,7 @@
 .codex-accounts-empty { padding:14px 10px; }
 .codex-accounts-status { padding:7px 9px; border-bottom:.5px solid rgba(255,255,255,.1); }
 .codex-accounts-error { margin:6px 0 0 29px; color:#ef7777; font-size:10.5px; }
-.codex-accounts-actions { gap:2px; margin:7px 0 0 23px; }
+.codex-accounts-actions { flex-wrap:wrap; gap:2px; margin:7px 0 0 23px; }
 .codex-accounts-actions button { min-height:23px; padding:0 6px; border:0; border-radius:5px; background:transparent; color:#aaa; font-size:10.5px; }
 .codex-accounts-actions button.is-primary { color:#8db8ff; }
 .codex-accounts-actions button.is-danger { color:#d28b8b; }
