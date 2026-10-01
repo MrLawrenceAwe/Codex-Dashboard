@@ -209,10 +209,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "P2", "organisation", true, NSNull(),
-                                "naming", true, NSNull(), "performance", false, "P2"])
+                                "naming", true, NSNull(), "performance", false, "P2", "content", true, NSNull()])
     }
 
-    func testProjectContextAppearsOnlyForBugsAndPerformance() async throws {
+    func testProjectContextAppearsForSupportedReviewTypes() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -224,7 +224,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const focus = document.querySelector('[data-review-focus]');
           const context = document.querySelector('[data-review-prompt-context]');
           const states = [];
-          for (const kind of ['bugs', 'organisation', 'naming', 'performance']) {
+          for (const kind of ['bugs', 'organisation', 'naming', 'performance', 'content']) {
             focus.value = kind;
             focus.dispatchEvent(new Event('change'));
             states.push(kind,context.parentElement.hidden,context.value);
@@ -238,7 +238,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "", "personal", "organisation", true, "", "general",
-                                "naming", true, "", "general", "performance", false, "", "personal"])
+                                "naming", true, "", "general", "performance", false, "", "personal",
+                                "content", false, "personal", "personal"])
     }
 
     func testReviewTypeLabelsAndPriorityBehaviorComeFromSnapshot() async throws {

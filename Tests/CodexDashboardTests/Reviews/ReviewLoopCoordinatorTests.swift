@@ -741,6 +741,9 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             case .naming:
                 expectedReview = "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
                 expectedFix = "Address the finding and commit"
+            case .content:
+                expectedReview = "Review project for content accuracy, clarity, wording, consistency, and completeness."
+                expectedFix = "Address the finding and commit"
             case .performance:
                 expectedReview = "Review project for performance and responsiveness."
                 expectedFix = "Address the finding to improve performance and responsiveness. Keep changes proportionate and verify the improvements, then commit"

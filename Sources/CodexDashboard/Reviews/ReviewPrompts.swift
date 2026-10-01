@@ -12,6 +12,8 @@ enum ReviewPrompts {
             return "Do a code minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
         case .performance:
             return "Review project for performance and responsiveness\(context)."
+        case .content:
+            return "Review project for content accuracy, clarity, wording, consistency, and completeness\(context)."
         }
     }
 
@@ -26,7 +28,7 @@ enum ReviewPrompts {
         switch loop.focus {
         case .bugs:
             task = "Fix \(findings) and commit"
-        case .organisation, .naming:
+        case .organisation, .naming, .content:
             task = "Address \(findings) and commit"
         case .performance:
             task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate and verify the improvements, then commit"
