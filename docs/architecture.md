@@ -59,6 +59,8 @@ single-folder project, a review type (bugs and issues, simplification and struct
 
 The review prompt follows the selected review type. The bugs prompt is **Review project for bugs and issues.** The content prompt is **Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose.** Content reviews cover non-code work such as CVs, documents, and presentations, report findings without priority labels, and use the standard address-and-commit follow-up. Selecting Personal project for a bugs or performance review adds **(this is a project for personal use)** before the final period.
 
+Simplification and structure reviews cover both code and content, including UI copy, documentation, prompts, and configuration. The naming variant uses the same scope and also reviews naming. Both prompts define minimisation as removing duplication and unnecessary complexity while preserving clarity and useful information.
+
 The driver appends a Markdown contract for the final response to each prompt; it does not restrict investigation or progress updates. Reviews show a
 summary and a separate explanation and file link for each finding. Bugs and
 performance findings also have priority headings and follow the selected priority limit.
