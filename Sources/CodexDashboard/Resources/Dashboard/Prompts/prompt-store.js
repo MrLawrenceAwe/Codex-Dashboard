@@ -89,20 +89,25 @@ const promptStore = (() => {
         return merged;
       });
     const present = new Set(prompts.map(prompt => prompt.id));
-    prompts.push(...desired.prompts.filter(prompt => changed.has(prompt.id) && !present.has(prompt.id)));
+    // A stale edit must not recreate a prompt deleted by another window.
+    prompts.push(...desired.prompts.filter(prompt => !basePrompts.has(prompt.id) && !present.has(prompt.id)));
     if (!librariesMatch(base.prompts.map(prompt => prompt.id), desired.prompts.map(prompt => prompt.id))) {
       const order = new Map(desired.prompts.map((prompt, index) => [prompt.id, index]));
       prompts.sort((left, right) => (order.get(left.id) ?? Infinity) - (order.get(right.id) ?? Infinity));
     }
 
     const removedSections = new Set(base.sections.filter(section => !desired.sections.includes(section)));
+    const concurrentlyDeletedSections = new Set(base.sections.filter(section => !current.sections.includes(section)));
     const sections = current.sections.filter(section => !removedSections.has(section));
-    sections.push(...desired.sections.filter(section => !sections.includes(section)));
+    sections.push(...desired.sections.filter(section => !base.sections.includes(section) && !sections.includes(section)));
     if (!librariesMatch(base.sections, desired.sections)) {
       const order = new Map(desired.sections.map((section, index) => [section, index]));
       sections.sort((left, right) => (order.get(left) ?? Infinity) - (order.get(right) ?? Infinity));
     }
-    return normalizedLibrary({ version, prompts, sections });
+    // Keep new or moved prompts without restoring their deleted destination section.
+    const survivingPrompts = prompts.map(prompt => concurrentlyDeletedSections.has(normalizeSection(prompt.section))
+      ? { ...prompt, section: promptLibraryContract.defaultSection } : prompt);
+    return normalizedLibrary({ version, prompts: survivingPrompts, sections });
   }
 
   function pendingLibrary(keys = pendingChangeKeys()) {

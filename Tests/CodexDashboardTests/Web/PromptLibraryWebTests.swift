@@ -5,6 +5,58 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testStalePromptEditPreservesConcurrentPromptAndSectionDeletions() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const prompt = (id, section, content = 'Original') => ({
+            id, name: id, content, section, scope: { type: 'global' },
+          });
+          const base = { version: \(PromptLibrarySchema.currentVersion),
+            prompts: [prompt('deleted', 'Personal'), prompt('survivor', 'Work')],
+            sections: ['Personal', 'Work', 'Empty section'] };
+          window.__codexDashboard.applyPromptLibrary(base);
+          const remote = { ...base, prompts: [prompt('survivor', 'Work', 'Remote notes')],
+            sections: ['Work'] };
+          const desired = { ...base,
+            prompts: [prompt('deleted', 'Personal', 'Stale edit'),
+              prompt('survivor', 'Work'), prompt('added', 'New section')],
+            sections: [...base.sections, 'New section'] };
+          localStorage.setItem('codex-dashboard.pending-prompt-change.0000000000001.remote',
+            JSON.stringify({ base, desired: remote }));
+          localStorage.setItem('codex-dashboard.pending-prompt-change.0000000000002.local',
+            JSON.stringify({ base, desired }));
+          const merged = JSON.parse(window.__codexDashboard.exportPendingPromptLibrary());
+          return [!merged.prompts.some(item => item.id === 'deleted'),
+            merged.prompts.some(item => item.id === 'added'),
+            merged.prompts.find(item => item.id === 'survivor').content,
+            !merged.sections.includes('Personal'), !merged.sections.includes('Empty section'),
+            merged.sections.includes('New section'), merged.prompts.length];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, true, "Remote notes", true, true, true, 2])
+    }
+
+    func testNewPromptInConcurrentlyDeletedSectionMovesToGeneral() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const base = { version: \(PromptLibrarySchema.currentVersion), prompts: [], sections: ['Personal'] };
+          window.__codexDashboard.applyPromptLibrary(base);
+          const desired = { ...base, prompts: [{ id: 'added', name: 'New prompt',
+            content: 'Keep this content', section: 'Personal', scope: { type: 'global' } }] };
+          localStorage.setItem('codex-dashboard.pending-prompt-change.0000000000001.remote',
+            JSON.stringify({ base, desired: { ...base, sections: [] } }));
+          localStorage.setItem('codex-dashboard.pending-prompt-change.0000000000002.local',
+            JSON.stringify({ base, desired }));
+          const merged = JSON.parse(window.__codexDashboard.exportPendingPromptLibrary());
+          return [merged.prompts.length, merged.prompts[0].content,
+            merged.prompts[0].section, !merged.sections.includes('Personal')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [1, "Keep this content", "General", true])
+    }
+
     func testRendererPromptValidationMatchesNativeRequiredFields() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(
