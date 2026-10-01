@@ -108,7 +108,7 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
         }
         do {
             let data = try Data(contentsOf: globalStateURL, options: .mappedIfSafe)
-            _ = try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(from: data)
+            _ = try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(from: data, identityKey: nil)
             return check(
                 "unread-state", "Unread state", .compatible,
                 "The persisted local unread-thread contract is available."
