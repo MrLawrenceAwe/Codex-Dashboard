@@ -5,6 +5,17 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testBusyCoordinatorDoesNotConsumeQueuedAccountRequest() async throws {
+        let runtime = StubDashboardRuntime(accountPopoverActionWaitResult: .action(
+            AccountPopoverAction(kind: .saveCurrentAccount, accountID: nil)
+        ))
+        let coordinator = makeAppCoordinator(runtimeFactory: { _ in runtime })
+        coordinator.isPerformingAction = true
+        let outcome = await coordinator.handleAccountPopoverAction()
+        XCTAssertEqual(outcome, .unavailable)
+        XCTAssertEqual(runtime.accountPopoverPollCount, 0)
+    }
+
     func testScheduledNotificationRefreshReturnsNewActiveAccountSnapshot() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorNotificationRefreshTests-\(UUID().uuidString)")

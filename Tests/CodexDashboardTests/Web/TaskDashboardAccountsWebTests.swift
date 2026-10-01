@@ -319,6 +319,7 @@ extension TaskDashboardWebTests {
         document.querySelector('#profile-portal').remove();
         await new Promise(resolve => setTimeout(resolve, 0));
         const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
+        window.__codexDashboard.takeNextAccountPopoverAction();
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
@@ -435,6 +436,42 @@ extension TaskDashboardWebTests {
         })()
         """) as? [Bool]
         XCTAssertEqual(result, [true, false])
+    }
+
+    func testQueuedAccountRequestExpiresAndAllowsRetryWithoutExecutingLate() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const originalNow = Date.now;
+          let now = originalNow();
+          Date.now = () => now;
+          try {
+            document.querySelector('[data-account-global="save"]').click();
+            window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+            const stillQueued = document.querySelector('[data-account-global="save"]').disabled;
+            now += 15001;
+            const expiredAction = window.__codexDashboard.takeNextAccountPopoverAction();
+            const enabled = !document.querySelector('[data-account-global="save"]').disabled;
+            const message = document.querySelector('.codex-accounts-status').textContent;
+            document.querySelector('[data-account-global="save"]').click();
+            const retried = JSON.parse(window.__codexDashboard.takeNextAccountPopoverAction()).kind;
+            return [stillQueued, expiredAction, enabled, message, retried];
+          } finally { Date.now = originalNow; }
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? String, "null")
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertTrue((values[3] as? String)?.contains("Please try again") == true)
+        XCTAssertEqual(values[4] as? String, "saveCurrentAccount")
     }
 
     func testCommitNoticeRemainsAvailable() async throws {

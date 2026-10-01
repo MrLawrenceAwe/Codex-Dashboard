@@ -277,6 +277,18 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testUnavailableAccountPollRediscoversTargetsWithoutWaitingForHealthDeadline() async throws {
+        let devTools = EmptyRendererPollingDevTools()
+        let renderer = try DashboardRenderer(devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true"))
+        let first = await renderer.pollAccountPopoverAction()
+        let second = await renderer.pollAccountPopoverAction()
+        XCTAssertEqual(first, .unavailable)
+        XCTAssertEqual(second, .unavailable)
+        let requests = await devTools.requests()
+        XCTAssertEqual(requests, 2)
+    }
+
     func testEmptyRendererTargetsAreCachedUntilRefreshDeadline() async throws {
         let devTools = EmptyRendererPollingDevTools()
         var currentDate = Date(timeIntervalSince1970: 1_000)

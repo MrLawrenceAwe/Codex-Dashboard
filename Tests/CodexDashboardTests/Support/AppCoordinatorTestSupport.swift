@@ -329,6 +329,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     private let restartError: Error?
     private let onRestart: (() -> Void)?
     private let accountPopoverActionWaitResult: AccountPopoverActionPollResult
+    private(set) var accountPopoverPollCount = 0
     private(set) var restartCallCount = 0
     private(set) var synchronizeCallCount = 0
     private(set) var lastSynchronizedSnapshot: DashboardSnapshot?
@@ -388,7 +389,8 @@ final class StubDashboardRuntime: DashboardRuntime {
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func hasActiveSpeechInput() async -> Bool { speechInputIsActive }
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
-        accountPopoverActionWaitResult
+        accountPopoverPollCount += 1
+        return accountPopoverActionWaitResult
     }
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
         accountPopoverSynchronizationCount += 1

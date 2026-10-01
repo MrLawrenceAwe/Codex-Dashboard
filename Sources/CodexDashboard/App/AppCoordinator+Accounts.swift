@@ -3,14 +3,18 @@ import Foundation
 
 extension AppCoordinator {
     func handleAccountPopoverAction() async -> AccountPopoverActionHandlingOutcome {
-        guard let dashboardRuntime else { return .unavailable }
+        guard !isPerformingAction, let dashboardRuntime else { return .unavailable }
         let result = await dashboardRuntime.pollAccountPopoverAction()
-        guard !isPerformingAction else { return .unavailable }
         let action: AccountPopoverAction
         switch result {
         case .action(let value): action = value
         case .empty: return .empty
         case .unavailable: return .unavailable
+        }
+        guard !isPerformingAction else {
+            accounts.setStatusMessage("Another dashboard action is in progress. Try again when it finishes.")
+            await publishAccountPopoverSnapshot()
+            return .handled
         }
         let presentationAlreadyUpdated: Bool
         switch action.kind {
@@ -80,7 +84,11 @@ extension AppCoordinator {
     private func performAccountTransition(
         transaction: () async throws -> AccountTransition
     ) async {
-        guard !isPerformingAction, let dashboardRuntime else { return }
+        guard !isPerformingAction else {
+            accounts.setStatusMessage("Another dashboard action is in progress. Try again when it finishes.")
+            return
+        }
+        guard let dashboardRuntime else { return }
 
         let previousUsageStatus = accounts.activeUsageStatus
         isPerformingAction = true

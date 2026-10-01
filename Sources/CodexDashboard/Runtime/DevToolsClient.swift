@@ -219,6 +219,7 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
 
 actor DevToolsClient: DevToolsServing {
     private struct CachedConnection {
+        let id = UUID()
         let address: String
         let connection: any DevToolsConnectionServing
     }
@@ -326,10 +327,10 @@ actor DevToolsClient: DevToolsServing {
         let cached = try connection(for: target)
         do {
             return try await cached.connection.evaluate(expression)
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
-            if connectionsByTargetID[target.id]?.address == cached.address {
+            // A deadline cancels the evaluation. Drop its socket as well so an
+            // unresponsive connection cannot trap every subsequent account poll.
+            if connectionsByTargetID[target.id]?.id == cached.id {
                 connectionsByTargetID.removeValue(forKey: target.id)
                 await cached.connection.cancel()
             }
