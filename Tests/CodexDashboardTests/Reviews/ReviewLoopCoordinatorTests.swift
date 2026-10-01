@@ -700,8 +700,8 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                        "Review project for performance and responsiveness (this is a project for personal use).")
     }
 
-    func testSimplificationReviewsIgnoreProjectContext() throws {
-        for focus in [ReviewFocus.organisation, .naming] {
+    func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
+        for focus in [ReviewFocus.organisation, .naming, .content] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
             var action = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
