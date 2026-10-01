@@ -188,7 +188,8 @@ const todoStore = (() => {
         return merged;
       });
     const existingIDs = new Set(existing.map((item) => item.id));
-    const added = desiredItems.filter((item) => changed.has(item.id) && !existingIDs.has(item.id));
+    // Missing baseline items were deleted by another window, not newly created here.
+    const added = desiredItems.filter((item) => !base.has(item.id) && !existingIDs.has(item.id));
     return [...added, ...existing];
   }
 

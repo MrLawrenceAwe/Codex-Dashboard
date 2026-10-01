@@ -35,8 +35,8 @@
 - A native-looking **Task Dashboard** sidebar item is inserted beside Codex's other
   top-level destinations; there is no floating launcher.
 - A neighboring **To-dos** destination stores a lightweight personal task list locally. To-dos can link to an existing task or populate a new task with their text and image.
-- To-do writes merge each window's changed fields into the latest shared document while preserving other windows' items and image references; storage notifications refresh open windows.
-- Prompt edits use separate durable pending changes per window. The renderer combines those changes with the current native library before the native bridge saves and acknowledges them.
+- To-do writes merge each window's changed fields into the latest shared document while preserving other windows' items and image references; concurrent deletions take precedence over stale edits, and storage notifications refresh open windows.
+- Prompt edits use separate durable pending changes per window. The renderer combines those changes with the current native library before the native bridge saves and acknowledges them. Concurrent prompt and section deletions take precedence over stale edits; new or moved prompts targeting a deleted section go to General.
 - Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Task Dashboard and To-dos own their page controllers. To-do orchestration lives in `todo-list-controller.js`, image and tag interactions live in focused controllers, and markup and rendering live in `todo-list-view.js`.
 - Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
 

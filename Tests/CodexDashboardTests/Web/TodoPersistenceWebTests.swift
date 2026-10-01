@@ -61,6 +61,29 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         }
     }
 
+    func testStaleTodoEditPreservesConcurrentDeletionAndNewItems() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const deleted = store.create('Delete in another window');
+          const survivor = store.create('Keep this task');
+          const base = [deleted, survivor];
+          await store.save(base, [], [], []);
+          await store.save([{ ...survivor, body: 'Remote notes' }], [], base, []);
+          const added = store.create('New local task');
+          const saved = await store.save([
+            { ...deleted, title: 'Stale edit' }, survivor, added,
+          ], [], base, []);
+          const items = store.load();
+          return [saved, !items.some(item => item.id === deleted.id),
+            items.some(item => item.id === added.id),
+            items.find(item => item.id === survivor.id).body, items.length];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, true, true, "Remote notes", 2])
+    }
+
     func testDeferredStorageRefreshRunsWhenTodoEditorLosesFocusWithoutAChange() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
