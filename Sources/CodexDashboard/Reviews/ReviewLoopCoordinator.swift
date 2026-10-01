@@ -61,7 +61,7 @@ final class ReviewLoopCoordinator {
             }
             let focus = action.focus ?? .bugs
             let promptContext = focus.supportsProjectContext ? action.promptContext ?? .general : .general
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, pushToRemote: action.pushToRemote ?? false))
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
@@ -362,11 +362,19 @@ final class ReviewLoopCoordinator {
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
+        if result.outcome == .fixed, updated.pushToRemote {
+            updated.message = "Fixes committed. Pushing the verified commit to the remote."
+            try persist(updated)
+            try await driver.pushCommit(at: updated.project.path, expectedRepository: repo)
+            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
+            updated = current
+        }
         updated.phase = result.outcome == .withdrawn ? .completed : updated.completedRoundCount + 1 >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
         updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn. No fix commit was needed."
             : updated.completedRoundCount + 1 >= updated.maxRounds
             ? "All configured review rounds completed."
             : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
+        if result.outcome == .fixed, updated.pushToRemote { updated.message += " Fixes pushed to remote." }
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
             outcome: result.outcome, findingCount: result.findingCount, commit: repo.commit, summary: result.summary)

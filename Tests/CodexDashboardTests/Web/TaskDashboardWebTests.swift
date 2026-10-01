@@ -303,7 +303,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
 
         let values = try XCTUnwrap(status)
         XCTAssertEqual(values[0] as? Bool, false)
-        XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes: dirty")
+        XCTAssertEqual(values[1] as? String, "1 project has uncommitted changes or unpushed commits: dirty")
     }
 
     func testThreadRowUsesNativeButtonAndOpensFromActivation() async throws {

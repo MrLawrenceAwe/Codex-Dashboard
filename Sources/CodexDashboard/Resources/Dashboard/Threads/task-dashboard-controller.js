@@ -198,7 +198,7 @@ function createTaskDashboard({ catalog }) {
       </div>
       <div class="dashboard-nav-status">
         <span class="dashboard-nav-spinner" data-navigation-running role="status" aria-label="0 running chats" title="0 running chats" hidden><span data-navigation-running-count aria-hidden="true">0</span></span>
-        <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes" title="0 projects with uncommitted changes" hidden>${dashboardIcons.render('gitChanges')}</span>
+        <span class="dashboard-nav-changes" data-navigation-changes role="status" aria-label="0 projects with uncommitted changes or unpushed commits" title="0 projects with uncommitted changes or unpushed commits" hidden>${dashboardIcons.render('gitChanges')}</span>
         <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread chats" hidden>0</strong>
       </div>`,
     })) return false;

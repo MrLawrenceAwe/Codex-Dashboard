@@ -8,11 +8,13 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 ## Project overview
 
-- **Chat monitoring:** recent activity, unread status, completion tracking and Git working-tree changes.
-- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops in a responsive card grid, grouped setup alongside on wide windows, and previous loops in a separate history section; independent pause/resume/stop controls (stopping also interrupts the running review or fix chat) and saved progress; fresh review chats with selectable bugs/issues, code and content minimisation/organisation, naming, performance, or content and quality reviews, separate model and reasoning choices for reviews and fixes, priority limits for bugs and performance reviews, automatic address-and-commit follow-ups, and verified commit checkpoints.
+- **Chat monitoring:** recent activity, unread status, completion tracking, uncommitted files and unpushed Git commits.
+- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops in a responsive card grid, grouped setup alongside on wide windows, and previous loops in a separate history section; independent pause/resume/stop controls (stopping also interrupts the running review or fix chat) and saved progress; fresh review chats with selectable bugs/issues, code and content minimisation/organisation, naming, performance, or content and quality reviews, separate model and reasoning choices for reviews and fixes, priority limits for bugs and performance reviews, automatic address-and-commit follow-ups, verified commit checkpoints, and optional remote pushing after each fix round. Push failures block the loop until resolved; pushes never force updates.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 - **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
 - **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
+
+Chat overview’s **Local changes** filter includes uncommitted files and unpushed commits, with separate status labels. Unpushed status uses local remote-tracking refs without fetching; a branch without an upstream is compared with all known remote refs. Repositories without a remote show only uncommitted changes.
 
 The project explores reliable desktop workflow automation, including file-change
 monitoring, scheduled refresh, asynchronous persistence and recovery after failed

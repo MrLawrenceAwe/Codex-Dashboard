@@ -10,6 +10,26 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testStartIncludesOptInRemotePushPreference() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let values = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),
+            projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null});
+          api.openReviews();
+          const select = document.querySelector('[data-review-push]');
+          const defaultValue = select.value;
+          select.value = 'true';
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
+          document.querySelector('[data-review-form]').requestSubmit();
+          return [defaultValue, JSON.parse(api.pendingReviewAction()).pushToRemote];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(values, ["false", true])
+    }
+
     func testBlockedLoopOffersResumeAndDoesNotCountBlockedAttempts() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

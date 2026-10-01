@@ -120,7 +120,7 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-count { display:inline-flex; justify-content:center; min-width:24px; padding:2px 7px; border-radius:6px; background:var(--review-tint); color:var(--review-muted); font-size:11px; font-variant-numeric:tabular-nums; }
 .dashboard-review-loop fieldset > legend { padding:0; margin-bottom:12px; font-size:11px; font-weight:600; color:var(--review-muted); }
 .dashboard-review-loop .review-limits { grid-template-columns:90px minmax(0, 1fr); padding-top:4px; }
-.dashboard-review-loop .review-limits > label:first-of-type, .dashboard-review-loop .review-priority { grid-column:1 / -1; }
+.dashboard-review-loop .review-limits > label:first-of-type, .dashboard-review-loop .review-priority, .dashboard-review-loop .review-remote-push, .dashboard-review-loop .review-push-help { grid-column:1 / -1; }
 .dashboard-review-loop .review-field-help { align-self:end; font-size:11px; }
 .dashboard-review-loop .review-availability { padding:12px; border-radius:8px; background:var(--review-tint); font-size:12px; }
 

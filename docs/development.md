@@ -93,10 +93,10 @@ migrations write only current fields; failed migration writes leave stored data 
 Task filter preferences migrate `recent` and `home` to `all`, displayed as **All chats**.
 Keep old field names confined to migration code and legacy fixtures.
 
-Review loops use version 1 of the `review-loop.json` document. The file-store
-boundary converts older unversioned single-loop and array documents, including
+Review loops use version 2 of the `review-loop.json` document. The file-store
+boundary migrates version 1 with remote pushing disabled, and converts older unversioned single-loop and array documents, including
 former prompt-context and model-selection fields, before decoding current models.
-The coordinator writes version 1 after a successful load. Keep that conversion
+The coordinator writes version 2 after a successful load. Keep that conversion
 until a release can establish that all supported installs have loaded and rewritten
 their older files; only then remove the unversioned reader and its fixtures. The
 to-do store likewise retains versions 1–7 because those documents may still hold

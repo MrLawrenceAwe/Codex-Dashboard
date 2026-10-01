@@ -11,6 +11,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let promptContext: ReviewPromptContext?
     let maxRounds: Int?
     let loopID: UUID?
+    var pushToRemote: Bool? = nil
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
