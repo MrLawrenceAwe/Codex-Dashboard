@@ -116,7 +116,7 @@ const todoStore = (() => {
         .map(normalizeItem).filter(Boolean);
       if (document.version !== version) {
         // Preserve inline image data and leave the old document intact if storage is full.
-        try { localStorage.setItem(storageKey, documentData(migrated, true)); } catch (_) {}
+        try { localStorage.setItem(storageKey, documentData(migrated)); } catch (_) {}
       }
       return migrated;
     } catch (_) {
@@ -145,16 +145,8 @@ const todoStore = (() => {
     }
   }
 
-  function documentData(items, includesImageData) {
-    return JSON.stringify({
-      version,
-      items: items.map((item) => ({
-        ...item,
-        image: item.image
-          ? { ...item.image, dataURL: includesImageData ? item.image.dataURL : '' }
-          : null,
-      })),
-    });
+  function documentData(items) {
+    return JSON.stringify({ version, items });
   }
 
   let saveQueue = Promise.resolve();
@@ -242,7 +234,7 @@ const todoStore = (() => {
     try {
       if (writeProtectionReason()) return false;
       localStorage.setItem(tagsStorageKey, JSON.stringify(mergedTags));
-      localStorage.setItem(storageKey, documentData(persistedItems, true));
+      localStorage.setItem(storageKey, documentData(persistedItems));
       await todoImageStore.prune(mergedItems).catch(() => {});
       return true;
     } catch (_) {

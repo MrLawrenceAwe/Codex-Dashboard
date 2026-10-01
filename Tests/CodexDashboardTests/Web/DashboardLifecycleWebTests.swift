@@ -5,6 +5,48 @@ import XCTest
 
 @MainActor
 final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
+    func testDestroyCancelsQueuedRepairAndRemountRestoresFeatureInteractions() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          document.querySelector('[data-codex-prompt-library-button]').click();
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          window.__codexDashboard.destroy();
+        })()
+        """)
+        // The queued animation frame must not recreate any feature after teardown.
+        try await Task.sleep(for: .milliseconds(100))
+        let removed = try await webView.evaluateJavaScript("""
+        typeof window.__codexDashboard === 'undefined'
+          && !document.querySelector('[id^="codex-dashboard-"]')
+          && !document.querySelector('[data-codex-prompt-library-button]')
+        """) as? Bool
+        XCTAssertEqual(removed, true)
+
+        let injection = try InjectionBundle.load()
+        let remounted = try await webView.evaluateJavaScript(injection.mountExpression) as? Bool
+        XCTAssertEqual(remounted, true)
+        let interactions = try await webView.evaluateJavaScript("""
+        (() => {
+          const pageKinds = ['task', 'todo', 'review'];
+          const pagesOpen = pageKinds.every(kind => {
+            document.getElementById(`codex-dashboard-${kind}-navigation`).click();
+            return pageKinds.every(candidate =>
+              (document.getElementById(`codex-dashboard-${candidate}-navigation`)
+                .getAttribute('aria-current') === 'page') === (candidate === kind));
+          });
+          document.querySelector('[data-codex-prompt-library-button]').click();
+          const promptOpened = !!document.getElementById('codex-dashboard-prompt-library-dialog');
+          document.querySelector('button[data-prompt-close]').click();
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          return [pagesOpen, promptOpened,
+            !document.getElementById('codex-dashboard-prompt-library-dialog'),
+            !window.__codexDashboard.isOpen()];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(interactions, [true, true, true, true])
+    }
+
     func testNavigationMountsInHomeBesideWrappedNewChatAndRepairsReplacement() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>

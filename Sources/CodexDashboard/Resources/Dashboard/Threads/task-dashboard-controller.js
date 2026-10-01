@@ -128,7 +128,7 @@ function createTaskDashboard({ catalog }) {
     const result = await codexHost.openCommitDialog(thread);
     if (result.opened) return;
     commitDialogError = result.reason;
-    dashboardNavigation.openTasks();
+    dashboardNavigation.openPage(taskDashboard);
     renderDashboard();
   }
 

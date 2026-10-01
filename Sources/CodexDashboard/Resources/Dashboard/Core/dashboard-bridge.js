@@ -10,24 +10,57 @@ const dashboardPages = [
   { controller: reviewLoopPage, pageID: dashboardElements.elementIDs.reviewPage,
     navigationID: dashboardElements.elementIDs.reviewNavButton },
 ];
+const dashboardNavigation = createDashboardNavigation(dashboardPages);
+const dashboardLifecycle = createDashboardLifecycle({
+  ...dashboardNavigation,
+  pages: dashboardPages,
+  mountPages() {
+    dashboardPages.forEach(({ controller }) => controller.mountPage());
+    dashboardPages.forEach(({ controller }) => controller.mountNavigation());
+  },
+  mountFeatures() {
+    sidebarProjectHighlights.start();
+    promptLibrary.mount();
+    accountPopover.mount();
+  },
+  rebindFeatures() {
+    sidebarProjectHighlights.mount();
+    promptLibraryButton.scheduleSync();
+  },
+  syncComposer: promptLibraryButton.scheduleSync,
+  requestRender: taskDashboard.requestRender,
+  syncInterruptedSidebarMarkers: taskDashboard.syncInterruptedSidebarMarkers,
+  syncUnread: taskDashboard.syncUnread,
+  destroyFeatures() {
+    reviewRPCClient.destroy();
+    dashboardPages.forEach(({ controller }) => controller.destroy());
+    sidebarProjectHighlights.destroy();
+    promptLibrary.unmount();
+    accountPopover.unmount();
+  },
+});
+
+function ensureDashboardMounted() {
+  const mounted = dashboardLifecycle.ensureMounted();
+  taskDashboard.startMonitoring();
+  return mounted;
+}
 
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewLoop: reviewLoopPage.apply,
-  ensureMounted: dashboardNavigation.ensureMounted,
+  ensureMounted: ensureDashboardMounted,
   destroy() {
-    reviewRPCClient.destroy();
-    dashboardPages.forEach(({ controller }) => controller.destroy());
     dashboardLifecycle.destroy();
     threadCatalog.clear();
     delete window.__codexDashboard;
   },
-  open: dashboardNavigation.openTasks,
+  open: () => dashboardNavigation.openPage(taskDashboard),
   isOpen: dashboardNavigation.isOpen,
-  openReviews: dashboardNavigation.openReviews,
-  openTodos: dashboardNavigation.openTodos,
+  openReviews: () => dashboardNavigation.openPage(reviewLoopPage),
+  openTodos: () => dashboardNavigation.openPage(todoList),
   applyThreads(nextThreads) {
     threadCatalog.applyThreads(nextThreads);
     taskDashboard.applyThreads();
@@ -51,4 +84,4 @@ window.__codexDashboard = {
     return applied;
   },
 };
-return dashboardNavigation.ensureMounted();
+return ensureDashboardMounted();
