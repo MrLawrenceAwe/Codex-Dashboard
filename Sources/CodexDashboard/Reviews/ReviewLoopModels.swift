@@ -15,7 +15,7 @@ enum ReviewFocus: String, Codable, CaseIterable, Sendable {
     case bugs, organisation, naming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .performance }
-    var supportsProjectContext: Bool { self == .bugs || self == .performance || self == .content }
+    var supportsProjectContext: Bool { self == .bugs || self == .performance }
 
     var label: String {
         switch self {

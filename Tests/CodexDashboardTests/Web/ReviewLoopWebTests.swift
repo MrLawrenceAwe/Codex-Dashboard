@@ -239,7 +239,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "", "personal", "organisation", true, "", "general",
                                 "naming", true, "", "general", "performance", false, "", "personal",
-                                "content", false, "personal", "personal"])
+                                "content", true, "", "general"])
     }
 
     func testReviewTypeLabelsAndPriorityBehaviorComeFromSnapshot() async throws {
