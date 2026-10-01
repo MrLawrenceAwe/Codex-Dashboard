@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class UsageNotificationUpdateContext {
+final class UsageNotificationUpdateCoordinator {
     let history: UsageNotificationHistory
     private var updateInProgress = false
     private var updateWaiters: [CheckedContinuation<Void, Never>] = []

@@ -19,13 +19,13 @@ function createTaskDashboard({ catalog }) {
   let markAllReadError = '';
   let destroyed = false;
   let readConfirmation;
-  let presentationState;
+  let unreadState;
   const completionIndicators = createThreadCompletionIndicators({
     findThread: catalog.findThread,
-    isThreadUnread: (thread) => presentationState.isThreadUnread(thread),
+    isThreadUnread: (thread) => unreadState.isThreadUnread(thread),
     onChange: requestRender,
   });
-  presentationState = createThreadUnreadState({
+  unreadState = createThreadUnreadState({
     findThread: catalog.findThread,
     isOpen: pageState.isOpen,
     onChange: () => {
@@ -34,7 +34,7 @@ function createTaskDashboard({ catalog }) {
     },
     completionIndicators,
   });
-  const { isThreadUnread } = presentationState;
+  const { isThreadUnread } = unreadState;
   const isCompletionTickVisible = completionIndicators.isVisible;
 
   function savePreferences() {
@@ -47,38 +47,6 @@ function createTaskDashboard({ catalog }) {
 
   function deriveViewState() {
     return taskDashboardQuery.summarizeActivity(currentThreads(), isThreadUnread, hiddenChangeIndicatorPaths);
-  }
-
-  function syncInterruptedSidebarMarkers() {
-    const nextInterruptedThreadIDs = new Set(
-      currentThreads()
-        .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
-        .map((thread) => thread.id),
-    );
-    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {
-      const threadID = marker.dataset.codexSidebarInterrupted;
-      const row = codexUIContracts.threadRow(threadID);
-      const title = row?.querySelector('[data-thread-title-trigger]');
-      if (!nextInterruptedThreadIDs.has(threadID) || !row?.contains(marker)
-          || marker.parentElement !== title?.parentElement) marker.remove();
-    });
-    nextInterruptedThreadIDs.forEach((threadID) => {
-      const row = codexUIContracts.threadRow(threadID);
-      if (!row) return;
-      let marker = row.querySelector('[data-codex-sidebar-interrupted]');
-      if (!marker) {
-        const title = row.querySelector('[data-thread-title-trigger]');
-        const markerHost = title?.parentElement;
-        if (!markerHost) return;
-        marker = document.createElement('span');
-        marker.setAttribute('data-codex-sidebar-interrupted', threadID);
-        marker.textContent = 'Interrupted';
-        markerHost.insertBefore(marker, title);
-      }
-      marker.setAttribute('role', 'status');
-      marker.setAttribute('aria-label', 'Interrupted because the usage limit was reached');
-      marker.setAttribute('title', 'This task was interrupted because the usage limit was reached');
-    });
   }
 
   function openThread(thread) {
@@ -130,8 +98,8 @@ function createTaskDashboard({ catalog }) {
         return;
       }
       const submittedIDs = unreadIDs.filter((id) => !failedIDs.includes(id));
-      presentationState.markReadRequested(submittedIDs);
-      presentationState.syncUnread();
+      unreadState.markReadRequested(submittedIDs);
+      unreadState.syncUnread();
       const unconfirmedIDs = submittedIDs.length
         ? await waitForReadConfirmation(submittedIDs) : [];
       const failed = failedIDs.length + unconfirmedIDs.length;
@@ -299,20 +267,20 @@ function createTaskDashboard({ catalog }) {
 
   function openDashboard() {
     if (!pageState.open()) return;
-    if (presentationState.syncUnread()) viewNeedsRender = true;
+    if (unreadState.syncUnread()) viewNeedsRender = true;
     if (viewNeedsRender) renderDashboard();
     else taskDashboardView.updateSidebarStatus(deriveViewState());
-    presentationState.scheduleUnreadSync(1500);
+    unreadState.scheduleUnreadSync(1500);
   }
 
   function closeDashboard() {
     pageState.close();
-    presentationState.scheduleUnreadSync();
+    unreadState.scheduleUnreadSync();
   }
 
   function applyThreads() {
-    syncInterruptedSidebarMarkers();
-    presentationState.applyThreads(currentThreads());
+    threadInterruptionIndicators.applyThreads(currentThreads());
+    unreadState.applyThreads(currentThreads());
     checkReadConfirmation();
     // A native refresh can update the catalog, unread state, and Git state in a
     // short burst. Keep the renderer responsive by applying only the latest
@@ -332,9 +300,9 @@ function createTaskDashboard({ catalog }) {
     readConfirmation?.finish(readConfirmation.ids);
     pageState.close();
     cancelScheduledRender();
-    presentationState.destroy();
+    unreadState.destroy();
     completionIndicators.destroy();
-    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
+    threadInterruptionIndicators.destroy();
     viewNeedsRender = true;
   }
 
@@ -343,10 +311,10 @@ function createTaskDashboard({ catalog }) {
     mountNavigation: mountTaskNavigationButton,
     mountPage: mountTaskDashboardPage,
     applyVisibility: pageState.applyVisibility,
-    startMonitoring: presentationState.startMonitoring,
+    startMonitoring: unreadState.startMonitoring,
     requestRender,
-    syncInterruptedSidebarMarkers,
-    syncUnread: presentationState.syncUnread,
+    syncInterruptedSidebarMarkers: () => threadInterruptionIndicators.applyThreads(currentThreads()),
+    syncUnread: unreadState.syncUnread,
     destroy,
     open: openDashboard,
     close: closeDashboard,

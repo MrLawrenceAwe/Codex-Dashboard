@@ -95,7 +95,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: any DesktopNotificationCenter
-    private let updateContext: UsageNotificationUpdateContext
+    private let updateContext: UsageNotificationUpdateCoordinator
     private var history: UsageNotificationHistory { updateContext.history }
     private var deadlineUsageRefresh: DeadlineUsageRefreshHandler?
     private var liveTasksByIdentifier: [String: Task<Void, Never>] = [:]
@@ -106,7 +106,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         userDefaults: UserDefaults = .standard
     ) {
         self.notificationCenter = notificationCenter
-        updateContext = UsageNotificationUpdateContext(userDefaults: userDefaults, channel: .desktop)
+        updateContext = UsageNotificationUpdateCoordinator(userDefaults: userDefaults, channel: .desktop)
     }
 
     deinit {

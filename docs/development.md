@@ -48,7 +48,7 @@ ignored `injection.js` is built by the production `InjectionBundle` loader, incl
 the Swift-defined prompt schema; preview fixtures use the current thread contract.
 Generation exits before starting the menu-bar application.
 
-Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation and polling; `Threads/thread-completion-indicators.js` owns completion tick expiry. The native thread catalog supplies recency-sorted snapshots; `Threads/thread-catalog.js` owns project matching and the thread-ID index. `Core/dashboard-bridge.js` creates the dashboard, to-do, and prompt controllers with the catalog lookups they need, then applies each thread snapshot to those controllers. `Core/dashboard-navigation.js` handles page switching, mounting, visibility, and navigation repair. The prompt controller receives an
+Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation and polling; `Threads/thread-completion-indicators.js` owns completion tick expiry. `Sidebar/thread-interruption-indicators.js` owns native sidebar interruption markers and their cleanup. The native thread catalog supplies recency-sorted snapshots; `Threads/thread-catalog.js` owns project matching and the thread-ID index. `Core/dashboard-bridge.js` creates the dashboard, to-do, and prompt controllers with the catalog lookups they need, then applies each thread snapshot to those controllers. `Core/dashboard-navigation.js` handles page switching, mounting, visibility, and navigation repair. The prompt controller receives an
 explicit thread lookup for composer context. Native import/export and renderer
 persistence share the prompt store constructed by the application coordinator.
 
@@ -62,7 +62,7 @@ save queue. Item and tag mutations share optimistic rendering and rollback. Imag
 writes finish before metadata is committed; obsolete images are pruned after a
 successful commit. `todo-image-store.js` owns IndexedDB image persistence;
 `todo-image-controller.js` owns image validation, draft state, and
-reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. The list
+reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. `todo-create-form.js` owns creation drafts, project and thread assignments, submission, and reset decisions. The list
 controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
 an action to the sidebar chat/task context menu, snapshots the selected task
 before the menu opens, supports keyboard navigation, and
@@ -112,6 +112,7 @@ Application filesystem watchers, refresh scheduling, and activity monitors live 
 `App/Monitoring`; diagnostics presentation lives in `App/Diagnostics`. Tests mirror
 these folders. `NotificationUsageRefresher` owns request coalescing, freshness checks,
 and the short-lived cache shared by desktop and phone notification delivery.
+`UsageNotificationUpdateCoordinator` serialises each channel’s updates and prepares plans with its own delivery history. Disabling integration reports renderer availability explicitly; the application checks whether Codex is running before showing a disconnected or closed status.
 Required runtime and DevTools operations have explicit implementations; test doubles
 provide their own stub behaviour. The DevTools convenience overload supplies a real
 four-second timeout to the required timed operation.

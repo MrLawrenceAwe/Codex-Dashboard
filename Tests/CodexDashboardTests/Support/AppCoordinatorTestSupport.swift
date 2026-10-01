@@ -382,7 +382,7 @@ final class StubDashboardRuntime: DashboardRuntime {
         lastSynchronizedSnapshot = snapshot
         if let synchronizationError { throw synchronizationError }
     }
-    func disableIntegration() async throws -> DashboardDisableOutcome { .codexClosed }
+    func disableIntegration() async throws -> DashboardDisableOutcome { .rendererUnavailable }
     func openTaskDashboard() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {

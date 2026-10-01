@@ -215,7 +215,7 @@ final class DashboardRenderer {
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
     }
 
-    func disable() async throws -> Bool {
+    func disable() async throws -> DashboardDisableOutcome {
         let wasMaintainingDashboard = maintainsDashboard
         maintainsDashboard = false
         await waitForSynchronizationsToFinish()
@@ -224,7 +224,7 @@ final class DashboardRenderer {
             let targets = await targets(forceRefresh: true)
             guard !targets.isEmpty else {
                 clearMountState()
-                return false
+                return .rendererUnavailable
             }
 
             for target in targets {
@@ -234,7 +234,7 @@ final class DashboardRenderer {
                 }
             }
             clearMountState()
-            return true
+            return .disabled
         } catch {
             maintainsDashboard = wasMaintainingDashboard
             throw error

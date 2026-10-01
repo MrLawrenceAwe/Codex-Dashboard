@@ -423,7 +423,8 @@ final class DashboardRendererTests: XCTestCase {
             devTools: StubRendererDevTools(targets: []),
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )
-        _ = try await renderer.disable()
+        let outcome = try await renderer.disable()
+        XCTAssertEqual(outcome, .rendererUnavailable)
         XCTAssertFalse(renderer.maintainsDashboard)
 
         renderer.prepareForRestart()
@@ -453,7 +454,7 @@ final class DashboardRendererTests: XCTestCase {
 
         await devTools.setEvaluationResult(true)
         let disabled = try await renderer.disable()
-        XCTAssertTrue(disabled)
+        XCTAssertEqual(disabled, .disabled)
         XCTAssertFalse(renderer.maintainsDashboard)
     }
 

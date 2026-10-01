@@ -89,7 +89,7 @@ const threadMarkup = (() => {
     return `<span class="dashboard-git-changes"${showHiddenStatus ? ' title="This Git project has uncommitted changes"' : ''}>${dashboardIcons.render('gitChanges')}<span>Changed</span></span>`;
   }
 
-  function renderThreadList(visibleThreads, {
+  function renderThreadList(displayedThreads, {
     filterMode,
     leadingRunningThreadCount = 0,
     collapsedProjectPaths,
@@ -104,9 +104,9 @@ const threadMarkup = (() => {
         isUnread: isUnread(item),
         isCompletionTickVisible,
       })).join('');
-      const running = visibleThreads.slice(0, leadingRunningThreadCount);
-      if (!running.length) return renderRows(visibleThreads);
-      const recent = visibleThreads.slice(leadingRunningThreadCount);
+      const running = displayedThreads.slice(0, leadingRunningThreadCount);
+      if (!running.length) return renderRows(displayedThreads);
+      const recent = displayedThreads.slice(leadingRunningThreadCount);
       return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running tasks">
         <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
         ${renderRows(running)}
@@ -116,7 +116,7 @@ const threadMarkup = (() => {
       </section>` : ''}`;
     }
     if (filterMode === 'changedProjects') {
-      const projects = groupThreadsByProject(visibleThreads);
+      const projects = groupThreadsByProject(displayedThreads);
       const projectCard = ({ path: projectPath, name: projectName, threads: projectThreads }) => {
         return `
         <article class="dashboard-git-project" data-dashboard-git-project="${domUtils.escapeHTML(projectPath)}">
@@ -142,7 +142,7 @@ const threadMarkup = (() => {
             <div class="dashboard-hidden-indicators-list">${projectsWithHiddenIndicators.map(projectCard).join('')}</div>
           </details>` : ''}`;
     }
-    return groupThreadsByProject(visibleThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
+    return groupThreadsByProject(displayedThreads).map(({ path: projectPath, name: project, threads: projectThreads }, index) => {
       const isCollapsed = collapsedProjectPaths.has(projectPath);
       const projectListID = `dashboard-project-${index}`;
       const hasChanges = projectThreads.some((item) => item.workingTreeStatus === 'hasChanges');

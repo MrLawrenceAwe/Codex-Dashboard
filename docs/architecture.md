@@ -37,7 +37,7 @@
 - A neighboring **To-dos** destination stores a lightweight personal task list locally. To-dos can link to an existing task or populate a new task with their text and image.
 - To-do writes merge each window's changed fields into the latest shared document while preserving other windows' items and image references; concurrent deletions take precedence over stale edits, and storage notifications refresh open windows.
 - Prompt edits use separate durable pending changes per window. The renderer combines those changes with the current native library before the native bridge saves and acknowledges them. Concurrent prompt and section deletions take precedence over stale edits; new or moved prompts targeting a deleted section go to General.
-- Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Task Dashboard and To-dos own their page controllers. To-do orchestration lives in `todo-list-controller.js`, image and tag interactions live in focused controllers, and markup and rendering live in `todo-list-view.js`.
+- Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Task Dashboard and To-dos own their page controllers. To-do orchestration and persistence coordination live in `todo-list-controller.js`, creation drafts and submission live in `todo-create-form.js`, image and tag interactions live in focused controllers, and markup and rendering live in `todo-list-view.js`.
 - Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
 
 This is an unofficial personal integration. Codex updates can require dashboard
@@ -78,8 +78,10 @@ green **Limit reached** status indicating that all configured rounds finished su
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 
-`Reviews/ReviewLoopCoordinator` owns the state machine, `ReviewLoopPresentation`
-builds status and prompt previews, and `ReviewLoopFileStore` persists state.
+`Reviews/ReviewLoopCoordinator` owns the state machine with separate review acceptance,
+fix submission, and round completion stages. `ReviewPrompts` defines the execution
+prompts shared with previews, `ReviewLoopPresentation` builds status and prompt
+previews, and `ReviewLoopFileStore` persists state.
 `ReviewLoopDriver` uses the desktop renderer's existing local app-server connection;
 `ReviewRepositoryCheckpoint` verifies Git state through argument-based subprocess
 calls. The driver uses the saved review selection for review turns and the fix
