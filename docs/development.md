@@ -75,7 +75,11 @@ speed preset; both new-task and selected-task actions apply it before inserting 
 through `insertTodoIntoComposer`. The inline paste dropdown resolves the saved project ID
 against current sidebar projects, lists threads with that project's exact path,
 and rechecks project membership before navigation. Choosing a destination does
-not change the saved task link or submit the chat draft. Image formats are validated through the store’s
+not change the saved task link or submit the chat draft. Transfers wait for the
+destination task's composer identity; selecting its sidebar row alone is insufficient.
+Navigation changes cancel pending preset selections and insertion into another task.
+Prompt placeholders preserve literal selection and clipboard text, including dollar signs.
+Image formats are validated through the store’s
 `isAcceptedImageType`, and `todoImageStore.load` retrieves deferred image data. Teardown disconnects project
 observation, aborts image readers, and prevents pending callbacks from changing a
 replacement UI.

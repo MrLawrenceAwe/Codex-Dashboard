@@ -65,7 +65,10 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForStableComposer = false } = {}) {
+  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForStableComposer = false, threadID = null } = {}) {
+    const isDestination = () => !isDestroyed()
+      && (!threadID || codexUIContracts.activeComposerThreadID() === threadID);
+    const destinationComposer = () => isDestination() ? activeComposer() : null;
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
     const [loadedItem] = await todoImageStore.load([item]);
@@ -75,7 +78,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     const composer = await domUtils.waitFor(
       () => {
         if (isDestroyed()) return null;
-        const current = activeComposer();
+        const current = destinationComposer();
         if (!current) {
           observedComposer = null;
           return null;
@@ -91,7 +94,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       },
       { timeout: 5000, interval: 25 },
     );
-    if (!composer || isDestroyed()) {
+    if (!composer || !isDestination()) {
       if (!isDestroyed()) {
         if (keepDraftOnPresetFailure) {
           showComposerWarning(activeComposer(), 'Could not find the new task editor. Return to To-dos and try again.');
@@ -105,7 +108,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     }
     let presetFailed = false;
     if (item.preset) {
-      if (!await composerModelPicker.applyPreset(item.preset)) {
+      if (!await composerModelPicker.applyPreset(item.preset, { isCurrent: isDestination })) {
         if (keepDraftOnPresetFailure) {
           presetFailed = true;
         } else {
@@ -118,6 +121,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
         }
       }
     }
+    if (!isDestination()) return false;
     const notice = document.querySelector('[data-todo-composer-error]');
     if (notice) notice.hidden = true;
     const content = [item.title, item.body].filter(Boolean).join('\n\n');
@@ -134,7 +138,8 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     };
     let imageComposer = null;
     for (let attempt = 0; attempt < 3 && !isDestroyed(); attempt += 1) {
-      const editor = activeComposer();
+      if (!isDestination()) return false;
+      const editor = destinationComposer();
       if (!editor) {
         await domUtils.delay(100);
         continue;
@@ -151,7 +156,8 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
         imageComposer = editor;
       }
       await domUtils.delay(100);
-      const current = activeComposer();
+      if (!isDestination()) return false;
+      const current = destinationComposer();
       if (current && containsText(current) && (!image || current === imageComposer)) {
         if (presetFailed) showComposerWarning(
           current,
@@ -185,7 +191,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
         showTransferError('Could not open the selected chat/task. Choose a chat/task again.');
         return;
       }
-      if (!await insertTodoIntoComposer(item, { waitForStableComposer: true })) {
+      if (!await insertTodoIntoComposer(item, { waitForStableComposer: true, threadID: thread.id })) {
         if (!isDestroyed()) showTransferError('Could not paste this to-do. Check the chat/task editor and composer preset, then try again.');
       }
     } finally {

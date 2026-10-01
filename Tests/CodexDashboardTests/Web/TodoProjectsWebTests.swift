@@ -469,6 +469,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
                     composer.placeholder = 'Do anything';
                     document.querySelector('main').append(composer);
                   }
+                  document.querySelector('main').__reactFiber$test = {
+                    memoizedProps: { conversationId: 'linked-chat' },
+                  };
                 });
               </script>
             </body></html>
@@ -570,6 +573,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
                 document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', (event) => {
                   event.currentTarget.setAttribute('aria-current', 'page');
                   window.__navigationCount = (window.__navigationCount || 0) + 1;
+                  document.querySelector('main').__reactFiber$test = {
+                    memoizedProps: { conversationId: 'chosen' },
+                  };
                 });
                 document.addEventListener('submit', () => { window.__submitCount = (window.__submitCount || 0) + 1; });
               </script>

@@ -74,8 +74,8 @@ function createPromptLibrary({ findThread }) {
 
   function expandedPromptContent(content, clipboardText = '') {
     return content
-      .replaceAll('{{selection}}', capturedSelectionText)
-      .replaceAll('{{clipboard}}', clipboardText);
+      .replaceAll('{{selection}}', () => capturedSelectionText)
+      .replaceAll('{{clipboard}}', () => clipboardText);
   }
 
   function closeLibrary({ restoreFocus = true } = {}) {
