@@ -22,7 +22,7 @@ extension AppCoordinator {
             await refreshInactiveAccountUsage(interactionAllowed: true)
             presentationAlreadyUpdated = true
         case .saveCurrentAccount:
-            saveCurrentAccount()
+            await saveCurrentAccount()
             presentationAlreadyUpdated = false
         case .switchAccount:
             guard let accountID = action.accountID else { return .unavailable }
@@ -33,7 +33,7 @@ extension AppCoordinator {
             presentationAlreadyUpdated = false
         case .forgetAccount:
             guard let accountID = action.accountID else { return .unavailable }
-            accounts.forgetSavedAccount(accountID)
+            await accounts.forgetSavedAccount(accountID)
             presentationAlreadyUpdated = false
         }
         if !presentationAlreadyUpdated {
@@ -43,8 +43,8 @@ extension AppCoordinator {
     }
 
     func refreshAccountStateAfterFileChange() async {
-        accounts.refreshState()
-        if accounts.synchronizeActiveCredentialAfterFileChange() {
+        await accounts.refreshState()
+        if await accounts.synchronizeActiveCredentialAfterFileChange() {
             await refreshAccountUsage()
             return
         }
@@ -52,22 +52,22 @@ extension AppCoordinator {
         await publishAccountPopoverSnapshot()
     }
 
-    func refreshAccountState() {
-        accounts.refreshState()
+    func refreshAccountState() async {
+        await accounts.refreshState()
     }
 
-    func saveCurrentAccount() {
-        if accounts.saveCurrentAccount() {
+    func saveCurrentAccount() async {
+        if await accounts.saveCurrentAccount() {
             Task { await refreshAccountUsage() }
         }
     }
 
     func switchAccount(to accountID: UUID) async {
-        await performAccountTransition { try accounts.activate(accountID) }
+        await performAccountTransition { try await accounts.activate(accountID) }
     }
 
     func beginAddingAccount() async {
-        await performAccountTransition { try accounts.beginAddingAccount() }
+        await performAccountTransition { try await accounts.beginAddingAccount() }
     }
 
     func dashboardSnapshotPayload() -> DashboardSnapshot {
@@ -78,7 +78,7 @@ extension AppCoordinator {
     }
 
     private func performAccountTransition(
-        transaction: () throws -> AccountTransition
+        transaction: () async throws -> AccountTransition
     ) async {
         guard !isPerformingAction, let dashboardRuntime else { return }
 
@@ -107,11 +107,11 @@ extension AppCoordinator {
         accounts.persistUsageCache(force: true)
         let accountTransaction: AccountTransition
         do {
-            accountTransaction = try transaction()
+            accountTransaction = try await transaction()
         } catch {
             accounts.setStatusMessage(error.localizedDescription)
             accounts.restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
-            accounts.refreshState()
+            await accounts.refreshState()
             return
         }
 
@@ -123,10 +123,10 @@ extension AppCoordinator {
             targets = try await dashboardRuntime.restartCodex()
         } catch let restartError {
             do {
-                try accounts.rollback(accountTransaction)
+                try await accounts.rollback(accountTransaction)
             } catch let rollbackError {
                 accounts.invalidateUsage()
-                accounts.refreshState()
+                await accounts.refreshState()
                 accounts.setStatusMessage(
                     "Codex could not restart, and the account change could not be rolled back. "
                         + rollbackError.localizedDescription
@@ -135,7 +135,7 @@ extension AppCoordinator {
                 return
             }
             accounts.invalidateUsage()
-            accounts.refreshState()
+            await accounts.refreshState()
             accounts.setStatusMessage("Codex could not restart, so the account change was rolled back.")
             dashboardRuntime.prepareForRestart()
             _ = try? await dashboardRuntime.restartCodex()
@@ -143,7 +143,7 @@ extension AppCoordinator {
             return
         }
 
-        accounts.refreshState()
+        await accounts.refreshState()
         accounts.restoreActiveUsageFromCache()
         accounts.setStatusMessage(
             accounts.activeAccountName.map { "Switched to \($0)." }
@@ -192,6 +192,7 @@ extension AppCoordinator {
         reportsFailure: Bool = true,
         interactionAllowed: Bool = false
     ) async -> UsageRefreshAuthorization {
+        await accounts.refreshState()
         if accountID == accounts.activeSavedAccountID {
             await refreshAccountUsage()
             return .notRequired

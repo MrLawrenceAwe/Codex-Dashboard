@@ -80,7 +80,10 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
             document.activeAccountID = nil
             return
         }
-        guard let identity = AccountIdentityDecoder.identity(in: credential) else { return }
+        guard let identity = AccountIdentityDecoder.identity(in: credential) else {
+            document.activeAccountID = nil
+            return
+        }
         if let account = document.accounts.first(where: {
             $0.codexAccountID == identity.identifier
         }) {

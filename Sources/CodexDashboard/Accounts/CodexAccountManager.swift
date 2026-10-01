@@ -41,9 +41,12 @@ final class CodexAccountManager: @unchecked Sendable {
         self.now = now
     }
 
-    func activeCodexAccountID() throws -> String? {
+    func loadState() throws -> (SavedAccountsDocument, String?) {
         try lock.withLock {
-            try activeCredentialFile.read().flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
+            let document = try documentStore.load()
+            let identifier = try activeCredentialFile.read()
+                .flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
+            return (document, identifier)
         }
     }
 
@@ -110,8 +113,6 @@ final class CodexAccountManager: @unchecked Sendable {
             if
                 let index = document.accounts.firstIndex(where: {
                     $0.codexAccountID == identity.identifier
-                }) ?? document.activeAccountID.flatMap({ activeID in
-                    document.accounts.firstIndex(where: { $0.id == activeID })
                 })
             {
                 document.accounts[index].name = identity.accountName
@@ -235,8 +236,10 @@ final class CodexAccountManager: @unchecked Sendable {
     private func saveActiveCredentialIfKnown(_ document: SavedAccountsDocument) throws {
         guard
             let activeID = document.activeAccountID,
-            document.accounts.contains(where: { $0.id == activeID }),
-            let credential = try activeCredentialFile.read()
+            let account = document.accounts.first(where: { $0.id == activeID }),
+            let credential = try activeCredentialFile.read(),
+            let identity = AccountIdentityDecoder.identity(in: credential),
+            identity.identifier == account.codexAccountID
         else { return }
         try vault.store(credential, for: activeID)
     }

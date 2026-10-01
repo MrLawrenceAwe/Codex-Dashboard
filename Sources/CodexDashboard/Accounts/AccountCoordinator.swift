@@ -19,7 +19,10 @@ final class AccountCoordinator: ObservableObject {
 
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
+    private let accountOperationQueue = DispatchQueue(label: "codex-dashboard.account-operations")
     private var usageGeneration = 0
+    private var stateRefresh: (id: UUID, task: Task<(SavedAccountsDocument, String?), Error>)?
+    private var activeUsageRefresh: (id: UUID, task: Task<Void, Never>)?
     private var activeCodexAccountID: String?
 
     init(
@@ -33,18 +36,33 @@ final class AccountCoordinator: ObservableObject {
             cache: usageCacheStore ?? manager.usageCacheStore
         )
         usageByAccountID = usageSession.loadCache()
-        refreshState()
-        restoreActiveUsageFromCache()
     }
 
     var activeAccountName: String? {
         savedAccounts.first { $0.id == activeSavedAccountID }?.name
     }
 
-    func refreshState() {
+    // Keychain reads (including document migrations) and mutations run away from
+    // the main actor, in submission order. The manager's lock also protects callers
+    // outside this coordinator while each complete transaction is in progress.
+    private func withManager<Value: Sendable>(
+        _ operation: @escaping @Sendable (CodexAccountManager) throws -> Value
+    ) async throws -> Value {
+        let manager = manager
+        return try await withCheckedThrowingContinuation { continuation in
+            accountOperationQueue.async {
+                continuation.resume(with: Result { try operation(manager) })
+            }
+        }
+    }
+
+    func refreshState() async {
+        let request = stateRefresh ?? (UUID(), Task { try await withManager { try $0.loadState() } })
+        stateRefresh = request
         do {
-            let document = try manager.loadDocument()
-            let identifier = try manager.activeCodexAccountID()
+            let (document, identifier) = try await request.task.value
+            guard stateRefresh?.id == request.id else { return }
+            stateRefresh = nil
             let accounts = document.accounts.sorted {
                 if $0.lastUsedAt == $1.lastUsedAt { return $0.name < $1.name }
                 return $0.lastUsedAt > $1.lastUsedAt
@@ -61,23 +79,30 @@ final class AccountCoordinator: ObservableObject {
                 restoreActiveUsageFromCache()
             }
         } catch {
+            guard stateRefresh?.id == request.id else { return }
+            stateRefresh = nil
             statusMessage = error.localizedDescription
         }
     }
 
     @discardableResult
-    func saveCurrentAccount() -> Bool {
+    func saveCurrentAccount() async -> Bool {
         do {
-            refreshState()
+            await refreshState()
             let existingUsage = activeUsageStatus.snapshot
-            let account = try manager.saveCurrentAccount()
-            if let existingUsage { usageByAccountID[account.id] = existingUsage }
+            let usageAccountID = activeCodexAccountID
+            let account = try await withManager { try $0.saveCurrentAccount() }
+            stateRefresh = nil
+            if let existingUsage, account.codexAccountID == usageAccountID {
+                usageByAccountID[account.id] = existingUsage
+            }
             accountsRequiringSignIn.remove(account.id)
             usageErrorsByAccountID[account.id] = nil
-            refreshState()
+            await refreshState()
             persistUsageCache(force: true)
             statusMessage = "Saved \(account.name) securely in Keychain."
-            if let existingUsage { activeUsageStatus = .available(existingUsage) }
+            if let existingUsage, account.codexAccountID == usageAccountID,
+               activeSavedAccountID == account.id { activeUsageStatus = .available(existingUsage) }
             return true
         } catch {
             statusMessage = error.localizedDescription
@@ -86,17 +111,18 @@ final class AccountCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func synchronizeActiveCredentialAfterFileChange() -> Bool {
+    func synchronizeActiveCredentialAfterFileChange() async -> Bool {
         do {
-            refreshState()
+            await refreshState()
             guard let activeCodexAccountID,
                   savedAccounts.contains(where: { $0.codexAccountID == activeCodexAccountID })
             else { return false }
-            let account = try manager.saveCurrentAccount()
+            let account = try await withManager { try $0.saveCurrentAccount() }
+            stateRefresh = nil
             let completedReauthentication = accountsRequiringSignIn.contains(account.id)
             accountsRequiringSignIn.remove(account.id)
             usageErrorsByAccountID[account.id] = nil
-            refreshState()
+            await refreshState()
             persistUsageCache(force: true)
             if completedReauthentication {
                 statusMessage = "Signed in as \(account.name). Saved the refreshed credential securely in Keychain."
@@ -110,32 +136,38 @@ final class AccountCoordinator: ObservableObject {
         }
     }
 
-    func forgetSavedAccount(_ accountID: UUID) {
+    func forgetSavedAccount(_ accountID: UUID) async {
         do {
-            try manager.forgetSavedAccount(accountID)
+            try await withManager { try $0.forgetSavedAccount(accountID) }
+            stateRefresh = nil
             statusMessage = "Removed the saved account from Keychain."
             usageByAccountID[accountID] = nil
             refreshingUsageAccountIDs.remove(accountID)
             usageErrorsByAccountID[accountID] = nil
             accountsRequiringSignIn.remove(accountID)
             persistUsageCache(force: true)
-            refreshState()
+            await refreshState()
             if activeSavedAccountID == nil { activeUsageStatus = .unavailable }
         } catch {
             statusMessage = error.localizedDescription
         }
     }
 
-    func activate(_ accountID: UUID) throws -> AccountTransition {
-        try manager.activate(accountID: accountID)
+    func activate(_ accountID: UUID) async throws -> AccountTransition {
+        let transition = try await withManager { try $0.activate(accountID: accountID) }
+        stateRefresh = nil
+        return transition
     }
 
-    func beginAddingAccount() throws -> AccountTransition {
-        try manager.beginAddingAccount()
+    func beginAddingAccount() async throws -> AccountTransition {
+        let transition = try await withManager { try $0.beginAddingAccount() }
+        stateRefresh = nil
+        return transition
     }
 
-    func rollback(_ transition: AccountTransition) throws {
-        try manager.rollback(transition)
+    func rollback(_ transition: AccountTransition) async throws {
+        try await withManager { try $0.rollback(transition) }
+        stateRefresh = nil
     }
 
     func setStatusMessage(_ message: String?) {
@@ -157,6 +189,8 @@ final class AccountCoordinator: ObservableObject {
 
     func invalidateUsage() {
         usageGeneration += 1
+        activeUsageRefresh?.task.cancel()
+        activeUsageRefresh = nil
         // New usage requests already wait for the queued provider reset. Account
         // transitions only need to cancel old requests and reject their results.
         usageSession.invalidate()
@@ -164,7 +198,20 @@ final class AccountCoordinator: ObservableObject {
 
     func refreshActiveUsage(codexIsRunning: Bool) async {
         guard codexIsRunning else { return }
-        refreshState()
+        if let request = activeUsageRefresh {
+            await request.task.value
+            return
+        }
+        let id = UUID()
+        let task = Task { await performActiveUsageRefresh() }
+        activeUsageRefresh = (id, task)
+        await task.value
+        if activeUsageRefresh?.id == id { activeUsageRefresh = nil }
+    }
+
+    private func performActiveUsageRefresh() async {
+        await refreshState()
+        guard !Task.isCancelled else { return }
         let generation = usageGeneration
         let accountID = activeSavedAccountID
         let previous = activeUsageStatus.snapshot
@@ -192,6 +239,7 @@ final class AccountCoordinator: ObservableObject {
     }
 
     func refreshInactiveUsage(interactionAllowed: Bool = false) async {
+        await refreshState()
         let generation = usageGeneration
         let inactiveAccounts = savedAccounts.filter { $0.id != activeSavedAccountID }
         var shouldPersistUsageCache = false
@@ -216,6 +264,7 @@ final class AccountCoordinator: ObservableObject {
         interactionAllowed: Bool = false,
         persistsUsageCache: Bool = true
     ) async -> UsageRefreshAuthorization {
+        await refreshState()
         if accountID == activeSavedAccountID { return .notRequired }
         guard savedAccounts.contains(where: { $0.id == accountID }) else { return .notRequired }
 
@@ -223,9 +272,13 @@ final class AccountCoordinator: ObservableObject {
         refreshingUsageAccountIDs.insert(accountID)
         defer { refreshingUsageAccountIDs.remove(accountID) }
         do {
-            let credential = try manager.savedCredential(
-                for: accountID, interactionAllowed: interactionAllowed
-            )
+            let credential = try await withManager {
+                try $0.savedCredential(for: accountID, interactionAllowed: interactionAllowed)
+            }
+            guard !Task.isCancelled, generation == usageGeneration,
+                  accountID != activeSavedAccountID,
+                  savedAccounts.contains(where: { $0.id == accountID })
+            else { return .notRequired }
             let result = try await usageSession.fetchUsage(using: credential, for: accountID)
             guard !Task.isCancelled,
                   generation == usageGeneration,
@@ -233,11 +286,14 @@ final class AccountCoordinator: ObservableObject {
                   savedAccounts.contains(where: { $0.id == accountID })
             else { return .notRequired }
 
-            try manager.updateSavedCredential(
-                result.credential,
-                for: accountID,
-                interactionAllowed: interactionAllowed
-            )
+            try await withManager {
+                try $0.updateSavedCredential(result.credential, for: accountID,
+                                            interactionAllowed: interactionAllowed)
+            }
+            guard !Task.isCancelled, generation == usageGeneration,
+                  accountID != activeSavedAccountID,
+                  savedAccounts.contains(where: { $0.id == accountID })
+            else { return .notRequired }
             usageByAccountID[accountID] = CodexAccountUsageSnapshot(
                 usage: result.usage,
                 fetchedAt: .now

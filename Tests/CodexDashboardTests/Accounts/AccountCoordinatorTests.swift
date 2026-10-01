@@ -1,6 +1,30 @@
 import XCTest
 @testable import CodexDashboard
 
+private final class ThreadRecordingCredentialVault: AccountCredentialVault, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [UUID: Data] = [:]
+    private var mainThreadCalls: [Bool] = []
+
+    func credential(for id: UUID) -> Data? {
+        lock.withLock {
+            mainThreadCalls.append(Thread.isMainThread)
+            return values[id]
+        }
+    }
+    func credentialWithoutUserInteraction(for id: UUID) -> Data? { credential(for: id) }
+    func store(_ data: Data, for id: UUID) {
+        lock.withLock {
+            mainThreadCalls.append(Thread.isMainThread)
+            values[id] = data
+        }
+    }
+    func storeWithoutUserInteraction(_ data: Data, for id: UUID) { store(data, for: id) }
+    func deleteCredential(for id: UUID) { lock.withLock { values[id] = nil } }
+    func resetCalls() { lock.withLock { mainThreadCalls = [] } }
+    var calls: [Bool] { lock.withLock { mainThreadCalls } }
+}
+
 private actor CachedAccountUsageProvider: AccountUsageProviding {
     private var current: CodexAccountUsage
     private var cached: CodexAccountUsage?
@@ -20,7 +44,7 @@ private actor CachedAccountUsageProvider: AccountUsageProviding {
 
 @MainActor
 private final class AccountChangingUsageProvider: AccountUsageProviding {
-    var onFetch: (() throws -> Void)?
+    var onFetch: (() async throws -> Void)?
     private(set) var requestCount = 0
 
     func usage() async throws -> CodexAccountUsage {
@@ -29,7 +53,7 @@ private final class AccountChangingUsageProvider: AccountUsageProviding {
 
     func usage(using credential: Data) async throws -> SavedAccountUsageResult {
         requestCount += 1
-        try onFetch?()
+        try await onFetch?()
         return SavedAccountUsageResult(usage: try await usage(), credential: credential)
     }
 
@@ -64,6 +88,32 @@ private struct ExpiredAccountUsageProvider: AccountUsageProviding {
 
 @MainActor
 final class AccountCoordinatorTests: XCTestCase {
+    func testUsageRefreshReadsAndWritesKeychainOffMainThread() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        let vault = ThreadRecordingCredentialVault()
+        let manager = CodexAccountManager(metadataURL: directory.appendingPathComponent("accounts.json"),
+                                          authenticationURL: auth, vault: vault)
+        try testAccountCredential(accountID: "inactive", name: "Inactive").write(to: auth)
+        let account = try manager.saveCurrentAccount()
+        try testAccountCredential(accountID: "active", name: "Active").write(to: auth)
+        _ = try manager.saveCurrentAccount()
+        let coordinator = AccountCoordinator(manager: manager, usageProvider: StubAccountUsageProvider())
+        vault.resetCalls()
+
+        _ = await coordinator.refreshInactiveAccountUsage(account.id, interactionAllowed: true)
+
+        XCTAssertEqual(vault.calls, [false, false])
+        XCTAssertNotNil(coordinator.usageByAccountID[account.id])
+
+        vault.resetCalls()
+        let saved = await coordinator.saveCurrentAccount()
+        XCTAssertTrue(saved)
+        XCTAssertEqual(vault.calls, [false])
+    }
+
     func testExpiredInactiveAccountRequiresSignInInsteadOfCredentialSwitch() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -108,9 +158,10 @@ final class AccountCoordinatorTests: XCTestCase {
             withJSONObject: refreshedCredentialObject
         )
         try refreshedCredential.write(to: auth)
-        coordinator.refreshState()
+        await coordinator.refreshState()
 
-        XCTAssertTrue(coordinator.synchronizeActiveCredentialAfterFileChange())
+        let synchronized = await coordinator.synchronizeActiveCredentialAfterFileChange()
+        XCTAssertTrue(synchronized)
         let refreshedItem = try XCTUnwrap(
             coordinator.popoverSnapshot(isBusy: false).accounts.first { $0.id == expired.id }
         )
@@ -173,7 +224,7 @@ final class AccountCoordinatorTests: XCTestCase {
         let coordinator = AccountCoordinator(manager: manager, usageProvider: provider)
         provider.onFetch = { [weak coordinator] in
             try testAccountCredential(accountID: "New", name: "New").write(to: auth)
-            coordinator?.refreshState()
+            await coordinator?.refreshState()
         }
 
         await coordinator.refreshInactiveUsage(interactionAllowed: true)
@@ -203,7 +254,7 @@ final class AccountCoordinatorTests: XCTestCase {
         let usageB = CodexAccountUsage(fiveHour: CodexUsageWindow(usedPercent: 10, resetsAt: nil), weekly: nil)
         await provider.changeAccountUsage(to: usageB)
         try credentialB.write(to: auth)
-        coordinator.refreshState()
+        await coordinator.refreshState()
         XCTAssertEqual(coordinator.activeSavedAccountID, accountB.id)
         XCTAssertNil(coordinator.activeUsageStatus.snapshot, "Account B has never had usage fetched; must not show A's usage")
         await coordinator.refreshActiveUsage(codexIsRunning: true)
@@ -217,7 +268,7 @@ final class AccountCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.activeUsageStatus.snapshot?.usage, usageA)
     }
 
-    func testForgettingActiveAccountDoesNotAutomaticallySaveItAgain() throws {
+    func testForgettingActiveAccountDoesNotAutomaticallySaveItAgain() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -231,12 +282,14 @@ final class AccountCoordinatorTests: XCTestCase {
         let account = try manager.saveCurrentAccount()
         let coordinator = AccountCoordinator(manager: manager, usageProvider: StubAccountUsageProvider())
 
-        coordinator.forgetSavedAccount(account.id)
-        XCTAssertFalse(coordinator.synchronizeActiveCredentialAfterFileChange())
+        await coordinator.forgetSavedAccount(account.id)
+        let synchronized = await coordinator.synchronizeActiveCredentialAfterFileChange()
+        XCTAssertFalse(synchronized)
         XCTAssertTrue(try manager.loadDocument().accounts.isEmpty)
         XCTAssertNil(coordinator.activeSavedAccountID)
 
-        XCTAssertTrue(coordinator.saveCurrentAccount())
+        let saved = await coordinator.saveCurrentAccount()
+        XCTAssertTrue(saved)
         XCTAssertEqual(try manager.loadDocument().accounts.count, 1)
     }
 }
