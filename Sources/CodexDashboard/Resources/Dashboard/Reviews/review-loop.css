@@ -92,6 +92,10 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-round-findings :is(a, .review-file-link) { color:var(--review-accent); text-decoration:underline; text-underline-offset:2px; }
 .dashboard-review-loop .review-round-findings .review-file-link { display:inline; border:0; border-radius:2px; padding:0; background:none; font:inherit; }
 .dashboard-review-loop .review-round-findings .review-file-link:hover { background:none; }
+.dashboard-review-loop .review-findings-details { margin-top:8px; }
+.dashboard-review-loop .review-findings-details:not([open]) > .review-round-findings { display:none; }
+.dashboard-review-loop .review-findings-details[open] .review-findings-show,
+.dashboard-review-loop .review-findings-details:not([open]) .review-findings-hide { display:none; }
 .dashboard-review-loop .review-round-details { margin-top:8px; }
 .dashboard-review-loop summary { cursor:pointer; color:var(--review-muted); font-size:11px; width:fit-content; }
 .dashboard-review-loop .review-round-details p { margin-top:10px; overflow-wrap:anywhere; white-space:pre-wrap; font-size:12px; }
