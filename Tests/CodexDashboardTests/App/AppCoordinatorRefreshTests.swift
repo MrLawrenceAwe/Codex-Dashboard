@@ -57,7 +57,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(coordinator.connectionState, .dashboardMounted)
         XCTAssertNil(coordinator.connectionError)
         XCTAssertEqual(coordinator.connectionNotice, AccountTestError.mountFailed.localizedDescription)
-        XCTAssertEqual(coordinator.statusPresentation.title, "Task Dashboard is live")
+        XCTAssertEqual(coordinator.statusPresentation.title, "Chat overview is live")
     }
 
     func testUnchangedSynchronizationDoesNotRepublishViewState() async {

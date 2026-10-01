@@ -494,7 +494,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
             XCTAssertEqual(driver.interruptedTurns, [fixing ? "turn-2" : "turn-1"])
             XCTAssertEqual(driver.thread.turns.last?.status, "interrupted")
-            XCTAssertEqual(store.loops.last?.message, "Stopped loop and its running task.")
+            XCTAssertEqual(store.loops.last?.message, "Stopped loop and its running chat.")
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts.count, fixing ? 2 : 1)
         }
@@ -520,7 +520,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             XCTFail("Expected interrupt failure")
         } catch { }
         XCTAssertEqual(store.loops.last?.phase, .stopped)
-        XCTAssertTrue(store.loops.last!.message.contains("could not stop its task"))
+        XCTAssertTrue(store.loops.last!.message.contains("could not stop its chat"))
         driver.failStopThread = false
         try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
         XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
@@ -585,7 +585,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.finish(findings: 1, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Limit reached")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Round limit reached")
         XCTAssertEqual(coordinator.loops.last?.message, "All configured review rounds completed.")
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])

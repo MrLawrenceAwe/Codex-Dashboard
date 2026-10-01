@@ -9,6 +9,7 @@ const reviewLoopView = (() => {
   const isFinished = loop => finishedLoopIDs.has(loop.id);
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
   const supportsProjectContext = focus => reviewTypes.find(type => type.id === focus)?.supportsProjectContext === true;
+  const reasoningLabel = value => value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1);
 
   function findingBody(body, loopID) {
     const text = String(body || '');
@@ -68,9 +69,9 @@ const reviewLoopView = (() => {
         </fieldset>
         <fieldset class="review-limits"><legend>Review settings</legend>
         <label>Review type<select data-review-focus aria-label="Review type"></select></label>
-        <label class="review-priority">Priorities<select data-review-priority aria-label="Review and fix priority limit">
-          <option value="P0">P0 only · Critical</option><option value="P1">P0–P1 · High and critical</option>
-          <option value="P2" selected>P0–P2 · Medium and higher</option><option value="P3">P0–P3 · All priorities</option>
+        <label class="review-priority">Finding priority<select data-review-priority aria-label="Review and fix priority limit">
+          <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
+          <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
         <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits fixes when findings are found. Stops when no findings remain or the limit is reached.</p>
@@ -78,16 +79,16 @@ const reviewLoopView = (() => {
         <details class="review-execution-options" open><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
         <label>Review model<select data-review-model required aria-label="Review model"><option value="">Choose a model</option></select></label>
-        <label>Review reasoning<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <label>Review reasoning effort<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
         <label>Fix model<select data-fix-model required aria-label="Fix model"><option value="">Choose a model</option></select></label>
-        <label>Fix reasoning<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
-        <label>Loop speed<select data-review-speed aria-label="Loop speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
+        <label>Fix reasoning effort<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
+        <label>Response speed<select data-review-speed aria-label="Response speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         </fieldset>
         </details>
         <p class="review-availability" data-review-availability role="status" hidden></p>
         <div data-review-error role="alert" hidden></div>
         <div class="review-form-footer">
-          <button type="submit" data-review-start>Start loop <span aria-hidden="true">→</span></button>
+          <button type="submit" data-review-start>Start review &amp; fix <span aria-hidden="true">→</span></button>
         </div>
       </form>
       <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
@@ -95,9 +96,10 @@ const reviewLoopView = (() => {
         <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
         <div class="review-history-actions">
           <button type="button" data-review-history-action="delete">Delete selected</button>
-          <button type="button" data-review-history-action="deleteOlder">Delete older</button>
-          <button type="button" data-review-history-action="deleteAll">Delete all</button>
+          <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete earlier reviews</button>
+          <button type="button" data-review-history-action="deleteAll">Delete all history</button>
         </div>
+        <p id="review-history-delete-help" class="review-field-help">Deletes saved reviews before the selected review. Review chats remain available.</p>
         <details class="review-history-details" data-review-history-details>
           <summary>Review details</summary>
           <div data-review-history-card></div>
@@ -120,7 +122,7 @@ const reviewLoopView = (() => {
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
         <div class="review-live" data-review-live hidden>
-          <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open task ↗</button></div>
+          <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open chat ↗</button></div>
           <div class="review-prompt" data-review-current-prompt>
             <div class="review-prompt-heading"><span data-review-current-label>Current prompt</span><span data-review-current-title></span></div>
             <p data-review-current-note></p><pre data-review-current-text></pre>
@@ -152,7 +154,7 @@ const reviewLoopView = (() => {
     const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
     const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
-    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1))}</option>`).join('');
+    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(reasoningLabel(value))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
     select.disabled = !model || !!pendingAction;
   }
@@ -200,7 +202,7 @@ const reviewLoopView = (() => {
     root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
     for (const kind of ['review', 'fix']) root.querySelector(`[data-${kind}-effort]`).disabled ||= !root.querySelector(`[data-${kind}-model]`).value;
     renderReviewSettings();
-    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start loop <span aria-hidden="true">→</span>';
+    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
     const current = loops.filter(loop => !isFinished(loop) || retainedLoopIDs.has(loop.id));
     root.querySelector('[data-review-empty]').hidden = current.length > 0;
@@ -232,7 +234,7 @@ const reviewLoopView = (() => {
   }
 
   function phaseLabel(loop) {
-    return loop.phase === 'limitReached' ? 'Limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
+    return loop.phase === 'limitReached' ? 'Round limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
   }
 
   function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs = new Set()) {
@@ -252,7 +254,7 @@ const reviewLoopView = (() => {
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(selection.reasoningEffort)}` : ''}` : 'Not recorded'}</span>`;
+    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const focusLabel = reviewTypes.find(type => type.id === loop.focus)?.label || loop.focus || '';
     root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
@@ -266,7 +268,7 @@ const reviewLoopView = (() => {
     meter.value = completedRounds;
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Clear</button>` : '') : `${loop.phase === 'paused'
+    controls.innerHTML = isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'paused'
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;

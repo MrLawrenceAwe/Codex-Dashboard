@@ -260,9 +260,9 @@ extension PromptLibraryWebTests {
         ) as? String
         let values = try decodeJSONObject(try XCTUnwrap(result))
 
-        XCTAssertEqual(values["projectAHeadings"] as? [String], ["This project · Project A", "Global"])
+        XCTAssertEqual(values["projectAHeadings"] as? [String], ["This project · Project A", "All projects"])
         XCTAssertEqual(values["projectANames"] as? [String], ["Project A prompt", "Global prompt"])
-        XCTAssertEqual(values["projectBHeadings"] as? [String], ["This project · Project B", "Global"])
+        XCTAssertEqual(values["projectBHeadings"] as? [String], ["This project · Project B", "All projects"])
         XCTAssertEqual(values["projectBNames"] as? [String], ["Global prompt"])
         XCTAssertEqual(values["version"] as? Int, 3)
         XCTAssertEqual(

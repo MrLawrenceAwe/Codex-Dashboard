@@ -91,7 +91,7 @@ enum CodexAccountError: LocalizedError {
         case .accountNotFound:
             return "The selected Codex account no longer exists."
         case .activeTasks:
-            return "Wait for active Codex tasks to finish before switching accounts."
+            return "Wait for active Codex chats to finish before switching accounts."
         case .accountIdentityUnavailable:
             return "Codex could not read the signed-in account identity. Sign in again, then save the account."
         case .credentialAccountMismatch:

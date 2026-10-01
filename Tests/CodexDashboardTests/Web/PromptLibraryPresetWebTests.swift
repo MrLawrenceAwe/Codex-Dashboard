@@ -413,7 +413,7 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(values["dialogOpen"] as? Bool, true)
         XCTAssertEqual(
             values["error"] as? String,
-            "Could not apply this prompt’s composer preset. The prompt was not inserted."
+            "Could not apply this prompt’s model settings. The prompt was not inserted."
         )
         XCTAssertEqual(values["content"] as? String, "")
     }

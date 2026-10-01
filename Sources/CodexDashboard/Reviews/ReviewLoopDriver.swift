@@ -74,7 +74,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
             "experimentalRawEvents": false, "ephemeral": false,
         ])
         guard let thread = response["thread"] as? [String: Any], let id = thread["id"] as? String else {
-            throw ReviewLoopError("Codex did not return the new review task ID.")
+            throw ReviewLoopError("Codex did not return the new review chat ID.")
         }
         // A title is cosmetic; its failure must not turn a known launch into an unknown one.
         _ = try? await request("thread/name/set", ["threadId": id, "name": title])
@@ -95,7 +95,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         // It also covers the time spent creating and naming a new review thread.
         let current = try await repositoryCheckpoint.repository(at: projectPath)
         guard current.clean, current == expectedRepository else {
-            throw ReviewLoopError("The checkout changed before the review task started. Inspect its changes before continuing.")
+            throw ReviewLoopError("The checkout changed before the review chat started. Inspect its changes before continuing.")
         }
         let response = try await request("turn/start", params)
         guard let turn = response["turn"] as? [String: Any], let id = turn["id"] as? String else {
@@ -105,7 +105,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     }
 
     func stopThread(_ threadID: String) async throws {
-        // Read only the latest turn metadata so stopping also works while the task
+        // Read only the latest turn metadata so stopping also works while the chat
         // is waiting for approval or input, without loading its report.
         let page = try await request("thread/turns/list", [
             "threadId": threadID, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
@@ -124,7 +124,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
 
     func readThread(_ threadID: String) async throws -> ReviewThreadState {
         let response = try await request("thread/read", ["threadId": threadID, "includeTurns": false])
-        guard var thread = response["thread"] as? [String: Any] else { throw ReviewLoopError("Codex returned no review task.") }
+        guard var thread = response["thread"] as? [String: Any] else { throw ReviewLoopError("Codex returned no review chat.") }
         // Bounded metadata reads avoid hydrating a long tool transcript on every poll.
         let page = try await request("thread/turns/list", ["threadId": threadID, "limit": 3, "sortDirection": "asc", "itemsView": "notLoaded"])
         guard var turns = page["data"] as? [[String: Any]], turns.count <= 2,
@@ -162,14 +162,14 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         let statusType = threadStatus?["type"] as? String
         let activeFlags = threadStatus?["activeFlags"] as? [String] ?? []
         if activeFlags.contains("waitingOnApproval") || activeFlags.contains("waitingOnUserInput") {
-            throw ReviewLoopError("The review task needs your approval or input. Open its chat; the loop will not continue automatically.")
+            throw ReviewLoopError("The review chat needs your approval or input. Open its chat; the loop will not continue automatically.")
         }
         let states = try turns.map { turn -> ReviewTurnState in
             guard let id = turn["id"] as? String, let status = turn["status"] as? String else {
                 throw ReviewLoopError("Codex returned an invalid review turn.")
             }
             if status == "inProgress", statusType != "active" {
-                throw ReviewLoopError("The review task is no longer active. Open its chat before restarting the loop.")
+                throw ReviewLoopError("The review chat is no longer active. Open its chat before restarting the loop.")
             }
             let items = turn["items"] as? [[String: Any]] ?? []
             let final = items.last { $0["type"] as? String == "agentMessage" && $0["phase"] as? String != "commentary" }

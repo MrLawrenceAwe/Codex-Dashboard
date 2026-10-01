@@ -1,6 +1,6 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS menu-bar utility that adds a recent-task dashboard
+Codex Dashboard is a native macOS menu-bar utility that adds a chat overview
 to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
 and injects a removable dashboard into the main renderer.
 
@@ -8,8 +8,8 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 ## Project overview
 
-- **Task monitoring:** recent activity, unread status, completion tracking and Git working-tree changes.
-- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops in a responsive card grid, grouped setup alongside on wide windows, and previous loops in a separate history section; independent pause/resume/stop controls (stopping also interrupts the running review or fix task) and saved progress; fresh review chats with selectable bugs/issues, code minimisation/organisation, naming, or performance reviews, separate model and reasoning choices for reviews and fixes, priority limits for bugs and performance reviews, automatic address-and-commit follow-ups, and verified commit checkpoints.
+- **Chat monitoring:** recent activity, unread status, completion tracking and Git working-tree changes.
+- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops in a responsive card grid, grouped setup alongside on wide windows, and previous loops in a separate history section; independent pause/resume/stop controls (stopping also interrupts the running review or fix chat) and saved progress; fresh review chats with selectable bugs/issues, code minimisation/organisation, naming, or performance reviews, separate model and reasoning choices for reviews and fixes, priority limits for bugs and performance reviews, automatic address-and-commit follow-ups, and verified commit checkpoints.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 - **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
 - **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
@@ -61,26 +61,26 @@ It moves the installed app to the Trash.
 1. Open **Codex Dashboard** from `$HOME/Applications`; it appears in the menu bar.
 2. Finish any active response in Codex.
 3. Select **Restart & Enable**.
-4. Select **Task Dashboard** directly in the Codex sidebar. It opens in
+4. Select **Chat overview** directly in the Codex sidebar. It opens in
    the main content pane while the rest of Codex navigation stays available.
 
 Select **To-dos** in the same sidebar area to keep a personal task list in Codex's
 local renderer storage.
-Right-click a sidebar chat/task and select **Add to To-dos** to save its title
+Right-click a sidebar chat and select **Add to To-dos** to save its title
 and link, including its project when available. Chats with an open linked to-do
 show **Already in To-dos**.
 Each to-do can be edited, completed, filtered, or deleted without leaving the app.
-New prompt-library and to-do composer presets default to **GPT-6.1 Sol**.
+New prompt-library and to-do model settings default to **GPT-6.1 Sol**.
 The shared model selector also offers the other models; saved presets keep their
 selected model. Review-loop model and reasoning choices come from Codex's live
 model list, including GPT-6.1 Sol when available to the signed-in account.
-For an open to-do with a project assigned, select **Paste in chat/task** to choose
-a chat from an inline dropdown and insert the to-do into its draft. Linked tasks
-are labelled in the dropdown. Pasting includes the title, details, image, and composer preset when
+For an open to-do with a project assigned, select **Paste into chat…** to choose
+a chat from an inline dropdown and insert the to-do into its draft. Linked chats
+are labelled in the dropdown. Pasting includes the title, details, image, and model settings when
 present; it does not send the message.
 
 The application runs without a main window and must remain open to refresh thread activity and restore the dashboard after renderer reloads.
-All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed task on task completion, except for review loop tasks and chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use
+All controls are available from the menu bar, with a separate Diagnostics window available on demand. Launch at Login is optional. By default, the utility brings Codex to the foreground and opens the completed chat when its response finishes, except for review loop chats and chats started in the ChatGPT Chrome extension; this can be disabled from the menu bar. Use
 **Disable dashboard integration** to unload the injected UI immediately. A normal Codex restart also
 removes it.
 
@@ -94,6 +94,6 @@ renderer previews, resource organisation, migrations, and visual baselines.
 
 1. While signed in to Codex, choose **Accounts → Save Current Account**. The dashboard uses the authenticated account's name automatically.
 2. Choose **Sign In to Another Account…**. Codex restarts signed out; complete the normal OpenAI sign-in in Codex.
-3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Task Dashboard**.
+3. Save the second account. You can then switch between the saved accounts from the menu bar or the account selector in **Chat overview**.
 
 Codex still uses one active account at a time. The switcher does not merge accounts, transfer subscriptions or usage, or rotate accounts automatically. Do not commit, export, or manually copy `~/.codex/auth.json`.

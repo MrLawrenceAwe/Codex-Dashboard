@@ -326,7 +326,7 @@ extension TaskDashboardWebTests {
             isRefreshing: false, errorMessage: null,
           }],
           activeAccountID: null,
-          statusMessage: 'Finish or cancel active Codex tasks before changing accounts.',
+          statusMessage: 'Finish or cancel active Codex chats before changing accounts.',
           isBusy: false,
         });
         const panel = document.querySelector('#codex-accounts-panel');
@@ -336,7 +336,7 @@ extension TaskDashboardWebTests {
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Bool, true)
         XCTAssertEqual(values[1] as? Bool, true)
-        XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex tasks") == true)
+        XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex chats") == true)
     }
 
     func testExpiredAccountUsesSignInFlowInsteadOfSwitchingDeadCredential() async throws {

@@ -65,7 +65,7 @@ extension TaskDashboardWebTests {
         XCTAssertEqual(values[1] as? Int, 1)
         XCTAssertEqual(values[2] as? Int, 1)
         XCTAssertEqual(values[3] as? String, "1")
-        XCTAssertEqual(values[4] as? String, "Changed projects 1")
+        XCTAssertEqual(values[4] as? String, "Uncommitted changes 1")
     }
 
     func testChangedProjectsDoesNotOfferLoadMoreForAdditionalTasksInOneProject() async throws {
@@ -202,7 +202,7 @@ extension TaskDashboardWebTests {
 
         XCTAssertEqual(
             try XCTUnwrap(state) as? [AnyHashable],
-            [true, false, "Codex did not show Git actions for the project task."]
+            [true, false, "Codex did not show Git actions for the project chat."]
         )
     }
 
@@ -435,7 +435,7 @@ extension TaskDashboardWebTests {
             """
         ) as? [Any]
 
-        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", true, true, "Task running"])
+        XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", true, true, "Chat running"])
     }
 
 }

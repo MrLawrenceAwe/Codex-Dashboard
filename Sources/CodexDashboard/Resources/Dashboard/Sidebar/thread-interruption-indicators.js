@@ -27,7 +27,7 @@ const threadInterruptionIndicators = (() => {
       }
       marker.setAttribute('role', 'status');
       marker.setAttribute('aria-label', 'Interrupted because the usage limit was reached');
-      marker.setAttribute('title', 'This task was interrupted because the usage limit was reached');
+      marker.setAttribute('title', 'This chat was interrupted because the usage limit was reached');
     });
   }
 

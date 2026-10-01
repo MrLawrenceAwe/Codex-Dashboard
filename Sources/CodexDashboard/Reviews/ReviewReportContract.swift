@@ -156,6 +156,6 @@ enum ReviewReportContract {
     }
 
     private static func invalid() -> ReviewLoopError {
-        ReviewLoopError("The task did not return a complete review-loop report. Open its chat to inspect the result.")
+        ReviewLoopError("The chat did not return a complete review-loop report. Open its chat to inspect the result.")
     }
 }

@@ -350,7 +350,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [Any]
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? [String], ["BUTTON", "button", "Open task: Keyboard target"])
+        XCTAssertEqual(values[0] as? [String], ["BUTTON", "button", "Open chat: Keyboard target"])
         XCTAssertEqual(values[1] as? String, "2")
     }
 

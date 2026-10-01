@@ -43,7 +43,7 @@ const todoListView = (() => {
   function threadMarkup(thread) {
     if (!thread) return '';
     const title = domUtils.escapeHTML(thread.title);
-    return `<div class="todo-thread" aria-label="Linked task: ${title}" title="Linked task: ${title}">
+    return `<div class="todo-thread" aria-label="Linked chat: ${title}" title="Linked chat: ${title}">
       <span aria-hidden="true">#</span><span>${title}</span>
     </div>`;
   }
@@ -52,15 +52,15 @@ const todoListView = (() => {
     const defaults = composerPresets.defaults;
     return `<div class="todo-preset-fields" data-todo-${scope}-preset-fields${preset ? '' : ' hidden'}>
       <label>Model<select data-todo-${scope}-preset-model>${composerPresets.selectOptions(composerPresets.models, preset?.model || defaults.model)}</select></label>
-      <label>Effort<select data-todo-${scope}-preset-effort>${composerPresets.selectOptions(composerPresets.reasoningEfforts, preset?.reasoningEffort || defaults.reasoningEffort)}</select></label>
+      <label>Reasoning effort<select data-todo-${scope}-preset-effort>${composerPresets.selectOptions(composerPresets.reasoningEfforts, preset?.reasoningEffort || defaults.reasoningEffort)}</select></label>
       <label>Speed<select data-todo-${scope}-preset-speed>${composerPresets.selectOptions(composerPresets.speeds, preset?.speed || defaults.speed)}</select></label>
     </div>`;
   }
 
   function itemPresetMarkup(item) {
     return `<details class="todo-preset" data-todo-preset-details>
-      <summary>${domUtils.escapeHTML((composerPresets.summary(item.preset).join(' · ') || 'Composer preset'))}</summary>
-      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Use composer preset</label>
+      <summary>${domUtils.escapeHTML((composerPresets.summary(item.preset).join(' · ') || 'Model settings'))}</summary>
+      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Apply model settings</label>
       ${presetFields(item.preset, 'item')}
     </details>`;
   }
@@ -84,8 +84,8 @@ const todoListView = (() => {
   }
 
   function threadOptions(threads, selectedID = '') {
-    if (!threads.length) return '<option value="">No tasks in this project</option>';
-    return `<option value="">No linked task</option>${threads.map((thread) => (
+    if (!threads.length) return '<option value="">No chats in this project</option>';
+    return `<option value="">No linked chat</option>${threads.map((thread) => (
       `<option value="${domUtils.escapeHTML(thread.id)}"${thread.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(thread.title)}</option>`
     )).join('')}`;
   }
@@ -186,9 +186,9 @@ const todoListView = (() => {
             <button type="button" data-todo-image-remove>Remove image</button>
           </div>` : ''}
           ${!item.completed ? `<div class="todo-item-actions">
-            <button type="button" class="todo-thread-action" data-todo-paste-in-thread aria-expanded="false" aria-label="Choose a chat/task to paste this to-do into" title="${item.project ? 'Choose a chat/task from this project' : 'Assign a project to choose a chat/task'}"${item.project ? '' : ' disabled'}>Paste in chat/task</button>
-            ${!item.thread && item.project ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="Start a new task for ${domUtils.escapeHTML(item.project.name)}" title="Start a new task">New task</button>` : ''}
-            <select class="todo-paste-thread-picker" data-todo-paste-thread aria-label="Chat/task to paste this to-do into" hidden disabled></select>
+            <button type="button" class="todo-thread-action" data-todo-paste-in-thread aria-expanded="false" aria-label="Choose a chat to paste this to-do into" title="${item.project ? 'Choose a chat from this project' : 'Assign a project to choose a chat'}"${item.project ? '' : ' disabled'}>Paste into chat…</button>
+            ${!item.thread && item.project ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="Start a new chat for ${domUtils.escapeHTML(item.project.name)}" title="Start a new chat">New chat</button>` : ''}
+            <select class="todo-paste-thread-picker" data-todo-paste-thread aria-label="Chat to paste this to-do into" hidden disabled></select>
           </div>` : ''}
         </div>
         <button type="button" class="todo-delete" data-todo-delete aria-label="Delete ${domUtils.escapeHTML(item.title)}" title="Delete to-do">
@@ -236,12 +236,12 @@ const todoListView = (() => {
             <textarea data-todo-new-body aria-label="New to-do details" maxlength="5000" placeholder="Add details (optional)" rows="1"></textarea>
             <div class="todo-tag-composer">
               <select data-todo-new-project aria-label="Project">${projectOptions([])}</select>
-              <select data-todo-new-thread-picker aria-label="Linked task" title="Choose a task from the selected project" hidden disabled><option value="">No tasks in this project</option></select>
+              <select data-todo-new-thread-picker aria-label="Linked chat" title="Choose a chat from the selected project" hidden disabled><option value="">No chats in this project</option></select>
               <div class="todo-tags" data-todo-new-tags aria-label="New to-do tags"></div>
               <select data-todo-new-tag aria-label="Tag to attach">${tagOptions([])}</select>
             </div>
             <div class="todo-new-preset">
-              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Use composer preset</label>
+              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Apply model settings</label>
               ${presetFields(null, 'new')}
             </div>
           </div>
@@ -249,7 +249,7 @@ const todoListView = (() => {
         </form>
         <p class="todo-image-paste-status" data-todo-new-image-status hidden></p>
         <p class="todo-storage-error" data-todo-storage-error role="alert" hidden>Could not save this change. It may be lost when Codex reloads.</p>
-        <p class="todo-storage-error" data-todo-composer-error role="alert" hidden>Could not apply this to-do’s composer preset. The to-do was not inserted.</p>
+        <p class="todo-storage-error" data-todo-composer-error role="alert" hidden>Could not apply this to-do’s model settings. The to-do was not inserted.</p>
         <p class="todo-storage-error" data-todo-image-error role="alert" hidden></p>
         <div class="todo-toolbar">
           <div class="todo-filters" aria-label="Filter to-dos">
@@ -261,7 +261,7 @@ const todoListView = (() => {
             <select data-todo-project-filter aria-label="Filter by project"><option value="">All projects</option></select>
             <select data-todo-tag-filter aria-label="Filter by tag"><option value="">All tags</option></select>
           </div>
-          <button type="button" class="todo-clear" data-todo-clear-completed hidden>Clear completed</button>
+          <button type="button" class="todo-clear" data-todo-clear-completed hidden>Delete all completed to-dos</button>
         </div>
         <main class="todo-list" data-todo-list></main>
       </div>`;

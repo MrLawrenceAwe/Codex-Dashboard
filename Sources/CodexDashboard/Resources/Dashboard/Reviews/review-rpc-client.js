@@ -21,7 +21,7 @@ const reviewRPCClient = (() => {
         resolve(JSON.stringify(message));
       };
       const fail = (error) => finish({ error: { message: String(error?.message || error) } });
-      const timer = setTimeout(() => fail('Codex did not acknowledge the request. Inspect the review task before retrying.'), 20000);
+      const timer = setTimeout(() => fail('Codex did not acknowledge the request. Inspect the review chat before retrying.'), 20000);
       pending.set(id, { finish, timer });
       Promise.resolve().then(() => window.electronBridge.sendMessageFromView({
         type: 'mcp-request', hostId: 'local', request: { id, method, params },

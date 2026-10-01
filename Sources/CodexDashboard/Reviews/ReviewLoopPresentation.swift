@@ -20,7 +20,7 @@ enum ReviewLoopPresentation {
     private static func step(for loop: ReviewLoop, round: ReviewRound?) -> String {
         switch loop.phase {
         case .completed: "Complete"
-        case .limitReached: "Limit reached"
+        case .limitReached: "Round limit reached"
         case .stopped: "Stopped"
         case .blocked: "Needs attention"
         case .paused: "Paused"

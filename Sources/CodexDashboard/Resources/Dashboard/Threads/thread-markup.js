@@ -15,13 +15,13 @@ const threadMarkup = (() => {
     isCompletionTickVisible = () => false,
     compact = false,
   } = {}) {
-    const openLabel = `${isUnread ? 'Unread. ' : ''}Open task: ${thread.title}`;
+    const openLabel = `${isUnread ? 'Unread. ' : ''}Open chat: ${thread.title}`;
     const isCompleted = isCompletionTickVisible(thread);
     const isForcedHalt = thread.latestLifecycleEventKind === 'forcedHalt';
     const statusMarkup = thread.runState === 'running'
       ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`
       : isForcedHalt
-        ? `<span class="dashboard-forced-halt-status" role="status" aria-label="Interrupted because the usage limit was reached" title="This task was interrupted because the usage limit was reached">${dashboardIcons.render('forcedHalt')}<span>Interrupted</span></span>`
+        ? `<span class="dashboard-forced-halt-status" role="status" aria-label="Interrupted because the usage limit was reached" title="This chat was interrupted because the usage limit was reached">${dashboardIcons.render('forcedHalt')}<span>Interrupted</span></span>`
         : isCompleted
           ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
           : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
@@ -68,7 +68,7 @@ const threadMarkup = (() => {
     const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
-      <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle task'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Task running'}</span></button>`;
+      <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle chat'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Chat running'}</span></button>`;
   }
 
   function renderProjectIdentity(projectName, projectPath) {
@@ -107,10 +107,10 @@ const threadMarkup = (() => {
       const running = displayedThreads.slice(0, leadingRunningThreadCount);
       if (!running.length) return renderRows(displayedThreads);
       const recent = displayedThreads.slice(leadingRunningThreadCount);
-      return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running tasks">
+      return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running chats">
         <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
         ${renderRows(running)}
-      </section>${recent.length ? `<section class="dashboard-task-section" data-dashboard-section="recent" aria-label="Recent tasks">
+      </section>${recent.length ? `<section class="dashboard-task-section" data-dashboard-section="recent" aria-label="Recent chats">
         <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Recents</h2>
         ${renderRows(recent)}
       </section>` : ''}`;
@@ -158,7 +158,7 @@ const threadMarkup = (() => {
             </span>
           </button>
           <span class="dashboard-project-summary">
-            <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'task' : 'tasks'}</span>
+            <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'chat' : 'chats'}</span>
             ${renderProjectActions(projectPath, projectThreads, indicatorsHidden)}
           </span>
         </header>

@@ -52,7 +52,7 @@ Shared page visibility, navigation-button construction, and icons live in `Core`
 explicit thread lookup for composer context. Native import/export and renderer
 persistence share the prompt store constructed by the application coordinator.
 
-Internal Codex data uses `Thread` terminology; UI copy uses **Task**. Renderer
+Internal Codex data uses `Thread` terminology; UI copy uses **chat** for conversations and **to-do** for checklist items. Renderer
 snapshots use `RendererThread`; native completion detection uses `ThreadCompletionTracker`.
 Shared visibility application lives in `Core/page-visibility-controller.js`.
 Composer text/image insertion, model-picker interaction, and shared preset validation and rendering live in `Composer/`. To-do composer transfer lives in `Todos/todo-composer-actions.js`.
@@ -64,7 +64,7 @@ successful commit. `todo-image-store.js` owns IndexedDB image persistence;
 `todo-image-controller.js` owns image validation, draft state, and
 reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. `todo-create-form.js` owns creation drafts, project and thread assignments, submission, and reset decisions. The list
 controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
-an action to the sidebar chat/task context menu, snapshots the selected task
+an action to the sidebar chat context menu, snapshots the selected task
 before the menu opens, supports keyboard navigation, and
 uses the list controller’s persistence and rollback flow. Codex's installed
 ContextMenu uses `electronBridge.showContextMenu` on macOS. The to-do controller
@@ -90,7 +90,7 @@ older `projectTag` and `projectBadge` fields, and the version 6 `chat` field. Pr
 loading migrates `collapsedProjects` to `collapsedProjectPaths`, and both
 `ignoredProjectPaths` and `mutedProjectPaths` to `hiddenChangeIndicatorPaths`. Successful
 migrations write only current fields; failed migration writes leave stored data intact.
-Task filter preferences migrate `recent` and `home` to `all`, displayed as **All tasks**.
+Task filter preferences migrate `recent` and `home` to `all`, displayed as **All chats**.
 Keep old field names confined to migration code and legacy fixtures.
 
 Review loops use version 1 of the `review-loop.json` document. The file-store
