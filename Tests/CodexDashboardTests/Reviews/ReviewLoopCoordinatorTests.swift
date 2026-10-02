@@ -4,10 +4,6 @@ import XCTest
 @MainActor
 final class ReviewLoopCoordinatorTests: XCTestCase {
     private let reviewBoundary = "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
-    private func fixScope(_ entries: [String]) -> String {
-        "\n\nAddress only the findings listed below. Use their original review numbers when reporting withdrawn findings. Do not address other findings from the review.\n\n" + entries.joined(separator: "\n\n")
-    }
-
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
     private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
@@ -327,7 +323,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope(["### Finding 1: [P1] Example issue\nEvidence and impact", "### Finding 2: [P2] Example issue\nEvidence and impact"]))
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
@@ -793,7 +789,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
                     let task = count == 1 ? "Fix the finding and commit" : count == 2 ? "Fix both findings and commit" : "Fix all findings and commit"
-                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope((1...count).map { "### Finding \($0): [\(limit.rawValue)] Example issue\nEvidence and impact" }))
+                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
@@ -816,7 +812,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             XCTAssertEqual(driver.prompts.count, priorities.count == 1 ? 1 : 2)
             XCTAssertEqual(coordinator.loops.last?.rounds.last?.review?.findings.count, priorities.count)
             if priorities.count > 1 {
-                XCTAssertTrue(driver.prompts.last!.contains("### Finding 2: [P1]"))
+                XCTAssertTrue(driver.prompts.last!.contains("- Finding 2: [P1]"))
                 XCTAssertFalse(driver.prompts.last!.contains("[P2]"))
                 XCTAssertFalse(driver.prompts.last!.contains("[P3]"))
                 driver.finish(findings: 0, commit: "none", withdrawn: [1])
@@ -844,7 +840,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(recovered.loops.last?.phase, .running)
         XCTAssertEqual(driver.createdThreads.count, 1)
         XCTAssertEqual(driver.prompts.count, 2)
-        XCTAssertTrue(driver.prompts.last!.contains("### Finding 2: [P2]"))
+        XCTAssertTrue(driver.prompts.last!.contains("- Finding 2: [P2]"))
         XCTAssertFalse(driver.prompts.last!.contains("[P3]"))
         driver.finish(findings: 1, commit: "fixed")
         await recovered.advance(using: driver, threads: [])
@@ -939,8 +935,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            let entry = focus.usesPriorities ? "### Finding 1: [P1] Example issue\nEvidence and impact" : "### Finding 1: Simplify the layout\nEvidence and impact"
-            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope([entry])
+            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
             XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
