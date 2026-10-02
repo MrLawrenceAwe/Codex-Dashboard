@@ -70,7 +70,7 @@ sections or count mismatches instead of inferring success from prose. If no qual
 stops without sending a fix request. Otherwise the same chat receives
 **Fix the finding and commit**, **Fix both findings and commit**, or **Fix all findings and commit**,
 according to the number of qualifying findings, followed by instructions to verify each
-finding and mark invalid ones as withdrawn. The fix prompt includes only qualifying findings, with their original review numbers and full descriptions. Withdrawn numbers must refer to those qualifying findings. The workflow does not request
+finding and mark invalid ones as withdrawn. When a review also contains excluded priorities, the fix prompt lists only qualifying findings, with their original review numbers and titles; descriptions remain in the preceding review. When every finding qualifies, the short fix prompt needs no list. Withdrawn numbers must refer to those qualifying findings. The workflow does not request
 tests or require a test result. A Markdown fix report identifies the addressed
 fixed count, withdrawn finding numbers, and commit. A fully withdrawn
 review ends without a commit; a partial withdrawal continues after the fix commit.
