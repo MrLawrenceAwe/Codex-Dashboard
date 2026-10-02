@@ -23,7 +23,7 @@ enum ReviewReportContract {
             ## [P?] Short title
             Impact and linked file location.
 
-            \(limit.rawValue)+. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            Report only priorities \(ReviewFinding.Priority.allCases.filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")). Omit lower-priority findings. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
             """
             } else {
                 format = """
