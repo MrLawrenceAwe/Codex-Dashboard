@@ -16,7 +16,7 @@ enum ReviewPrompts {
         case .content:
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
-        return task + "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted."
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {

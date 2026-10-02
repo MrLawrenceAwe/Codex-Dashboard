@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopCoordinatorTests: XCTestCase {
-    private let reviewBoundary = "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
+    private let reviewBoundary = "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted."
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
     private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
