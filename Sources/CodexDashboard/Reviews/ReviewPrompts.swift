@@ -7,6 +7,8 @@ enum ReviewPrompts {
         switch loop.focus {
         case .bugs:
             task = "Review project for bugs and issues\(context)."
+        case .bugsAndPerformance:
+            task = "Review project for bugs, issues, performance and responsiveness\(context)."
         case .organisation:
             task = "Do a code and content minimisation and organisation review\(context)."
         case .naming:
@@ -29,7 +31,7 @@ enum ReviewPrompts {
         }
         let task: String
         switch loop.focus {
-        case .bugs:
+        case .bugs, .bugsAndPerformance:
             task = "Fix \(findings) and commit"
         case .organisation, .naming, .content, .performance:
             task = "Address \(findings) and commit"
