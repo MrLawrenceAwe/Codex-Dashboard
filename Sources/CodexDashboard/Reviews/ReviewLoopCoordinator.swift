@@ -273,9 +273,6 @@ final class ReviewLoopCoordinator {
         updated = current
         guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
         let findings = report.findings(upTo: updated.priorityLimit)
-        if !findings.isEmpty, findings.count != report.findings.count {
-            throw ReviewLoopError("The review included findings outside the selected priority limit. Inspect its report before asking to address all.")
-        }
         round.reviewTurnID = reviewTurn.id
         round.review = report
         if findings.isEmpty {
@@ -337,8 +334,11 @@ final class ReviewLoopCoordinator {
         let result = fixReport.result
         guard result.outcome != .blocked else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
         let findings = report.findings(upTo: updated.priorityLimit)
+        let acceptedNumbers = Set(report.findings.enumerated().compactMap { index, finding in
+            findings.contains(finding) ? index + 1 : nil
+        })
         guard result.findingCount + fixReport.withdrawn.count == findings.count,
-              fixReport.withdrawn.allSatisfy({ $0 <= findings.count }) else {
+              fixReport.withdrawn.allSatisfy({ acceptedNumbers.contains($0) }) else {
             throw ReviewLoopError("Commit checkpoint failed: the fix report accounted for \(result.findingCount + fixReport.withdrawn.count) of \(findings.count) findings.")
         }
         let reportedCommit = try await result.outcome == .fixed

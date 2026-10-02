@@ -45,6 +45,15 @@ final class ReviewReportContractTests: XCTestCase {
         XCTAssertTrue(ReviewReportContract.instructions(for: .review(nil)).contains("without priority labels"))
     }
 
+    func testPriorityInstructionsExplicitlyListAllowedPriorities() {
+        for limit in ReviewFinding.Priority.allCases {
+            let allowed = ReviewFinding.Priority.allCases.filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")
+            let instructions = ReviewReportContract.instructions(for: .review(limit))
+            XCTAssertTrue(instructions.contains("Report only priorities \(allowed). Omit lower-priority findings."))
+            XCTAssertFalse(instructions.contains("\(limit.rawValue)+"))
+        }
+    }
+
     func testReviewInstructionsDoNotRequestEvidence() {
         for kind in [ReviewTurnKind.review(.p2), .review(nil)] {
             let instructions = ReviewReportContract.instructions(for: kind)

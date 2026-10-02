@@ -20,8 +20,9 @@ enum ReviewPrompts {
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
+        let accepted = round.review?.findings(upTo: loop.priorityLimit) ?? []
         let findings: String
-        switch round.review?.findings.count ?? 0 {
+        switch accepted.count {
         case 1: findings = "the finding"
         case 2: findings = "both findings"
         default: findings = "all findings"
@@ -33,6 +34,12 @@ enum ReviewPrompts {
         case .organisation, .naming, .content, .performance:
             task = "Address \(findings) and commit"
         }
+        let scope = (round.review?.findings ?? []).enumerated().compactMap { index, finding -> String? in
+            guard accepted.contains(finding) else { return nil }
+            let priority = finding.priority.map { "[\($0.rawValue)] " } ?? ""
+            return "### Finding \(index + 1): \(priority)\(finding.title)\n\(finding.body)"
+        }.joined(separator: "\n\n")
         return task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+            + "\n\nAddress only the findings listed below. Use their original review numbers when reporting withdrawn findings. Do not address other findings from the review.\n\n" + scope
     }
 }

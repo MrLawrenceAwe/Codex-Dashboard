@@ -64,13 +64,13 @@ Simplification and structure reviews cover both code and content, including UI c
 
 The driver appends a Markdown contract for the final response to each prompt; it does not restrict investigation or progress updates. Reviews show a
 summary and a separate explanation and file link for each finding. Bugs and
-performance findings also have priority headings and follow the selected priority limit.
+performance findings also have priority headings. The report instructions explicitly list the allowed priorities. Dashboard retains the complete report for inspection but excludes lower-priority findings from fixes; a mixed-priority report does not block the loop.
 `ReviewReportContract` reads the explicit status and finding count, rejecting missing
 sections or count mismatches instead of inferring success from prose. If no qualifying issues are found, the loop
 stops without sending a fix request. Otherwise the same chat receives
 **Fix the finding and commit**, **Fix both findings and commit**, or **Fix all findings and commit**,
 according to the number of qualifying findings, followed by instructions to verify each
-finding and mark invalid ones as withdrawn. The workflow does not request
+finding and mark invalid ones as withdrawn. The fix prompt includes only qualifying findings, with their original review numbers and full descriptions. Withdrawn numbers must refer to those qualifying findings. The workflow does not request
 tests or require a test result. A Markdown fix report identifies the addressed
 fixed count, withdrawn finding numbers, and commit. A fully withdrawn
 review ends without a commit; a partial withdrawal continues after the fix commit.
@@ -103,7 +103,7 @@ page queues controls and its view module renders snapshots; it does not own exec
 State is atomically persisted to `~/Library/Application Support/Codex Dashboard/review-loop.json`.
 Intent is saved before each task or follow-up launch. Unknown launches are never
 resent automatically. Relaunching Dashboard pauses unfinished loops; Resume
-reconciles known tasks first for paused loops. Blocked loops remain active and offer Resume and Stop. Open the review chat and answer its question or resolve its blocker, then Resume. Resume inspects the existing chat, including user follow-up turns, and accepts its latest final report only after the usual finding counts, clean checkout, original branch, and commit ancestry checks. Codex handles edits and commits; users do not need to create evidence files or commits. Follow-ups remain in the same round and do not use extra rounds. Unknown chat launches are never duplicated. A blocker before any round launches retries checkout verification. Responses from older JSON-format turns are not
+reconciles known tasks first for paused loops. Blocked loops remain active and offer Resume and Stop. A loop previously blocked by mixed-priority findings can resume directly without a replacement report. Open the review chat and answer its question or resolve its blocker, then Resume. Resume inspects the existing chat, including user follow-up turns, and accepts its latest final report only after the usual finding counts, clean checkout, original branch, and commit ancestry checks. Codex handles edits and commits; users do not need to create evidence files or commits. Follow-ups remain in the same round and do not use extra rounds. Unknown chat launches are never duplicated. A blocker before any round launches retries checkout verification. Responses from older JSON-format turns are not
 converted; start a new loop if an unfinished old turn returns that format. Malformed reports, failed/interrupted turns, approval
 requests, dirty checkouts, or unexpected changes stop progression with an
 explanation. Pause lets the current review/fix round finish. Stop prevents new

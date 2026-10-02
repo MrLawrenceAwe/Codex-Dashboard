@@ -4,6 +4,10 @@ import XCTest
 @MainActor
 final class ReviewLoopCoordinatorTests: XCTestCase {
     private let reviewBoundary = "\n\nThis is a read-only review. Report findings and recommendations only. Do not edit, create, delete, or rename project files, apply fixes, commit, or push. Leave HEAD and the working tree unchanged. Run checks only if they leave the checkout unchanged; put temporary files outside the project. Fixes will be requested in a separate follow-up after the review is accepted."
+    private func fixScope(_ entries: [String]) -> String {
+        "\n\nAddress only the findings listed below. Use their original review numbers when reporting withdrawn findings. Do not address other findings from the review.\n\n" + entries.joined(separator: "\n\n")
+    }
+
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
     private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
@@ -323,7 +327,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope(["### Finding 1: [P1] Example issue\nEvidence and impact", "### Finding 2: [P2] Example issue\nEvidence and impact"]))
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
@@ -789,15 +793,15 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
                     let task = count == 1 ? "Fix the finding and commit" : count == 2 ? "Fix both findings and commit" : "Fix all findings and commit"
-                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope((1...count).map { "### Finding \($0): [\(limit.rawValue)] Example issue\nEvidence and impact" }))
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
         }
     }
 
-    func testPriorityLimitRejectsLowerPriorityAndNeverSendsAddressAllForMixedReport() async throws {
-        for priorities: [ReviewFinding.Priority] in [[.p2], [.p1, .p2]] {
+    func testPriorityLimitFiltersMixedReportsAndCompletesLowerPriorityOnlyReview() async throws {
+        for priorities: [ReviewFinding.Priority] in [[.p2], [.p2, .p1, .p3]] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
             var start = startAction(id: "start", kind: .start, projectID: project.id, promptContext: nil, maxRounds: 5, loopID: nil)
@@ -808,9 +812,44 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             driver.review(priorities: priorities)
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(coordinator.loops.last?.phase, priorities.count == 1 ? .completed : .blocked)
-            XCTAssertEqual(driver.prompts.count, 1)
+            XCTAssertEqual(coordinator.loops.last?.phase, priorities.count == 1 ? .completed : .running)
+            XCTAssertEqual(driver.prompts.count, priorities.count == 1 ? 1 : 2)
+            XCTAssertEqual(coordinator.loops.last?.rounds.last?.review?.findings.count, priorities.count)
+            if priorities.count > 1 {
+                XCTAssertTrue(driver.prompts.last!.contains("### Finding 2: [P1]"))
+                XCTAssertFalse(driver.prompts.last!.contains("[P2]"))
+                XCTAssertFalse(driver.prompts.last!.contains("[P3]"))
+                driver.finish(findings: 0, commit: "none", withdrawn: [1])
+                await coordinator.advance(using: driver, threads: [])
+                XCTAssertEqual(coordinator.loops.last?.phase, .blocked, "Excluded finding numbers cannot be withdrawn")
+                driver.finish(findings: 0, commit: "none", withdrawn: [2])
+                try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+                await coordinator.advance(using: driver, threads: [])
+                XCTAssertEqual(coordinator.loops.last?.phase, .completed)
+                XCTAssertEqual(driver.prompts.count, 2)
+            }
         }
+    }
+
+    func testPreviouslyBlockedMixedPriorityReviewResumesWithoutFollowUp() async throws {
+        let (coordinator, store, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p3, .p2])
+        store.loops[0].phase = .blocked
+        store.loops[0].message = "The review included findings outside the selected priority limit."
+        let recovered = ReviewLoopCoordinator(store: store)
+        try recovered.apply(action(.resume, for: recovered), projects: [project])
+        await recovered.advance(using: driver, threads: [])
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(recovered.loops.last?.phase, .running)
+        XCTAssertEqual(driver.createdThreads.count, 1)
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertTrue(driver.prompts.last!.contains("### Finding 2: [P2]"))
+        XCTAssertFalse(driver.prompts.last!.contains("[P3]"))
+        driver.finish(findings: 1, commit: "fixed")
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(recovered.loops.last?.phase, .waiting)
+        XCTAssertEqual(recovered.loops.last?.rounds.last?.result?.findingCount, 1)
     }
 
     func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
@@ -900,7 +939,8 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+            let entry = focus.usesPriorities ? "### Finding 1: [P1] Example issue\nEvidence and impact" : "### Finding 1: Simplify the layout\nEvidence and impact"
+            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit." + fixScope([entry])
             XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
