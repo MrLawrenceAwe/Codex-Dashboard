@@ -30,10 +30,8 @@ enum ReviewPrompts {
         switch loop.focus {
         case .bugs:
             task = "Fix \(findings) and commit"
-        case .organisation, .naming, .content:
+        case .organisation, .naming, .content, .performance:
             task = "Address \(findings) and commit"
-        case .performance:
-            task = "Address \(findings) to improve performance and responsiveness. Keep changes proportionate and verify the improvements, then commit"
         }
         return task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
     }
