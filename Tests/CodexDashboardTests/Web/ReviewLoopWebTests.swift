@@ -247,7 +247,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return results;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["bugs", false, "P2", "organisation", true, NSNull(),
+        XCTAssertEqual(result, ["bugs", false, "P2", "bugsAndPerformance", false, "P2", "organisation", true, NSNull(),
                                 "naming", true, NSNull(), "performance", false, "P2", "content", true, NSNull()])
     }
 
@@ -263,7 +263,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const focus = document.querySelector('[data-review-focus]');
           const context = document.querySelector('[data-review-prompt-context]');
           const states = [];
-          for (const kind of ['bugs', 'organisation', 'naming', 'performance', 'content']) {
+          for (const kind of ['bugs', 'bugsAndPerformance', 'organisation', 'naming', 'performance', 'content']) {
             focus.value = kind;
             focus.dispatchEvent(new Event('change'));
             states.push(kind,context.parentElement.hidden,context.value);
@@ -276,7 +276,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["bugs", false, "", "personal", "organisation", true, "", "general",
+        XCTAssertEqual(result, ["bugs", false, "", "personal", "bugsAndPerformance", false, "personal", "personal", "organisation", true, "", "general",
                                 "naming", true, "", "general", "performance", false, "", "personal",
                                 "content", true, "", "general"])
     }

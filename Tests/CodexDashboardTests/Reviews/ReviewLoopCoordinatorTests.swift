@@ -881,6 +881,13 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                        "Review project for performance and responsiveness (this is a project for personal use)." + reviewBoundary)
     }
 
+    func testCombinedReviewIncludesOptionalProjectContext() {
+        let loop = ReviewLoop(id: UUID(), startActionID: "combined", project: project,
+                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance)
+        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
+                       "Review project for bugs, issues, performance and responsiveness (this is a project for personal use)." + reviewBoundary)
+    }
+
     func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
         for focus in [ReviewFocus.organisation, .naming, .content] {
             let store = ReviewTestStore()
@@ -915,6 +922,9 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             switch focus {
             case .bugs:
                 expectedReview = "Review project for bugs and issues."
+                expectedFix = "Fix the finding and commit"
+            case .bugsAndPerformance:
+                expectedReview = "Review project for bugs, issues, performance and responsiveness."
                 expectedFix = "Fix the finding and commit"
             case .organisation:
                 expectedReview = "Do a code and content minimisation and organisation review."
