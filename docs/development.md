@@ -99,11 +99,14 @@ Composer transfers wait for the destination composer's identity, recheck project
 membership, and cancel when navigation changes. Prompt placeholders preserve
 literal selection and clipboard text, including dollar signs. Current presets
 use `low` for reasoning effort, displayed as **Low** in all three features.
+To-do views receive project choices from their controller; removed assigned
+projects remain visible as unavailable.
 Account popover snapshots carry labelled usage rows and separate status notes;
 the renderer does not parse formatted strings.
 `review-presentation.js` supplies shared labels independently of setup rendering.
-Review model cards resolve display names and use saved identifiers only when the
-model is no longer available. Navigation counts describe running or waiting loops.
+Reasoning order and labels come from the shared composer preset schema and
+presentation helpers. Chat rows and review model cards resolve display names and
+fall back to identifiers when no display name is known. Navigation counts describe running or waiting loops.
 
 `ReviewPageSnapshot` supplies the review page through `applyReviewPageSnapshot`;
 `ReviewLoopsDocument` defines the current saved document independently of migrations.
@@ -126,7 +129,9 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
-Review-loop version 3 renames the `naming` focus to `organisationAndNaming`.
+Review-loop version 6 renames saved round-result `findings` to
+`addressedFindingCount`, preserving existing history at the migration boundary.
+Version 3 renames the `naming` focus to `organisationAndNaming`.
 Version 1 and older unversioned single-loop/array documents also migrate remote
 push, prompt context, and model selection fields at the file-store boundary.
 The coordinator writes the current version after a successful load.

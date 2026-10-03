@@ -5,6 +5,54 @@ import XCTest
 
 @MainActor
 final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
+    func testRemovedAssignedProjectRemainsVisibleUntilExplicitlyUnassigned() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-a"
+                  data-app-action-sidebar-project-label="Project A"></div>
+              </aside><main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          const project = form.querySelector('[data-todo-new-project]');
+          project.value = 'project-a';
+          project.dispatchEvent(new Event('change', { bubbles: true }));
+          form.querySelector('[data-todo-new-title]').value = 'Keep my project';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          document.querySelector('[data-app-action-sidebar-project-id="project-a"]').remove();
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-project]').selectedOptions[0]?.textContent === 'Unavailable · Project A'",
+            in: webView
+        )
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
+          const project = document.querySelector('[data-todo-project]');
+          const before = [project.value, project.selectedOptions[0].disabled,
+            JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project.id,
+            document.querySelector('[data-todo-project-filter] option[value="project-a"]').textContent,
+            Boolean(document.querySelector('[data-todo-new-project] option[value="project-a"]'))];
+          window.__codexDashboard.openTodos();
+          before.push(document.querySelector('[data-todo-project]').value);
+          document.querySelector('[data-todo-project]').value = '';
+          document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
+          await window.__waitForTodoSaves();
+          return [...before, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["project-a", true, "project-a", "Project A (1)", false, "project-a", NSNull()])
+    }
+
     func testProjectsComeFromCodexAndCanStartANewTaskWithTheTodo() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """

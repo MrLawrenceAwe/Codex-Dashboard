@@ -87,7 +87,7 @@ const composerModelPicker = (() => {
 
   async function selectEffort(effort, isCurrent) {
     const target = effort;
-    const order = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+    const order = COMPOSER_PRESET_SCHEMA.reasoningEfforts;
     if (!order.includes(target)) return false;
     for (let step = 0; step < order.length; step += 1) {
       if (!isCurrent()) return false;

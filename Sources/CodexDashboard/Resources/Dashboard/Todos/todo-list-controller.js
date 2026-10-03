@@ -57,6 +57,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     if (destroyed) return;
     projects = codexUIContracts.projects();
     createForm.updateProjects(projects);
+    todoListView.updateItemProjectOptions(projects, items);
     updateFilterOptions();
   }
 
@@ -104,9 +105,13 @@ function createTodoList({ threadReferencesForProject, findThread }) {
       projectFilter = '';
     }
     if (tagFilter && !availableTags.includes(tagFilter)) tagFilter = '';
-    todoListView.render(items, filterMode, availableTags, selectableProjects, {
-      project: projectFilter,
-      tag: tagFilter,
+    todoListView.render({
+      items,
+      filterMode,
+      availableTags,
+      projects,
+      filterProjects: selectableProjects,
+      filters: { project: projectFilter, tag: tagFilter },
     });
     if (expandedPresetTodoID) {
       const row = [...document.querySelectorAll('[data-todo-id]')]

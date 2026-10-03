@@ -54,8 +54,8 @@ const codexHost = {
     };
   },
 
-  threadReadStates() {
-    return codexUIContracts.threadReadStates();
+  threadUnreadStates() {
+    return codexUIContracts.threadUnreadStates();
   },
 
   markThreadsRead(threadIDs) {

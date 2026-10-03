@@ -4,30 +4,18 @@ const promptLibraryView = (() => {
   }
 
   function renderSectionForm(content, dialogState) {
-    if (dialogState.mode === 'createSection') {
-      content.innerHTML = `
-        <form class="dashboard-prompt-form" data-prompt-section-form>
-          <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" placeholder="e.g. Code review" required /></label>
-          <div class="dashboard-prompt-form-actions">
-            <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
-            <button type="submit" class="dashboard-prompt-primary">Create section</button>
-          </div>
-        </form>`;
-      content.querySelector('[name="sectionName"]')?.focus();
-      return;
-    }
-    if (dialogState.mode === 'renameSection') {
-      content.innerHTML = `
-        <form class="dashboard-prompt-form" data-prompt-section-rename-form>
-          <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" value="${domUtils.escapeHTML(dialogState.section)}" required /></label>
-          <div class="dashboard-prompt-form-actions">
-            <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
-            <button type="submit" class="dashboard-prompt-primary">Rename section</button>
-          </div>
-        </form>`;
-      content.querySelector('[name="sectionName"]')?.focus();
-      return;
-    }
+    const renaming = dialogState.mode === 'renameSection';
+    const action = renaming ? 'Rename' : 'Create';
+    const formAttribute = renaming ? 'data-prompt-section-rename-form' : 'data-prompt-section-form';
+    content.innerHTML = `
+      <form class="dashboard-prompt-form" ${formAttribute}>
+        <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" ${renaming ? `value="${domUtils.escapeHTML(dialogState.section)}"` : 'placeholder="e.g. Code review"'} required /></label>
+        <div class="dashboard-prompt-form-actions">
+          <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
+          <button type="submit" class="dashboard-prompt-primary">${action} section</button>
+        </div>
+      </form>`;
+    content.querySelector('[name="sectionName"]')?.focus();
   }
 
   function renderPromptForm(content, dialogState, composerProject) {

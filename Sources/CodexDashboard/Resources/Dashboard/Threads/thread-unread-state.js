@@ -3,7 +3,7 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
   let unreadThreadIDs = new Set();
   let persistedUnreadThreadIDs = new Set();
   const sidebarUnreadOverrides = new Map();
-  const observedSidebarReadStates = new Map();
+  const observedSidebarUnreadStates = new Map();
   let unreadSyncTimer;
   let unreadMonitoringStarted = false;
 
@@ -27,15 +27,15 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
       if (override.isUnread) nextUnreadThreadIDs.add(id);
       else nextUnreadThreadIDs.delete(id);
     });
-    const readStates = codexHost.threadReadStates();
-    observedSidebarReadStates.forEach((_, id) => {
-      if (!readStates.has(id) || !findThread(id)) observedSidebarReadStates.delete(id);
+    const unreadStates = codexHost.threadUnreadStates();
+    observedSidebarUnreadStates.forEach((_, id) => {
+      if (!unreadStates.has(id) || !findThread(id)) observedSidebarUnreadStates.delete(id);
     });
-    readStates.forEach((isUnread, id) => {
+    unreadStates.forEach((isUnread, id) => {
       const thread = findThread(id);
       if (!thread) return;
-      const isNewObservation = observedSidebarReadStates.get(id) !== isUnread;
-      observedSidebarReadStates.set(id, isUnread);
+      const isNewObservation = observedSidebarUnreadStates.get(id) !== isUnread;
+      observedSidebarUnreadStates.set(id, isUnread);
       if (isUnread === (thread.isUnread === true)) sidebarUnreadOverrides.delete(id);
       else if (isNewObservation) {
         sidebarUnreadOverrides.set(id, {
@@ -131,7 +131,7 @@ function createThreadUnreadState({ findThread, isOpen, onChange, completionIndic
     if (unreadSyncTimer !== undefined) clearTimeout(unreadSyncTimer);
     unreadSyncTimer = undefined;
     sidebarUnreadOverrides.clear();
-    observedSidebarReadStates.clear();
+    observedSidebarUnreadStates.clear();
     unreadThreadIDs.clear();
     persistedUnreadThreadIDs.clear();
     unreadMonitoringStarted = false;

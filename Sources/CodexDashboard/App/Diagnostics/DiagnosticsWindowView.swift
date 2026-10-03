@@ -124,12 +124,7 @@ struct DiagnosticsWindowView: View {
 
     var body: some View {
         let codexVersion = CodexConfiguration.installedVersion ?? "not found"
-        let dashboardShortVersion = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "development"
-        let dashboardBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-        let dashboardVersion = dashboardBuild.map { "\(dashboardShortVersion) (\($0))" }
-            ?? dashboardShortVersion
+        let dashboardVersion = DashboardDiagnostics.versionDescription()
         let actions = coordinator.dashboardActions
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
@@ -186,7 +181,7 @@ struct DiagnosticsWindowView: View {
                 .font(.system(size: 12, weight: .medium))
 
                 if coordinator.phoneNotificationsEnabled {
-                    Text("In ntfy, choose Add Subscription and enter this private topic:")
+                    Text("In ntfy, choose Add Subscription and enter this generated secret topic:")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Text(coordinator.phoneNotificationTopic)

@@ -23,7 +23,7 @@ const promptReordering = (() => {
       && promptLibraryContract.scopeKey(prompt.scope) === scopeKey;
   }
 
-  function moveByOffset(promptID, offset, persist) {
+  function moveByOffset(promptID, offset, stageLibraryUpdate) {
     const index = promptStore.prompts.findIndex((prompt) => prompt.id === promptID);
     const prompt = promptStore.prompts[index];
     if (!prompt) return false;
@@ -36,10 +36,10 @@ const promptReordering = (() => {
     if (destination === undefined) return false;
     const nextPrompts = [...promptStore.prompts];
     [nextPrompts[index], nextPrompts[destination]] = [nextPrompts[destination], nextPrompts[index]];
-    return persist(nextPrompts, promptStore.sections);
+    return stageLibraryUpdate(nextPrompts, promptStore.sections);
   }
 
-  function reorder(destination, dropAfter, persist) {
+  function reorder(destination, dropAfter, stageLibraryUpdate) {
     const movingPrompt = promptStore.prompts.find((prompt) => prompt.id === draggedPromptID);
     if (!movingPrompt || !destination?.section) return false;
     const movingScopeKey = promptLibraryContract.scopeKey(movingPrompt.scope);
@@ -60,10 +60,10 @@ const promptReordering = (() => {
       ), remainingPrompts.length);
     }
     remainingPrompts.splice(insertionIndex, 0, movedPrompt);
-    return persist(remainingPrompts, promptStore.sections);
+    return stageLibraryUpdate(remainingPrompts, promptStore.sections);
   }
 
-  function handle(event, target, dialog, persist, render) {
+  function handle(event, target, dialog, stageLibraryUpdate, render) {
     if (event.type === 'dragstart') {
       const row = target?.closest('[data-prompt-row-id]');
       if (!row) return false;
@@ -102,7 +102,7 @@ const promptReordering = (() => {
       event.preventDefault();
       const bounds = destination.row?.getBoundingClientRect();
       const dropAfter = Boolean(bounds && event.clientY > bounds.top + bounds.height / 2);
-      const moved = reorder(destination, dropAfter, persist);
+      const moved = reorder(destination, dropAfter, stageLibraryUpdate);
       dialog?.querySelector('.is-dragging')?.classList.remove('is-dragging');
       clearIndicators(dialog);
       draggedPromptID = undefined;

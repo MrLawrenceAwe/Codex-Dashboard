@@ -76,7 +76,7 @@ const reviewLoopSetupView = (() => {
     const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
     const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
-    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(reviewPresentation.reasoningLabel(value))}</option>`).join('');
+    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(composerPresets.reasoningLabel(value))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
     select.disabled = !model || !!pendingAction;
   }

@@ -28,6 +28,10 @@ const composerPresets = (() => {
     return options.find(([option]) => option === value)?.[1];
   }
 
+  function reasoningLabel(value) {
+    return label(reasoningEfforts, value) || value;
+  }
+
   function isValid(preset) {
     if (!preset || typeof preset !== 'object' || Array.isArray(preset)) return false;
     return (preset.model === undefined || (typeof preset.model === 'string' && Boolean(preset.model.trim())))
@@ -61,5 +65,5 @@ const composerPresets = (() => {
     )).join('');
   }
 
-  return { defaults: COMPOSER_PRESET_SCHEMA.defaults, isValid, label, models, normalize, reasoningEfforts, selectOptions, speeds, summary };
+  return { defaults: COMPOSER_PRESET_SCHEMA.defaults, isValid, label, models, normalize, reasoningEfforts, reasoningLabel, selectOptions, speeds, summary };
 })();

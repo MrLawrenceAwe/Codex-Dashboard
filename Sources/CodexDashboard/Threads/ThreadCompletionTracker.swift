@@ -9,7 +9,7 @@ struct ThreadCompletionTracker {
     private var eventsByThreadID: [String: ThreadLifecycleEvent]?
     private var observationDate: Date?
 
-    mutating func recordSnapshotAndFindNewestCompletion(
+    mutating func observeCompletions(
         in threads: [ThreadSummary],
         excluding excludedThreadIDs: Set<String> = [],
         observedAt currentDate: Date = .now
@@ -25,7 +25,7 @@ struct ThreadCompletionTracker {
             return Result(hasCompletion: false, threadIDToOpen: nil)
         }
 
-        let completions = latestEvents.compactMap { threadID, event -> (String, ThreadLifecycleEvent)? in
+        let completions = latestEvents.compactMap { threadID, event -> (threadID: String, event: ThreadLifecycleEvent)? in
             guard
                 event.kind == .completed,
                 previousEvents[threadID] != event,
@@ -33,10 +33,10 @@ struct ThreadCompletionTracker {
             else { return nil }
             return (threadID, event)
         }
-        let newestEligible = completions.filter { !excludedThreadIDs.contains($0.0) }.max { left, right in
-            if left.1.timestamp == right.1.timestamp { return left.0 < right.0 }
-            return left.1.timestamp < right.1.timestamp
-        }?.0
+        let newestEligible = completions.filter { !excludedThreadIDs.contains($0.threadID) }.max { left, right in
+            if left.event.timestamp == right.event.timestamp { return left.threadID < right.threadID }
+            return left.event.timestamp < right.event.timestamp
+        }?.threadID
         return Result(hasCompletion: !completions.isEmpty, threadIDToOpen: newestEligible)
     }
 }

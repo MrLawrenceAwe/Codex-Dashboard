@@ -43,7 +43,7 @@ final class CodexAccountManager: @unchecked Sendable {
 
     func loadState() throws -> (SavedAccountsDocument, String?) {
         try lock.withLock {
-            let document = try documentStore.load()
+            let document = try documentStore.loadAndReconcile()
             let identifier = try activeCredentialFile.read()
                 .flatMap { AccountIdentityDecoder.identity(in: $0)?.identifier }
             return (document, identifier)
@@ -51,7 +51,7 @@ final class CodexAccountManager: @unchecked Sendable {
     }
 
     func loadDocument() throws -> SavedAccountsDocument {
-        try lock.withLock { try documentStore.load() }
+        try lock.withLock { try documentStore.loadAndReconcile() }
     }
 
     func savedCredential(
@@ -59,7 +59,7 @@ final class CodexAccountManager: @unchecked Sendable {
         interactionAllowed: Bool
     ) throws -> Data {
         try lock.withLock {
-            let document = try documentStore.load()
+            let document = try documentStore.loadAndReconcile()
             guard let account = document.accounts.first(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
             }
@@ -79,7 +79,7 @@ final class CodexAccountManager: @unchecked Sendable {
         interactionAllowed: Bool
     ) throws {
         try lock.withLock {
-            let document = try documentStore.load()
+            let document = try documentStore.loadAndReconcile()
             guard let account = document.accounts.first(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
             }
@@ -107,7 +107,7 @@ final class CodexAccountManager: @unchecked Sendable {
             guard let identity = AccountIdentityDecoder.identity(in: credential) else {
                 throw CodexAccountError.accountIdentityUnavailable
             }
-            var document = try documentStore.load()
+            var document = try documentStore.loadAndReconcile()
             let timestamp = now()
             let account: SavedAccount
             if
@@ -139,7 +139,7 @@ final class CodexAccountManager: @unchecked Sendable {
 
     func activate(accountID: UUID) throws -> AccountTransition {
         try lock.withLock {
-            var document = try documentStore.load()
+            var document = try documentStore.loadAndReconcile()
             guard let index = document.accounts.firstIndex(where: { $0.id == accountID }) else {
                 throw CodexAccountError.accountNotFound
             }
@@ -168,7 +168,7 @@ final class CodexAccountManager: @unchecked Sendable {
 
     func beginAddingAccount() throws -> AccountTransition {
         try lock.withLock {
-            let document = try documentStore.load()
+            let document = try documentStore.loadAndReconcile()
             let transaction = AccountTransition(
                 previousCredential: try activeCredentialFile.read(), previousDocument: document
             )
@@ -189,7 +189,7 @@ final class CodexAccountManager: @unchecked Sendable {
     func rollback(_ transaction: AccountTransition) throws {
         try lock.withLock {
             let currentCredential = try activeCredentialFile.read()
-            let currentDocument = try documentStore.load()
+            let currentDocument = try documentStore.loadAndReconcile()
             do {
                 try activeCredentialFile.restore(transaction.previousCredential)
                 try documentStore.save(transaction.previousDocument)
@@ -211,7 +211,7 @@ final class CodexAccountManager: @unchecked Sendable {
 
     func forgetSavedAccount(_ accountID: UUID) throws {
         try lock.withLock {
-            var document = try documentStore.load()
+            var document = try documentStore.loadAndReconcile()
             let previousDocument = document
             document.accounts.removeAll { $0.id == accountID }
             if document.activeAccountID == accountID { document.activeAccountID = nil }

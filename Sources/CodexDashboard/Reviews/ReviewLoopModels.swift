@@ -130,14 +130,9 @@ enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix }
 struct ReviewRoundResult: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Sendable { case clean, fixed, withdrawn, blocked }
     let outcome: Outcome
-    let findingCount: Int
+    let addressedFindingCount: Int
     let commit: String
     let summary: String
-
-    private enum CodingKeys: String, CodingKey {
-        case outcome, commit, summary
-        case findingCount = "findings"
-    }
 }
 
 struct ReviewLoop: Codable, Equatable, Sendable {
@@ -170,7 +165,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 5
+    static let currentVersion = 6
     let version: Int
     let loops: [ReviewLoop]
 }

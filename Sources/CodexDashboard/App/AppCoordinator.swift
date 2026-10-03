@@ -29,7 +29,7 @@ final class AppCoordinator: ObservableObject {
     let threadSnapshotService: ThreadSnapshotService
     let compatibilityMonitor: CompatibilityMonitor
     let refreshScheduler: RefreshScheduler
-    let accountPopoverActionListener = AccountPopoverActionListener()
+    let accountPopoverActionPoller = AccountPopoverActionPoller()
     private let userDefaults: UserDefaults
     let codexForegrounder: any CodexForegrounding
     let keyboardActivityDetector: any KeyboardActivityDetecting
@@ -141,7 +141,7 @@ final class AppCoordinator: ObservableObject {
                 await self?.refreshAccountStateAfterFileChange()
             }
         )
-        accountPopoverActionListener.start { [weak self] in
+        accountPopoverActionPoller.start { [weak self] in
             await self?.handleAccountPopoverAction() ?? .unavailable
         }
         Task {
@@ -177,7 +177,7 @@ final class AppCoordinator: ObservableObject {
         refreshGeneration += 1
         accounts.persistUsageCache(force: true)
         refreshScheduler.stop()
-        accountPopoverActionListener.stop()
+        accountPopoverActionPoller.stop()
         synchronizationCoalescer.cancel()
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
@@ -323,8 +323,8 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func recordSnapshotAndFindNewestCompletion(in threads: [ThreadSummary]) -> ThreadCompletionTracker.Result {
-        threadCompletionTracker.recordSnapshotAndFindNewestCompletion(
+    func observeCompletions(in threads: [ThreadSummary]) -> ThreadCompletionTracker.Result {
+        threadCompletionTracker.observeCompletions(
             in: threads,
             excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
         )

@@ -121,7 +121,7 @@ enum ReviewReportContract {
               (outcome == .fixed && addressedCount > 0 && commit != "none") ||
               (outcome == .withdrawn && addressedCount == 0 && !withdrawn.isEmpty && commit == "none") ||
               (outcome == .blocked && commit == "none") else { throw invalid() }
-        return FixReport(result: ReviewRoundResult(outcome: outcome, findingCount: addressedCount,
+        return FixReport(result: ReviewRoundResult(outcome: outcome, addressedFindingCount: addressedCount,
                                                    commit: outcome == .fixed ? commit : "",
                                                    summary: try content(sections[1], prefix: "Summary\n")),
                          withdrawn: withdrawn)
