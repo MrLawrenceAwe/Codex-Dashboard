@@ -39,6 +39,19 @@ const promptStore = (() => {
     };
   }
 
+  // Upgrade saved caches and durable pending edits before validating current data.
+  function readStoredLibrary(value) {
+    if (value?.version === 3 && Array.isArray(value.prompts)) {
+      value = {
+        ...value,
+        version,
+        prompts: value.prompts.map(prompt => prompt?.preset?.reasoningEffort === 'light'
+          ? { ...prompt, preset: { ...prompt.preset, reasoningEffort: 'low' } } : prompt),
+      };
+    }
+    return normalizedLibrary(value);
+  }
+
   function canonicalize(value) {
     if (Array.isArray(value)) return value.map(canonicalize);
     if (value && typeof value === 'object') {
@@ -47,12 +60,12 @@ const promptStore = (() => {
     return value;
   }
 
-  function librariesMatch(left, right) {
+  function jsonValuesEqual(left, right) {
     return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
   }
 
   function loadCachedLibrary() {
-    return normalizedLibrary(readJSON(libraryStorageKey, null))
+    return readStoredLibrary(readJSON(libraryStorageKey, null))
       || { version, prompts: [], sections: [] };
   }
 
@@ -72,7 +85,7 @@ const promptStore = (() => {
     const desiredPrompts = new Map(desired.prompts.map(prompt => [prompt.id, prompt]));
     const removed = new Set(base.prompts.filter(prompt => !desiredPrompts.has(prompt.id)).map(prompt => prompt.id));
     const changed = new Map(desired.prompts.filter(prompt =>
-      !basePrompts.has(prompt.id) || !librariesMatch(basePrompts.get(prompt.id), prompt))
+      !basePrompts.has(prompt.id) || !jsonValuesEqual(basePrompts.get(prompt.id), prompt))
       .map(prompt => [prompt.id, prompt]));
     const prompts = current.prompts.filter(prompt => !removed.has(prompt.id))
       .map(prompt => {
@@ -82,7 +95,7 @@ const promptStore = (() => {
         if (!previous) return local;
         const merged = { ...prompt };
         for (const key of new Set([...Object.keys(previous), ...Object.keys(local)])) {
-          if (librariesMatch(previous[key], local[key])) continue;
+          if (jsonValuesEqual(previous[key], local[key])) continue;
           if (Object.prototype.hasOwnProperty.call(local, key)) merged[key] = local[key];
           else delete merged[key];
         }
@@ -91,7 +104,7 @@ const promptStore = (() => {
     const present = new Set(prompts.map(prompt => prompt.id));
     // A stale edit must not recreate a prompt deleted by another window.
     prompts.push(...desired.prompts.filter(prompt => !basePrompts.has(prompt.id) && !present.has(prompt.id)));
-    if (!librariesMatch(base.prompts.map(prompt => prompt.id), desired.prompts.map(prompt => prompt.id))) {
+    if (!jsonValuesEqual(base.prompts.map(prompt => prompt.id), desired.prompts.map(prompt => prompt.id))) {
       const order = new Map(desired.prompts.map((prompt, index) => [prompt.id, index]));
       prompts.sort((left, right) => (order.get(left.id) ?? Infinity) - (order.get(right.id) ?? Infinity));
     }
@@ -100,7 +113,7 @@ const promptStore = (() => {
     const concurrentlyDeletedSections = new Set(base.sections.filter(section => !current.sections.includes(section)));
     const sections = current.sections.filter(section => !removedSections.has(section));
     sections.push(...desired.sections.filter(section => !base.sections.includes(section) && !sections.includes(section)));
-    if (!librariesMatch(base.sections, desired.sections)) {
+    if (!jsonValuesEqual(base.sections, desired.sections)) {
       const order = new Map(desired.sections.map((section, index) => [section, index]));
       sections.sort((left, right) => (order.get(left) ?? Infinity) - (order.get(right) ?? Infinity));
     }
@@ -111,13 +124,13 @@ const promptStore = (() => {
   }
 
   function pendingLibrary(keys = pendingChangeKeys()) {
-    const legacy = normalizedLibrary(readJSON(pendingLibraryStorageKey, null));
+    const legacy = readStoredLibrary(readJSON(pendingLibraryStorageKey, null));
     if (!legacy && !keys.length) return null;
     let current = legacy || loadCachedLibrary();
     for (const key of keys) {
       const change = readJSON(key, null);
-      const base = normalizedLibrary(change?.base);
-      const desired = normalizedLibrary(change?.desired);
+      const base = readStoredLibrary(change?.base);
+      const desired = readStoredLibrary(change?.desired);
       if (base && desired) current = mergeLibrary(base, desired, current);
     }
     return current;
@@ -212,7 +225,7 @@ const promptStore = (() => {
 
     matchesLibrary(library) {
       const normalized = normalizedLibrary(library);
-      return normalized ? librariesMatch(store.exportLibrary(), normalized) : false;
+      return normalized ? jsonValuesEqual(store.exportLibrary(), normalized) : false;
     },
 
     pendingLibrary,
@@ -231,7 +244,7 @@ const promptStore = (() => {
       if (!pending) return true;
       // A new edit may have arrived while native storage was being written.
       // Leave it queued for the next synchronization.
-      if (!librariesMatch(pending, library)) return true;
+      if (!jsonValuesEqual(pending, library)) return true;
       try {
         for (const key of keys) localStorage.removeItem(key);
         localStorage.removeItem(pendingLibraryStorageKey);

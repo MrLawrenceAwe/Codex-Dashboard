@@ -264,7 +264,7 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(values["projectANames"] as? [String], ["Project A prompt", "Global prompt"])
         XCTAssertEqual(values["projectBHeadings"] as? [String], ["This project · Project B", "All projects"])
         XCTAssertEqual(values["projectBNames"] as? [String], ["Global prompt"])
-        XCTAssertEqual(values["version"] as? Int, 3)
+        XCTAssertEqual(values["version"] as? Int, PromptLibrarySchema.currentVersion)
         XCTAssertEqual(
             values["scopes"] as? [[String: String]],
             [

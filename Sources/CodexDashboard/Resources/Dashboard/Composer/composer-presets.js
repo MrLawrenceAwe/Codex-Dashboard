@@ -11,10 +11,10 @@ const composerPresets = (() => {
     ['gpt-5.4-mini', 'GPT-5.4 Mini'],
   ];
   const optionLabels = {
-    light: 'Light',
+    low: 'Low',
     medium: 'Medium',
     high: 'High',
-    xhigh: 'Extra High',
+    xhigh: 'Extra high',
     max: 'Max',
     ultra: 'Ultra',
     standard: 'Standard',

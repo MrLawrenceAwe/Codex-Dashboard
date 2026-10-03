@@ -154,10 +154,7 @@ const todoListView = (() => {
       );
     });
     page.querySelector('[data-todo-clear-completed]').hidden = completedCount === 0;
-    const projectFilter = page.querySelector('[data-todo-project-filter]');
-    const tagFilter = page.querySelector('[data-todo-tag-filter]');
-    if (projectFilter) projectFilter.innerHTML = filterProjectOptions(projects, items, filters.project || '');
-    if (tagFilter) tagFilter.innerHTML = filterTagOptions(availableTags, items, filters.tag || '');
+    updateFilterOptions(projects, availableTags, items, filters);
     const list = page.querySelector('[data-todo-list]');
     const visible = visibleItems(items, filterMode, filters.project, filters.tag);
     if (!visible.length) {
@@ -265,19 +262,6 @@ const todoListView = (() => {
         </div>
         <main class="todo-list" data-todo-list></main>
       </div>`;
-    const addForm = page.querySelector('[data-todo-form]');
-    const titleInput = page.querySelector('[data-todo-new-title]');
-    const addButton = addForm.querySelector('button[type="submit"]');
-    // Codex applies high-priority form-control styles to its own renderer. Keep
-    // this small composer self-contained even when those styles change.
-    addForm.style.setProperty('display', 'grid', 'important');
-    addForm.style.setProperty('grid-template-columns', 'minmax(0, 1fr) auto', 'important');
-    addForm.style.setProperty('width', '100%', 'important');
-    addForm.style.setProperty('padding', '0', 'important');
-    titleInput.style.setProperty('width', '100%', 'important');
-    titleInput.style.setProperty('max-width', 'none', 'important');
-    titleInput.style.setProperty('min-width', '0', 'important');
-    addButton.style.setProperty('width', 'auto', 'important');
     ensureDialogHost();
     return page;
   }
@@ -339,11 +323,7 @@ const todoListView = (() => {
     const previewButton = preview.querySelector('[data-todo-new-image-open]');
     previewButton?.setAttribute('aria-label', image ? `Preview pasted image: ${image.name}` : 'Preview pasted image');
     previewButton?.setAttribute('title', image ? `Preview ${image.name}` : 'Preview pasted image');
-    form?.style.setProperty(
-      'grid-template-columns',
-      image ? 'auto minmax(0, 1fr) auto' : 'minmax(0, 1fr) auto',
-      'important'
-    );
+    form?.classList.toggle('has-image', Boolean(image));
   }
 
   function updateTagDraft(tags) {

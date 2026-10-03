@@ -79,19 +79,19 @@ const reviewLoopCardView = (() => {
     for (const [index, loop] of loops.entries()) {
       const card = cards.get(loop.id) || createCard(loop);
       if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
-      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id), isFinished);
+      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id), isFinished, snapshot.models || []);
       cards.delete(loop.id);
     }
     cards.forEach(card => card.remove());
   }
 
-  function renderCard(root, loop, progress, pendingAction, retained, isFinished) {
+  function renderCard(root, loop, progress, pendingAction, retained, isFinished, models) {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
     badge.textContent = phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(selection.modelID)}${selection.reasoningEffort ? ` · ${escape(reviewLoopSetupView.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
+    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID)}${selection.reasoningEffort ? ` · ${escape(reviewLoopSetupView.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const focusLabel = reviewLoopSetupView.focusLabel(loop.focus);
     root.querySelector('[data-review-context]').innerHTML = `<span>${escape(focusLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id

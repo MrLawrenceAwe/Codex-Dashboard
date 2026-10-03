@@ -86,8 +86,7 @@ const composerModelPicker = (() => {
   }
 
   async function selectEffort(effort, isCurrent) {
-    // Persisted "light" is the picker's label for the underlying "low" effort.
-    const target = effort === 'light' ? 'low' : effort;
+    const target = effort;
     const order = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
     if (!order.includes(target)) return false;
     for (let step = 0; step < order.length; step += 1) {

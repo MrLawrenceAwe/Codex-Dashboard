@@ -12,8 +12,7 @@
 - The menu bar provides dashboard, restart, compatibility, diagnostics, completion foregrounding, and launch-at-login actions. **Disable dashboard integration** removes all injected pages and controls, including To-dos and Prompts.
 - Subprocess deadlines cover process termination and complete stdout/stderr draining. Nonblocking pipe readers close on timeout or cancellation even if a descendant retains a write end.
 - No modification of `/Applications/ChatGPT.app` or its code signature.
-- Injection startup and shared page navigation live in `Core`; `dashboard-bridge.js` exposes the native-to-renderer API and `createPageVisibilityController` manages page visibility. Chat overview and To-dos own their page controllers. To-do orchestration and persistence coordination live in `todo-list-controller.js`, creation drafts and submission live in `todo-create-form.js`, image and tag interactions live in focused controllers, and markup and rendering live in `todo-list-view.js`.
-- Codex host selectors and injected-page lifecycle code are isolated in `Core`; account controls, prompt storage and UI, composer integration, and thread rendering live in focused modules listed by `injection-manifest.json`.
+- The renderer bridge connects native snapshots to feature controllers and restores injected pages after host reloads. See the [renderer module map and contracts](development.md#code-organisation) for source ownership and integration details.
 
 ## Chat overview and projects
 

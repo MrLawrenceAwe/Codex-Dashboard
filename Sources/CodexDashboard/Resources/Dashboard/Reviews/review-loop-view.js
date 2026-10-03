@@ -45,7 +45,7 @@ const reviewLoopView = (() => {
     const spinner = document.querySelector('[data-review-navigation-running]');
     if (!spinner) return;
     const runningCount = snapshot.loops.filter(loop => ['waiting', 'running'].includes(loop.phase)).length;
-    const label = `${runningCount} running review ${runningCount === 1 ? 'loop' : 'loops'}`;
+    const label = `${runningCount} running or waiting review ${runningCount === 1 ? 'loop' : 'loops'}`;
     spinner.hidden = runningCount === 0;
     spinner.setAttribute('aria-label', label);
     spinner.setAttribute('title', label);

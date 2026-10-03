@@ -11,7 +11,7 @@ enum ReviewPrompts {
             task = "Review project for bugs, issues, performance and responsiveness\(context)."
         case .organisation:
             task = "Do a code and content minimisation and organisation review\(context)."
-        case .naming:
+        case .organisationAndNaming:
             task = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
         case .performance:
             task = "Review project for performance and responsiveness\(context)."
@@ -33,7 +33,7 @@ enum ReviewPrompts {
         switch loop.focus {
         case .bugs, .bugsAndPerformance:
             task = "Fix \(findings) and commit"
-        case .organisation, .naming, .content, .performance:
+        case .organisation, .organisationAndNaming, .content, .performance:
             task = "Address \(findings) and commit"
         }
         let prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."

@@ -910,7 +910,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     }
 
     func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
-        for focus in [ReviewFocus.organisation, .naming, .content] {
+        for focus in [ReviewFocus.organisation, .organisationAndNaming, .content] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
             var action = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
@@ -950,7 +950,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             case .organisation:
                 expectedReview = "Do a code and content minimisation and organisation review."
                 expectedFix = "Address the finding and commit"
-            case .naming:
+            case .organisationAndNaming:
                 expectedReview = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
                 expectedFix = "Address the finding and commit"
             case .content:
@@ -973,6 +973,21 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
         }
+    }
+
+    func testVersionTwoNamingFocusMigratesToOrganisationAndNaming() throws {
+        let (coordinator, _, _) = try make()
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
+        saved["focus"] = "naming"
+        let data = try JSONSerialization.data(withJSONObject: ["version": 2, "loops": [saved]])
+        let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+        XCTAssertEqual(migrated.focus, .organisationAndNaming)
+        XCTAssertEqual(migrated.id, coordinator.loops.last?.id)
+        XCTAssertEqual(migrated.project, coordinator.loops.last?.project)
+        let current = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(migrated)) as? [String: Any])
+        XCTAssertEqual(current["focus"] as? String, "organisationAndNaming")
     }
 
     func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {

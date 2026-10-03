@@ -10,6 +10,26 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testCardsUseModelNamesAndPreserveUnavailableIdentifiers() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(
+            html: DashboardWebTestHarness.basicTodoHTML,
+            baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'saved',project,phase:'paused',completedRoundCount:0,maxRounds:5,rounds:[],
+            reviewSelection:{modelID:'model-a',reasoningEffort:'low'},
+            fixSelection:{modelID:'retired-model',reasoningEffort:'xhigh'}};
+          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),
+            projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null});
+          const text = document.querySelector('[data-review-context]').textContent;
+          return [text.includes('Review: Model A · Low'),
+            text.includes('Fix: retired-model · Extra high'),text.includes('Review: model-a')];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, true, false])
+    }
+
     func testStartIncludesOptInRemotePushPreference() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let values = try await webView.evaluateAsyncJavaScript("""
@@ -221,7 +241,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(states, [true, false, "1", "1 running review loop", false, false, "1", "2", "2 running review loops", "2 running review loops", false, "1", true, "0", true])
+        XCTAssertEqual(states, [true, false, "1", "1 running or waiting review loop", false, false, "1", "2", "2 running or waiting review loops", "2 running or waiting review loops", false, "1", true, "0", true])
     }
 
     func testReviewTypesQueueSelectedFocusAndKeepPromptContextOptional() async throws {
@@ -248,7 +268,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "P2", "bugsAndPerformance", false, "P2", "organisation", true, NSNull(),
-                                "naming", true, NSNull(), "performance", false, "P2", "content", true, NSNull()])
+                                "organisationAndNaming", true, NSNull(), "performance", false, "P2", "content", true, NSNull()])
     }
 
     func testProjectContextAppearsForSupportedReviewTypes() async throws {
@@ -263,7 +283,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const focus = document.querySelector('[data-review-focus]');
           const context = document.querySelector('[data-review-prompt-context]');
           const states = [];
-          for (const kind of ['bugs', 'bugsAndPerformance', 'organisation', 'naming', 'performance', 'content']) {
+          for (const kind of ['bugs', 'bugsAndPerformance', 'organisation', 'organisationAndNaming', 'performance', 'content']) {
             focus.value = kind;
             focus.dispatchEvent(new Event('change'));
             states.push(kind,context.parentElement.hidden,context.value);
@@ -277,7 +297,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? [AnyHashable]
         XCTAssertEqual(result, ["bugs", false, "", "personal", "bugsAndPerformance", false, "personal", "personal", "organisation", true, "", "general",
-                                "naming", true, "", "general", "performance", false, "", "personal",
+                                "organisationAndNaming", true, "", "general", "performance", false, "", "personal",
                                 "content", true, "", "general"])
     }
 
@@ -289,12 +309,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const reviewTypes = [
-            {id:'naming',label:'Naming audit',usesPriorities:false},
+            {id:'organisationAndNaming',label:'Naming audit',usesPriorities:false},
             {id:'bugs',label:'Bug audit',usesPriorities:true},
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           window.__codexDashboard.applyReviewLoop({reviewTypes,projects:[project],models:[],
-            loops:[{id:'loop',project,focus:'naming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
+            loops:[{id:'loop',project,focus:'organisationAndNaming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
           const select = document.querySelector('[data-review-focus]');
           const labels = [...select.options].map(option => option.textContent);
           const namingHidesPriorities = document.querySelector('.review-priority').hidden;

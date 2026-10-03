@@ -12,7 +12,7 @@ extension DashboardRendererTests {
             url: "app://-/index.html",
             webSocketURL: "ws://127.0.0.1/main"
         )
-        let rendererLibrary = #"{"version":3,"prompts":[{"id":"old","name":"Old","content":"Old content","scope":{"type":"global"},"preset":{"model":"gpt-future"}}],"sections":[]}"#
+        let rendererLibrary = #"{"version":4,"prompts":[{"id":"old","name":"Old","content":"Old content","scope":{"type":"global"},"preset":{"model":"gpt-future"}}],"sections":[]}"#
         let devTools = PromptLibraryRendererDevTools(target: target, exportedLibrary: rendererLibrary)
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("renderer-prompts-\(UUID().uuidString)", isDirectory: true)
@@ -38,7 +38,7 @@ extension DashboardRendererTests {
         XCTAssertEqual(unchangedStringEvaluationCount, initialStringEvaluationCount)
 
         let imported = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "imported",
                 name: "Imported",
@@ -67,12 +67,12 @@ extension DashboardRendererTests {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let nativeLibrary = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [],
             sections: []
         )
         let pendingLibrary = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "pending",
                 name: "Pending",
@@ -88,7 +88,7 @@ extension DashboardRendererTests {
         let pendingJSON = try XCTUnwrap(String(data: pendingData, encoding: .utf8))
         let devTools = PromptLibraryRendererDevTools(
             target: target,
-            exportedLibrary: #"{"version":3,"prompts":[],"sections":[]}"#,
+            exportedLibrary: #"{"version":4,"prompts":[],"sections":[]}"#,
             pendingLibrary: pendingJSON
         )
         let directory = FileManager.default.temporaryDirectory
@@ -120,7 +120,7 @@ extension DashboardRendererTests {
             id: "second", type: "page", url: "app://-/index.html", webSocketURL: "ws://127.0.0.1/second"
         )
         let pendingLibrary = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "pending", name: "Pending", content: "Persist me", section: nil,
                 scope: SavedPromptScope(type: "global", projectPath: nil), preset: nil, usePreset: nil
@@ -130,7 +130,7 @@ extension DashboardRendererTests {
         let pendingJSON = try XCTUnwrap(String(data: JSONEncoder().encode(pendingLibrary), encoding: .utf8))
         let devTools = MultiTargetPromptLibraryRendererDevTools(
             targets: [firstTarget, secondTarget],
-            exportedLibrary: #"{"version":3,"prompts":[],"sections":[]}"#,
+            exportedLibrary: #"{"version":4,"prompts":[],"sections":[]}"#,
             pendingLibraryByTargetID: [firstTarget.id: pendingJSON, secondTarget.id: pendingJSON]
         )
         let directory = FileManager.default.temporaryDirectory
@@ -163,7 +163,7 @@ extension DashboardRendererTests {
             webSocketURL: "ws://127.0.0.1/main"
         )
         let imported = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "imported",
                 name: "Imported",
@@ -176,7 +176,7 @@ extension DashboardRendererTests {
             sections: []
         )
         let pending = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "pending",
                 name: "Pending",

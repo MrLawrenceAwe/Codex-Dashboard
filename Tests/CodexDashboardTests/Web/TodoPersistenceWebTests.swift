@@ -5,6 +5,30 @@ import XCTest
 
 @MainActor
 final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
+    func testLegacyLightPresetMigratesAndSurvivesFailedRewrite() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateJavaScript("""
+        (() => {
+          const key = 'codex-dashboard.todos';
+          const legacy = JSON.stringify({version:8,items:[{id:'saved',title:'Keep me',
+            preset:{model:'gpt-future',reasoningEffort:'light',speed:'fast'},createdAt:1,updatedAt:2}]});
+          localStorage.setItem(key, legacy);
+          const nativeSet = Storage.prototype.setItem;
+          Storage.prototype.setItem = function() { throw new Error('Storage full'); };
+          let loaded;
+          try { loaded = window.__todoStoreForTests.load(); }
+          finally { Storage.prototype.setItem = nativeSet; }
+          const preserved = localStorage.getItem(key) === legacy;
+          window.__todoStoreForTests.load();
+          const rewritten = JSON.parse(localStorage.getItem(key));
+          return [preserved,loaded[0].preset.reasoningEffort,rewritten.version,
+            rewritten.items[0].title,rewritten.items[0].preset.model,
+            rewritten.items[0].preset.reasoningEffort,rewritten.items[0].createdAt];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "low", 9, "Keep me", "gpt-future", "low", 1])
+    }
+
     func testPersistenceInstrumentationRejectsMissingAndDuplicateAnchors() throws {
         XCTAssertThrowsError(try DashboardWebTestHarness.instrumentSource(
             "source without anchor", anchor: "instrument here", replacement: "tracked"))
@@ -141,7 +165,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             const loaded = store.load();
             const tags = store.loadTags(loaded);
             const migrated = JSON.parse(localStorage.getItem('codex-dashboard.todos'));
-            results.push(migrated.version === 8 && loaded[0].project.id === 'project-a'
+            results.push(migrated.version === 9 && loaded[0].project.id === 'project-a'
               && loaded[0].tags[0] === 'Work' && loaded[0].image.dataURL === image.dataURL
               && loaded[0].createdAt === 1 && loaded[0].updatedAt === 2
               && tags.includes('Personal') && tags.includes('Work')
@@ -185,7 +209,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const storage = window.localStorage;
           const results = [];
           for (const original of [
-            JSON.stringify({ version: 9, items: [{ id: 'future', title: 'Keep me' }] }),
+            JSON.stringify({ version: 10, items: [{ id: 'future', title: 'Keep me' }] }),
             '{invalid json',
           ]) {
             storage.setItem('codex-dashboard.todos', original);
@@ -208,7 +232,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (() => {
           window.__codexDashboard.destroy();
           localStorage.setItem('codex-dashboard.todos', JSON.stringify({
-            version: 9, items: [{ id: 'future', title: 'Keep me' }],
+            version: 10, items: [{ id: 'future', title: 'Keep me' }],
           }));
           return true;
         })()
@@ -317,7 +341,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           // Another window falls back to inline storage while this save is pending.
           const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'inline.png' };
           const external = store.create('Other window image', '', image);
-          localStorage.setItem(store.storageKey, JSON.stringify({ version: 8, items: [external] }));
+          localStorage.setItem(store.storageKey, JSON.stringify({ version: 9, items: [external] }));
           release();
           const saved = await saving;
           images.persist = originalPersist;

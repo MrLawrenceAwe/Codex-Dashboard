@@ -16,6 +16,16 @@ const codexUIContracts = (() => {
 
   const { isVisible } = domUtils;
 
+  function reactFiber(element) {
+    if (!element) return null;
+    const key = Object.keys(element).find(key => key.startsWith('__reactFiber$'));
+    return key ? element[key] : null;
+  }
+
+  function* parentFibers(element) {
+    for (let fiber = reactFiber(element); fiber; fiber = fiber.return) yield fiber;
+  }
+
   function sidebar() {
     return document.querySelector('aside.app-shell-left-panel, aside');
   }
@@ -67,15 +77,13 @@ const codexUIContracts = (() => {
       const id = String(row.getAttribute('data-app-action-sidebar-project-id') || '').trim();
       const name = String(row.getAttribute('data-app-action-sidebar-project-label') || '').trim();
       if (!id || !name || seen.has(id)) return result;
-      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = fiberKey ? row[fiberKey] : null;
       let path = '';
-      while (fiber && !path) {
+      for (const fiber of parentFibers(row)) {
         const group = (fiber.memoizedProps || fiber.pendingProps)?.group;
         if (group?.projectId === id && group?.projectKind === 'local') {
           path = String(group.path || '').trim();
         }
-        fiber = fiber.return;
+        if (path) break;
       }
       seen.add(id);
       result.push({ id, name, path });
@@ -88,16 +96,13 @@ const codexUIContracts = (() => {
       `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
     );
     if (!row) return false;
-    const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-    let fiber = fiberKey ? row[fiberKey] : null;
-    while (fiber) {
+    for (const fiber of parentFibers(row)) {
       const props = fiber.memoizedProps || fiber.pendingProps;
       const select = props?.projectId === projectID ? props.selectAction?.onSelect : null;
       if (typeof select === 'function') {
         select();
         return true;
       }
-      fiber = fiber.return;
     }
     row.click();
     return true;
@@ -118,12 +123,9 @@ const codexUIContracts = (() => {
     const activeComposer = composer();
     let host = activeComposer?.parentElement;
     while (host && host !== document.body) {
-      const fiberKey = Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = fiberKey ? host[fiberKey] : null;
-      while (fiber) {
+      for (const fiber of parentFibers(host)) {
         const props = fiber.memoizedProps || fiber.pendingProps;
         if (typeof props?.conversationId === 'string') return props.conversationId;
-        fiber = fiber.return;
       }
       host = host.parentElement;
     }
@@ -135,9 +137,7 @@ const codexUIContracts = (() => {
     let host = activeComposer?.parentElement;
     let projectID;
     while (host && host !== document.body && !projectID) {
-      const fiberKey = Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = fiberKey ? host[fiberKey] : null;
-      while (fiber) {
+      for (const fiber of parentFibers(host)) {
         const props = fiber.memoizedProps || fiber.pendingProps;
         const selectedProject = props?.selectedProject;
         if (
@@ -148,7 +148,6 @@ const codexUIContracts = (() => {
           projectID = selectedProject.projectId.trim();
           break;
         }
-        fiber = fiber.return;
       }
       host = host.parentElement;
     }
@@ -157,10 +156,7 @@ const codexUIContracts = (() => {
     const projectRow = document.querySelector(
       `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
     );
-    const fiberKey = projectRow
-      && Object.keys(projectRow).find((key) => key.startsWith('__reactFiber$'));
-    let fiber = fiberKey ? projectRow[fiberKey] : null;
-    while (fiber) {
+    for (const fiber of parentFibers(projectRow)) {
       const props = fiber.memoizedProps || fiber.pendingProps;
       const group = props?.group;
       const path = String(group?.path || '').trim();
@@ -172,7 +168,6 @@ const codexUIContracts = (() => {
           path,
         };
       }
-      fiber = fiber.return;
     }
     return null;
   }
@@ -209,8 +204,7 @@ const codexUIContracts = (() => {
       if (!sidebarID.startsWith('local:')) return;
       const threadID = sidebarID.slice('local:'.length);
       if (!threadID) return;
-      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = committedFiber(fiberKey ? row[fiberKey] : null, fiberCache);
+      let fiber = committedFiber(reactFiber(row), fiberCache);
       while (fiber) {
         const props = fiber.memoizedProps;
         if (props?.conversationId === threadID && typeof props?.isUnread === 'boolean') {
@@ -244,8 +238,7 @@ const codexUIContracts = (() => {
     let markRead = null;
     for (const row of threadRows()) {
       if (!row.getAttribute('data-app-action-sidebar-thread-id')?.startsWith('local:')) continue;
-      const fiberKey = Object.keys(row).find((key) => key.startsWith('__reactFiber$'));
-      let fiber = committedFiber(fiberKey ? row[fiberKey] : null, fiberCache);
+      let fiber = committedFiber(reactFiber(row), fiberCache);
       while (fiber && !markRead) {
         const visited = new Set();
         markRead = cachedReadAction(fiber.updateQueue?.memoCache?.data, visited);
@@ -294,9 +287,7 @@ const codexUIContracts = (() => {
 
   function composerEditorView(composerElement) {
     const host = composerElement?.parentElement;
-    const fiberKey = host && Object.keys(host).find((key) => key.startsWith('__reactFiber$'));
-    let fiber = fiberKey ? host[fiberKey] : null;
-    while (fiber) {
+    for (const fiber of parentFibers(host)) {
       const props = fiber.pendingProps || fiber.memoizedProps;
       const view = props?.composerController?.view;
       if (
@@ -306,7 +297,6 @@ const codexUIContracts = (() => {
           && typeof view.state?.tr?.replaceSelection === 'function'
           && typeof view.state?.schema?.nodes?.paragraph?.create === 'function'
       ) return view;
-      fiber = fiber.return;
     }
     return null;
   }

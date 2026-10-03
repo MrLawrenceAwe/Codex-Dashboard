@@ -48,89 +48,100 @@ ignored `injection.js` is built by the production `InjectionBundle` loader, incl
 the Swift-defined prompt schema; preview fixtures use the current thread contract.
 Generation exits before starting the menu-bar application.
 
-Shared page visibility, navigation-button construction, and icons live in `Core`. Sidebar navigation is scoped to the left panel and excludes the app icon rail. Injected entries follow the outer New chat action row, outside its Quick chat controls and tooltip trigger. Initial mounting and renderer repairs share one mounting operation. `Threads/thread-unread-state.js` owns unread reconciliation and polling; `Threads/thread-completion-indicators.js` owns completion tick expiry. `Sidebar/thread-interruption-indicators.js` owns native sidebar interruption markers and their cleanup. The native thread catalog supplies recency-sorted snapshots; `Threads/thread-catalog.js` owns project matching and the thread-ID index. `Core/dashboard-bridge.js` creates the dashboard, to-do, and prompt controllers with the catalog lookups they need, then applies each thread snapshot to those controllers. `Core/dashboard-bridge.js` also wires feature mounting, host repairs, composer updates, and teardown into `createDashboardLifecycle`. `Core/dashboard-navigation.js` owns page switching; lifecycle observers and DOM repair remain in `Core/dashboard-lifecycle.js`. The prompt controller receives an
-explicit thread lookup for composer context. Native import/export and renderer
-persistence share the prompt store constructed by the application coordinator.
-
-Internal Codex data uses `Thread` terminology; UI copy uses **chat** for conversations and **to-do** for checklist items. Renderer
-snapshots use `RendererThread`; native completion detection uses `ThreadCompletionTracker`.
-Shared visibility application lives in `Core/page-visibility-controller.js`.
-Composer text/image insertion, model-picker interaction, and shared preset validation and rendering live in `Composer/`. To-do composer transfer lives in `Todos/todo-composer-actions.js`.
-
-`Todos/todo-store.js` owns normalisation, migration, and a serial `Promise<boolean>`
-save queue. Item and tag mutations share optimistic rendering and rollback. Image
-writes finish before metadata is committed; obsolete images are pruned after a
-successful commit. `todo-image-store.js` owns IndexedDB image persistence;
-`todo-image-controller.js` owns image validation, draft state, and
-reader cleanup; `todo-tag-controller.js` owns tag drafts and tag management. `todo-create-form.js` owns creation drafts, project and thread assignments, submission, and reset decisions. The list
-controller coordinates these with persistence. `Sidebar/thread-todo-actions.js` adds
-an action to the sidebar chat context menu, snapshots the selected task
-before the menu opens, supports keyboard navigation, and
-uses the list controller’s persistence and rollback flow. Codex's installed
-ContextMenu uses `electronBridge.showContextMenu` on macOS. The to-do controller
-reads the host menu provider and its Intl formatter from the row's React fiber,
-adds a native menu entry, and retains the host callbacks and submenus. Browser
-previews use the DOM menu path. Regression tests cover both menu implementations. To-dos can save a model, effort, and
-speed preset; both new-task and selected-task actions apply it before inserting content
-through `insertTodoIntoComposer`. The inline paste dropdown resolves the saved project ID
-against current sidebar projects, lists threads with that project's exact path,
-and rechecks project membership before navigation. Choosing a destination does
-not change the saved task link or submit the chat draft. Transfers wait for the
-destination task's composer identity; selecting its sidebar row alone is insufficient.
-Navigation changes cancel pending preset selections and insertion into another task.
-Prompt placeholders preserve literal selection and clipboard text, including dollar signs.
-Image formats are validated through the store’s
-`isAcceptedImageType`, and `todoImageStore.load` retrieves deferred image data. Teardown disconnects project
-observation, aborts image readers, and prevents pending callbacks from changing a
-replacement UI.
-
-To-do schema version 8 adds the optional `preset` to items. Version 7 introduced
-`project` and `thread` for a linked task. Loading migrates
-older `projectTag` and `projectBadge` fields, and the version 6 `chat` field. Preference
-loading migrates `collapsedProjects` to `collapsedProjectPaths`, and both
-`ignoredProjectPaths` and `mutedProjectPaths` to `hiddenChangeIndicatorPaths`. Successful
-migrations write only current fields; failed migration writes leave stored data intact.
-Task filter preferences migrate `recent` and `home` to `all`, displayed as **All chats**.
-Keep old field names confined to migration code and legacy fixtures.
-
-Review loops use version 2 of the `review-loop.json` document. The file-store
-boundary migrates version 1 with remote pushing disabled, and converts older unversioned single-loop and array documents, including
-former prompt-context and model-selection fields, before decoding current models.
-The coordinator writes version 2 after a successful load. Keep that conversion
-until a release can establish that all supported installs have loaded and rewritten
-their older files; only then remove the unversioned reader and its fixtures. The
-to-do store likewise retains versions 1–7 because those documents may still hold
-personal items. Do not remove a reader solely because the current writer has moved
-on; first establish a migration cutoff that protects saved data.
-
-Run `swift test` for the complete native and WebKit test suite. Web tests await to-do
-save completion instead of assuming that persistence finishes during a DOM event. To-do web tests are split by presets, tags, projects, images, storage failures, and navigation.
-
 ## Code organisation
 
-Application filesystem watchers, refresh scheduling, and activity monitors live in
-`App/Monitoring`; diagnostics presentation lives in `App/Diagnostics`. Tests mirror
-these folders. `NotificationUsageRefresher` owns request coalescing, freshness checks,
-and the short-lived cache shared by desktop and phone notification delivery.
-`UsageNotificationUpdateCoordinator` serialises each channel’s updates and prepares plans with its own delivery history. Each notifier stores its scheduled notification and task together in one delivery entry; phone delivery entries also retain their retry attempt. Disabling integration reports renderer availability explicitly; the application checks whether Codex is running before showing a disconnected or closed status.
-Required runtime and DevTools operations have explicit implementations; test doubles
-provide their own stub behaviour. The DevTools convenience overload supplies a real
-four-second timeout to the required timed operation.
+Swift source and tests mirror the application, account, compatibility, composer,
+prompt, review, runtime, and thread boundaries. Filesystem watchers and activity
+monitors live in `App/Monitoring`; diagnostics views live in `App/Diagnostics`.
+
+Renderer resources are listed in `injection-manifest.json`:
+
+| Folder | Responsibility |
+| --- | --- |
+| `Core` | Injection, host contracts, lifecycle, navigation, visibility, and shared DOM helpers |
+| `Accounts` | Account popover presentation and actions |
+| `Composer` | Text/image insertion, model selection, and shared preset validation and labels |
+| `Threads` | Chat overview, thread indexing, unread reconciliation, and completion indicators |
+| `Todos` | To-do storage, list rendering, creation drafts, tags, images, and composer transfer |
+| `Sidebar` | Project highlights, interruption indicators, and chat context-menu to-do actions |
+| `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
+| `Reviews` | Review page controls, setup, cards, history, and app-server requests |
+
+`dashboard-bridge.js` wires feature controllers to `createDashboardLifecycle` and
+catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
+their mounting and teardown. `todo-list-view.js` owns filter markup, and the to-do
+composer layout lives in CSS with a `has-image` class for the image draft.
+`codex-ui-contracts.js` shares React fiber lookup and ancestor traversal while
+keeping committed-fiber resolution explicit for read-state inspection.
+
+See [architecture and behaviour](architecture.md) for refresh, persistence,
+account transactions, notifications, and review execution. Keep behavioural
+explanations there rather than duplicating them in the module map.
+
+## Renderer contracts
+
+Internal Codex data uses `Thread`; UI copy uses **chat** and **to-do**. Chat overview
+operations use `ChatOverview` names so they do not imply control of every dashboard
+page. `RendererThread` exposes `checkoutPath` for the original directory,
+`projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
+uncommitted changes and unpushed commits. Preview fixtures include the same fields.
+
+Sidebar entries mount after the outer New chat action row, outside Quick chat and
+its tooltip trigger; the icon rail is excluded. Mounting and repairs share one
+operation. Native macOS context-menu integration preserves Codex callbacks and
+submenus; previews exercise the DOM menu path.
+
+Composer transfers wait for the destination composer's identity, recheck project
+membership, and cancel when navigation changes. Prompt placeholders preserve
+literal selection and clipboard text, including dollar signs. Current presets
+use `low` for reasoning effort, displayed as **Low** in all three features.
+Review model cards resolve display names and use saved identifiers only when the
+model is no longer available. Navigation counts describe running or waiting loops.
+
+Review display snapshots add the computed `completedRoundCount`; saved documents
+retain round data without duplicating that count. Required runtime and DevTools
+operations have explicit implementations; test doubles supply their own stubs.
+The DevTools convenience overload uses a four-second timeout.
+
+## Storage migrations
+
+Prompt-library version 4 migrates version 3 presets from `light` to `low` when
+loading or importing a native document. Native migration creates a backup before
+rewriting. Renderer cached libraries and durable pending edits are migrated before
+validation and merging, so queued edits survive an upgrade.
+
+To-do version 9 makes the same preset conversion for versions 1–8. Version 8 added
+presets; version 7 added `project` and `thread`. Older readers convert `projectTag`,
+`projectBadge`, and the version 6 `chat` field. Failed migration writes leave the
+stored document intact. Preference loading converts `collapsedProjects` to
+`collapsedProjectPaths`, former ignored/muted paths to
+`hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
+
+Review-loop version 3 renames the `naming` focus to `organisationAndNaming`.
+Version 1 and older unversioned single-loop/array documents also migrate remote
+push, prompt context, and model selection fields at the file-store boundary.
+The coordinator writes the current version after a successful load.
+
+Confine old identifiers to migration boundaries and legacy fixtures. Retain
+readers while supported installs may still contain personal data in those formats;
+establish a safe migration cutoff before removing them. Existing view-preference
+storage keys remain unchanged to preserve saved filters and collapsed projects.
+
+## Testing
+
+Run `swift test` for the complete native and WebKit suite. Web tests await to-do
+save completion; they do not assume persistence finishes during a DOM event.
+Persistence instrumentation requires each source anchor to match exactly once
+and fails on missing or duplicate anchors. Save waiters are required calls.
 
 ## Visual baselines
 
-The web test suite compares wide dark, medium light, and narrow dark screenshots against committed baselines.
-Snapshots explicitly use two pixels per point so Retina and headless CI displays
-produce the same dimensions.
+The web suite compares wide dark, medium light, and narrow dark screenshots with
+committed baselines. Snapshots use two pixels per point so Retina and headless CI
+displays produce the same dimensions.
 
-After an intentional visual change, regenerate them with:
+After an intentional visual change, regenerate and inspect them with:
 
 ```sh
 UPDATE_VISUAL_BASELINES=1 swift test --filter DashboardVisualRegressionTests
 ```
-
-Review page controls live in `Reviews/review-loop-page.js`; overview and history rendering live in `Reviews/review-loop-view.js`, setup rendering lives in `Reviews/review-loop-setup-view.js`, card and round rendering live in `Reviews/review-loop-card-view.js`, and app-server requests live in `Reviews/review-rpc-client.js`.
-
-The chat overview uses `chatOverview` names for its UI/controller modules and `Thread` for Codex data. Thread snapshots expose `checkoutPath` for the original chat directory, `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for both uncommitted changes and unpushed commits. Existing view-preference storage keys remain unchanged to retain saved filters and collapsed projects.
-
-Review display snapshots include Swift's computed `completedRoundCount`; persisted loop documents retain round data without storing the derived count. Web persistence instrumentation requires each source anchor to match exactly once and throws on missing or duplicate anchors. Save waiters are required calls, so absent instrumentation fails the test.

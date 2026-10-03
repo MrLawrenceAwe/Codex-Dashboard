@@ -75,7 +75,6 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     if (destroyed) return;
     todoListView.updateTagOptions(availableTags);
     todoListView.updateManagedTags(availableTags, items);
-    updateFilterOptions();
   }
 
   function collectFilterProjects() {
