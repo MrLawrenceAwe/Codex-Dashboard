@@ -171,8 +171,8 @@ extension AppCoordinatorTests {
 
         XCTAssertEqual(runtime.accountPopoverSynchronizationCount, 1)
         let item = try XCTUnwrap(runtime.lastAccountPopoverSnapshot?.accounts.first)
-        XCTAssertTrue(item.usageLines.contains { $0.contains("80% remaining") })
-        XCTAssertTrue(item.usageLines.contains { $0.contains("60% remaining") })
+        XCTAssertTrue(item.usageRows.contains { $0.value.contains("80% remaining") })
+        XCTAssertTrue(item.usageRows.contains { $0.value.contains("60% remaining") })
     }
 
     func testUsageFailureMarksPreviousUnsavedAccountUsageStale() async throws {

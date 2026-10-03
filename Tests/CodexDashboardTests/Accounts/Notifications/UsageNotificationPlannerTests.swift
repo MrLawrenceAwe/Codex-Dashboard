@@ -273,7 +273,8 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
 
         XCTAssertTrue(refreshed?.body.contains("Personal’s Weekly: 17% left") == true)
-        XCTAssertTrue(refreshed?.body.contains("⏱ 5-hour 60% · 📅 Weekly 17% · 🎟 Banked 1") == true)
+        XCTAssertTrue(refreshed?.body.contains("⏱ 5-hour 60% · 🎟 Banked 1") == true)
+        XCTAssertFalse(refreshed?.body.contains("📅 Weekly 17%") == true)
     }
 
     func testOmitsEmptyBankedResetsFromUsageNotifications() throws {
@@ -293,7 +294,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             for: [account], usageByAccountID: [account.id: current], now: now
         ).first { $0.kind == .weeklyReset })
         let refreshed = UsageNotificationPlanner.refreshedContent(for: reminder, using: current, now: now)
-        XCTAssertTrue(refreshed?.body.hasSuffix("⏱ 5-hour 40% · 📅 Weekly 70%") == true)
+        XCTAssertTrue(refreshed?.body.hasSuffix("⏱ 5-hour 40%") == true)
 
         let previous = UsageObservation(usage: CodexAccountUsage(
             fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: fiveHourReset),
@@ -304,7 +305,8 @@ final class UsageNotificationPlannerTests: XCTestCase {
             previousObservations: [account.id: previous], now: now
         )
         XCTAssertEqual(thresholds.count, 1)
-        XCTAssertTrue(thresholds[0].body.hasSuffix("⏱ 5-hour 40% · 📅 Weekly 70%"))
+        XCTAssertTrue(thresholds[0].body.hasSuffix("📅 Weekly 70%"))
+        XCTAssertFalse(thresholds[0].body.contains("⏱ 5-hour 40%"))
     }
 
     func testRejectsDeliveryTimeSnapshotForChangedDeadline() throws {
@@ -527,7 +529,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex 5-hour usage reset early")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour: 20% → 90% early") == true)
-        XCTAssertTrue(alerts.first?.body.contains("\n⏱ 5-hour 90% · 📅 Weekly 50% · 🎟 Banked 2") == true)
+        XCTAssertTrue(alerts.first?.body.contains("\n📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
     func testWeeklyEarlyResetTitleIdentifiesTheWeeklyLimit() {
@@ -587,7 +589,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         XCTAssertEqual(alerts.count, 1)
         XCTAssertEqual(alerts.first?.title, "Codex 5-hour usage reset")
         XCTAssertTrue(alerts.first?.body.contains("Personal’s 5-hour reset: 100% left") == true)
-        XCTAssertTrue(alerts.first?.body.contains("\n⏱ 5-hour 100% · 📅 Weekly 50% · 🎟 Banked 2") == true)
+        XCTAssertTrue(alerts.first?.body.contains("\n📅 Weekly 50% · 🎟 Banked 2") == true)
     }
 
     func testPlansAWeeklyResetAlertWhenTheNewCycleIsObserved() {

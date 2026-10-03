@@ -30,7 +30,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const todoControls = () => document.querySelector(
                 '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
               ) === null;
@@ -60,7 +60,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const initialCount = document.querySelectorAll('[data-thread-list] .dashboard-thread').length;
               const loadMoreVisible = !document.querySelector('[data-load-more]').hidden;
               document.querySelector('[data-load-more]').click();
@@ -137,7 +137,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               return [
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
@@ -179,7 +179,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               const canLoadMore = !document.querySelector('[data-load-more]').hidden;
@@ -217,7 +217,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [

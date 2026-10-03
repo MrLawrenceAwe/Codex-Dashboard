@@ -50,7 +50,7 @@ extension ChatOverviewWebTests {
               document.querySelector('[data-account-save]') === null,
               document.querySelector('[data-account-add]') === null,
               document.querySelector('[data-account-notice]') === null,
-              typeof window.__codexDashboard.takeNextAccountPopoverAction,
+              typeof window.__codexDashboard.takeQueuedAccountPopoverAction,
             ]
             """
         ) as? [Any]
@@ -83,7 +83,8 @@ extension ChatOverviewWebTests {
               id: '00000000-0000-0000-0000-000000000001',
               name: 'Lawrence',
               isActive: false,
-              usageLines: ['5-hour: 88% remaining'],
+              usageRows: [{ label: '5-hour', value: '88% remaining' },
+                { label: null, value: 'Status: waiting for refresh' }],
               isRefreshing: false,
               errorMessage: null,
             }],
@@ -96,6 +97,10 @@ extension ChatOverviewWebTests {
           trigger.click();
           const panel = document.querySelector('#codex-accounts-panel');
           const initialCard = panel.querySelector('.codex-accounts-card');
+          if (panel.querySelectorAll('.codex-accounts-usage').length !== 1
+              || panel.querySelector('.codex-accounts-usage-note').textContent !== 'Status: waiting for refresh') {
+            throw new Error('Usage notes must not be parsed as labelled values');
+          }
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           const retainedUnchangedCard = initialCard === panel.querySelector('.codex-accounts-card');
           return [
@@ -116,7 +121,7 @@ extension ChatOverviewWebTests {
             "document.querySelector('[data-account-action=\"update\"]').click()"
         )
         let serializedAction = try await webView.evaluateJavaScript(
-            "window.__codexDashboard.takeNextAccountPopoverAction()"
+            "window.__codexDashboard.takeQueuedAccountPopoverAction()"
         ) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: String.Encoding.utf8))
         let action = try XCTUnwrap(
@@ -275,7 +280,7 @@ extension ChatOverviewWebTests {
           window.__codexDashboard.applyAccountPopoverSnapshot({
             accounts: [{
               id: '00000000-0000-0000-0000-000000000001', name: 'Lawrence',
-              isActive: false, usageLines: [], isRefreshing: false, errorMessage: null,
+              isActive: false, usageRows: [], isRefreshing: false, errorMessage: null,
             }],
             activeAccountID: null, statusMessage: null, isBusy: false,
           });
@@ -309,7 +314,7 @@ extension ChatOverviewWebTests {
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
-            name: 'Personal', isActive: false, usageLines: [],
+            name: 'Personal', isActive: false, usageRows: [],
             isRefreshing: false, errorMessage: null,
           }],
           activeAccountID: null, statusMessage: null, isBusy: false,
@@ -319,11 +324,11 @@ extension ChatOverviewWebTests {
         document.querySelector('#profile-portal').remove();
         await new Promise(resolve => setTimeout(resolve, 0));
         const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
-        window.__codexDashboard.takeNextAccountPopoverAction();
+        window.__codexDashboard.takeQueuedAccountPopoverAction();
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
-            name: 'Personal', isActive: false, usageLines: [],
+            name: 'Personal', isActive: false, usageRows: [],
             isRefreshing: false, errorMessage: null,
           }],
           activeAccountID: null,
@@ -355,7 +360,7 @@ extension ChatOverviewWebTests {
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
-            name: 'Expired', isActive: false, usageLines: [],
+            name: 'Expired', isActive: false, usageRows: [],
             isRefreshing: false, requiresSignIn: true,
             errorMessage: 'Sign-in expired.',
           }],
@@ -368,7 +373,7 @@ extension ChatOverviewWebTests {
         return text;
         """, contentWorld: .page) as? String
         let serializedAction = try await webView.evaluateJavaScript(
-            "window.__codexDashboard.takeNextAccountPopoverAction()"
+            "window.__codexDashboard.takeQueuedAccountPopoverAction()"
         ) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
         let action = try XCTUnwrap(
@@ -394,7 +399,7 @@ extension ChatOverviewWebTests {
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
-            name: 'Expired', isActive: false, usageLines: [],
+            name: 'Expired', isActive: false, usageRows: [],
             isRefreshing: false, requiresSignIn: true,
             errorMessage: 'Sign-in expired.',
           }],
@@ -407,7 +412,7 @@ extension ChatOverviewWebTests {
         const button = document.querySelector('[data-account-action="sign-in"]');
         button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         if (button.isConnected) button.click();
-        return window.__codexDashboard.takeNextAccountPopoverAction();
+        return window.__codexDashboard.takeQueuedAccountPopoverAction();
         """, contentWorld: .page) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
         let action = try XCTUnwrap(
@@ -429,7 +434,7 @@ extension ChatOverviewWebTests {
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           document.querySelector('[data-codex-accounts-trigger]').click();
           document.querySelector('[data-account-global="save"]').click();
-          window.__codexDashboard.takeNextAccountPopoverAction();
+          window.__codexDashboard.takeQueuedAccountPopoverAction();
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           return [document.querySelector('.codex-accounts-status') === null,
                   document.querySelector('[data-account-global="save"]').disabled];
@@ -457,11 +462,11 @@ extension ChatOverviewWebTests {
             window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
             const stillQueued = document.querySelector('[data-account-global="save"]').disabled;
             now += 15001;
-            const expiredAction = window.__codexDashboard.takeNextAccountPopoverAction();
+            const expiredAction = window.__codexDashboard.takeQueuedAccountPopoverAction();
             const enabled = !document.querySelector('[data-account-global="save"]').disabled;
             const message = document.querySelector('.codex-accounts-status').textContent;
             document.querySelector('[data-account-global="save"]').click();
-            const retried = JSON.parse(window.__codexDashboard.takeNextAccountPopoverAction()).kind;
+            const retried = JSON.parse(window.__codexDashboard.takeQueuedAccountPopoverAction()).kind;
             return [stillQueued, expiredAction, enabled, message, retried];
           } finally { Date.now = originalNow; }
         })()
@@ -479,7 +484,7 @@ extension ChatOverviewWebTests {
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const notice = document.querySelector('[data-chat-overview-notice]');
               notice.textContent = 'Could not commit.';
               notice.hidden = false;

@@ -97,7 +97,7 @@ final class PromptLibraryBridge {
             let data = serialized.data(using: .utf8),
             let storedLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data)
         else { return nil }
-        let library = PromptLibraryNormalizer.normalize(storedLibrary)
+        let library = PromptLibraryMigration.migrate(storedLibrary)
         return library.isValid ? library : nil
     }
 

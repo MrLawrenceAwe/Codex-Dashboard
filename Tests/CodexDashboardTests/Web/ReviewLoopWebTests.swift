@@ -10,24 +10,33 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
-    func testCardsUseModelNamesAndPreserveUnavailableIdentifiers() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
-            baseURL: URL(string: "https://review-loop.test"))
+    func testCardsResolveLabelsWithoutRenderingSetupAndPreserveUnavailableIdentifiers() async throws {
+        let webView = DashboardWebTestHarness.makeWebView()
+        webView.loadHTMLString(DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        // History cards must resolve labels even when the setup view never renders.
+        let injection = try InjectionBundle.load()
+        let expression = try DashboardWebTestHarness.instrumentSource(
+            injection.mountExpression,
+            anchor: "reviewLoopSetupView.render(snapshot, pendingAction, isFinished);",
+            replacement: ""
+        )
+        _ = try await webView.evaluateJavaScript(expression)
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'saved',project,phase:'paused',completedRoundCount:0,maxRounds:5,rounds:[],
+          const loop = {id:'saved',project,phase:'paused',focus:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
             reviewSelection:{modelID:'model-a',reasoningEffort:'low'},
             fixSelection:{modelID:'retired-model',reasoningEffort:'xhigh'}};
           window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),
             projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null});
           const text = document.querySelector('[data-review-context]').textContent;
           return [text.includes('Review: Model A · Low'),
-            text.includes('Fix: retired-model · Extra high'),text.includes('Review: model-a')];
+            text.includes('Fix: retired-model · Extra high'),text.includes('Review: model-a'),
+            text.includes('Simplification, structure and naming')];
         })()
         """) as? [Bool]
-        XCTAssertEqual(result, [true, true, false])
+        XCTAssertEqual(result, [true, true, false, true])
     }
 
     func testStartIncludesOptInRemotePushPreference() async throws {

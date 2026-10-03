@@ -9,6 +9,9 @@ final class SpeechInputWebTests: SerializedDashboardWebTestCase {
         let webView = DashboardWebTestHarness.makeWebView()
         webView.loadHTMLString("<html><body><button id='speech'>Dictate</button></body></html>", baseURL: nil)
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        let expression = RendererScript.hasActiveSpeechInput(
+            contractSource: try InjectionBundle.loadRendererContractSource()
+        )
         let cases = [
             ("document.body.insertAdjacentHTML('beforeend', '<div data-dictation-enabled></div>')", false),
             ("document.body.insertAdjacentHTML('beforeend', '<div data-dictation-view=waveform></div>')", true),
@@ -23,7 +26,7 @@ final class SpeechInputWebTests: SerializedDashboardWebTestCase {
         ]
         for (setup, expected) in cases {
             _ = try await webView.evaluateJavaScript(setup + "; true")
-            let active = try await webView.evaluateJavaScript(RendererScript.hasActiveSpeechInput) as? Bool
+            let active = try await webView.evaluateJavaScript(expression) as? Bool
             XCTAssertEqual(active, expected, setup)
         }
     }

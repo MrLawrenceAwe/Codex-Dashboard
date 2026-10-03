@@ -26,6 +26,26 @@ const codexUIContracts = (() => {
     for (let fiber = reactFiber(element); fiber; fiber = fiber.return) yield fiber;
   }
 
+  // Inspect speech controller props during startup/transcription, before the
+  // dictation footer or realtime orb mounts. Avoid translated button labels.
+  function hasActiveSpeechInput() {
+    if (document.querySelector('[data-dictation-view], [data-realtime-voice-orb]')) return true;
+    const visited = new Set();
+    for (const element of document.querySelectorAll('button, [data-composer-body]')) {
+      for (const fiber of parentFibers(element)) {
+        if (visited.has(fiber)) break;
+        visited.add(fiber);
+        const props = fiber.memoizedProps;
+        if (!props || typeof props !== 'object') continue;
+        if (props.isDictating === true || props.isDictationStarting === true || props.isTranscribing === true) return true;
+        if (typeof props.startDictation === 'function' && (props.isStarting === true || props.isPreparing === true)) return true;
+        const phase = props.realtimeSession?.thread?.phase;
+        if (typeof phase === 'string' && phase !== 'inactive') return true;
+      }
+    }
+    return false;
+  }
+
   function sidebar() {
     return document.querySelector('aside.app-shell-left-panel, aside');
   }
@@ -368,6 +388,7 @@ const codexUIContracts = (() => {
   }
 
   return {
+    hasActiveSpeechInput,
     sidebar,
     navigation,
     profileMenu,

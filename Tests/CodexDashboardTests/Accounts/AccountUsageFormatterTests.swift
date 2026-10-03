@@ -3,7 +3,7 @@ import XCTest
 @testable import CodexDashboard
 
 final class AccountUsageFormatterTests: XCTestCase {
-    func testUsageLinesKeepRelativeResetTimingButRemoveVerboseAbsoluteDate() {
+    func testUsageRowsKeepRelativeResetTimingButRemoveVerboseAbsoluteDate() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let status = CodexAccountUsageStatus.available(CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
@@ -16,7 +16,7 @@ final class AccountUsageFormatterTests: XCTestCase {
             fetchedAt: now
         ))
 
-        let lines = AccountUsageFormatter.lines(
+        let rows = AccountUsageFormatter.rows(
             for: status,
             now: now,
             staleTimestampPrefix: "Usage may be stale · updated ",
@@ -25,11 +25,11 @@ final class AccountUsageFormatterTests: XCTestCase {
             timeZone: TimeZone(secondsFromGMT: 0)!
         )
 
-        XCTAssertEqual(lines.first, "5-hour: 90% remaining · resets in 3h 15m")
-        XCTAssertFalse(lines.joined().contains("2033"))
+        XCTAssertEqual(rows.first, AccountUsageRow(label: "5-hour", value: "90% remaining · resets in 3h 15m"))
+        XCTAssertFalse(rows.map(\.value).joined().contains("2033"))
     }
 
-    func testAccountUsageLinesIncludeLimitsCountdownsAndBankedResets() {
+    func testAccountUsageRowsIncludeLimitsCountdownsAndBankedResets() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let usage = CodexAccountUsage(
             fiveHour: CodexUsageWindow(
@@ -46,17 +46,17 @@ final class AccountUsageFormatterTests: XCTestCase {
             )
         )
 
-        let lines = AccountUsageFormatter.lines(
+        let rows = AccountUsageFormatter.rows(
             for: .available(CodexAccountUsageSnapshot(usage: usage, fetchedAt: now)),
             now: now,
             locale: Locale(identifier: "en_GB"),
             timeZone: TimeZone(secondsFromGMT: 0)!
         )
 
-        XCTAssertEqual(lines, [
-            "5-hour: 82% remaining · resets in 2h 15m (18 May 2033 at 5:48)",
-            "Weekly: 58% remaining · resets in 3d 4h (21 May 2033 at 7:33)",
-            "Banked resets: 2 available · expires in 1d (19 May 2033 at 3:33)",
+        XCTAssertEqual(rows, [
+            AccountUsageRow(label: "5-hour", value: "82% remaining · resets in 2h 15m (18 May 2033 at 5:48)"),
+            AccountUsageRow(label: "Weekly", value: "58% remaining · resets in 3d 4h (21 May 2033 at 7:33)"),
+            AccountUsageRow(label: "Banked resets", value: "2 available · expires in 1d (19 May 2033 at 3:33)"),
         ])
     }
 
@@ -70,13 +70,13 @@ final class AccountUsageFormatterTests: XCTestCase {
             fetchedAt: now
         )
 
-        let lines = AccountUsageFormatter.lines(
+        let rows = AccountUsageFormatter.rows(
             for: .stale(snapshot),
             now: now
         )
 
-        XCTAssertEqual(lines.first, "5-hour: 75% remaining")
-        XCTAssertTrue(lines.last?.hasPrefix("Usage may be stale · updated ") == true)
+        XCTAssertEqual(rows.first, AccountUsageRow(label: "5-hour", value: "75% remaining"))
+        XCTAssertTrue(rows.last?.value.hasPrefix("Usage may be stale · updated ") == true)
     }
 
     func testCachedAccountUsageUsesPlainUpdatedTimestamp() {
@@ -89,25 +89,25 @@ final class AccountUsageFormatterTests: XCTestCase {
             fetchedAt: now
         )
 
-        let lines = AccountUsageFormatter.lines(
+        let rows = AccountUsageFormatter.rows(
             for: .stale(snapshot),
             now: now,
             staleTimestampPrefix: "Updated "
         )
 
-        XCTAssertEqual(lines[0], "5-hour: 90% remaining")
-        XCTAssertEqual(lines[1], "Weekly: 70% remaining")
-        XCTAssertTrue(lines[2].hasPrefix("Updated "))
+        XCTAssertEqual(rows[0], AccountUsageRow(label: "5-hour", value: "90% remaining"))
+        XCTAssertEqual(rows[1], AccountUsageRow(label: "Weekly", value: "70% remaining"))
+        XCTAssertTrue(rows[2].value.hasPrefix("Updated "))
     }
 
     func testLoadingAndUnavailableAccountUsageHaveUsefulPlaceholders() {
         XCTAssertEqual(
-            AccountUsageFormatter.lines(for: .loading(previous: nil)),
-            ["Loading usage details…"]
+            AccountUsageFormatter.rows(for: .loading(previous: nil)),
+            [AccountUsageRow(label: nil, value: "Loading usage details…")]
         )
         XCTAssertEqual(
-            AccountUsageFormatter.lines(for: .unavailable),
-            ["Usage details unavailable"]
+            AccountUsageFormatter.rows(for: .unavailable),
+            [AccountUsageRow(label: nil, value: "Usage details unavailable")]
         )
     }
 

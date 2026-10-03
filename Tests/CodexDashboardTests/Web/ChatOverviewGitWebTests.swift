@@ -16,7 +16,7 @@ extension ChatOverviewWebTests {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           window.__codexDashboard.applyThreads((\(payload)).threads);
-          window.__codexDashboard.open();
+          window.__codexDashboard.openChatOverview();
           document.querySelector('[data-filter="changedProjects"]').click();
           const changed = [document.querySelector('[data-filter-count="changedProjects"]').textContent,
             [...document.querySelectorAll('[data-dashboard-git-project]')].map(row => row.dataset.dashboardGitProject)];
@@ -42,7 +42,7 @@ extension ChatOverviewWebTests {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           window.__codexDashboard.applyThreads((\(payload)).threads);
-          window.__codexDashboard.open();
+          window.__codexDashboard.openChatOverview();
           document.querySelector('[data-filter="changedProjects"]').click();
           return [document.querySelector('[data-filter-count="changedProjects"]').textContent,
             [...document.querySelectorAll('[data-thread-list] .dashboard-git-changes')].map(item => item.textContent.trim()),
@@ -97,7 +97,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               return [
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
@@ -135,7 +135,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               return [
                 document.querySelectorAll('[data-thread-list] .dashboard-git-project').length,
@@ -167,7 +167,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               const before = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
@@ -233,7 +233,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               document.querySelector('[data-project-commit]').click();
             })()
@@ -348,7 +348,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               const buttons = [...document.querySelectorAll('[data-project-commit]')];
               const result = [buttons.length, buttons[0]?.textContent.trim()];
@@ -434,7 +434,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               document.querySelector('[data-project-commit]').click();
             })()
@@ -472,7 +472,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
               const commit = document.querySelector('[data-project-commit]');
               return [

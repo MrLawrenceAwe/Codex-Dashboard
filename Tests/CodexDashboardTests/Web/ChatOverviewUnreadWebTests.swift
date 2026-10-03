@@ -14,7 +14,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const button = document.querySelector('[data-mark-all-read]');
               document.querySelector('[data-filter="all"]').click();
               const onAll = button.hidden;
@@ -42,7 +42,7 @@ extension ChatOverviewWebTests {
                 if (event.data?.type === 'navigate-to-route') window.__unexpectedNavigation = true;
               });
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
               return [
@@ -106,7 +106,7 @@ extension ChatOverviewWebTests {
                 if (event.data?.type === 'navigate-to-route') window.__unexpectedNavigation = true;
               });
               window.__codexDashboard.applyThreads(threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               const button = document.querySelector('[data-mark-all-read]');
               return [button.textContent, button.hidden, button.disabled];
@@ -162,7 +162,7 @@ extension ChatOverviewWebTests {
               };
               document.querySelector('aside').append(row);
               window.__codexDashboard.applyThreads([thread]);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
             })()
@@ -199,7 +199,7 @@ extension ChatOverviewWebTests {
               };
               document.querySelector('aside').append(row);
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
             })()
@@ -230,11 +230,11 @@ extension ChatOverviewWebTests {
               };
               document.querySelector('aside').append(row);
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const before = document.querySelector('[data-filter-count="unread"]').textContent;
               const realNow = Date.now;
               Date.now = () => realNow() + 10_001;
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               Date.now = realNow;
               return [before, document.querySelector('[data-filter-count="unread"]').textContent];
             })()
@@ -264,7 +264,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               return [
                 document.querySelector('[data-filter-count="unread"]').textContent,
@@ -294,7 +294,7 @@ extension ChatOverviewWebTests {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               return document.querySelector('[data-thread-id="unread-thread"]').getAttribute('aria-label');
             })()
@@ -380,7 +380,7 @@ extension ChatOverviewWebTests {
               row.__reactFiber$test = hostA;
               const sample = () => {
                 window.__codexDashboard.applyThreads((\(payload)).threads);
-                window.__codexDashboard.open();
+                window.__codexDashboard.openChatOverview();
                 document.querySelector('[data-filter="unread"]').click();
                 return document.querySelector('[data-filter-count="unread"]').textContent;
               };
@@ -418,7 +418,7 @@ extension ChatOverviewWebTests {
               const thread = (\(payload)).threads[0];
               const sample = (value) => {
                 window.__codexDashboard.applyThreads(value ? [value] : []);
-                window.__codexDashboard.open();
+                window.__codexDashboard.openChatOverview();
                 document.querySelector('[data-filter="unread"]').click();
                 return document.querySelector('[data-filter-count="unread"]').textContent;
               };
@@ -477,7 +477,7 @@ extension ChatOverviewWebTests {
               const thread = (\(payload)).threads[0];
               const sample = (value) => {
                 window.__codexDashboard.applyThreads([value]);
-                window.__codexDashboard.open();
+                window.__codexDashboard.openChatOverview();
                 return document.querySelector('[data-filter-count="unread"]').textContent;
               };
               const results = [sample(thread)];
@@ -515,10 +515,10 @@ extension ChatOverviewWebTests {
               const row = document.querySelector('[data-app-action-sidebar-thread-id]');
               row.__reactFiber$test = { memoizedProps: { conversationId: 'one', isUnread: true }, return: null };
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               row.click();
               row.__reactFiber$test.memoizedProps.isUnread = false;
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               return document.querySelector('[data-filter-count="unread"]').textContent;
             })()
             """
@@ -543,7 +543,7 @@ extension ChatOverviewWebTests {
               const row = document.querySelector('[data-app-action-sidebar-thread-id]');
               row.__reactFiber$test = { memoizedProps: { conversationId: 'one', isUnread: false }, return: null };
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               return document.querySelector('[data-filter-count="unread"]').textContent;
             })()
             """

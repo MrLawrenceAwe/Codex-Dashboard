@@ -7,8 +7,6 @@ const reviewLoopSetupView = (() => {
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
   const supportsProjectContext = focus => reviewTypes.find(type => type.id === focus)?.supportsProjectContext === true;
-  const focusLabel = focus => reviewTypes.find(type => type.id === focus)?.label || focus || '';
-  const reasoningLabel = value => value === 'xhigh' ? 'Extra high' : value.charAt(0).toUpperCase() + value.slice(1);
 
   function formMarkup() {
     return `
@@ -65,7 +63,7 @@ const reviewLoopSetupView = (() => {
     const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
     const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
-    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(reasoningLabel(value))}</option>`).join('');
+    select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(reviewPresentation.reasoningLabel(value))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
     select.disabled = !model || !!pendingAction;
   }
@@ -123,5 +121,5 @@ const reviewLoopSetupView = (() => {
     reviewTypesSignature = '';
   }
 
-  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, usesPriorities, supportsProjectContext, focusLabel, reasoningLabel };
+  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, usesPriorities, supportsProjectContext };
 })();

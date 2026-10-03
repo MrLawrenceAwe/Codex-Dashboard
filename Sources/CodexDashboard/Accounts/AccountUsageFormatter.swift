@@ -1,18 +1,18 @@
 import Foundation
 
 enum AccountUsageFormatter {
-    static func lines(
+    static func rows(
         for status: CodexAccountUsageStatus,
         now: Date = .now,
         staleTimestampPrefix: String? = "Usage may be stale · updated ",
         includesAbsoluteDate: Bool = true,
         locale: Locale = .current,
         timeZone: TimeZone = .current
-    ) -> [String] {
-        var lines: [String] = []
+    ) -> [AccountUsageRow] {
+        var rows: [AccountUsageRow] = []
         if let snapshot = status.snapshot {
             if let window = snapshot.usage.fiveHour {
-                lines.append(windowTitle(
+                rows.append(windowRow(
                     "5-hour",
                     window: window,
                     now: now,
@@ -22,7 +22,7 @@ enum AccountUsageFormatter {
                 ))
             }
             if let window = snapshot.usage.weekly {
-                lines.append(windowTitle(
+                rows.append(windowRow(
                     "Weekly",
                     window: window,
                     now: now,
@@ -32,7 +32,7 @@ enum AccountUsageFormatter {
                 ))
             }
             if let resets = snapshot.usage.bankedResets {
-                var title = "Banked resets: \(max(0, resets.availableCount)) available"
+                var value = "\(max(0, resets.availableCount)) available"
                 if resets.availableCount > 0, let expiration = resets.nextExpiration {
                     let deadline = deadlineDescription(
                         expiration,
@@ -41,37 +41,37 @@ enum AccountUsageFormatter {
                         locale: locale,
                         timeZone: timeZone
                     )
-                    title += " · expires \(deadline)"
+                    value += " · expires \(deadline)"
                 }
-                lines.append(title)
+                rows.append(AccountUsageRow(label: "Banked resets", value: value))
             }
         }
 
         switch status {
         case .loading(let previous):
-            lines.append(previous == nil ? "Loading usage details…" : "Updating usage details…")
+            rows.append(AccountUsageRow(label: nil, value: previous == nil ? "Loading usage details…" : "Updating usage details…"))
         case .available:
-            if lines.isEmpty { lines.append("Usage details unavailable") }
+            if rows.isEmpty { rows.append(AccountUsageRow(label: nil, value: "Usage details unavailable")) }
         case .stale(let snapshot):
             if let staleTimestampPrefix {
-                lines.append("\(staleTimestampPrefix)\(timeString(snapshot.fetchedAt))")
+                rows.append(AccountUsageRow(label: nil, value: "\(staleTimestampPrefix)\(timeString(snapshot.fetchedAt))"))
             }
         case .unavailable:
-            lines.append("Usage details unavailable")
+            rows.append(AccountUsageRow(label: nil, value: "Usage details unavailable"))
         }
-        return lines
+        return rows
     }
 
-    private static func windowTitle(
+    private static func windowRow(
         _ label: String,
         window: CodexUsageWindow,
         now: Date,
         includesAbsoluteDate: Bool,
         locale: Locale,
         timeZone: TimeZone
-    ) -> String {
+    ) -> AccountUsageRow {
         let remaining = 100 - min(100, max(0, window.usedPercent))
-        var title = "\(label): \(remaining)% remaining"
+        var value = "\(remaining)% remaining"
         if let resetsAt = window.resetsAt {
             let deadline = deadlineDescription(
                 resetsAt,
@@ -80,9 +80,9 @@ enum AccountUsageFormatter {
                 locale: locale,
                 timeZone: timeZone
             )
-            title += " · resets \(deadline)"
+            value += " · resets \(deadline)"
         }
-        return title
+        return AccountUsageRow(label: label, value: value)
     }
 
     private static func deadlineDescription(

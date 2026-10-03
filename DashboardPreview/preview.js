@@ -46,4 +46,4 @@ const threads = [
   },
 ];
 window.__codexDashboard.applyThreads(threads);
-window.__codexDashboard.open();
+window.__codexDashboard.openChatOverview();

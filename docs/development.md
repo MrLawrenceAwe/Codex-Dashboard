@@ -67,12 +67,14 @@ Renderer resources are listed in `injection-manifest.json`:
 | `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
 | `Reviews` | Review page controls, setup, cards, history, and app-server requests |
 
+`chat-overview-list-view.js` renders chat rows and project groups, including Git
+cards and actions.
 `dashboard-bridge.js` wires feature controllers to `createDashboardLifecycle` and
 catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
 their mounting and teardown. `todo-list-view.js` owns filter markup, and the to-do
 composer layout lives in CSS with a `has-image` class for the image draft.
-`codex-ui-contracts.js` shares React fiber lookup and ancestor traversal while
-keeping committed-fiber resolution explicit for read-state inspection.
+`codex-ui-contracts.js` owns speech detection and shares React fiber lookup and
+ancestor traversal while keeping committed-fiber resolution explicit for read-state inspection.
 
 See [architecture and behaviour](architecture.md) for refresh, persistence,
 account transactions, notifications, and review execution. Keep behavioural
@@ -81,8 +83,9 @@ explanations there rather than duplicating them in the module map.
 ## Renderer contracts
 
 Internal Codex data uses `Thread`; UI copy uses **chat** and **to-do**. Chat overview
-operations use `ChatOverview` names so they do not imply control of every dashboard
-page. `RendererThread` exposes `checkoutPath` for the original directory,
+operations, including the renderer’s `openChatOverview` entry point, use
+`ChatOverview` names so they do not imply control of every dashboard page.
+`RendererThread` exposes `checkoutPath` for the original directory,
 `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
 uncommitted changes and unpushed commits. Preview fixtures include the same fields.
 
@@ -95,6 +98,9 @@ Composer transfers wait for the destination composer's identity, recheck project
 membership, and cancel when navigation changes. Prompt placeholders preserve
 literal selection and clipboard text, including dollar signs. Current presets
 use `low` for reasoning effort, displayed as **Low** in all three features.
+Account popover snapshots carry labelled usage rows and separate status notes;
+the renderer does not parse formatted strings.
+`review-presentation.js` supplies shared labels independently of setup rendering.
 Review model cards resolve display names and use saved identifiers only when the
 model is no longer available. Navigation counts describe running or waiting loops.
 
@@ -105,9 +111,9 @@ The DevTools convenience overload uses a four-second timeout.
 
 ## Storage migrations
 
-Prompt-library version 4 migrates version 3 presets from `light` to `low` when
-loading or importing a native document. Native migration creates a backup before
-rewriting. Renderer cached libraries and durable pending edits are migrated before
+`PromptLibraryMigration` upgrades native version 3 presets from `light` to `low`
+when loading or importing a native document. Native migration creates a backup
+before rewriting. Renderer cached libraries and durable pending edits are migrated before
 validation and merging, so queued edits survive an upgrade.
 
 To-do version 9 makes the same preset conversion for versions 1–8. Version 8 added

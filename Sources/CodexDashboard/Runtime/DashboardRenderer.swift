@@ -11,6 +11,7 @@ final class DashboardRenderer {
 
     private let devTools: any DevToolsServing
     private let injectionBundle: InjectionBundle
+    private let rendererContractSource: String
     private let compatibilityChecker: RendererCompatibilityChecker
     private let reviewLoopBridge: ReviewLoopBridge?
     private let promptLibraryBridge: PromptLibraryBridge?
@@ -48,9 +49,10 @@ final class DashboardRenderer {
         self.healthCheckInterval = healthCheckInterval
         self.promptLibrarySynchronizationInterval = promptLibrarySynchronizationInterval
         self.now = now
+        rendererContractSource = try InjectionBundle.loadRendererContractSource()
         compatibilityChecker = RendererCompatibilityChecker(
             devTools: devTools,
-            contractSource: try InjectionBundle.loadRendererContractSource()
+            contractSource: rendererContractSource
         )
     }
 
@@ -241,9 +243,9 @@ final class DashboardRenderer {
         }
     }
 
-    func open() async {
+    func openChatOverview() async {
         for target in await targets(forceRefresh: true) {
-            _ = try? await devTools.evaluateBoolean(RendererScript.open, in: target)
+            _ = try? await devTools.evaluateBoolean(RendererScript.openChatOverview, in: target)
         }
     }
 
@@ -251,7 +253,7 @@ final class DashboardRenderer {
         for target in await targets(forceRefresh: true) {
             // If a renderer cannot be inspected, avoid automatic focus changes.
             do {
-                if try await devTools.evaluateBoolean(RendererScript.hasActiveSpeechInput, in: target) {
+                if try await devTools.evaluateBoolean(RendererScript.hasActiveSpeechInput(contractSource: rendererContractSource), in: target) {
                     return true
                 }
             } catch {
@@ -273,7 +275,7 @@ final class DashboardRenderer {
         for target in await targets() {
             do {
                 guard let serialized = try await devTools.evaluateString(
-                    RendererScript.takeNextAccountPopoverAction,
+                    RendererScript.takeQueuedAccountPopoverAction,
                     in: target,
                     timeout: .seconds(1)
                 ), serialized != RendererScript.accountPopoverUnavailable else { continue }

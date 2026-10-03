@@ -47,7 +47,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
               window.__codexDashboard.applyThreads((\(payload)).threads);
             })()
@@ -75,7 +75,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(initialPayload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
               window.__changedThreadElement = document.querySelector('[data-thread-id="changed"]');
               window.__codexDashboard.applyThreads((\(updatedPayload)).threads);
@@ -113,7 +113,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const list = document.querySelector('[data-thread-list]');
               window.__taskListRenderCount = 0;
               new MutationObserver(() => { window.__taskListRenderCount += 1; })
@@ -159,7 +159,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         let openedThreadID = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               return document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId;
             })()
             """
@@ -198,7 +198,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             (() => {
               try {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
               document.querySelector('[data-filter="all"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
@@ -294,7 +294,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const indicator = document.querySelector('[data-navigation-changes]');
               return [indicator.hidden, indicator.getAttribute('title')];
             })()
@@ -339,11 +339,11 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const row = document.querySelector('[data-thread-list] .dashboard-thread');
               const contract = [row.tagName, row.type, row.getAttribute('aria-label')];
               row.click();
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-thread-list] .dashboard-thread').click();
               return [contract, document.documentElement.dataset.openCount];
             })()
@@ -369,7 +369,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               const row = document.querySelector('[data-thread-id="completed"]');
               return [
@@ -399,7 +399,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const row = document.querySelector('[data-thread-id="usage-halted"]');
               const marker = row.querySelector('.dashboard-forced-halt-status');
               return [
@@ -562,7 +562,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             (() => {
               const completed = (\(unreadPayload)).threads[0];
               window.__codexDashboard.applyThreads([completed]);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const row = () => document.querySelector('[data-thread-id="completed"]');
               return Boolean(row().querySelector('.dashboard-completed-status'));
             })()
@@ -642,7 +642,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
                   );
                 }
               });
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               \(expression);
               return [
                 document.documentElement.dataset.routeCount,

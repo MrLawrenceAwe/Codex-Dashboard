@@ -57,7 +57,7 @@ window.__codexDashboard = {
     threadCatalog.clear();
     delete window.__codexDashboard;
   },
-  open: () => dashboardNavigation.openPage(chatOverview),
+  openChatOverview: () => dashboardNavigation.openPage(chatOverview),
   isOpen: dashboardNavigation.isOpen,
   openReviews: () => dashboardNavigation.openPage(reviewLoopPage),
   openTodos: () => dashboardNavigation.openPage(todoList),
@@ -69,7 +69,7 @@ window.__codexDashboard = {
     return true;
   },
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
-  takeNextAccountPopoverAction: accountPopover.takeNextAction,
+  takeQueuedAccountPopoverAction: accountPopover.takeQueuedAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   exportPendingPromptLibrary: () => {
     const library = promptStore.pendingLibrary();

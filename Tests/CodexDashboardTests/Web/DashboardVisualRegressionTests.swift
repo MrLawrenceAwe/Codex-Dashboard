@@ -101,7 +101,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               const testStyle = document.createElement('style');
               testStyle.textContent = '#codex-dashboard-chat-overview-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';
               document.head.append(testStyle);
