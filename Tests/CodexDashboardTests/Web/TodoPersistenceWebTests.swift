@@ -5,6 +5,16 @@ import XCTest
 
 @MainActor
 final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
+    func testPersistenceInstrumentationRejectsMissingAndDuplicateAnchors() throws {
+        XCTAssertThrowsError(try DashboardWebTestHarness.instrumentSource(
+            "source without anchor", anchor: "instrument here", replacement: "tracked"))
+        XCTAssertThrowsError(try DashboardWebTestHarness.instrumentSource(
+            "instrument here; instrument here", anchor: "instrument here", replacement: "tracked"))
+        XCTAssertEqual(try DashboardWebTestHarness.instrumentSource(
+            "before instrument here after", anchor: "instrument here", replacement: "tracked"),
+            "before tracked after")
+    }
+
     private func webView() async throws -> WKWebView {
         try await DashboardWebTestHarness.todoWebView(
             html: """
@@ -204,7 +214,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? Bool
         XCTAssertEqual(result, true)
-        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
         let state = try await view.evaluateJavaScript("""
         (() => {
           window.__codexDashboard.openTodos();
@@ -431,7 +441,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         true;
         """)
         let injection = try InjectionBundle.load()
-        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
         _ = try await view.evaluateJavaScript("""
         window.__codexDashboard.openTodos();
         window.__todoStoreForTests.save = () => new Promise(resolve => { window.__finishOldSave = resolve; });
@@ -445,7 +455,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             "window.__projectObservers.length > 0 && window.__projectObservers.every(observer => !observer.isProjectObserverActive)"
         ) as? Bool
         XCTAssertEqual(disconnected, true)
-        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
         let result = try await view.evaluateAsyncJavaScript("""
         (async () => {
           window.__codexDashboard.openTodos();
@@ -489,7 +499,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         """) as? Int
         XCTAssertEqual(removed, 0)
 
-        _ = try await view.evaluateJavaScript(DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
         let reinjected = try await view.evaluateAsyncJavaScript("""
         (async () => {
           window.__codexDashboard.openTodos();

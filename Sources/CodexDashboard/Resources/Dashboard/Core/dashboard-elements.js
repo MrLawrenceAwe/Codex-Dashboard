@@ -1,8 +1,8 @@
 const dashboardElements = {
   elementIDs: {
     style: 'codex-dashboard-style',
-    taskNavButton: 'codex-dashboard-task-navigation',
-    taskPage: 'codex-dashboard-task-page',
+    chatOverviewNavButton: 'codex-dashboard-chat-overview-navigation',
+    chatOverviewPage: 'codex-dashboard-chat-overview-page',
     todoNavButton: 'codex-dashboard-todo-navigation',
     todoPage: 'codex-dashboard-todo-page',
     reviewNavButton: 'codex-dashboard-review-navigation',

@@ -65,7 +65,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { keepDraftOnPresetFailure = false, waitForStableComposer = false, threadID = null } = {}) {
+  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null } = {}) {
     const isDestination = () => !isDestroyed()
       && (!threadID || codexUIContracts.activeComposerThreadID() === threadID);
     const destinationComposer = () => isDestination() ? activeComposer() : null;
@@ -96,7 +96,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     );
     if (!composer || !isDestination()) {
       if (!isDestroyed()) {
-        if (keepDraftOnPresetFailure) {
+        if (failurePolicy === 'stayInChat') {
           showComposerWarning(activeComposer(), 'Could not find the new chat editor. Return to To-dos and try again.');
         } else {
           pageState.open();
@@ -109,7 +109,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     let presetFailed = false;
     if (item.preset) {
       if (!await composerModelPicker.applyPreset(item.preset, { isCurrent: isDestination })) {
-        if (keepDraftOnPresetFailure) {
+        if (failurePolicy === 'stayInChat') {
           presetFailed = true;
         } else {
           if (!isDestroyed()) {
@@ -131,7 +131,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       return text.includes(item.title) && (!item.body || text.includes(item.body));
     };
     const reportTransferFailure = () => {
-      if (keepDraftOnPresetFailure && activeComposer()) showComposerWarning(
+      if (failurePolicy === 'stayInChat' && activeComposer()) showComposerWarning(
         activeComposer(),
         'Could not insert this to-do in the new chat. Return to To-dos and try again.',
       );
@@ -173,7 +173,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
   async function openTodoInNewThread(item) {
     if (isDestroyed() || !item?.project || !await codexHost.newChat(item.project.id) || isDestroyed()) return;
     pageState.close();
-    await insertTodoIntoComposer(item, { keepDraftOnPresetFailure: true, waitForStableComposer: true });
+    await insertTodoIntoComposer(item, { failurePolicy: 'stayInChat', waitForStableComposer: true });
   }
 
   async function pasteTodoInThread(item, thread) {

@@ -66,7 +66,7 @@ final class AppCoordinator: ObservableObject {
 
     init(
         catalogProvider: any ThreadCatalogProviding = CodexThreadCatalogProvider(),
-        workingTreeStatusProvider: any WorkingTreeStatusProviding = GitWorkingTreeStatusProvider(),
+        projectGitStatusProvider: any ProjectGitStatusProviding = ProjectGitStatusProvider(),
         unreadThreadIDProvider: any UnreadThreadIDProviding = CodexUnreadThreadIDProvider(),
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
         userDefaults: UserDefaults = .standard,
@@ -87,7 +87,7 @@ final class AppCoordinator: ObservableObject {
     ) {
         threadSnapshotService = ThreadSnapshotService(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: workingTreeStatusProvider,
+            projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: unreadThreadIDProvider
         )
         self.userDefaults = userDefaults
@@ -130,7 +130,7 @@ final class AppCoordinator: ObservableObject {
         refreshScheduler.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
             updateWorkingTrees: { [weak self] paths in
-                await self?.updateWorkingTreeStatuses(projectPaths: paths)
+                await self?.updateProjectGitStatuses(projectPaths: paths)
             },
             updateUnreadState: { [weak self] in await self?.refreshUnreadState() },
             refreshAccountUsage: { [weak self] in await self?.refreshAccountUsage() },
@@ -261,8 +261,8 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func openTaskDashboard() async {
-        await dashboardRuntime?.openTaskDashboard()
+    func openChatOverview() async {
+        await dashboardRuntime?.openChatOverview()
     }
 
     private func cancelSynchronization() async {
@@ -303,7 +303,7 @@ final class AppCoordinator: ObservableObject {
         if let refreshedAt { lastSuccessfulRefresh = refreshedAt }
         if !newlyMonitoredProjectPaths.isEmpty {
             Task { @MainActor [weak self] in
-                await self?.updateWorkingTreeStatuses(projectPaths: newlyMonitoredProjectPaths)
+                await self?.updateProjectGitStatuses(projectPaths: newlyMonitoredProjectPaths)
             }
         }
     }
@@ -318,7 +318,7 @@ final class AppCoordinator: ObservableObject {
         }
         var paths: Set<String> = []
         for thread in prioritizedThreads where paths.count < Self.maximumLiveMonitoredProjectCount {
-            if let path = thread.registeredProjectPath { paths.insert(path) }
+            if let path = thread.projectGroupPath { paths.insert(path) }
         }
         return paths
     }

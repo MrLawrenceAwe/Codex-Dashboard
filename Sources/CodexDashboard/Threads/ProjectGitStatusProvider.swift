@@ -1,45 +1,45 @@
 import Foundation
 
-protocol WorkingTreeStatusProviding: Sendable {
+protocol ProjectGitStatusProviding: Sendable {
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) async -> [String: WorkingTreeStatus]
+        policy: ProjectGitStatusRefreshPolicy
+    ) async -> [String: ProjectGitStatus]
 }
 
-enum WorkingTreeStatusRefreshPolicy: Equatable, Sendable {
+enum ProjectGitStatusRefreshPolicy: Equatable, Sendable {
     case useCached
     case refresh
 }
 
-actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+actor ProjectGitStatusProvider: ProjectGitStatusProviding {
     static let defaultStatusCacheLifetime: TimeInterval = 60
 
     private enum GitStatusError: Error { case unavailable }
 
     private struct CachedStatus {
-        let value: WorkingTreeStatus
+        let value: ProjectGitStatus
         let loadedAt: Date
     }
 
     private enum RepositoryResolution: Sendable {
         case repository
-        case terminal(WorkingTreeStatus)
+        case terminal(ProjectGitStatus)
     }
 
     private static let maximumConcurrentChecks = 6
 
     private let subprocessTimeout: TimeInterval
     private let cacheLifetime: TimeInterval
-    private let statusLoader: @Sendable (String, TimeInterval) async -> WorkingTreeStatus
+    private let statusLoader: @Sendable (String, TimeInterval) async -> ProjectGitStatus
     private var statusByProjectPath: [String: CachedStatus] = [:]
     private var refreshGenerationByProjectPath: [String: UInt64] = [:]
 
     init(
         subprocessTimeout: TimeInterval = 3,
-        cacheLifetime: TimeInterval = GitWorkingTreeStatusProvider.defaultStatusCacheLifetime,
-        statusLoader: @escaping @Sendable (String, TimeInterval) async -> WorkingTreeStatus = {
-            await GitWorkingTreeStatusProvider.status(atProjectPath: $0, timeout: $1)
+        cacheLifetime: TimeInterval = ProjectGitStatusProvider.defaultStatusCacheLifetime,
+        statusLoader: @escaping @Sendable (String, TimeInterval) async -> ProjectGitStatus = {
+            await ProjectGitStatusProvider.status(atProjectPath: $0, timeout: $1)
         }
     ) {
         self.subprocessTimeout = subprocessTimeout
@@ -49,8 +49,8 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) async -> [String: WorkingTreeStatus] {
+        policy: ProjectGitStatusRefreshPolicy
+    ) async -> [String: ProjectGitStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
         let now = Date()
@@ -78,7 +78,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         let refreshed = await Self.concurrentMap(staleProjectPaths) { path in
             (path, await statusLoader(path, timeout))
         }
-        var statusesByProjectPath: [String: WorkingTreeStatus] = [:]
+        var statusesByProjectPath: [String: ProjectGitStatus] = [:]
         for path in repositoryProjectPaths {
             guard let cached = statusByProjectPath[path],
                   now.timeIntervalSince(cached.loadedAt) < cacheLifetime
@@ -95,7 +95,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
         }
 
         return Dictionary(uniqueKeysWithValues: projectPaths.map { path in
-            let status: WorkingTreeStatus
+            let status: ProjectGitStatus
             switch resolutions[path] {
             case .repository:
                 status = statusesByProjectPath[path] ?? .unavailable
@@ -178,7 +178,7 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
     private static func status(
         atProjectPath path: String,
         timeout: TimeInterval
-    ) async -> WorkingTreeStatus {
+    ) async -> ProjectGitStatus {
         do {
             // Separate tracked and untracked checks. `git status --untracked-files=normal`
             // recursively expands untracked directories, which is needlessly expensive
@@ -208,8 +208,8 @@ actor GitWorkingTreeStatusProvider: WorkingTreeStatusProviding {
             guard untracked.terminationStatus == 0 else { return .unavailable }
             let dirty = !tracked.standardOutput.isEmpty || !untracked.standardOutput.isEmpty
             let pending = try await hasUnpushedCommits(at: path, timeout: timeout)
-            if pending { return dirty ? .hasChangesAndUnpushedCommits : .unpushedCommits }
-            return dirty ? .hasChanges : .clean
+            if pending { return dirty ? .uncommittedChangesAndUnpushedCommits : .unpushedCommits }
+            return dirty ? .uncommittedChanges : .clean
         } catch {
             return .unavailable
         }

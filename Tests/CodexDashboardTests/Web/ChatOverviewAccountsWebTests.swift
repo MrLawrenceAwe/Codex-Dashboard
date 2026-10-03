@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension TaskDashboardWebTests {
+extension ChatOverviewWebTests {
     func testDashboardInsetAccountsForScaledCodexShell() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -26,7 +26,7 @@ extension TaskDashboardWebTests {
             """
             (() => {
               const sidebarRight = document.querySelector('aside').getBoundingClientRect().right;
-              const pageLeft = document.querySelector('#codex-dashboard-task-page').getBoundingClientRect().left;
+              const pageLeft = document.querySelector('#codex-dashboard-chat-overview-page').getBoundingClientRect().left;
               const inset = getComputedStyle(document.documentElement)
                 .getPropertyValue('--codex-dashboard-content-left');
               return [sidebarRight, pageLeft, inset];
@@ -41,7 +41,7 @@ extension TaskDashboardWebTests {
     }
 
     func testDashboardDoesNotRenderAccountControlsOrAccountStatusNotice() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let state = try await webView.evaluateJavaScript(
             """
             [
@@ -475,12 +475,12 @@ extension TaskDashboardWebTests {
     }
 
     func testCommitNoticeRemainsAvailable() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let result = try await webView.evaluateJavaScript(
             """
             (() => {
               window.__codexDashboard.open();
-              const notice = document.querySelector('[data-task-notice]');
+              const notice = document.querySelector('[data-chat-overview-notice]');
               notice.textContent = 'Could not commit.';
               notice.hidden = false;
               return [notice.hidden, notice.textContent];

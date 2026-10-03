@@ -6,26 +6,24 @@ import XCTest
 @MainActor
 final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
     func testPageSelectionRemainsExclusiveAcrossRemountAndReinjection() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let result = try await webView.evaluateAsyncJavaScript("""
         (async () => {
           const state = () => [
-            document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
+            document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
             document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
             document.querySelectorAll('[aria-current="page"]').length,
           ];
           window.__codexDashboard.open();
           document.getElementById('codex-dashboard-todo-navigation').click();
-          await window.__waitForTodoSaves?.();
           const todos = state();
           document.getElementById('codex-dashboard-todo-navigation').remove();
           window.__codexDashboard.ensureMounted();
           const remounted = state();
-          document.getElementById('codex-dashboard-task-navigation').click();
-          await window.__waitForTodoSaves?.();
-          const tasks = state();
+          document.getElementById('codex-dashboard-chat-overview-navigation').click();
+          const chats = state();
           window.__codexDashboard.openTodos();
-          return [todos, remounted, tasks, state()];
+          return [todos, remounted, chats, state()];
         })()
         """) as? [[AnyHashable]]
         XCTAssertEqual(result, [
@@ -50,7 +48,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(replacedVersion, [1, false, false])
     }
 
-    func testTodoDestinationSitsAfterTaskDashboard() async throws {
+    func testTodoDestinationSitsAfterChatOverview() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -67,12 +65,12 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
-              const taskButton = document.getElementById('codex-dashboard-task-navigation');
+              const chatOverviewButton = document.getElementById('codex-dashboard-chat-overview-navigation');
               const todoButton = document.getElementById('codex-dashboard-todo-navigation');
               todoButton.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
-                taskButton.nextElementSibling === todoButton,
+                chatOverviewButton.nextElementSibling === todoButton,
                 todoButton.nextElementSibling?.nextElementSibling?.textContent.trim(),
                 document.querySelector('[data-todo-project]') === null,
                 document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
@@ -103,28 +101,28 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Ship to-do list';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const title = document.querySelector('[data-todo-title]');
               title.value = 'Ship project to-dos';
               title.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const checkbox = document.querySelector('[data-todo-completed]');
               checkbox.checked = true;
               checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const hiddenFromOpen = document.querySelectorAll('[data-todo-id]').length === 0;
               document.querySelector('[data-todo-filter="completed"]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const completedTitle = document.querySelector('[data-todo-title]').value;
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const deleteButton = document.querySelector('[data-todo-delete]');
               deleteButton.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const deletionWasConfirmed = deleteButton.dataset.todoDeleteConfirm === stored.id
                 && deleteButton.textContent.trim() === 'Confirm delete';
               const remainsAfterFirstClick = document.querySelectorAll('[data-todo-id]').length === 1;
               deleteButton.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
                 hiddenFromOpen,
                 completedTitle,
@@ -149,7 +147,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
     }
 
     func testOpenTodoPageIsRepairedAndClosesForCodexNavigation() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         _ = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {

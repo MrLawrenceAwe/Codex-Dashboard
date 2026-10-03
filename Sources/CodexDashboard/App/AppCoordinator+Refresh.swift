@@ -81,26 +81,26 @@ extension AppCoordinator {
         await synchronizeDashboard()
         await refreshAccountUsage()
         if !refreshScheduler.hasFileChangeMonitoring {
-            await updateWorkingTreeStatuses()
+            await updateProjectGitStatuses()
         }
     }
 
-    func updateWorkingTreeStatuses(
+    func updateProjectGitStatuses(
         projectPaths: Set<String>? = nil,
         forceRefresh: Bool = false
     ) async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
         let generation = refreshGeneration
-        let requestedPaths = forceRefresh ? Set(threads.map(\.projectPath)) : projectPaths
-        guard let statusByProjectPath = await threadSnapshotService.updateWorkingTreeStatuses(
+        let requestedPaths = forceRefresh ? Set(threads.map(\.checkoutPath)) : projectPaths
+        guard let statusByProjectPath = await threadSnapshotService.updateProjectGitStatuses(
             in: threads, projectPaths: requestedPaths
         ) else { return }
         guard !isPerformingAction, generation == refreshGeneration else { return }
         applyThreadSnapshot(threads.map { thread in
             var updatedThread = thread
-            if let status = statusByProjectPath[updatedThread.registeredProjectPath ?? ""] {
-                updatedThread.workingTreeStatus = status
+            if let status = statusByProjectPath[updatedThread.projectGroupPath ?? ""] {
+                updatedThread.projectGitStatus = status
             }
             return updatedThread
         })

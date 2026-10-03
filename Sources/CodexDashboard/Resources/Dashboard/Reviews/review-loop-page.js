@@ -40,14 +40,14 @@ const reviewLoopPage = (() => {
         focus,
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
-        promptContext: { kind: reviewLoopView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
-        priorityLimit: reviewLoopView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,
+        promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
+        priorityLimit: reviewLoopSetupView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
-    details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopView.renderReviewSettings());
+    details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     for (const kind of ['review', 'fix']) {
       const model = details.querySelector(`[data-${kind}-model]`);
-      model.addEventListener('change', () => reviewLoopView.renderReasoningOptions(snapshot, pendingAction, kind));
+      model.addEventListener('change', () => reviewLoopSetupView.renderReasoningOptions(snapshot, pendingAction, kind));
       model.addEventListener('invalid', () => { details.querySelector('.review-execution-options').open = true; });
     }
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
@@ -79,7 +79,7 @@ const reviewLoopPage = (() => {
         codexHost.navigateToThread({ id: thread.dataset.reviewThread });
       }
     });
-    reviewLoopView.reset();
+    reviewLoopSetupView.reset();
     render();
     pageState.applyVisibility();
     return true;

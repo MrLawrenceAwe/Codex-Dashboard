@@ -22,7 +22,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -55,7 +55,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime(codexIsRunning: true, reviewLoopThreadIDs: ["review-thread"])
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -96,7 +96,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime(reviewLoopThreadIDs: ["review-thread"])
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -126,7 +126,7 @@ extension AppCoordinatorTests {
         let usageProvider = RecordingAccountUsageProvider()
         let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: usageProvider,
@@ -158,7 +158,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -231,7 +231,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -255,7 +255,7 @@ extension AppCoordinatorTests {
                     totalThreadCount: 1
                 )
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -283,7 +283,7 @@ extension AppCoordinatorTests {
         let foregrounder = RecordingCodexForegrounder()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,
@@ -315,7 +315,7 @@ extension AppCoordinatorTests {
         let foregrounder = RecordingCodexForegrounder()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             userDefaults: defaults,
@@ -370,7 +370,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime()
         let coordinator = makeAppCoordinator(
             catalogProvider: provider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             codexForegrounder: foregrounder,

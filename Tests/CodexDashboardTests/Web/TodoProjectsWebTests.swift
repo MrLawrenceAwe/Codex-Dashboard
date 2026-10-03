@@ -29,11 +29,11 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               const projectNames = [...project.options].map((option) => option.textContent);
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-title]').value = 'Ship project tags';
               form.querySelector('[data-todo-new-body]').value = 'Include the new chat action.';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               window.__todoProjectNames = projectNames;
               window.__todoProjectID = stored.project.id;
@@ -53,7 +53,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
                 }, 200);
               });
               document.querySelector('[data-todo-new-thread]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
             })()
             """
         )
@@ -172,9 +172,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             clearLocalStorage: true
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "dashboard-new", title: "Newest dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 3),
-            .fixture(id: "dashboard-old", title: "Older dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 2),
-            .fixture(id: "other-chat", title: "Other project chat", projectName: "Other Project", projectPath: "/tmp/other", recencyEpochMillis: 1),
+            .fixture(id: "dashboard-new", title: "Newest dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 3),
+            .fixture(id: "dashboard-old", title: "Older dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 2),
+            .fixture(id: "other-chat", title: "Other project chat", projectName: "Other Project", checkoutPath: "/tmp/other", recencyEpochMillis: 1),
         ])
 
         let result = try await webView.evaluateAsyncJavaScript(
@@ -198,7 +198,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               chat.dispatchEvent(new Event('change', { bubbles: true }));
               form.querySelector('[data-todo-new-title]').value = 'Continue this work';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [
                 initiallyHidden,
@@ -245,7 +245,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             clearLocalStorage: true
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "dashboard-chat", title: "Dashboard chat", projectName: "Codex Dashboard", projectPath: "/tmp/dashboard", recencyEpochMillis: 1),
+            .fixture(id: "dashboard-chat", title: "Dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 1),
         ])
 
         let result = try await webView.evaluateAsyncJavaScript(
@@ -265,14 +265,14 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               chat.dispatchEvent(new Event('change', { bubbles: true }));
               form.querySelector('[data-todo-new-title]').value = 'Move me';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const originalChat = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].thread.id;
               const project = document.querySelector('[data-todo-project]');
               project.value = 'other';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [originalChat, stored.project.id, stored.thread, Boolean(document.querySelector('[data-todo-paste-in-thread]')), Boolean(document.querySelector('[data-todo-new-thread]'))];
             })()
@@ -303,8 +303,8 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             """
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "one", title: "First project", projectName: "shared", projectPath: "/tmp/one/shared"),
-            .fixture(id: "two", title: "Second project", projectName: "shared", projectPath: "/tmp/two/shared"),
+            .fixture(id: "one", title: "First project", projectName: "shared", checkoutPath: "/tmp/one/shared"),
+            .fixture(id: "two", title: "Second project", projectName: "shared", checkoutPath: "/tmp/two/shared"),
         ])
         let choices = try await webView.evaluateJavaScript(
             """
@@ -358,17 +358,17 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Assign me later';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const project = document.querySelector('[data-todo-project]');
               const options = [...project.options].map((option) => option.textContent);
               project.value = 'project-b';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const assigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
               const newChatVisible = Boolean(document.querySelector('[data-todo-new-thread]'));
               document.querySelector('[data-todo-project]').value = '';
               document.querySelector('[data-todo-project]').dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const unassigned = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].project;
               return [options, assigned.id, assigned.name, newChatVisible, unassigned, Boolean(document.querySelector('[data-todo-new-thread]'))];
             })()
@@ -397,7 +397,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Assign after refresh';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const row = document.querySelector('[data-todo-id]');
               const project = row.querySelector('[data-todo-project]');
               const sidebarProject = document.createElement('div');
@@ -408,7 +408,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               project.innerHTML = '<option value="">No project</option><option value="late-project">Late Project</option>';
               project.value = 'late-project';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [stored.project.id, stored.project.name];
             })()
@@ -515,7 +515,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         let taggedState = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               window.__codexDashboard.openTodos();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [
@@ -587,8 +587,8 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         webView.frame = CGRect(x: 0, y: 0, width: 900, height: 900)
         try await DashboardWebTestHarness.waitForJavaScript("window.innerWidth === 900", in: webView)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "chosen", title: "Chosen chat", projectPath: "/tmp/project"),
-            .fixture(id: "other", title: "Other project chat", projectPath: "/tmp/other"),
+            .fixture(id: "chosen", title: "Chosen chat", checkoutPath: "/tmp/project"),
+            .fixture(id: "other", title: "Other project chat", checkoutPath: "/tmp/other"),
         ])
         let result = try await webView.evaluateAsyncJavaScript(
             """
@@ -604,13 +604,13 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
               form.querySelector('[data-todo-new-title]').value = 'Todo title';
               form.querySelector('[data-todo-new-body]').value = 'Todo details';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const noProjectDisabled = document.querySelector('[data-todo-paste-in-thread]').disabled;
               const assign = async (id) => {
                 const project = document.querySelector('[data-todo-project]');
                 project.value = id;
                 project.dispatchEvent(new Event('change', { bubbles: true }));
-                await window.__waitForTodoSaves?.();
+                await window.__waitForTodoSaves();
               };
               await assign('/tmp/empty');
               document.querySelector('[data-todo-paste-in-thread]').click();

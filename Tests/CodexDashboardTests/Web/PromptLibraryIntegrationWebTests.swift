@@ -207,12 +207,12 @@ extension PromptLibraryWebTests {
             .fixture(
                 id: "project-a-thread",
                 projectName: "Project A",
-                projectPath: "/tmp/project-a"
+                checkoutPath: "/tmp/project-a"
             ),
             .fixture(
                 id: "project-b-thread",
                 projectName: "Project B",
-                projectPath: "/tmp/project-b"
+                checkoutPath: "/tmp/project-b"
             ),
         ])
         let result = try await webView.evaluateJavaScript(

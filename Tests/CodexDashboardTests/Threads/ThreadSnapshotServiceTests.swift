@@ -14,12 +14,12 @@ private actor CountingCatalogProvider: ThreadCatalogProviding {
     }
 }
 
-private struct ChangedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+private struct ChangedProjectGitStatusProvider: ProjectGitStatusProviding {
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) -> [String: WorkingTreeStatus] {
-        Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .hasChanges) })
+        policy: ProjectGitStatusRefreshPolicy
+    ) -> [String: ProjectGitStatus] {
+        Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, .uncommittedChanges) })
     }
 }
 
@@ -58,14 +58,14 @@ private actor SequencedUnreadIDProvider: UnreadThreadIDProviding {
     }
 }
 
-private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    private var continuations: [Int: CheckedContinuation<[String: WorkingTreeStatus], Never>] = [:]
+private actor SequencedProjectGitStatusProvider: ProjectGitStatusProviding {
+    private var continuations: [Int: CheckedContinuation<[String: ProjectGitStatus], Never>] = [:]
     private var nextRequestID = 0
 
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) async -> [String: WorkingTreeStatus] {
+        policy: ProjectGitStatusRefreshPolicy
+    ) async -> [String: ProjectGitStatus] {
         let requestID = nextRequestID
         nextRequestID += 1
         return await withCheckedContinuation { continuation in
@@ -75,20 +75,20 @@ private actor SequencedWorkingTreeStatusProvider: WorkingTreeStatusProviding {
 
     func pendingRequestCount() -> Int { continuations.count }
 
-    func resume(requestID: Int, status: WorkingTreeStatus) {
+    func resume(requestID: Int, status: ProjectGitStatus) {
         continuations.removeValue(forKey: requestID)?.resume(returning: ["/tmp/project": status])
     }
 }
 
-private actor CountingWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+private actor CountingProjectGitStatusProvider: ProjectGitStatusProviding {
     private var requests = 0
 
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) -> [String: WorkingTreeStatus] {
+        policy: ProjectGitStatusRefreshPolicy
+    ) -> [String: ProjectGitStatus] {
         requests += 1
-        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, requests == 1 ? .hasChanges : .clean) })
+        return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, requests == 1 ? .uncommittedChanges : .clean) })
     }
 
     func requestCount() -> Int { requests }
@@ -107,9 +107,9 @@ private actor SuspendedStatusCatalogProvider: ThreadCatalogProviding {
         continuation != nil
     }
 
-    func resume(with workingTreeStatus: WorkingTreeStatus) {
+    func resume(with projectGitStatus: ProjectGitStatus) {
         continuation?.resume(returning: ThreadCatalog(
-            threads: [.fixture(workingTreeStatus: workingTreeStatus)],
+            threads: [.fixture(projectGitStatus: projectGitStatus)],
             totalThreadCount: 1
         ))
         continuation = nil
@@ -121,7 +121,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let catalogProvider = SuspendedStatusCatalogProvider()
         let service = ThreadSnapshotService(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            projectGitStatusProvider: ChangedProjectGitStatusProvider(),
             unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
         let snapshotTask = Task {
@@ -131,71 +131,71 @@ final class ThreadSnapshotServiceTests: XCTestCase {
             await Task.yield()
         }
 
-        let sourceThreads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
-        let updatedStatuses = await service.updateWorkingTreeStatuses(in: sourceThreads)
-        XCTAssertEqual(updatedStatuses?["/tmp/project"], .hasChanges)
+        let sourceThreads = [ThreadSummary.fixture(projectGitStatus: .notRepository)]
+        let updatedStatuses = await service.updateProjectGitStatuses(in: sourceThreads)
+        XCTAssertEqual(updatedStatuses?["/tmp/project"], .uncommittedChanges)
         await catalogProvider.resume(with: .notRepository)
 
         let snapshot = try await snapshotTask.value
-        XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
+        XCTAssertEqual(snapshot.catalog.threads.first?.projectGitStatus, .uncommittedChanges)
     }
 
     func testWorkingTreeUpdateChangesCurrentThreadsWithoutReloadingCatalog() async throws {
         let catalogProvider = CountingCatalogProvider()
         let service = ThreadSnapshotService(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            projectGitStatusProvider: ChangedProjectGitStatusProvider(),
             unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
         let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
 
-        let updatedStatuses = await service.updateWorkingTreeStatuses(in: snapshot.catalog.threads)
+        let updatedStatuses = await service.updateProjectGitStatuses(in: snapshot.catalog.threads)
         let loadCount = await catalogProvider.loadCount
 
-        XCTAssertEqual(updatedStatuses?["/tmp/project"], .hasChanges)
+        XCTAssertEqual(updatedStatuses?["/tmp/project"], .uncommittedChanges)
         XCTAssertEqual(loadCount, 1)
     }
 
     func testOlderWorkingTreeRefreshCannotOverwriteNewerResult() async throws {
-        let statusProvider = SequencedWorkingTreeStatusProvider()
+        let statusProvider = SequencedProjectGitStatusProvider()
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
-            workingTreeStatusProvider: statusProvider,
+            projectGitStatusProvider: statusProvider,
             unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
-        let threads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
+        let threads = [ThreadSummary.fixture(projectGitStatus: .notRepository)]
 
-        let older = Task { await service.updateWorkingTreeStatuses(in: threads) }
+        let older = Task { await service.updateProjectGitStatuses(in: threads) }
         while await statusProvider.pendingRequestCount() < 1 { await Task.yield() }
-        let newer = Task { await service.updateWorkingTreeStatuses(in: threads) }
+        let newer = Task { await service.updateProjectGitStatuses(in: threads) }
         while await statusProvider.pendingRequestCount() < 2 { await Task.yield() }
 
-        await statusProvider.resume(requestID: 1, status: .hasChanges)
+        await statusProvider.resume(requestID: 1, status: .uncommittedChanges)
         let newerResult = await newer.value
-        XCTAssertEqual(newerResult?["/tmp/project"], .hasChanges)
+        XCTAssertEqual(newerResult?["/tmp/project"], .uncommittedChanges)
         await statusProvider.resume(requestID: 0, status: .clean)
         let olderResult = await older.value
         XCTAssertNil(olderResult)
 
         let snapshot = try await service.loadSnapshot(codexLaunchDate: nil)
-        XCTAssertEqual(snapshot.catalog.threads.first?.workingTreeStatus, .hasChanges)
+        XCTAssertEqual(snapshot.catalog.threads.first?.projectGitStatus, .uncommittedChanges)
     }
 
     func testRapidEventDrivenWorkingTreeRefreshPublishesFinalCleanStatus() async {
-        let statusProvider = CountingWorkingTreeStatusProvider()
+        let statusProvider = CountingProjectGitStatusProvider()
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
-            workingTreeStatusProvider: statusProvider,
+            projectGitStatusProvider: statusProvider,
             unreadThreadIDProvider: EmptyUnreadIDProvider()
         )
-        let threads = [ThreadSummary.fixture(workingTreeStatus: .notRepository)]
+        let threads = [ThreadSummary.fixture(projectGitStatus: .notRepository)]
         let paths: Set<String> = ["/tmp/project"]
 
-        let initial = await service.updateWorkingTreeStatuses(in: threads, projectPaths: paths)
-        let repeated = await service.updateWorkingTreeStatuses(in: threads, projectPaths: paths)
+        let initial = await service.updateProjectGitStatuses(in: threads, projectPaths: paths)
+        let repeated = await service.updateProjectGitStatuses(in: threads, projectPaths: paths)
         let requestCount = await statusProvider.requestCount()
 
-        XCTAssertEqual(initial?["/tmp/project"], .hasChanges)
+        XCTAssertEqual(initial?["/tmp/project"], .uncommittedChanges)
         XCTAssertEqual(repeated?["/tmp/project"], .clean)
         XCTAssertEqual(requestCount, 2)
     }
@@ -203,7 +203,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
     func testUnreadFailureKeepsCatalogAvailableAndReportsWarning() async throws {
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
-            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            projectGitStatusProvider: ChangedProjectGitStatusProvider(),
             unreadThreadIDProvider: FailingUnreadIDProvider()
         )
 
@@ -221,7 +221,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let unreadProvider = SequencedUnreadIDProvider()
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
-            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            projectGitStatusProvider: ChangedProjectGitStatusProvider(),
             unreadThreadIDProvider: unreadProvider
         )
         _ = try await service.loadSnapshot(codexLaunchDate: nil)
@@ -250,7 +250,7 @@ final class ThreadSnapshotServiceTests: XCTestCase {
         let unreadProvider = SequencedUnreadIDProvider(suspendInitial: true)
         let service = ThreadSnapshotService(
             catalogProvider: CountingCatalogProvider(),
-            workingTreeStatusProvider: ChangedWorkingTreeStatusProvider(),
+            projectGitStatusProvider: ChangedProjectGitStatusProvider(),
             unreadThreadIDProvider: unreadProvider
         )
 

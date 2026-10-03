@@ -36,7 +36,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let title: String
         let preview: String
         let projectID: String?
-        let projectPath: String
+        let checkoutPath: String
         let pinnedValue: Int
         let model: String?
         let totalCount: Int
@@ -55,7 +55,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     private func registeredRoot(for thread: StoredThread, in roots: [ProjectRoot]) -> ProjectRoot? {
-        let cwd = Self.canonicalPath(thread.projectPath)
+        let cwd = Self.canonicalPath(thread.checkoutPath)
         let assigned = roots.filter { $0.id == thread.projectID }
         let candidates = thread.projectID == nil ? roots : assigned
         return candidates.filter { cwd == $0.path || cwd.hasPrefix($0.path + "/") }
@@ -118,7 +118,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
                project_id AS projectID,
-               cwd AS projectPath,
+               cwd AS checkoutPath,
                is_pinned AS pinnedValue,
                model,
                rollout_path AS rolloutPath,
@@ -181,18 +181,18 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 title: thread.title,
                 preview: thread.preview,
                 projectName: root?.name ?? "Other chats",
-                projectPath: thread.projectPath,
+                checkoutPath: thread.checkoutPath,
                 recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
                 model: thread.model,
                 runState: runState,
                 latestLifecycleEvent: latestLifecycleEvent,
-                workingTreeStatus: .notRepository
+                projectGitStatus: .notRepository
             )
             if let root {
-                let cwd = Self.canonicalPath(thread.projectPath)
+                let cwd = Self.canonicalPath(thread.checkoutPath)
                 // Worktree chats can be assigned to a project outside its saved root.
-                summary.registeredProjectPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
+                summary.projectGroupPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
             }
             return summary
         }

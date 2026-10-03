@@ -20,11 +20,11 @@ struct ReviewLoopAction: Codable, Sendable {
     var priorityLimit: ReviewFinding.Priority? = nil
 }
 
-struct ReviewLoopSnapshot: Codable, Sendable {
+struct ReviewLoopSnapshot: Encodable, Sendable {
     let projects: [ReviewProject]
     let models: [ReviewModel]
     let reviewTypes: [ReviewTypeOption]
-    let loops: [ReviewLoop]
+    let loops: [ReviewLoopDisplaySnapshot]
     let finishedLoopIDs: [UUID]
     let progress: [String: ReviewLoopProgress]
     let error: String?
@@ -58,4 +58,17 @@ struct ReviewLoopProgress: Codable, Sendable {
     let upcoming: ReviewPromptPreview?
     let nextMessage: String
     let threadID: String?
+}
+
+/// Adds derived presentation values without duplicating them in saved loop documents.
+struct ReviewLoopDisplaySnapshot: Encodable, Sendable {
+    let loop: ReviewLoop
+
+    private enum CodingKeys: String, CodingKey { case completedRoundCount }
+
+    func encode(to encoder: Encoder) throws {
+        try loop.encode(to: encoder)
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(loop.completedRoundCount, forKey: .completedRoundCount)
+    }
 }

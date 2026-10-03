@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
+final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
     func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -41,7 +41,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testUnchangedSnapshotRetainsRenderedThreadElements() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [.fixture(id: "stable")])
         _ = try await webView.evaluateJavaScript(
             """
@@ -62,7 +62,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testChangedSnapshotRetainsUnaffectedThreadElements() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let initialPayload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "changed", title: "Before", recencyEpochMillis: 2),
             .fixture(id: "stable", title: "Stable", recencyEpochMillis: 1),
@@ -101,7 +101,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testOpenDashboardCoalescesSnapshotBurstToLatestTaskList() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let now = Int64(Date.now.timeIntervalSince1970 * 1_000)
         let initial = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "initial", title: "Initial task", recencyEpochMillis: now),
@@ -135,7 +135,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testClosedDashboardDefersThreadDOMUntilOpened() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "deferred-thread", recencyEpochMillis: now, isUnread: true, runState: .running),
@@ -286,8 +286,8 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
             """,
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(projectPath: "/tmp/dirty", workingTreeStatus: .hasChanges),
-            .fixture(id: "clean", projectPath: "/tmp/clean", workingTreeStatus: .clean),
+            .fixture(checkoutPath: "/tmp/dirty", projectGitStatus: .uncommittedChanges),
+            .fixture(id: "clean", checkoutPath: "/tmp/clean", projectGitStatus: .clean),
         ])
 
         let status = try await webView.evaluateJavaScript(
@@ -355,7 +355,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletedThreadShowsTickInsteadOfOpenArrow() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "completed",
@@ -385,7 +385,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testUsageLimitedThreadShowsPersistentForcedHaltMarker() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "usage-halted",
@@ -546,7 +546,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletedTickExpiresOneMinuteAfterThreadIsRead() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let unreadPayload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "completed",
@@ -628,7 +628,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletionRouteDoesNotReplaceOpenDashboard() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))
 
         let result = try await webView.evaluateJavaScript(
@@ -656,7 +656,7 @@ final class TaskDashboardWebTests: SerializedDashboardWebTestCase {
     }
 
     func testCompletionRouteNavigatesWhenDashboardIsClosed() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let expression = try XCTUnwrap(RendererScript.openThread("completed-thread"))
 
         let result = try await webView.evaluateJavaScript(

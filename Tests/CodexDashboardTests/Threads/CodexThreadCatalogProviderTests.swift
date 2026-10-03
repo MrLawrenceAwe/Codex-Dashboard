@@ -5,8 +5,11 @@ import XCTest
 final class CodexThreadCatalogProviderTests: XCTestCase {
     func testSavedProjectsGroupAliasesAndRemovalDoesNotHideChats() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
-        let project = url.deletingLastPathComponent().appendingPathComponent("Mail-Verify")
-        let alias = url.deletingLastPathComponent().appendingPathComponent("Yahoo-Code-Fill")
+        let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let project = workspace.appendingPathComponent("Mail-Verify")
+        let alias = workspace.appendingPathComponent("Yahoo-Code-Fill")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
         func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
@@ -25,15 +28,15 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
         let grouped = initial.threads.filter { ["running", "updated"].contains($0.id) }
         XCTAssertEqual(grouped.map(\.projectName), ["Mail Verify", "Mail Verify"])
-        XCTAssertEqual(Set(grouped.compactMap(\.registeredProjectPath)), [project.resolvingSymlinksInPath().path])
-        XCTAssertEqual(initial.threads.first { $0.id == "running" }?.projectPath, alias.path, "Keep the original chat checkout for review-loop isolation")
-        XCTAssertNil(initial.threads.first { $0.id == "idle" }?.registeredProjectPath)
+        XCTAssertEqual(Set(grouped.compactMap(\.projectGroupPath)), [project.resolvingSymlinksInPath().path])
+        XCTAssertEqual(initial.threads.first { $0.id == "running" }?.checkoutPath, alias.path, "Keep the original chat checkout for review-loop isolation")
+        XCTAssertNil(initial.threads.first { $0.id == "idle" }?.projectGroupPath)
         let removal = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [url.path, "DELETE FROM projects; DELETE FROM project_roots;"], timeout: 3)
         XCTAssertEqual(removal.terminationStatus, 0)
         let removed = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
         XCTAssertEqual(removed.threads.map(\.id), initial.threads.map(\.id))
-        XCTAssertTrue(removed.threads.allSatisfy { $0.registeredProjectPath == nil && $0.projectName == "Other chats" })
+        XCTAssertTrue(removed.threads.allSatisfy { $0.projectGroupPath == nil && $0.projectName == "Other chats" })
     }
 
     func testEmptyCatalogReturnsEmptySnapshotAfterArchivingAllThreads() async throws {
@@ -137,9 +140,9 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads.map { $0.latestLifecycleEvent?.kind }, [.started, .completed, .completed])
         XCTAssertEqual(catalog.threads.first?.title, "Running thread")
         XCTAssertEqual(catalog.threads.first?.projectName, "running")
-        XCTAssertEqual(catalog.threads.first?.projectPath, "/tmp/running")
+        XCTAssertEqual(catalog.threads.first?.checkoutPath, "/tmp/running")
         XCTAssertEqual(catalog.threads.first?.recencyEpochMillis, (now - 30) * 1_000)
-        XCTAssertEqual(catalog.threads.first?.workingTreeStatus, .notRepository)
+        XCTAssertEqual(catalog.threads.first?.projectGitStatus, .notRepository)
         XCTAssertTrue(catalog.threads.first?.isPinned == true)
         XCTAssertEqual(catalog.threads[1].title, "Renamed thread")
         XCTAssertEqual(catalog.threads[1].recencyEpochMillis, (now - 600) * 1_000)

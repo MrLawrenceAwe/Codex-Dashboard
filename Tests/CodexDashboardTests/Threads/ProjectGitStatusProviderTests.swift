@@ -2,13 +2,13 @@ import XCTest
 
 @testable import CodexDashboard
 
-final class GitWorkingTreeStatusProviderTests: XCTestCase {
+final class ProjectGitStatusProviderTests: XCTestCase {
     private actor OrderedStatusLoader {
         private var callCount = 0
-        private var firstCall: CheckedContinuation<WorkingTreeStatus, Never>?
+        private var firstCall: CheckedContinuation<ProjectGitStatus, Never>?
         private var firstCallStarted: CheckedContinuation<Void, Never>?
 
-        func load() async -> WorkingTreeStatus {
+        func load() async -> ProjectGitStatus {
             callCount += 1
             if callCount == 1 {
                 firstCallStarted?.resume()
@@ -24,7 +24,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         }
 
         func releaseFirstCall() {
-            firstCall?.resume(returning: .hasChanges)
+            firstCall?.resume(returning: .uncommittedChanges)
             firstCall = nil
         }
 
@@ -32,7 +32,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
     }
 
     func testDefaultStatusCacheAvoidsRepeatedPeriodicGitScans() {
-        XCTAssertEqual(GitWorkingTreeStatusProvider.defaultStatusCacheLifetime, 60)
+        XCTAssertEqual(ProjectGitStatusProvider.defaultStatusCacheLifetime, 60)
     }
 
     func testDefaultProviderImmediatelyObservesCleanWorkingTree() async throws {
@@ -47,13 +47,13 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         )
         let changedFileURL = projectURL.appendingPathComponent("notes.txt")
         try Data("uncommitted\n".utf8).write(to: changedFileURL)
-        let provider = GitWorkingTreeStatusProvider()
+        let provider = ProjectGitStatusProvider()
 
         let changed = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
         try FileManager.default.removeItem(at: changedFileURL)
         let clean = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
-        XCTAssertEqual(changed[projectURL.path], .hasChanges)
+        XCTAssertEqual(changed[projectURL.path], .uncommittedChanges)
         XCTAssertEqual(clean[projectURL.path], .clean)
     }
 
@@ -69,7 +69,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         )
 
         let loader = OrderedStatusLoader()
-        let provider = GitWorkingTreeStatusProvider(statusLoader: { _, _ in
+        let provider = ProjectGitStatusProvider(statusLoader: { _, _ in
             await loader.load()
         })
         let olderRefresh = Task {
@@ -102,11 +102,11 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("uncommitted\n".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+        let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: [projectURL.path], policy: .useCached
         )
 
-        XCTAssertEqual(statuses[projectURL.path], .hasChanges)
+        XCTAssertEqual(statuses[projectURL.path], .uncommittedChanges)
     }
 
     func testIgnoresTrackedAndUntrackedMacOSMetadata() async throws {
@@ -127,19 +127,19 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             arguments: ["-C", projectURL.path, "add", ".DS_Store"],
             timeout: 3
         )
-        let provider = GitWorkingTreeStatusProvider()
+        let provider = ProjectGitStatusProvider()
 
         let metadataOnly = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
         try Data("meaningful".utf8).write(to: projectURL.appendingPathComponent("notes.txt"))
         let meaningfulChange = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
         XCTAssertEqual(metadataOnly[projectURL.path], .clean)
-        XCTAssertEqual(meaningfulChange[projectURL.path], .hasChanges)
+        XCTAssertEqual(meaningfulChange[projectURL.path], .uncommittedChanges)
     }
 
     func testReportsUnavailablePath() async {
         let missingPath = "/tmp/codex-dashboard-missing-\(UUID().uuidString)"
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+        let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: [missingPath], policy: .useCached
         )
         XCTAssertEqual(statuses[missingPath], .unavailable)
@@ -151,7 +151,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+        let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: [directory.path], policy: .useCached
         )
         XCTAssertEqual(statuses[directory.path], .notRepository)
@@ -162,7 +162,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             "/tmp/codex-dashboard-missing-\(index)-\(UUID().uuidString)"
         })
 
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(
+        let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: paths, policy: .useCached
         )
 
@@ -183,7 +183,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             arguments: ["-C", repositoryURL.path, "init", "--quiet"],
             timeout: 3
         )
-        let provider = GitWorkingTreeStatusProvider(cacheLifetime: 60)
+        let provider = ProjectGitStatusProvider(cacheLifetime: 60)
         let paths: Set<String> = [firstProjectURL.path, secondProjectURL.path]
 
         let initial = await provider.loadStatuses(for: paths, policy: .useCached)
@@ -196,9 +196,9 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
         XCTAssertEqual(cached[secondProjectURL.path], .clean)
 
         try Data("feature change\n".utf8).write(to: firstProjectURL.appendingPathComponent("feature.txt"))
-        let uncachedProvider = GitWorkingTreeStatusProvider(cacheLifetime: 0)
+        let uncachedProvider = ProjectGitStatusProvider(cacheLifetime: 0)
         let refreshed = await uncachedProvider.loadStatuses(for: paths, policy: .useCached)
-        XCTAssertEqual(refreshed[firstProjectURL.path], .hasChanges)
+        XCTAssertEqual(refreshed[firstProjectURL.path], .uncommittedChanges)
         XCTAssertEqual(refreshed[secondProjectURL.path], .clean)
     }
 
@@ -207,7 +207,7 @@ final class GitWorkingTreeStatusProviderTests: XCTestCase {
             .appendingPathComponent("codex-dashboard-resolution-cache-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-        let provider = GitWorkingTreeStatusProvider()
+        let provider = ProjectGitStatusProvider()
 
         let initial = await provider.loadStatuses(for: [directory.path], policy: .useCached)
         XCTAssertEqual(initial[directory.path], .notRepository)

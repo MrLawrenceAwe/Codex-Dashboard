@@ -128,7 +128,7 @@ final class ReviewLoopCoordinator {
         guard let loop = matchingLoop(id), loop.phase == .stopped else { return }
         do {
             if let round = loop.rounds.last, round.result == nil, let threadID = round.threadID {
-                try await driver.stopThread(threadID)
+                try await driver.interruptLatestTurn(threadID)
             }
         } catch {
             if var updated = matchingLoop(id), updated.phase == .stopped {
@@ -445,7 +445,7 @@ final class ReviewLoopCoordinator {
 
     private func hasOtherRunningTask(_ threads: [RendererThread], root: String, excluding: String?) -> Bool {
         threads.contains { thread in
-            let cwd = Self.canonicalPath(thread.projectPath)
+            let cwd = Self.canonicalPath(thread.checkoutPath)
             let root = Self.canonicalPath(root)
             return thread.id != excluding && thread.runState == .running && (cwd == root || cwd.hasPrefix(root + "/"))
         }

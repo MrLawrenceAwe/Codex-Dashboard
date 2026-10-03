@@ -89,7 +89,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         for status in ["inProgress", "completed", "interrupted", "empty"] {
             let connection = ReviewStopDevTools(status: status)
             let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
-            try await driver.stopThread("thread")
+            try await driver.interruptLatestTurn("thread")
             let expressions = await connection.expressions
             let prefix = "window.__codexDashboard.reviewRequest("
             let requests = try expressions.map {

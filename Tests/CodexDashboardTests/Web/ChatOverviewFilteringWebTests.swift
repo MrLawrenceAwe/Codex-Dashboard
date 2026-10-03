@@ -4,24 +4,24 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension TaskDashboardWebTests {
-    func testTaskDashboardDoesNotSurfaceTodoControls() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+extension ChatOverviewWebTests {
+    func testChatOverviewDoesNotSurfaceTodoControls() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "changed-task",
                 title: "Changed task",
                 projectName: "Project A",
-                projectPath: "/tmp/project-a",
+                checkoutPath: "/tmp/project-a",
                 recencyEpochMillis: 2,
                 runState: .running,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             .fixture(
                 id: "idle-task",
                 title: "Idle task",
                 projectName: "Project B",
-                projectPath: "/tmp/project-b",
+                checkoutPath: "/tmp/project-b",
                 recencyEpochMillis: 1
             ),
         ])
@@ -47,7 +47,7 @@ extension TaskDashboardWebTests {
     }
 
     func testCompleteCatalogUsesClientPaging() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let threads = (0..<65).map { index in
             ThreadSummary.fixture(
                 id: "thread-\(index)",
@@ -97,27 +97,27 @@ extension TaskDashboardWebTests {
                 title: "First running thread",
                 preview: "Running",
                 projectName: "Project A",
-                projectPath: "/tmp/project-a",
+                checkoutPath: "/tmp/project-a",
                 recencyEpochMillis: 4,
                 runState: .running,
-                workingTreeStatus: .clean
+                projectGitStatus: .clean
             ),
             ThreadSummary.fixture(
                 id: "project-a-running-two",
                 title: "Second running thread",
                 preview: "Running",
                 projectName: "Project A",
-                projectPath: "/tmp/project-a",
+                checkoutPath: "/tmp/project-a",
                 recencyEpochMillis: 3,
                 runState: .running,
-                workingTreeStatus: .clean
+                projectGitStatus: .clean
             ),
             ThreadSummary.fixture(
                 id: "project-a-idle",
                 title: "Idle thread",
                 preview: "Idle",
                 projectName: "Project A",
-                projectPath: "/tmp/project-a",
+                checkoutPath: "/tmp/project-a",
                 recencyEpochMillis: 2
             ),
             ThreadSummary.fixture(
@@ -125,10 +125,10 @@ extension TaskDashboardWebTests {
                 title: "Other running thread",
                 preview: "Running",
                 projectName: "Project B",
-                projectPath: "/tmp/project-b",
+                checkoutPath: "/tmp/project-b",
                 recencyEpochMillis: 1,
                 runState: .running,
-                workingTreeStatus: .clean
+                projectGitStatus: .clean
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -169,7 +169,7 @@ extension TaskDashboardWebTests {
     }
 
     func testRecentsKeepsOlderRunningTasksVisibleWhilePagingIdleTasks() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let threads = (0..<12).map { index in
             ThreadSummary.fixture(id: "idle-\(index)", recencyEpochMillis: Int64(100 - index))
         } + [ThreadSummary.fixture(id: "older-running", recencyEpochMillis: 1, runState: .running)]
@@ -204,13 +204,13 @@ extension TaskDashboardWebTests {
     }
 
     func testAllTasksFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "newest", title: "Latest task", projectPath: "/tmp/a", recencyEpochMillis: now - 1_000),
-            .fixture(id: "middle", title: "Middle task", projectPath: "/tmp/b", recencyEpochMillis: now - 2_000),
-            .fixture(id: "oldest", title: "Earlier task", projectPath: "/tmp/a", recencyEpochMillis: now - 3_000),
-            .fixture(id: "yesterday", title: "Yesterday's task", projectPath: "/tmp/a", recencyEpochMillis: now - 86_400_000),
+            .fixture(id: "newest", title: "Latest task", checkoutPath: "/tmp/a", recencyEpochMillis: now - 1_000),
+            .fixture(id: "middle", title: "Middle task", checkoutPath: "/tmp/b", recencyEpochMillis: now - 2_000),
+            .fixture(id: "oldest", title: "Earlier task", checkoutPath: "/tmp/a", recencyEpochMillis: now - 3_000),
+            .fixture(id: "yesterday", title: "Yesterday's task", checkoutPath: "/tmp/a", recencyEpochMillis: now - 86_400_000),
         ])
 
         let result = try await webView.evaluateJavaScript(

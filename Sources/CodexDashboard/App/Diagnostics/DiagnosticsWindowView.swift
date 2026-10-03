@@ -164,7 +164,7 @@ struct DiagnosticsWindowView: View {
 
             HStack(spacing: 10) {
                 Button(DashboardActionPresentation.openTitle) {
-                    Task { await coordinator.openTaskDashboard() }
+                    Task { await coordinator.openChatOverview() }
                 }
                 .disabled(!actions.canOpen)
 

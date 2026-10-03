@@ -9,7 +9,7 @@ This is an independent personal project and is not affiliated with OpenAI.
 ## Project overview
 
 - **Chat monitoring:** recent activity, unread status, completion tracking, uncommitted files and unpushed Git commits.
-- **Review loops:** multiple concurrent loops across projects (one active loop per project), with active loops in a responsive card grid, grouped setup alongside on wide windows, and previous loops in a separate history section; independent pause/resume/stop controls (stopping also interrupts the running review or fix chat) and saved progress; fresh review chats with selectable bugs/issues, combined bugs/issues/performance/responsiveness, code and content minimisation/organisation, naming, performance, or content and quality reviews, separate model and reasoning choices for reviews and fixes, priority limits for bugs, performance and combined reviews, automatic address-and-commit follow-ups, verified commit checkpoints, and optional remote pushing after each fix round. Push failures block the loop until resolved; pushes never force updates.
+- **Review loops:** concurrent project reviews with automatic fixes and commits, separate model choices, pause/resume/stop controls, and optional remote pushing. See [review-loop behaviour](docs/architecture.md#review-loops).
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 - **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
 - **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.

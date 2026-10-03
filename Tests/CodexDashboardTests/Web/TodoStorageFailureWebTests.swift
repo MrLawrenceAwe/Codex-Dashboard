@@ -28,7 +28,7 @@ final class TodoStorageFailureWebTests: SerializedDashboardWebTestCase {
               });
               title.value = 'Keep this draft';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               Object.defineProperty(window, 'localStorage', {
                 configurable: true,
                 value: realStorage,
@@ -67,13 +67,13 @@ final class TodoStorageFailureWebTests: SerializedDashboardWebTestCase {
           const form = document.querySelector('[data-todo-form]');
           form.querySelector('[data-todo-new-title]').value = 'Saved item';
           form.requestSubmit();
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           const checkbox = document.querySelector('[data-todo-completed]');
           checkbox.checked = true;
           checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           document.querySelector('[data-todo-filter="completed"]').click();
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           const original = localStorage.getItem('codex-dashboard.todos');
           const realStorage = window.localStorage;
           Object.defineProperty(window, 'localStorage', {
@@ -83,16 +83,16 @@ final class TodoStorageFailureWebTests: SerializedDashboardWebTestCase {
           const title = document.querySelector('[data-todo-title]');
           title.value = 'Unsaved edit';
           title.dispatchEvent(new Event('change', { bubbles: true }));
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           const restoredTitle = document.querySelector('[data-todo-title]').value;
           const deletion = document.querySelector('[data-todo-delete]');
           deletion.click();
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           deletion.click();
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           const countAfterDelete = document.querySelectorAll('[data-todo-id]').length;
           document.querySelector('[data-todo-clear-completed]').click();
-          await window.__waitForTodoSaves?.();
+          await window.__waitForTodoSaves();
           const countAfterClear = document.querySelectorAll('[data-todo-id]').length;
           Object.defineProperty(window, 'localStorage', { configurable: true, value: realStorage });
           return [restoredTitle, countAfterDelete, countAfterClear,

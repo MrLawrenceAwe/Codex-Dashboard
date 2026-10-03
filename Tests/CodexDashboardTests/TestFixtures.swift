@@ -8,29 +8,29 @@ extension ThreadSummary {
         title: String = "Thread",
         preview: String = "Preview",
         projectName: String = "Project",
-        projectPath: String = "/tmp/project",
+        checkoutPath: String = "/tmp/project",
         recencyEpochMillis: Int64 = 1,
         isPinned: Bool = false,
         isUnread: Bool = false,
         model: String? = nil,
         runState: ThreadRunState = .idle,
         latestLifecycleEvent: ThreadLifecycleEvent? = nil,
-        workingTreeStatus: WorkingTreeStatus = .clean
+        projectGitStatus: ProjectGitStatus = .clean
     ) -> ThreadSummary {
         var thread = ThreadSummary(
             id: id,
             title: title,
             preview: preview,
             projectName: projectName,
-            projectPath: projectPath,
+            checkoutPath: checkoutPath,
             recencyEpochMillis: recencyEpochMillis,
             isPinned: isPinned,
             model: model,
             runState: runState,
             latestLifecycleEvent: latestLifecycleEvent,
-            workingTreeStatus: workingTreeStatus
+            projectGitStatus: projectGitStatus
         )
-        thread.registeredProjectPath = projectPath
+        thread.projectGroupPath = checkoutPath
         thread.isUnread = isUnread
         return thread
     }

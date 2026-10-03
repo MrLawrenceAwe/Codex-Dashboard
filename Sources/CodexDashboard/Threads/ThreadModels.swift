@@ -17,13 +17,13 @@ struct ThreadLifecycleEvent: Codable, Equatable, Sendable {
     let timestamp: Date
 }
 
-enum WorkingTreeStatus: String, Codable, Equatable, Sendable {
+enum ProjectGitStatus: String, Codable, Equatable, Sendable {
     case notRepository
     case unavailable
     case clean
-    case hasChanges
+    case uncommittedChanges
     case unpushedCommits
-    case hasChangesAndUnpushedCommits
+    case uncommittedChangesAndUnpushedCommits
 }
 
 struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
@@ -31,15 +31,15 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let title: String
     let preview: String
     let projectName: String
-    let projectPath: String
+    let checkoutPath: String
     let recencyEpochMillis: Int64
     let isPinned: Bool
     var isUnread = false
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEvent: ThreadLifecycleEvent?
-    var registeredProjectPath: String? = nil
-    var workingTreeStatus: WorkingTreeStatus
+    var projectGroupPath: String? = nil
+    var projectGitStatus: ProjectGitStatus
 
     var originatesFromChromeExtension: Bool {
         preview.contains("# Chrome tabs:\n- The user has the Chrome extension side panel open.")
@@ -56,30 +56,30 @@ struct RendererThread: Codable, Equatable, Sendable {
     let title: String
     let preview: String
     let projectName: String
-    let projectPath: String
+    let checkoutPath: String
     let recencyEpochMillis: Int64
     let isPinned: Bool
     let isUnread: Bool
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEventKind: ThreadLifecycleEventKind?
-    let registeredProjectPath: String?
-    let workingTreeStatus: WorkingTreeStatus
+    let projectGroupPath: String?
+    let projectGitStatus: ProjectGitStatus
 
     init(_ thread: ThreadSummary) {
         id = thread.id
         title = thread.title
         preview = thread.preview
         projectName = thread.projectName
-        projectPath = thread.projectPath
+        checkoutPath = thread.checkoutPath
         recencyEpochMillis = thread.recencyEpochMillis
         isPinned = thread.isPinned
         isUnread = thread.isUnread
         model = thread.model
         runState = thread.runState
         latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
-        registeredProjectPath = thread.registeredProjectPath
-        workingTreeStatus = thread.workingTreeStatus
+        projectGroupPath = thread.projectGroupPath
+        projectGitStatus = thread.projectGitStatus
     }
 }
 

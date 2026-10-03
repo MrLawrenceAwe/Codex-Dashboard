@@ -77,7 +77,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
               const project = form.querySelector('[data-todo-new-project]');
               project.value = 'dashboard';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const title = form.querySelector('[data-todo-new-title]');
               title.value = 'Review the image';
               const image = new File([new Uint8Array([137, 80, 78, 71])], 'handoff.png', { type: 'image/png' });
@@ -113,7 +113,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
                 document.body.append(composer);
               });
               document.querySelector('[data-todo-new-thread]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
             })()
             """
         )
@@ -163,7 +163,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
             """
             (async () => {
               document.querySelector('[data-todo-new-image-open]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-image-dialog]');
               const result = [dialog.open, dialog.querySelector('img').alt];
               dialog.close();
@@ -208,14 +208,14 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const preview = document.querySelector('[data-todo-image-preview]');
               preview.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-image-dialog]');
               const checkbox = document.querySelector('[data-todo-completed]');
               checkbox.checked = true;
               checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               document.querySelector('[data-todo-filter="completed"]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const values = [
                 stored.image.name,
                 stored.image.type,
@@ -260,7 +260,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
               Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
               form.querySelector('[data-todo-new-title]').dispatchEvent(paste);
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
                 document.querySelector('[data-todo-image-error]').textContent,
                 document.querySelectorAll('[data-todo-id]').length === 0,
@@ -313,7 +313,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
                 },
               });
               document.querySelector('[data-todo-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
             })()
             """
         )
@@ -375,7 +375,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
             """
             (async () => {
               document.querySelector('[data-todo-new-image-remove]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
                 document.querySelector('[data-todo-new-image-preview]').hidden,
                 document.querySelector('[data-todo-new-image-preview] img').getAttribute('src'),

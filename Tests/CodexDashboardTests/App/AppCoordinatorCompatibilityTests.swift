@@ -11,20 +11,20 @@ extension AppCoordinatorTests {
             title: "Running",
             preview: "Working",
             projectName: "Project",
-            projectPath: "/tmp/project",
+            checkoutPath: "/tmp/project",
             recencyEpochMillis: 1,
             isPinned: false,
             model: nil,
             runState: .running,
             latestLifecycleEvent: nil,
-            workingTreeStatus: .notRepository
+            projectGitStatus: .notRepository
         )
         let runtime = StubDashboardRuntime()
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [runningThread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             runtimeFactory: { _ in runtime }
@@ -40,7 +40,7 @@ extension AppCoordinatorTests {
     func testMountedDashboardFailureIsReportedAsANotice() {
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(threads: [], totalThreadCount: 0)),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             runtimeFactory: { _ in StubDashboardRuntime() }
@@ -71,7 +71,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [incompatible]),
             runtimeFactory: { _ in runtime }
@@ -103,7 +103,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: checker,
             runtimeFactory: { _ in runtime }
@@ -128,7 +128,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: [expected]),
             runtimeFactory: { _ in StubDashboardRuntime() }
@@ -216,7 +216,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             userDefaults: defaults,
@@ -239,7 +239,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             userDefaults: defaults,

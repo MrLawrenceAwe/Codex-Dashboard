@@ -1,16 +1,16 @@
-const taskDashboardPage = (() => {
+const chatOverviewPage = (() => {
   function mount({ onFilter, onMarkAllRead, onLoadMore, onListClick }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = document.createElement('section');
-    page.id = dashboardElements.elementIDs.taskPage;
+    page.id = dashboardElements.elementIDs.chatOverviewPage;
     page.setAttribute('aria-label', 'Codex Chat overview');
     page.innerHTML = `
       <div class="dashboard-shell">
         <header class="dashboard-header">
           <h1>Chat overview</h1>
         </header>
-        <div class="dashboard-notice" data-task-notice role="alert" hidden></div>
+        <div class="dashboard-notice" data-chat-overview-notice role="alert" hidden></div>
         <div class="dashboard-section-header">
           <div class="dashboard-toolbar">
             <div class="dashboard-toolbar-group dashboard-filter-group">

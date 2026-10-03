@@ -29,7 +29,7 @@ final class ReviewRemotePushTests: XCTestCase {
 
     func testPushCreatesUpstreamAndOverviewTracksPendingAndDirtyStates() async throws {
         let (checkout, remote) = try await fixture()
-        let provider = GitWorkingTreeStatusProvider()
+        let provider = ProjectGitStatusProvider()
         var statuses = await provider.loadStatuses(for: [checkout], policy: .refresh)
         XCTAssertEqual(statuses[checkout], .unpushedCommits, "A branch without an upstream still has unpublished commits")
         let checkpoint = ReviewRepositoryCheckpoint()
@@ -47,7 +47,7 @@ final class ReviewRemotePushTests: XCTestCase {
         let note = URL(fileURLWithPath: checkout).appendingPathComponent("notes.txt")
         try Data("Unrelated work".utf8).write(to: note)
         statuses = await provider.loadStatuses(for: [checkout], policy: .refresh)
-        XCTAssertEqual(statuses[checkout], .hasChangesAndUnpushedCommits)
+        XCTAssertEqual(statuses[checkout], .uncommittedChangesAndUnpushedCommits)
         try FileManager.default.removeItem(at: note)
         let fixed = try await checkpoint.repository(at: checkout)
         try await checkpoint.pushCommit(at: checkout, expectedRepository: fixed)
@@ -98,7 +98,7 @@ final class ReviewRemotePushTests: XCTestCase {
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("Push needs a remote"))
         }
-        let statuses = await GitWorkingTreeStatusProvider().loadStatuses(for: [checkout], policy: .refresh)
+        let statuses = await ProjectGitStatusProvider().loadStatuses(for: [checkout], policy: .refresh)
         XCTAssertEqual(statuses[checkout], .clean, "A local-only repository has no unpushed status")
     }
 }

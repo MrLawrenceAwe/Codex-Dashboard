@@ -70,19 +70,19 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
                 title: "Build the dashboard",
                 preview: "Finish the current dashboard improvements and verify the result.",
                 projectName: "Codex Dashboard",
-                projectPath: "/Users/example/Codex Dashboard",
+                checkoutPath: "/Users/example/Codex Dashboard",
                 recencyEpochMillis: now * 1_000,
                 isPinned: true,
                 model: "gpt-5.6-sol",
                 runState: .running,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             .fixture(
                 id: "unread",
                 title: "Review the release",
                 preview: "Check the finished release notes and packaging.",
                 projectName: "Codex Dashboard",
-                projectPath: "/Users/example/Codex Dashboard",
+                checkoutPath: "/Users/example/Codex Dashboard",
                 recencyEpochMillis: (now - 900) * 1_000,
                 isUnread: true,
                 model: "gpt-5.6-terra"
@@ -92,7 +92,7 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
                 title: "Improve keyboard navigation",
                 preview: "Add predictable focus and activation behavior.",
                 projectName: "Voice Tools",
-                projectPath: "/Users/example/Voice Tools",
+                checkoutPath: "/Users/example/Voice Tools",
                 recencyEpochMillis: (now - 7_200) * 1_000,
                 model: "gpt-5.5"
             ),
@@ -103,9 +103,9 @@ final class DashboardVisualRegressionTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.open();
               const testStyle = document.createElement('style');
-              testStyle.textContent = '#codex-dashboard-task-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';
+              testStyle.textContent = '#codex-dashboard-chat-overview-page { transition: none !important; opacity: 1 !important; visibility: visible !important; transform: none !important; }';
               document.head.append(testStyle);
-              return document.getElementById('codex-dashboard-task-page').classList.contains('is-open');
+              return document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open');
             })()
             """
         )

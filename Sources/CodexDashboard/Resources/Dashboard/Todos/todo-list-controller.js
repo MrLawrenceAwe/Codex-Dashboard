@@ -240,7 +240,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     if (!mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.todoNavButton,
       label: 'To-dos',
-      afterID: dashboardElements.elementIDs.taskNavButton,
+      afterID: dashboardElements.elementIDs.chatOverviewNavButton,
       markup: `
       <span class="todo-nav-copy">
         <span class="todo-nav-icon">${dashboardIcons.render('completed')}</span>
