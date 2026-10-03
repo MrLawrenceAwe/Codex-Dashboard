@@ -1,3 +1,4 @@
+import DashboardKeychainProtocol
 import Foundation
 import Security
 
@@ -11,27 +12,27 @@ protocol AccountCredentialVault: Sendable {
 
 struct KeychainAccountCredentialVault: AccountCredentialVault {
     func credential(for accountID: UUID) throws -> Data? {
-        try request("read", accountID, interactionAllowed: true)
+        try request(.read, accountID, interactionAllowed: true)
     }
 
     func credentialWithoutUserInteraction(for accountID: UUID) throws -> Data? {
-        try request("read", accountID, interactionAllowed: false)
+        try request(.read, accountID, interactionAllowed: false)
     }
 
     func store(_ credential: Data, for accountID: UUID) throws {
-        _ = try request("store", accountID, credential: credential, interactionAllowed: true)
+        _ = try request(.store, accountID, credential: credential, interactionAllowed: true)
     }
 
     func storeWithoutUserInteraction(_ credential: Data, for accountID: UUID) throws {
-        _ = try request("store", accountID, credential: credential, interactionAllowed: false)
+        _ = try request(.store, accountID, credential: credential, interactionAllowed: false)
     }
 
     func deleteCredential(for accountID: UUID) throws {
-        _ = try request("delete", accountID, interactionAllowed: true)
+        _ = try request(.delete, accountID, interactionAllowed: true)
     }
 
     private func request(
-        _ operation: String,
+        _ operation: KeychainOperation,
         _ accountID: UUID,
         credential: Data? = nil,
         interactionAllowed: Bool
@@ -50,7 +51,7 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
-        let request = HelperRequest(operation: operation, accountID: accountID,
+        let request = KeychainRequest(operation: operation, accountID: accountID,
             credential: credential, interactionAllowed: interactionAllowed)
         do { try process.run() }
         catch { throw CodexAccountError.keychain(errSecNotAvailable) }
@@ -71,7 +72,7 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         let data = try output.fileHandleForReading.readToEnd() ?? Data()
         process.waitUntilExit()
         guard process.terminationStatus == 0,
-            let response = try? JSONDecoder().decode(HelperResponse.self, from: data) else {
+            let response = try? JSONDecoder().decode(KeychainResponse.self, from: data) else {
             throw CodexAccountError.keychain(errSecNotAvailable)
         }
         if response.authorizationRequired { throw CodexAccountError.keychainAuthorizationRequired }
@@ -79,16 +80,4 @@ struct KeychainAccountCredentialVault: AccountCredentialVault {
         return response.credential
     }
 
-    private struct HelperRequest: Encodable {
-        let operation: String
-        let accountID: UUID
-        let credential: Data?
-        let interactionAllowed: Bool
-    }
-
-    private struct HelperResponse: Decodable {
-        let status: OSStatus
-        let authorizationRequired: Bool
-        let credential: Data?
-    }
 }

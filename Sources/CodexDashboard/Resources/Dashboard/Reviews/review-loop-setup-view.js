@@ -20,14 +20,15 @@ const reviewLoopSetupView = (() => {
         </select></label>
         </fieldset>
         <fieldset class="review-limits"><legend>Review settings</legend>
-        <label>Review type<select data-review-focus aria-label="Review type"></select></label>
+        <label>Review type<select data-review-focus aria-label="Review type" aria-describedby="review-type-help"></select></label>
+        <p id="review-type-help" class="review-field-help" data-review-type-help></p>
         <label class="review-priority">Finding priority<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
         <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
         <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
-        <label class="review-extension">Browser extension<select data-review-extension aria-label="Browser extension" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
+        <label class="review-extension">Reload browser extension<select data-review-extension aria-label="Reload browser extension before testing" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
         <p id="review-extension-help" class="review-field-help review-extension-help">Use Computer Use to reload the extension before live testing.</p>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
@@ -56,6 +57,7 @@ const reviewLoopSetupView = (() => {
     const root = panel();
     if (!root) return;
     const focus = root.querySelector('[data-review-focus]').value;
+    root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === focus)?.scopeDescription || '';
     root.querySelector('.review-priority').hidden = !usesPriorities(focus);
     const liveTesting = root.querySelector('.review-live-testing');
     liveTesting.hidden = !supportsLiveTesting(focus);

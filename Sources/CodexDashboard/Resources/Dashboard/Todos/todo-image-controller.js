@@ -14,7 +14,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
 
   function reset() {
     draft = { status: 'empty', image: null, submitWhenReady: false };
-    todoListView.updateImageDraft(null);
+    todoImageView.updateImageDraft(null);
     const status = document.querySelector('[data-todo-new-image-status]');
     if (status) {
       status.hidden = true;
@@ -116,7 +116,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
         if (draft !== readingDraft) return;
         draft.image = image;
         draft.status = 'ready';
-        todoListView.updateImageDraft(image);
+        todoImageView.updateImageDraft(image);
         status.textContent = 'Image ready to attach when you add this to-do.';
         status.hidden = false;
         if (draft.submitWhenReady) {
@@ -136,7 +136,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
       page.querySelector('[data-todo-new-title]').focus();
     });
     page.querySelector('[data-todo-new-image-open]').addEventListener('click', () => {
-      if (draft.status === 'ready' && draft.image) todoListView.showImage(draft.image);
+      if (draft.status === 'ready' && draft.image) todoImageView.showImage(draft.image);
     });
   }
 

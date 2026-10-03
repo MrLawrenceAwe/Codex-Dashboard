@@ -18,13 +18,24 @@ enum ReviewFocus: String, Codable, CaseIterable, Sendable {
     var supportsLiveTesting: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
     var supportsProjectContext: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
 
+    var scopeDescription: String {
+        switch self {
+        case .bugs: "Find bugs and correctness issues."
+        case .bugsAndPerformance: "Find bugs and issues, and improve performance and responsiveness."
+        case .organisation: "Simplify and organise code, UI copy, documentation, prompts, and configuration."
+        case .organisationAndNaming: "Simplify and organise code and content, including folders, files, symbols, and UI names."
+        case .performance: "Improve performance and responsiveness."
+        case .content: "Review content accuracy, clarity, consistency, completeness, presentation, and effectiveness."
+        }
+    }
+
     var label: String {
         switch self {
         case .bugs: "Bugs and issues"
-        case .bugsAndPerformance: "Bugs, issues, performance and responsiveness"
-        case .organisation: "Simplification and structure"
-        case .organisationAndNaming: "Simplification, structure and naming"
-        case .performance: "Performance and responsiveness"
+        case .bugsAndPerformance: "Bugs and performance"
+        case .organisation: "Structure"
+        case .organisationAndNaming: "Structure and naming"
+        case .performance: "Performance"
         case .content: "Content and quality"
         }
     }
@@ -147,7 +158,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority? = nil
     var liveTesting = false
-    var isExtension = false
+    var reloadExtensionBeforeTesting = false
     var pushToRemote = false
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
@@ -165,7 +176,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 6
+    static let currentVersion = 7
     let version: Int
     let loops: [ReviewLoop]
 }

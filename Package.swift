@@ -10,9 +10,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "DashboardKeychain"),
-        .executableTarget(name: "CodexDashboardKeychainHelper", dependencies: ["DashboardKeychain"]),
+        .target(name: "DashboardKeychainProtocol"),
+        .executableTarget(name: "CodexDashboardKeychainHelper", dependencies: ["DashboardKeychain", "DashboardKeychainProtocol"]),
         .executableTarget(
             name: "CodexDashboard",
+            dependencies: ["DashboardKeychainProtocol"],
             resources: [.copy("Resources/Dashboard")]
         ),
         .testTarget(

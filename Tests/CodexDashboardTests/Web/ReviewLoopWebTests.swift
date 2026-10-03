@@ -33,7 +33,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const text = document.querySelector('[data-review-context]').textContent;
           return [text.includes('Review: Model A · Low'),
             text.includes('Fix: retired-model · Extra high'),text.includes('Review: model-a'),
-            text.includes('Simplification, structure and naming')];
+            text.includes('Structure and naming')];
         })()
         """) as? [Bool]
         XCTAssertEqual(result, [true, true, false, true])
@@ -221,18 +221,18 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           const select = document.querySelector('[data-review-history-select]');
           const states = [label() === expected(loops[1].updatedAt),select.selectedOptions[0].textContent.includes(dateText(loops[1].updatedAt)),document.querySelector('[data-review-history-details]').open];
-          states.push(type(),select.selectedOptions[0].textContent === `Example · Performance and responsiveness · ${dateText(loops[1].updatedAt)}`);
+          states.push(type(),select.selectedOptions[0].textContent === `Example · Performance · ${dateText(loops[1].updatedAt)}`);
           select.value = 'old'; select.dispatchEvent(new Event('change'));
           states.push(label());
-          states.push(type(),select.selectedOptions[0].textContent.includes('Simplification, structure and naming'));
+          states.push(type(),select.selectedOptions[0].textContent.includes('Structure and naming'));
           loops[0].updatedAt = Date.UTC(2026,9,4,9,10) / 1000;
           api.applyReviewPageSnapshot(snapshot);
           states.push(select.value,label() === expected(loops[0].updatedAt),select.selectedOptions[0].textContent.includes(dateText(loops[0].updatedAt)));
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, true, false, "Review type: Performance and responsiveness", true,
-                                "Last updated: Not recorded", "Review type: Simplification, structure and naming", true,
+        XCTAssertEqual(result, [true, true, false, "Review type: Performance", true,
+                                "Last updated: Not recorded", "Review type: Structure and naming", true,
                                 "old", true, true])
     }
 
@@ -335,7 +335,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           results.push(extension.parentElement.hidden);
           document.querySelector('[data-review-start]').click();
           const action = JSON.parse(api.pendingReviewAction());
-          results.push(action.isExtension, extension.disabled);
+          results.push(action.reloadExtensionBeforeTesting, extension.disabled);
           api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           results.push(extension.value);
           live.value = 'false';
@@ -343,7 +343,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           results.push(extension.parentElement.hidden, extension.value);
           extension.value = 'true';
           document.querySelector('[data-review-start]').click();
-          results.push(JSON.parse(api.pendingReviewAction()).isExtension);
+          results.push(JSON.parse(api.pendingReviewAction()).reloadExtensionBeforeTesting);
           return results;
         })()
         """) as? [AnyHashable]

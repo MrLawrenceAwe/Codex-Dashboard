@@ -3,7 +3,7 @@ function createTodoTagController({ isDestroyed, getAvailableTags, getItems, comm
 
   function reset() {
     draft = [];
-    todoListView?.updateTagDraft?.(draft);
+    todoTagView.updateTagDraft(draft);
   }
 
   function add(value) {
@@ -11,7 +11,7 @@ function createTodoTagController({ isDestroyed, getAvailableTags, getItems, comm
     const tags = todoStore.normalizeTags([...draft, value]);
     if (tags.length === draft.length) return false;
     draft = tags;
-    todoListView.updateTagDraft(draft);
+    todoTagView.updateTagDraft(draft);
     return true;
   }
 
@@ -19,11 +19,11 @@ function createTodoTagController({ isDestroyed, getAvailableTags, getItems, comm
     const previousDraft = draft;
     const nextDraft = draft.map(transformTag).filter(Boolean);
     draft = nextDraft;
-    todoListView.updateTagDraft(draft);
+    todoTagView.updateTagDraft(draft);
     const saved = await commitChange(nextTags, transformTag);
     if (!saved && !isDestroyed() && draft === nextDraft) {
       draft = previousDraft;
-      todoListView.updateTagDraft(draft);
+      todoTagView.updateTagDraft(draft);
     }
     return saved;
   }
@@ -40,7 +40,7 @@ function createTodoTagController({ isDestroyed, getAvailableTags, getItems, comm
       const button = event.target.closest('[data-todo-tag-remove]');
       if (!button) return;
       draft = draft.filter((tag) => tag !== button.dataset.todoTagRemove);
-      todoListView.updateTagDraft(draft);
+      todoTagView.updateTagDraft(draft);
       input.focus();
     });
   }
@@ -50,9 +50,9 @@ function createTodoTagController({ isDestroyed, getAvailableTags, getItems, comm
     button.addEventListener('click', () => {
       let dialog = document.querySelector('[data-todo-tag-dialog]');
       if (!dialog) {
-        dialog = todoListView.ensureDialogHost().querySelector('[data-todo-tag-dialog]');
+        dialog = todoDialogHost.ensure().querySelector('[data-todo-tag-dialog]');
         bindDialog(dialog);
-        todoListView.updateManagedTags(getAvailableTags(), getItems());
+        todoTagView.updateManagedTags(getAvailableTags(), getItems());
       }
       if (!dialog.open) dialog.showModal();
     });

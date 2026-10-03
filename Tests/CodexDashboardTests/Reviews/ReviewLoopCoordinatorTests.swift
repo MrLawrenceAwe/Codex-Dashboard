@@ -2,57 +2,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class ReviewLoopCoordinatorTests: XCTestCase {
-    private let reviewBoundary = "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted."
-    private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
-
-    func testDisplayCountIncludesCompletedRoundsAndExcludesBlockedAndPendingRounds() throws {
-        var loop = ReviewLoop(id: UUID(), startActionID: "display", project: project,
-                              promptContext: .general, maxRounds: 5)
-        loop.rounds = [
-            ReviewRound(number: 1, baseCommit: "base", result: ReviewRoundResult(
-                outcome: .fixed, addressedFindingCount: 1, commit: "fixed", summary: "Fixed")),
-            ReviewRound(number: 2, baseCommit: "fixed", result: ReviewRoundResult(
-                outcome: .withdrawn, addressedFindingCount: 0, commit: "", summary: "Withdrawn")),
-            ReviewRound(number: 3, baseCommit: "fixed", result: ReviewRoundResult(
-                outcome: .blocked, addressedFindingCount: 0, commit: "", summary: "Blocked")),
-            ReviewRound(number: 4, baseCommit: "fixed"),
-        ]
-        let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
-            ReviewLoopDisplaySnapshot(loop: loop))) as? [String: Any]
-        XCTAssertEqual(display?["completedRoundCount"] as? Int, 2)
-        XCTAssertEqual(display?["id"] as? String, loop.id.uuidString)
-        XCTAssertEqual((display?["rounds"] as? [Any])?.count, 4)
-        let saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any]
-        XCTAssertNil(saved?["completedRoundCount"], "Derived counts must not be persisted")
-    }
-
-    private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
-                             promptContext: ReviewPromptContext?, maxRounds: Int?, loopID: UUID?) -> ReviewLoopAction {
-        var action = ReviewLoopAction(id: id, kind: kind, projectID: projectID,
-                                      promptContext: promptContext, maxRounds: maxRounds, loopID: loopID)
-        action.reviewSelection = ReviewModelSelection(modelID: "review-model", reasoningEffort: nil)
-        action.fixSelection = ReviewModelSelection(modelID: "fix-model", reasoningEffort: nil)
-        return action
-    }
-
-    private func make(limit: Int = 5) throws -> (ReviewLoopCoordinator, ReviewTestStore, ReviewTestDriver) {
-        let store = ReviewTestStore()
-        let coordinator = ReviewLoopCoordinator(store: store)
-        try coordinator.apply(startAction(id: "start", kind: .start, projectID: project.id,
-                                              promptContext: .general, maxRounds: limit, loopID: nil), projects: [project])
-        return (coordinator, store, ReviewTestDriver())
-    }
-
-    private func action(_ kind: ReviewLoopAction.Kind, for coordinator: ReviewLoopCoordinator) -> ReviewLoopAction {
-        ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil, promptContext: nil, maxRounds: nil, loopID: coordinator.loops.last?.id)
-    }
-
-    private func stop(_ coordinator: ReviewLoopCoordinator) {
-        do { try coordinator.apply(action(.stop, for: coordinator), projects: [project]) }
-        catch { XCTFail("Could not stop review loop: \(error)") }
-    }
-
+final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
     func testUpdateTimestampPersistsAndHistoryDeletionKeepsOtherTimestamps() throws {
         let (_, store, _) = try make()
         let startedAt = try XCTUnwrap(store.loops.first?.updatedAt)
@@ -120,43 +70,6 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertThrowsError(try coordinator.apply(action, projects: []))
         XCTAssertEqual(coordinator.loops, [finished])
         XCTAssertEqual(store.loops, [finished])
-    }
-
-    func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {
-        let payload = Data("""
-        {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3,"reviewSelection":{"modelID":"review-model"},"fixSelection":{"modelID":"fix-model"}}
-        """.utf8)
-        let action = try JSONDecoder().decode(ReviewLoopAction.self, from: payload)
-        let store = ReviewTestStore()
-        let coordinator = ReviewLoopCoordinator(store: store)
-        try coordinator.apply(action, projects: [project])
-        XCTAssertEqual(coordinator.loops.first?.promptContext, .personal)
-        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: try XCTUnwrap(coordinator.loops.first)),
-                       "Review project for bugs and issues (this is a project for personal use)." + reviewBoundary)
-    }
-
-    func testUnknownReviewActionKindDoesNotDecode() {
-        let payload = Data(#"{"id":"unknown","kind":"retry"}"#.utf8)
-        XCTAssertThrowsError(try JSONDecoder().decode(ReviewLoopAction.self, from: payload))
-    }
-
-    func testReviewFileLinksStayInsideTheProject() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("review-files-\(UUID().uuidString)")
-        let project = root.appendingPathComponent("project", isDirectory: true)
-        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let file = project.appendingPathComponent("File.swift")
-        try Data("source".utf8).write(to: file)
-        let outside = root.appendingPathComponent("outside.swift")
-        try Data("outside".utf8).write(to: outside)
-        let alias = project.appendingPathComponent("alias.swift")
-        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: outside)
-
-        XCTAssertEqual(ReviewLoopBridge.reviewFileURL("File.swift:12", projectPath: project.path), file)
-        XCTAssertEqual(ReviewLoopBridge.reviewFileURL(file.absoluteString, projectPath: project.path), file)
-        XCTAssertNil(ReviewLoopBridge.reviewFileURL("../outside.swift", projectPath: project.path))
-        XCTAssertNil(ReviewLoopBridge.reviewFileURL(outside.path, projectPath: project.path))
-        XCTAssertNil(ReviewLoopBridge.reviewFileURL("alias.swift", projectPath: project.path))
     }
 
     func testStartRequiresBothModels() throws {
@@ -262,17 +175,6 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.loops.last?.message.contains("pushed to remote") == true)
     }
 
-    func testVersionOneSavedLoopsMigrateWithPushingDisabled() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: project,
-                              promptContext: .general, maxRounds: 1)
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved.removeValue(forKey: "pushToRemote")
-        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "loops": [saved]])
-        let restored = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
-        XCTAssertEqual(restored.id, loop.id)
-        XCTAssertFalse(restored.pushToRemote)
-    }
-
     func testFixCommitThenFreshReviewThenCleanStops() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
@@ -356,48 +258,6 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
         XCTAssertNil(coordinator.loops.last?.rounds.last?.result)
-    }
-
-    func testProgressTracksSubmittedAndConditionalPrompts() async throws {
-        let (coordinator, _, driver) = try make()
-        XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Reviewing")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
-        XCTAssertTrue(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note.contains("Only if") == true)
-        driver.review(priorities: [.p1, .p2])
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
-        try coordinator.apply(action(.pause, for: coordinator), projects: [project])
-        XCTAssertTrue(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note.contains("resume") == true)
-        driver.finish(findings: 2, commit: "fixed")
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Paused")
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
-        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
-        XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Latest prompt")
-    }
-
-    func testProgressDoesNotQueuePastRoundLimitOrCleanReview() async throws {
-        let (coordinator, _, driver) = try make(limit: 1)
-        await coordinator.advance(using: driver, threads: [])
-        driver.review(priorities: [.p1])
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertNotNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
-        let (clean, _, cleanDriver) = try make()
-        await clean.advance(using: cleanDriver, threads: [])
-        cleanDriver.review(priorities: [])
-        await clean.advance(using: cleanDriver, threads: [])
-        XCTAssertEqual(clean.progress[clean.loops.last!.id.uuidString]?.step, "Complete")
-        XCTAssertNil(clean.progress[clean.loops.last!.id.uuidString]?.upcoming)
     }
 
     func testBlockedFixResumesAfterChatAnswerWithoutNewChatOrRound() async throws {
@@ -927,11 +787,11 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                                     promptContext: .general, maxRounds: 3, loopID: nil)
             start.focus = focus
             start.liveTesting = true
-            start.isExtension = true
+            start.reloadExtensionBeforeTesting = true
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
             XCTAssertEqual(saved.liveTesting, focus.supportsLiveTesting)
-            XCTAssertEqual(saved.isExtension, focus.supportsLiveTesting)
+            XCTAssertEqual(saved.reloadExtensionBeforeTesting, focus.supportsLiveTesting)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
@@ -959,64 +819,12 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let coordinator = ReviewLoopCoordinator(store: store)
         var start = startAction(id: "extension", kind: .start, projectID: project.id,
                                 promptContext: .general, maxRounds: 3, loopID: nil)
-        start.isExtension = true
+        start.reloadExtensionBeforeTesting = true
         try coordinator.apply(start, projects: [project])
-        XCTAssertFalse(try XCTUnwrap(store.loops.first).isExtension)
+        XCTAssertFalse(try XCTUnwrap(store.loops.first).reloadExtensionBeforeTesting)
         var loop = try XCTUnwrap(store.loops.first)
-        loop.isExtension = true
+        loop.reloadExtensionBeforeTesting = true
         XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Computer Use"))
-    }
-
-    func testVersionFourLoopsMigrateWithoutExtensionReload() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "old", project: project,
-                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance,
-                              liveTesting: true)
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved.removeValue(forKey: "isExtension")
-        let data = try JSONSerialization.data(withJSONObject: ["version": 4, "loops": [saved]])
-        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
-    }
-
-    func testVersionThreeLoopsMigrateWithLiveTestingOff() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "old", project: project,
-                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance)
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved.removeValue(forKey: "liveTesting")
-        let data = try JSONSerialization.data(withJSONObject: ["version": 3, "loops": [saved]])
-        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
-    }
-
-    func testPerformanceReviewIncludesOptionalProjectContext() {
-        var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
-                              promptContext: .personal, maxRounds: 3)
-        loop.focus = .performance
-        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
-                       "Review project for performance and responsiveness (this is a project for personal use)." + reviewBoundary)
-    }
-
-    func testCombinedReviewIncludesOptionalProjectContext() {
-        let loop = ReviewLoop(id: UUID(), startActionID: "combined", project: project,
-                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance)
-        XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
-                       "Review project for bugs, issues, performance and responsiveness (this is a project for personal use)." + reviewBoundary)
-    }
-
-    func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
-        for focus in [ReviewFocus.organisation, .organisationAndNaming, .content] {
-            let store = ReviewTestStore()
-            let coordinator = ReviewLoopCoordinator(store: store)
-            var action = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
-                                     promptContext: .personal, maxRounds: 3, loopID: nil)
-            action.focus = focus
-            try coordinator.apply(action, projects: [project])
-            XCTAssertEqual(store.loops.first?.promptContext, .general)
-            XCTAssertFalse(ReviewPrompts.reviewPrompt(for: store.loops[0]).contains("personal use"))
-
-            let savedLoop = ReviewLoop(id: store.loops[0].id, startActionID: action.id,
-                                       project: project, promptContext: .personal,
-                                       maxRounds: 3, focus: focus)
-            XCTAssertFalse(ReviewPrompts.reviewPrompt(for: savedLoop).contains("personal use"))
-        }
     }
 
     func testReviewFocusPersistsAndDrivesBothTurnsAndNextRound() async throws {
@@ -1065,200 +873,5 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
         }
-    }
-
-    func testVersionTwoNamingFocusMigratesToOrganisationAndNaming() throws {
-        let (coordinator, _, _) = try make()
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
-        saved["focus"] = "naming"
-        let data = try JSONSerialization.data(withJSONObject: ["version": 2, "loops": [saved]])
-        let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
-        XCTAssertEqual(migrated.focus, .organisationAndNaming)
-        XCTAssertEqual(migrated.id, coordinator.loops.last?.id)
-        XCTAssertEqual(migrated.project, coordinator.loops.last?.project)
-        let current = try XCTUnwrap(JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(migrated)) as? [String: Any])
-        XCTAssertEqual(current["focus"] as? String, "organisationAndNaming")
-    }
-
-    func testOlderRoundResultsMigrateAddressedCountsWithoutChangingReviewFindings() throws {
-        let (coordinator, _, _) = try make()
-        var loop = try XCTUnwrap(coordinator.loops.last)
-        var round = ReviewRound(number: 1, baseCommit: "base")
-        round.review = ReviewReport(outcome: .reviewed, findings: [
-            ReviewFinding(priority: .p2, title: "Issue", body: "Details")
-        ], summary: "One finding")
-        round.result = ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1,
-                                         commit: "fixed", summary: "Done")
-        loop.rounds = [round]
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        var savedRounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
-        var savedResult = try XCTUnwrap(savedRounds[0]["result"] as? [String: Any])
-        savedResult["findings"] = savedResult.removeValue(forKey: "addressedFindingCount")
-        savedRounds[0]["result"] = savedResult
-        saved["rounds"] = savedRounds
-        let formats: [Any] = [saved, [saved]] + (1..<ReviewLoopsDocument.currentVersion).map {
-            ["version": $0, "loops": [saved]] as [String: Any]
-        }
-        for format in formats {
-            let data = try JSONSerialization.data(withJSONObject: format)
-            let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
-            XCTAssertEqual(migrated, loop)
-            let currentRound = try XCTUnwrap(JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(migrated.rounds[0])) as? [String: Any])
-            let currentResult = try XCTUnwrap(currentRound["result"] as? [String: Any])
-            XCTAssertEqual(currentResult["addressedFindingCount"] as? Int, 1)
-            XCTAssertNil(currentResult["findings"])
-        }
-    }
-
-    func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("loop.json")
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let store = ReviewLoopFileStore(url: url)
-        let (coordinator, _, _) = try make()
-        try store.save(coordinator.loops)
-        XCTAssertEqual(try store.load(), coordinator.loops)
-        let currentDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual(currentDocument["version"] as? Int, ReviewLoopsDocument.currentVersion)
-        XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
-        var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
-        olderLoop.removeValue(forKey: "speed")
-        olderLoop.removeValue(forKey: "focus")
-        olderLoop.removeValue(forKey: "promptContext")
-        olderLoop["instructions"] = "(this is a project for personal use)"
-        try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertEqual(try store.load().first?.speed, .standard)
-        XCTAssertEqual(try store.load().first?.focus, .bugs)
-        XCTAssertEqual(try store.load().first?.promptContext, .personal)
-        olderLoop["instructions"] = "(saved custom context)"
-        try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
-        try JSONSerialization.data(withJSONObject: [olderLoop]).write(to: url)
-        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
-        var futureDocument = currentDocument
-        futureDocument["version"] = ReviewLoopsDocument.currentVersion + 1
-        try JSONSerialization.data(withJSONObject: futureDocument).write(to: url)
-        XCTAssertThrowsError(try store.load())
-        try Data("broken".utf8).write(to: url)
-        let recovered = ReviewLoopCoordinator(store: store)
-        XCTAssertNotNil(recovered.error)
-        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "broken")
-    }
-}
-
-@MainActor
-private final class ReviewTestStore: ReviewLoopStoring {
-    var loops: [ReviewLoop] = []
-    var failSave = false
-    func load() throws -> [ReviewLoop] { loops }
-    func save(_ loops: [ReviewLoop]) throws {
-        if failSave { throw ReviewLoopError("disk full") }
-        self.loops = loops
-    }
-}
-
-@MainActor
-private final class ReviewTestDriver: ReviewLoopDriving {
-    var pushedCommits: [String] = []
-    var failPush = false
-    var clean = true
-    var commit = "base"
-    var branch = "main"
-    var ancestor = true
-    var resolvedCommit: String?
-    var onResolveCommit: (() -> Void)?
-    var failCreate = false
-    var failRepository = false
-    var failingPath: String?
-    var repositoryRoot: String?
-    var failReadThread = false
-    var failStopThread = false
-    var interruptedTurns: [String] = []
-    var createCalls = 0
-    var createdThreads: [String] = []
-    var prompts: [String] = []
-    var selections: [ReviewModelSelection?] = []
-    var speeds: [ReviewSpeed] = []
-    var thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
-    var onRepository: (() -> Void)?
-    var onCreateThread: (() -> Void)?
-    var onStartTurn: (() -> Void)?
-    var onReadThread: (() -> Void)?
-    func projects() async throws -> [ReviewProject] { [] }
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
-        if failPush { throw ReviewLoopError("Remote push failed") }
-        pushedCommits.append(expectedRepository.commit)
-    }
-    func repository(at path: String) async throws -> ReviewRepositoryState {
-        await Task.yield()
-        onRepository?()
-        if failRepository || path == failingPath { throw ReviewLoopError("Git timed out") }
-        return ReviewRepositoryState(root: repositoryRoot ?? path, branch: branch, commit: commit, clean: clean)
-    }
-    func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
-    func resolveCommit(_ commit: String, at path: String) async throws -> String {
-        onResolveCommit?()
-        return resolvedCommit ?? commit
-    }
-    func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String {
-        speeds.append(speed)
-        createCalls += 1
-        if failCreate { throw ReviewLoopError("Lost response") }
-        let id = "thread-\(createdThreads.count + 1)"
-        createdThreads.append(id)
-        thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
-        onCreateThread?()
-        return id
-    }
-    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState,
-                   prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
-        prompts.append(prompt)
-        selections.append(selection)
-        speeds.append(speed)
-        let id = "turn-\(prompts.count)"
-        thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
-        onStartTurn?()
-        return id
-    }
-    func interruptLatestTurn(_ threadID: String) async throws {
-        if failStopThread { throw ReviewLoopError("Connection timed out") }
-        guard let last = thread.turns.last, last.status == "inProgress" else { return }
-        interruptedTurns.append(last.id)
-        thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
-            ReviewTurnState(id: last.id, status: "interrupted", finalMessage: nil)
-        ])
-    }
-    func readThread(_ threadID: String) async throws -> ReviewThreadState {
-        onReadThread?()
-        if failReadThread { throw ReviewLoopError("Connection timed out") }
-        return thread
-    }
-    func review(priorities: [ReviewFinding.Priority]) {
-        let findings = priorities.map { "## [\($0.rawValue)] Example issue\nEvidence and impact" }.joined(separator: "\n\n")
-        finishTurn("# Review complete\n\nFindings: \(priorities.count)\n\n## Summary\nReview finished\n\n" + findings)
-    }
-    func reviewWithoutPriorities() {
-        finishTurn("# Review complete\n\nFindings: 1\n\n## Summary\nReview finished\n\n## Simplify the layout\nEvidence and impact")
-    }
-    func finish(findings: Int, commit: String, withdrawn: [Int] = []) {
-        if commit != "none" { self.commit = commit }
-        let withdrawnList = withdrawn.isEmpty ? "none" : withdrawn.map(String.init).joined(separator: ", ")
-        finishTurn("\(commit == "none" ? "# Findings withdrawn" : "# Fixes committed")\nFindings addressed: \(findings)\nFindings withdrawn: \(withdrawnList)\nCommit: `\(commit)`\n\n## Summary\nChanges committed")
-    }
-    func userFollowup() {
-        thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns + [
-            ReviewTurnState(id: "followup-\(thread.turns.count + 1)", status: "inProgress", finalMessage: nil)
-        ])
-    }
-    func blockFix() {
-        finishTurn("# Fixes blocked\nFindings addressed: 0\nFindings withdrawn: none\nCommit: `none`\n\n## Summary\nMissing evidence")
-    }
-    private func finishTurn(_ report: String) {
-        let last = thread.turns.last!
-        thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
-            ReviewTurnState(id: last.id, status: "completed", finalMessage: report)
-        ])
     }
 }

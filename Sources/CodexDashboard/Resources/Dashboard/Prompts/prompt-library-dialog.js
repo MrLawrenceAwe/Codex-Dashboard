@@ -10,7 +10,7 @@ const promptLibraryDialog = (() => {
           <h2 id="dashboard-prompt-title">Prompts</h2>
           <button type="button" class="dashboard-prompt-icon-button" data-prompt-close aria-label="Close prompts">×</button>
         </header>
-        <p class="dashboard-prompt-storage-error" data-prompt-storage-error role="alert" hidden>Could not save this prompt change. Reloading Codex will restore the last successfully saved version.</p>
+        <p class="dashboard-prompt-storage-error" data-prompt-storage-error role="alert" hidden>Could not queue this change for saving. Try again. Earlier queued changes remain pending.</p>
         <div data-prompt-content></div>
       </section>`;
     return dialog;

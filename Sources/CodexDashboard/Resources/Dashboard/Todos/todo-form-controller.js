@@ -1,4 +1,4 @@
-function createTodoCreateForm({ imageController, tagController, threadReferencesForProject, isDestroyed, onSubmit }) {
+function createTodoFormController({ imageController, tagController, threadReferencesForProject, isDestroyed, onSubmit }) {
   let projects = [];
   let selectedProject = null;
   let projectThreads = [];
