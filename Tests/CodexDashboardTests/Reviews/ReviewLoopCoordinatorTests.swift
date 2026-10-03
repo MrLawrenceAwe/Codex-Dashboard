@@ -909,7 +909,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             XCTAssertEqual(saved.isExtension, focus.supportsLiveTesting)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[0].contains("Also use live testing to find bugs and issues."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
             XCTAssertEqual(driver.prompts[0].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
             if focus.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
@@ -924,7 +924,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[2].contains("Also use live testing to find bugs and issues."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
             XCTAssertEqual(driver.prompts[2].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
         }
     }

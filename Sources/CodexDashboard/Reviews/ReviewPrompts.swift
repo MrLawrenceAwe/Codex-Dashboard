@@ -19,7 +19,7 @@ enum ReviewPrompts {
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
-            ? "\n\nAlso use live testing to find bugs and issues."
+            ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
         let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.isExtension
             ? "\n\nUse Computer Use to reload the browser extension before live testing."
