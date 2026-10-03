@@ -21,7 +21,7 @@ enum ReviewPrompts {
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
             ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
-        let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.isExtension
+        let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting
             ? "\n\nUse Computer Use to reload the browser extension before live testing."
             : ""
         return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReload

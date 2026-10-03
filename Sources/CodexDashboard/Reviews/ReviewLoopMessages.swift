@@ -12,7 +12,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let maxRounds: Int?
     let loopID: UUID?
     var liveTesting: Bool? = nil
-    var isExtension: Bool? = nil
+    var reloadExtensionBeforeTesting: Bool? = nil
     var pushToRemote: Bool? = nil
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil
@@ -36,6 +36,7 @@ struct ReviewPageSnapshot: Encodable, Sendable {
 struct ReviewTypeOption: Codable, Sendable {
     let id: ReviewFocus
     let label: String
+    let scopeDescription: String
     let usesPriorities: Bool
     let supportsProjectContext: Bool
     let supportsLiveTesting: Bool
@@ -43,6 +44,7 @@ struct ReviewTypeOption: Codable, Sendable {
     init(_ focus: ReviewFocus) {
         id = focus
         label = focus.label
+        scopeDescription = focus.scopeDescription
         usesPriorities = focus.usesPriorities
         supportsProjectContext = focus.supportsProjectContext
         supportsLiveTesting = focus.supportsLiveTesting

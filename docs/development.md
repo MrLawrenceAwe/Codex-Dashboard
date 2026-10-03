@@ -23,6 +23,7 @@ Apple development/Developer ID apps. Changed resources alter the code hash, so
 self-signed rebuilds can still prompt. An unchanged rebuild is not a valid test
 of approval persistence across code or resource changes.
 
+`DashboardKeychainProtocol` defines shared Codable request/response messages and typed operations.
 `CodexDashboardKeychainHelper` owns all saved-account Keychain operations. Its
 native vault lives in the independent `DashboardKeychain` target so dashboard code
 and resource changes do not change its executable. The installer signs the helper
@@ -60,7 +61,7 @@ Renderer resources are listed in `injection-manifest.json`:
 | --- | --- |
 | `Core` | Injection, host contracts, lifecycle, navigation, visibility, and shared DOM helpers |
 | `Accounts` | Account popover presentation and actions |
-| `Composer` | Text/image insertion, model selection, and shared preset validation and labels |
+| `Composer` | Text/image insertion, model selection, and shared preset validation, labels, and form fields |
 | `Threads` | Chat overview, thread indexing, unread reconciliation, and completion indicators |
 | `Todos` | To-do storage, list rendering, creation drafts, tags, images, and composer transfer |
 | `Sidebar` | Project highlights, interruption indicators, and chat context-menu to-do actions |
@@ -72,14 +73,17 @@ cards and actions.
 `dashboard-bridge.js` wires feature controllers to `createDashboardLifecycle` and
 catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
 their mounting and teardown. `todo-list-view.js` owns filter markup; `todo-query.js` selects matching items,
-and `todo-form-values.js` reads model settings for new and existing to-dos. The to-do
-composer layout lives in CSS with a `has-image` class for the image draft.
+`todo-form-controller.js` binds creation events and maintains draft project/chat selection.
+`todo-form-values.js` reads model settings for new and existing to-dos.
+Image and tag presentation live in `todo-image-view.js` and `todo-tag-view.js`;
+`todo-dialog-host.js` mounts their shared overlay host.
+The to-do composer layout lives in CSS with a `has-image` class for the image draft.
 `codex-ui-contracts.js` owns speech detection and shares React fiber lookup and
 ancestor traversal while keeping committed-fiber resolution explicit for read-state inspection.
 
-See [architecture and behaviour](architecture.md) for refresh, persistence,
-account transactions, notifications, and review execution. Keep behavioural
-explanations there rather than duplicating them in the module map.
+See [architecture](architecture.md) for refresh, persistence,
+account transactions, notifications, and review execution. Keep implementation explanations there rather than duplicating them in the module
+map. User-facing instructions belong in [Using Codex Dashboard](usage.md).
 
 ## Renderer contracts
 
@@ -129,7 +133,8 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
-Review-loop version 6 renames saved round-result `findings` to
+Review-loop version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.
+Version 6 renames saved round-result `findings` to
 `addressedFindingCount`, preserving existing history at the migration boundary.
 Version 3 renames the `naming` focus to `organisationAndNaming`.
 Version 1 and older unversioned single-loop/array documents also migrate remote
@@ -142,6 +147,10 @@ establish a safe migration cutoff before removing them. Existing view-preference
 storage keys remain unchanged to preserve saved filters and collapsed projects.
 
 ## Testing
+
+Review tests are split into coordinator, bridge, presentation, prompts, migration,
+and file-store suites, with doubles in `Reviews/ReviewLoopTestSupport.swift`.
+Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
 Run `swift test` for the complete native and WebKit suite. Web tests await to-do
 save completion; they do not assume persistence finishes during a DOM event.

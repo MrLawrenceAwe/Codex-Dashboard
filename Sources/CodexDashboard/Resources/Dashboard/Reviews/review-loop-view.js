@@ -24,17 +24,17 @@ const reviewLoopView = (() => {
       ${reviewLoopSetupView.formMarkup()}
       <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
         <div class="review-region-heading"><h2 id="review-history-title">Previous loops</h2><span data-review-history-count class="review-count"></span></div>
-        <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
+        <label>Previous loops<select data-review-history-select aria-label="Previous review loop"></select></label>
         <p class="review-field-help" data-review-history-type></p>
         <p class="review-field-help" data-review-history-updated></p>
         <div class="review-history-actions">
           <button type="button" data-review-history-action="delete">Delete selected</button>
-          <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete earlier reviews</button>
+          <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete earlier loops</button>
           <button type="button" data-review-history-action="deleteAll">Delete all history</button>
         </div>
-        <p id="review-history-delete-help" class="review-field-help">Deletes saved reviews before the selected review. Review chats remain available.</p>
+        <p id="review-history-delete-help" class="review-field-help">Deletes saved loops before the selected loop. Review chats remain available.</p>
         <details class="review-history-details" data-review-history-details>
-          <summary>Review details</summary>
+          <summary>Loop details</summary>
           <div data-review-history-card></div>
         </details>
       </section>

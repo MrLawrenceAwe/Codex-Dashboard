@@ -49,7 +49,7 @@ function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, com
       const item = row && getItems().find((candidate) => candidate.id === row.dataset.todoId);
       const previewButton = event.target.closest('[data-todo-image-preview]');
       if (previewButton) {
-        if (item?.image) todoListView.showImage(item.image);
+        if (item?.image) todoImageView.showImage(item.image);
         return;
       }
       const newThreadButton = event.target.closest('[data-todo-new-thread]');

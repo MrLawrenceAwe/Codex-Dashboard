@@ -96,7 +96,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         let task: Task<Void, Never>
     }
 
-    private static let legacyIdentifierPrefix = "codex-dashboard-account-deadline-"
+    private static let accountDeadlineIdentifierPrefix = "codex-dashboard-account-deadline-"
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: any DesktopNotificationCenter
@@ -154,7 +154,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
             .sorted { $0.identifier < $1.identifier }
         let pendingRequests = await notificationCenter.pendingRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
-            request.identifier.hasPrefix(Self.legacyIdentifierPrefix) ? request.identifier : nil
+            request.identifier.hasPrefix(Self.accountDeadlineIdentifierPrefix) ? request.identifier : nil
         }
         notificationCenter.removePendingRequests(withIdentifiers: existingIdentifiers)
         await removeOutdatedDeliveredNotifications(using: usageByAccountID)

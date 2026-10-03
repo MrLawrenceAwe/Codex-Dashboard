@@ -36,9 +36,11 @@ const promptLibraryView = (() => {
         <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save model settings</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
           <legend>Model settings</legend>
-          <label>Model<select name="presetModel">${composerPresets.selectOptions(composerPresets.models, prompt?.preset?.model || composerPresets.defaults.model)}</select></label>
-          <label>Reasoning effort<select name="presetReasoningEffort">${composerPresets.selectOptions(composerPresets.reasoningEfforts, prompt?.preset?.reasoningEffort || composerPresets.defaults.reasoningEffort)}</select></label>
-          <label>Speed<select name="presetSpeed">${composerPresets.selectOptions(composerPresets.speeds, prompt?.preset?.speed || composerPresets.defaults.speed)}</select></label>
+          ${composerPresets.fieldsMarkup(prompt?.preset, {
+            model: 'name="presetModel"',
+            reasoningEffort: 'name="presetReasoningEffort"',
+            speed: 'name="presetSpeed"',
+          })}
         </fieldset>
         <label>Prompt<textarea name="content" rows="8" placeholder="Write the prompt you want to reuse…" required>${domUtils.escapeHTML(prompt?.content || '')}</textarea></label>
         <div class="dashboard-prompt-form-actions">

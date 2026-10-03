@@ -39,7 +39,7 @@ const reviewLoopPage = (() => {
       queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
         liveTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true',
-        isExtension: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
+        reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
@@ -59,7 +59,7 @@ const reviewLoopPage = (() => {
       if (historyAction) {
         const kind = historyAction.dataset.reviewHistoryAction;
         const loopID = details.querySelector('[data-review-history-select]').value;
-        const message = { delete: 'Delete this saved review?', deleteOlder: 'Delete all saved reviews older than this one?', deleteAll: 'Delete all saved previous reviews?' }[kind];
+        const message = { delete: 'Delete this saved loop?', deleteOlder: 'Delete all saved loops older than this one?', deleteAll: 'Delete all saved previous loops?' }[kind];
         if (message && window.confirm(`${message} Review chats will remain available.`)) queue({ kind, loopID: kind === 'deleteAll' ? null : loopID });
         return;
       }

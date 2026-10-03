@@ -86,7 +86,7 @@ function createPromptLibrary({ findThread }) {
     if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
   }
 
-  function savePrompt(form) {
+  function stagePrompt(form) {
     const values = new FormData(form);
     const name = String(values.get('name') || '').trim();
     const content = String(values.get('content') || '').trim();
@@ -166,7 +166,7 @@ function createPromptLibrary({ findThread }) {
 
   function handlePromptSubmit(event, form) {
     event.preventDefault();
-    if (form.matches('[data-prompt-form]')) savePrompt(form);
+    if (form.matches('[data-prompt-form]')) stagePrompt(form);
     else if (form.matches('[data-prompt-section-form]')) createPromptSection(form);
     else if (form.matches('[data-prompt-section-rename-form]')) renamePromptSection(form);
   }

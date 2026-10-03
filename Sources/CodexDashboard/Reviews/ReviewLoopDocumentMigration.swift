@@ -34,7 +34,8 @@ enum ReviewLoopDocumentMigration {
             }
         }
         if loop["focus"] as? String == "naming" { loop["focus"] = "organisationAndNaming" }
-        if loop["isExtension"] == nil { loop["isExtension"] = false }
+        loop["reloadExtensionBeforeTesting"] = loop.removeValue(forKey: "isExtension")
+            ?? loop["reloadExtensionBeforeTesting"] ?? false
         if loop["liveTesting"] == nil { loop["liveTesting"] = false }
         if loop["pushToRemote"] == nil { loop["pushToRemote"] = false }
         if loop["promptContext"] == nil {

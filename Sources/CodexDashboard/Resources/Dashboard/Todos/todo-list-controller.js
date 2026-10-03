@@ -39,7 +39,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     })), nextTags),
   });
 
-  const createForm = createTodoCreateForm({
+  const createForm = createTodoFormController({
     imageController,
     tagController,
     threadReferencesForProject,
@@ -74,8 +74,8 @@ function createTodoList({ threadReferencesForProject, findThread }) {
 
   function renderTags() {
     if (destroyed) return;
-    todoListView.updateTagOptions(availableTags);
-    todoListView.updateManagedTags(availableTags, items);
+    todoTagView.updateTagOptions(availableTags);
+    todoTagView.updateManagedTags(availableTags, items);
   }
 
   function collectFilterProjects() {
@@ -137,7 +137,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
         return updated;
       });
       savedItems = savedItems.map(hydrate);
-      todoListView.showHydratedImages(updatedImages);
+      todoImageView.showHydratedImages(updatedImages);
     });
   }
 

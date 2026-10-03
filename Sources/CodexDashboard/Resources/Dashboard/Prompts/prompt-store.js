@@ -178,7 +178,7 @@ const promptStore = (() => {
       if (!store.stageLibraryUpdate(prompts, sections)) return 'failed';
       store.collapsedSections.delete(source);
       store.saveCollapsedSections();
-      return 'saved';
+      return 'staged';
     },
 
     deleteSection(section) {

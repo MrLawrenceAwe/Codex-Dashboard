@@ -65,5 +65,13 @@ const composerPresets = (() => {
     )).join('');
   }
 
-  return { defaults: COMPOSER_PRESET_SCHEMA.defaults, isValid, label, models, normalize, reasoningEfforts, reasoningLabel, selectOptions, speeds, summary };
+  function fieldsMarkup(preset, attributes) {
+    return [
+      ['model', 'Model', models],
+      ['reasoningEffort', 'Reasoning effort', reasoningEfforts],
+      ['speed', 'Speed', speeds],
+    ].map(([key, title, options]) => `<label>${title}<select ${attributes[key]}>${selectOptions(options, preset?.[key] || COMPOSER_PRESET_SCHEMA.defaults[key])}</select></label>`).join('\n');
+  }
+
+  return { defaults: COMPOSER_PRESET_SCHEMA.defaults, fieldsMarkup, isValid, label, models, normalize, reasoningEfforts, reasoningLabel, selectOptions, speeds, summary };
 })();

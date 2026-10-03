@@ -1,5 +1,6 @@
 import CryptoKit
 import DashboardKeychain
+import DashboardKeychainProtocol
 import Darwin
 import Foundation
 import Security
@@ -29,40 +30,26 @@ func authorizedParent() -> Bool {
     return SecCodeCheckValidity(parentCode, [], requirement) == errSecSuccess && getppid() == parentPID
 }
 
-struct Request: Decodable {
-    let operation: String
-    let accountID: UUID
-    let credential: Data?
-    let interactionAllowed: Bool
-    let probe: Bool?
-}
-struct Response: Encodable {
-    var status: OSStatus = errSecSuccess
-    var authorizationRequired = false
-    var credential: Data?
-}
-
 guard authorizedParent() else { exit(77) }
-var response = Response()
+var response = KeychainResponse()
 do {
     let input = try FileHandle.standardInput.readToEnd() ?? Data()
     guard input.count <= 1_048_576 else { exit(64) }
-    let request = try JSONDecoder().decode(Request.self, from: input)
+    let request = try JSONDecoder().decode(KeychainRequest.self, from: input)
     let vault = NativeAccountCredentialVault(probe: request.probe == true)
     switch request.operation {
-    case "read":
+    case .read:
         response.credential = try request.interactionAllowed
             ? vault.credential(for: request.accountID)
             : vault.credentialWithoutUserInteraction(for: request.accountID)
-    case "store":
+    case .store:
         guard let credential = request.credential else { exit(64) }
         if request.interactionAllowed { try vault.store(credential, for: request.accountID) }
         else { try vault.storeWithoutUserInteraction(credential, for: request.accountID) }
-    case "delete":
+    case .delete:
         // Deletion must also honor the no-interaction policy.
         guard request.interactionAllowed else { exit(64) }
         try vault.deleteCredential(for: request.accountID)
-    default: exit(64)
     }
 } catch KeychainVaultError.authorizationRequired {
     response.authorizationRequired = true
