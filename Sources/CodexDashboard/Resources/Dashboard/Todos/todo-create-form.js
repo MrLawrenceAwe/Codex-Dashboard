@@ -7,7 +7,7 @@ function createTodoCreateForm({ imageController, tagController, threadReferences
   function updateProjects(nextProjects) {
     projects = nextProjects;
     selectedProject = projects.find((project) => project.id === selectedProject?.id) || null;
-    todoListView.updateProjectOptions(projects, selectedProject?.id || '');
+    todoListView.updateNewProjectOptions(projects, selectedProject?.id || '');
     refreshThreadOptions();
   }
 
@@ -77,7 +77,7 @@ function createTodoCreateForm({ imageController, tagController, threadReferences
         selectedThread = null;
         page.querySelector('[data-todo-new-preset-enabled]').checked = false;
         page.querySelector('[data-todo-new-preset-fields]').hidden = true;
-        todoListView.updateProjectOptions(projects);
+        todoListView.updateNewProjectOptions(projects);
         refreshThreadOptions();
         title.focus();
       };

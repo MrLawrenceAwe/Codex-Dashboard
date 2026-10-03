@@ -22,6 +22,17 @@ enum ReviewLoopDocumentMigration {
 
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
+        if let rounds = loop["rounds"] as? [[String: Any]] {
+            loop["rounds"] = rounds.map { savedRound in
+                var round = savedRound
+                if var result = round["result"] as? [String: Any] {
+                    result["addressedFindingCount"] = result.removeValue(forKey: "findings")
+                        ?? result["addressedFindingCount"]
+                    round["result"] = result
+                }
+                return round
+            }
+        }
         if loop["focus"] as? String == "naming" { loop["focus"] = "organisationAndNaming" }
         if loop["isExtension"] == nil { loop["isExtension"] = false }
         if loop["liveTesting"] == nil { loop["liveTesting"] = false }

@@ -1,6 +1,13 @@
 import Foundation
 
 struct DashboardDiagnostics {
+    static func versionDescription(in bundle: Bundle = .main) -> String {
+        let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? "development"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return build.map { "\(shortVersion) (\($0))" } ?? shortVersion
+    }
+
     let dashboardVersion: String
     let codexVersion: String
     let status: String

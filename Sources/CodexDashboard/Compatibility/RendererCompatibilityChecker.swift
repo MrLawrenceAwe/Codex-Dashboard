@@ -49,7 +49,7 @@ struct RendererCompatibilityChecker {
         checks.append(await inspect(
             id: "sidebar-unread",
             title: "Sidebar unread sync",
-            expression: contractExpression("codexUIContracts.threadReadStates().size > 0"),
+            expression: contractExpression("codexUIContracts.threadUnreadStates().size > 0"),
             failureStatus: .warning,
             compatibleDetail: "Codex's mounted thread rows expose the unread state used for immediate synchronization.",
             failureDetail: "The React unread-state contract was not found; persisted unread state remains available.",

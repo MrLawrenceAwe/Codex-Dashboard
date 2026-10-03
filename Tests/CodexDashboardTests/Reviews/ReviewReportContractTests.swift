@@ -77,7 +77,7 @@ final class ReviewReportContractTests: XCTestCase {
         let text = "# Fixes committed\n\nFindings addressed: 2\nFindings withdrawn: none\nCommit: `abc1234`\n\n## Summary\nFixed both races."
         let result = try ReviewReportContract.fix(text).result
         XCTAssertEqual(result.outcome, .fixed)
-        XCTAssertEqual(result.findingCount, 2)
+        XCTAssertEqual(result.addressedFindingCount, 2)
         XCTAssertEqual(result.commit, "abc1234")
         XCTAssertEqual(result.summary, "Fixed both races.")
         let blocked = text.replacingOccurrences(of: "committed", with: "blocked").replacingOccurrences(of: "abc1234", with: "none")
@@ -93,7 +93,7 @@ final class ReviewReportContractTests: XCTestCase {
     func testFixReportTracksWithdrawnFindingNumbersWithoutEvidence() throws {
         let text = "# Fixes committed\nFindings addressed: 1\nFindings withdrawn: 2\nCommit: `abc1234`\n\n## Summary\nFixed one issue; the other was invalid."
         let report = try ReviewReportContract.fix(text)
-        XCTAssertEqual(report.result.findingCount, 1)
+        XCTAssertEqual(report.result.addressedFindingCount, 1)
         XCTAssertEqual(report.withdrawn, [2])
         for invalid in [text.replacingOccurrences(of: "Findings withdrawn: 2", with: "Findings withdrawn: 0"),
                         text.replacingOccurrences(of: "Findings withdrawn: 2", with: "Findings withdrawn: 2, 2"),
@@ -105,12 +105,12 @@ final class ReviewReportContractTests: XCTestCase {
         XCTAssertEqual(try ReviewReportContract.fix(allWithdrawn).result.outcome, .withdrawn)
     }
 
-    func testRoundResultRetainsStoredFindingKey() throws {
-        let stored = Data(#"{"outcome":"fixed","findings":2,"commit":"abc1234","summary":"Done"}"#.utf8)
+    func testRoundResultUsesAddressedFindingCount() throws {
+        let stored = Data(#"{"outcome":"fixed","addressedFindingCount":2,"commit":"abc1234","summary":"Done"}"#.utf8)
         let result = try JSONDecoder().decode(ReviewRoundResult.self, from: stored)
-        XCTAssertEqual(result.findingCount, 2)
+        XCTAssertEqual(result.addressedFindingCount, 2)
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
-        XCTAssertEqual(encoded?["findings"] as? Int, 2)
-        XCTAssertNil(encoded?["findingCount"])
+        XCTAssertEqual(encoded?["addressedFindingCount"] as? Int, 2)
+        XCTAssertNil(encoded?["findings"])
     }
 }

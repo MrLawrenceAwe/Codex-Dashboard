@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class AccountPopoverActionListener {
+final class AccountPopoverActionPoller {
     enum Schedule {
         static func unavailableRetry(active: Bool) -> Duration {
             active ? .seconds(1) : .seconds(10)

@@ -18,7 +18,7 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
         self.fileManager = fileManager
     }
 
-    func load() throws -> SavedAccountsDocument {
+    func loadAndReconcile() throws -> SavedAccountsDocument {
         guard fileManager.fileExists(atPath: metadataURL.path) else {
             return SavedAccountsDocument()
         }

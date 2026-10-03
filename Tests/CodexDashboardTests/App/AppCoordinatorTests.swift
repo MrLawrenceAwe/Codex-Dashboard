@@ -8,11 +8,11 @@ final class AppCoordinatorTests: XCTestCase {
 
     func testUnavailableAccountPopoverRetriesPromptly() {
         XCTAssertEqual(
-            AccountPopoverActionListener.Schedule.unavailableRetry(active: true),
+            AccountPopoverActionPoller.Schedule.unavailableRetry(active: true),
             .seconds(1)
         )
         XCTAssertEqual(
-            AccountPopoverActionListener.Schedule.unavailableRetry(active: false),
+            AccountPopoverActionPoller.Schedule.unavailableRetry(active: false),
             .seconds(10)
         )
     }

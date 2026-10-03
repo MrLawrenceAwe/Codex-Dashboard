@@ -281,7 +281,7 @@ final class ReviewLoopCoordinator {
         round.reviewTurnID = reviewTurn.id
         round.review = report
         if findings.isEmpty {
-            round.result = ReviewRoundResult(outcome: .clean, findingCount: 0,
+            round.result = ReviewRoundResult(outcome: .clean, addressedFindingCount: 0,
                                              commit: repo.commit, summary: report.summary)
             updated.phase = .completed
             updated.message = "Review \(round.number) found no \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. No fix prompt was sent."
@@ -342,9 +342,9 @@ final class ReviewLoopCoordinator {
         let acceptedNumbers = Set(report.findings.enumerated().compactMap { index, finding in
             findings.contains(finding) ? index + 1 : nil
         })
-        guard result.findingCount + fixReport.withdrawn.count == findings.count,
+        guard result.addressedFindingCount + fixReport.withdrawn.count == findings.count,
               fixReport.withdrawn.allSatisfy({ acceptedNumbers.contains($0) }) else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix report accounted for \(result.findingCount + fixReport.withdrawn.count) of \(findings.count) findings.")
+            throw ReviewLoopError("Commit checkpoint failed: the fix report accounted for \(result.addressedFindingCount + fixReport.withdrawn.count) of \(findings.count) findings.")
         }
         let reportedCommit = try await result.outcome == .fixed
             ? inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
@@ -374,15 +374,23 @@ final class ReviewLoopCoordinator {
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
             updated = current
         }
-        updated.phase = result.outcome == .withdrawn ? .completed : updated.completedRoundCount + 1 >= updated.maxRounds ? .limitReached : updated.pauseRequested ? .paused : .waiting
-        updated.message = result.outcome == .withdrawn ? "All review findings were withdrawn. No fix commit was needed."
-            : updated.completedRoundCount + 1 >= updated.maxRounds
-            ? "All configured review rounds completed."
-            : updated.pauseRequested ? "Fixes committed. Paused before the next review." : "Fixes committed. Ready for a fresh review."
+        if result.outcome == .withdrawn {
+            updated.phase = .completed
+            updated.message = "All review findings were withdrawn. No fix commit was needed."
+        } else if updated.completedRoundCount + 1 >= updated.maxRounds {
+            updated.phase = .limitReached
+            updated.message = "All configured review rounds completed."
+        } else if updated.pauseRequested {
+            updated.phase = .paused
+            updated.message = "Fixes committed. Paused before the next review."
+        } else {
+            updated.phase = .waiting
+            updated.message = "Fixes committed. Ready for a fresh review."
+        }
         if result.outcome == .fixed, updated.pushToRemote { updated.message += " Fixes pushed to remote." }
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
-            outcome: result.outcome, findingCount: result.findingCount, commit: repo.commit, summary: result.summary)
+            outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: repo.commit, summary: result.summary)
         updated.expectedCommit = repo.commit
         try persist(updated)
     }

@@ -11,11 +11,11 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                               promptContext: .general, maxRounds: 5)
         loop.rounds = [
             ReviewRound(number: 1, baseCommit: "base", result: ReviewRoundResult(
-                outcome: .fixed, findingCount: 1, commit: "fixed", summary: "Fixed")),
+                outcome: .fixed, addressedFindingCount: 1, commit: "fixed", summary: "Fixed")),
             ReviewRound(number: 2, baseCommit: "fixed", result: ReviewRoundResult(
-                outcome: .withdrawn, findingCount: 0, commit: "", summary: "Withdrawn")),
+                outcome: .withdrawn, addressedFindingCount: 0, commit: "", summary: "Withdrawn")),
             ReviewRound(number: 3, baseCommit: "fixed", result: ReviewRoundResult(
-                outcome: .blocked, findingCount: 0, commit: "", summary: "Blocked")),
+                outcome: .blocked, addressedFindingCount: 0, commit: "", summary: "Blocked")),
             ReviewRound(number: 4, baseCommit: "fixed"),
         ]
         let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
@@ -310,7 +310,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.finish(findings: 1, commit: "fixed", withdrawn: [2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
-        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.findingCount, 1)
+        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.addressedFindingCount, 1)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
@@ -891,7 +891,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         driver.finish(findings: 1, commit: "fixed")
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(recovered.loops.last?.phase, .waiting)
-        XCTAssertEqual(recovered.loops.last?.rounds.last?.result?.findingCount, 1)
+        XCTAssertEqual(recovered.loops.last?.rounds.last?.result?.addressedFindingCount, 1)
     }
 
     func testSeparateModelSelectionsPersistAndApplyToTheirTurns() async throws {
@@ -1080,6 +1080,37 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         let current = try XCTUnwrap(JSONSerialization.jsonObject(
             with: JSONEncoder().encode(migrated)) as? [String: Any])
         XCTAssertEqual(current["focus"] as? String, "organisationAndNaming")
+    }
+
+    func testOlderRoundResultsMigrateAddressedCountsWithoutChangingReviewFindings() throws {
+        let (coordinator, _, _) = try make()
+        var loop = try XCTUnwrap(coordinator.loops.last)
+        var round = ReviewRound(number: 1, baseCommit: "base")
+        round.review = ReviewReport(outcome: .reviewed, findings: [
+            ReviewFinding(priority: .p2, title: "Issue", body: "Details")
+        ], summary: "One finding")
+        round.result = ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1,
+                                         commit: "fixed", summary: "Done")
+        loop.rounds = [round]
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        var savedRounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
+        var savedResult = try XCTUnwrap(savedRounds[0]["result"] as? [String: Any])
+        savedResult["findings"] = savedResult.removeValue(forKey: "addressedFindingCount")
+        savedRounds[0]["result"] = savedResult
+        saved["rounds"] = savedRounds
+        let formats: [Any] = [saved, [saved]] + (1..<ReviewLoopsDocument.currentVersion).map {
+            ["version": $0, "loops": [saved]] as [String: Any]
+        }
+        for format in formats {
+            let data = try JSONSerialization.data(withJSONObject: format)
+            let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+            XCTAssertEqual(migrated, loop)
+            let currentRound = try XCTUnwrap(JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(migrated.rounds[0])) as? [String: Any])
+            let currentResult = try XCTUnwrap(currentRound["result"] as? [String: Any])
+            XCTAssertEqual(currentResult["addressedFindingCount"] as? Int, 1)
+            XCTAssertNil(currentResult["findings"])
+        }
     }
 
     func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {

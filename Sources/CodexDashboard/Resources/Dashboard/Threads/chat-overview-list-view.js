@@ -42,7 +42,7 @@ const chatOverviewListView = (() => {
                 <span class="dashboard-thread-preview">${domUtils.escapeHTML(thread.preview || 'No preview available')}</span>
                 <span class="dashboard-meta">
                   <span>${formatRelativeTime(thread.recencyEpochMillis)}</span>
-                  ${thread.model ? `<span>${domUtils.escapeHTML(thread.model)}</span>` : ''}
+                  ${thread.model ? `<span>${domUtils.escapeHTML(composerPresets.label(composerPresets.models, thread.model) || thread.model)}</span>` : ''}
                 </span>
               </span>`}
         </span>

@@ -216,8 +216,8 @@ const codexUIContracts = (() => {
     return current;
   }
 
-  function threadReadStates() {
-    const readStates = new Map();
+  function threadUnreadStates() {
+    const unreadStates = new Map();
     const fiberCache = new Map();
     threadRows().forEach((row) => {
       const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
@@ -228,13 +228,13 @@ const codexUIContracts = (() => {
       while (fiber) {
         const props = fiber.memoizedProps;
         if (props?.conversationId === threadID && typeof props?.isUnread === 'boolean') {
-          readStates.set(props.conversationId, props.isUnread);
+          unreadStates.set(props.conversationId, props.isUnread);
           break;
         }
         fiber = committedFiber(fiber.return, fiberCache);
       }
     });
-    return readStates;
+    return unreadStates;
   }
 
   function cachedReadAction(value, visited) {
@@ -401,7 +401,7 @@ const codexUIContracts = (() => {
     isThreadSelected,
     activeComposerThreadID,
     activeComposerProject,
-    threadReadStates,
+    threadUnreadStates,
     markThreadsRead,
     composer,
     composerAddButton,

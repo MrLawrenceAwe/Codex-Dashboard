@@ -36,8 +36,8 @@ const todoListView = (() => {
     }).join('');
   }
 
-  function projectPickerMarkup(project) {
-    return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(codexUIContracts.projects(), project?.id)}</select>`;
+  function projectPickerMarkup(project, projects) {
+    return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(projects, project?.id, project)}</select>`;
   }
 
   function threadMarkup(thread) {
@@ -77,8 +77,10 @@ const todoListView = (() => {
     </div>`;
   }
 
-  function projectOptions(projects, selectedID = '') {
-    return `<option value="">No project</option>${projects.map((project) => (
+  function projectOptions(projects, selectedID = '', savedProject = null) {
+    const unavailable = savedProject && !projects.some((project) => project.id === savedProject.id)
+      ? `<option value="${domUtils.escapeHTML(savedProject.id)}" selected disabled>Unavailable · ${domUtils.escapeHTML(savedProject.name)}</option>` : '';
+    return `<option value="">No project</option>${unavailable}${projects.map((project) => (
       `<option value="${domUtils.escapeHTML(project.id)}"${project.id === selectedID ? ' selected' : ''}>${domUtils.escapeHTML(project.name)}</option>`
     )).join('')}`;
   }
@@ -125,7 +127,7 @@ const todoListView = (() => {
     title.style.height = `${Math.min(title.scrollHeight, 144)}px`;
   }
 
-  function render(items, filterMode, availableTags = [], projects = [], filters = {}) {
+  function render({ items, filterMode, availableTags, projects, filterProjects, filters }) {
     const openCount = items.filter((item) => !item.completed).length;
     updateNavigation(openCount);
     const page = document.getElementById(dashboardElements.elementIDs.todoPage);
@@ -141,7 +143,7 @@ const todoListView = (() => {
       );
     });
     page.querySelector('[data-todo-clear-completed]').hidden = completedCount === 0;
-    updateFilterOptions(projects, availableTags, items, filters);
+    updateFilterOptions(filterProjects, availableTags, items, filters);
     const list = page.querySelector('[data-todo-list]');
     const visible = todoQuery.visibleItems(items, filterMode, filters.project, filters.tag);
     if (!visible.length) {
@@ -160,7 +162,7 @@ const todoListView = (() => {
         <div class="todo-item-copy">
           <textarea class="todo-title" data-todo-title aria-label="To-do title" maxlength="240" rows="1">${domUtils.escapeHTML(item.title)}</textarea>
           <textarea class="todo-body" data-todo-body aria-label="To-do details" maxlength="5000" placeholder="Add details…">${domUtils.escapeHTML(item.body)}</textarea>
-          ${projectPickerMarkup(item.project)}
+          ${projectPickerMarkup(item.project, projects)}
           ${threadMarkup(item.thread)}
           ${itemPresetMarkup(item)}
           ${tagMarkup(item.tags, !item.completed)}
@@ -325,13 +327,16 @@ const todoListView = (() => {
     });
   }
 
-  function updateProjectOptions(projects, selectedID = '') {
-    document.querySelectorAll('[data-todo-new-project], [data-todo-project]').forEach((select) => {
-      const itemID = select.closest('[data-todo-id]')?.dataset.todoId;
-      const selectedProjectID = itemID
-        ? select.value
-        : selectedID;
-      select.innerHTML = projectOptions(projects, selectedProjectID);
+  function updateNewProjectOptions(projects, selectedID = '') {
+    const select = document.querySelector('[data-todo-new-project]');
+    if (select) select.innerHTML = projectOptions(projects, selectedID);
+  }
+
+  function updateItemProjectOptions(projects, items) {
+    const projectsByItemID = new Map(items.map((item) => [item.id, item.project]));
+    document.querySelectorAll('[data-todo-project]').forEach((select) => {
+      const project = projectsByItemID.get(select.closest('[data-todo-id]').dataset.todoId);
+      select.innerHTML = projectOptions(projects, project?.id, project);
     });
   }
 
@@ -368,5 +373,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  return { createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
+  return { createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateNewProjectOptions, updateItemProjectOptions, updateThreadOptions, updateFilterOptions };
 })();
