@@ -18,7 +18,10 @@ enum ReviewPrompts {
         case .content:
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted."
+        let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
+            ? "\n\nAlso include live testing."
+            : ""
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {

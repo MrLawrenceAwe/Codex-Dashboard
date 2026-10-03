@@ -894,6 +894,43 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.speeds, [.fast, .fast, .fast, .fast, .fast])
     }
 
+    func testLiveTestingPersistsAndReachesReviewsWithoutChangingFixPrompt() async throws {
+        for focus in ReviewFocus.allCases {
+            let store = ReviewTestStore()
+            let coordinator = ReviewLoopCoordinator(store: store)
+            var start = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
+                                    promptContext: .general, maxRounds: 3, loopID: nil)
+            start.focus = focus
+            start.liveTesting = true
+            try coordinator.apply(start, projects: [project])
+            let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
+            XCTAssertEqual(saved.liveTesting, focus.supportsLiveTesting)
+            let driver = ReviewTestDriver()
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(driver.prompts[0].contains("Also include live testing."), focus.supportsLiveTesting)
+            if focus.usesPriorities { driver.review(priorities: [.p1]) }
+            else { driver.reviewWithoutPriorities() }
+            await coordinator.advance(using: driver, threads: [])
+            await coordinator.advance(using: driver, threads: [])
+            var withoutLiveTesting = saved
+            withoutLiveTesting.liveTesting = false
+            XCTAssertEqual(driver.prompts[1], ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last)))
+            driver.finish(findings: 1, commit: "fixed")
+            await coordinator.advance(using: driver, threads: [])
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(driver.prompts[2].contains("Also include live testing."), focus.supportsLiveTesting)
+        }
+    }
+
+    func testVersionThreeLoopsMigrateWithLiveTestingOff() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "old", project: project,
+                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "liveTesting")
+        let data = try JSONSerialization.data(withJSONObject: ["version": 3, "loops": [saved]])
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
+    }
+
     func testPerformanceReviewIncludesOptionalProjectContext() {
         var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
                               promptContext: .personal, maxRounds: 3)

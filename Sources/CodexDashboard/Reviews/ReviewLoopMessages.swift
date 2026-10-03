@@ -11,6 +11,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let promptContext: ReviewPromptContext?
     let maxRounds: Int?
     let loopID: UUID?
+    var liveTesting: Bool? = nil
     var pushToRemote: Bool? = nil
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil
@@ -36,12 +37,14 @@ struct ReviewTypeOption: Codable, Sendable {
     let label: String
     let usesPriorities: Bool
     let supportsProjectContext: Bool
+    let supportsLiveTesting: Bool
 
     init(_ focus: ReviewFocus) {
         id = focus
         label = focus.label
         usesPriorities = focus.usesPriorities
         supportsProjectContext = focus.supportsProjectContext
+        supportsLiveTesting = focus.supportsLiveTesting
     }
 }
 

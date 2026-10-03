@@ -6,6 +6,7 @@ const reviewLoopSetupView = (() => {
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
+  const supportsLiveTesting = focus => reviewTypes.find(type => type.id === focus)?.supportsLiveTesting === true;
   const supportsProjectContext = focus => reviewTypes.find(type => type.id === focus)?.supportsProjectContext === true;
 
   function formMarkup() {
@@ -24,6 +25,8 @@ const reviewLoopSetupView = (() => {
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
+        <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
+        <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
@@ -52,6 +55,10 @@ const reviewLoopSetupView = (() => {
     if (!root) return;
     const focus = root.querySelector('[data-review-focus]').value;
     root.querySelector('.review-priority').hidden = !usesPriorities(focus);
+    const liveTesting = root.querySelector('.review-live-testing');
+    liveTesting.hidden = !supportsLiveTesting(focus);
+    root.querySelector('.review-live-testing-help').hidden = liveTesting.hidden;
+    if (liveTesting.hidden) liveTesting.querySelector('select').value = 'false';
     const context = root.querySelector('.review-project-context');
     context.hidden = !supportsProjectContext(focus);
     if (context.hidden) context.querySelector('select').value = '';
@@ -121,5 +128,5 @@ const reviewLoopSetupView = (() => {
     reviewTypesSignature = '';
   }
 
-  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, usesPriorities, supportsProjectContext };
+  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, usesPriorities, supportsProjectContext, supportsLiveTesting };
 })();

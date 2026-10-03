@@ -15,6 +15,7 @@ enum ReviewFocus: String, Codable, CaseIterable, Sendable {
     case bugs, bugsAndPerformance, organisation, organisationAndNaming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
+    var supportsLiveTesting: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
     var supportsProjectContext: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
 
     var label: String {
@@ -150,6 +151,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var focus: ReviewFocus = .bugs
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority? = nil
+    var liveTesting = false
     var pushToRemote = false
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
