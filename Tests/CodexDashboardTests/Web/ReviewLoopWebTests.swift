@@ -205,6 +205,31 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [false, false, 0, true, true])
     }
 
+    func testHistoryUpdateDatesFollowSelectionAndRefresh() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loops = ['old','new'].map(id => ({id,project,phase:'completed',completedRoundCount:1,maxRounds:5,rounds:[]}));
+          loops[1].updatedAt = Date.UTC(2026,9,3,14,35) / 1000;
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['old','new'],error:null};
+          const expected = timestamp => 'Last updated: ' + new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
+          const label = () => document.querySelector('[data-review-history-updated]').textContent;
+          api.applyReviewLoop(snapshot);
+          const select = document.querySelector('[data-review-history-select]');
+          const states = [label() === expected(loops[1].updatedAt),select.selectedOptions[0].textContent.includes(expected(loops[1].updatedAt)),document.querySelector('[data-review-history-details]').open];
+          select.value = 'old'; select.dispatchEvent(new Event('change'));
+          states.push(label());
+          loops[0].updatedAt = Date.UTC(2026,9,4,9,10) / 1000;
+          api.applyReviewLoop(snapshot);
+          states.push(select.value,label() === expected(loops[0].updatedAt),select.selectedOptions[0].textContent.includes(expected(loops[0].updatedAt)));
+          return states;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, true, false, "Last updated: Not recorded", "old", true, true])
+    }
+
     func testPriorityOptionsDescribeIncludedFindings() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
             html: DashboardWebTestHarness.basicTodoHTML,

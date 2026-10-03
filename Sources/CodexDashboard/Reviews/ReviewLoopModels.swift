@@ -161,6 +161,8 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var expectedCommit: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
+    /// Unix timestamp; absent for saved reviews predating timestamp tracking.
+    var updatedAt: TimeInterval? = nil
 
     var completedRoundCount: Int {
         rounds.filter { $0.result.map { $0.outcome != .blocked } == true }.count
