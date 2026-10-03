@@ -23,6 +23,7 @@ final class ReviewLoopCoordinator {
         do {
             loops = try store.load()
             for index in loops.indices {
+                let previous = loops[index]
                 if loops[index].phase == .paused,
                    loops[index].completedRoundCount >= loops[index].maxRounds,
                    loops[index].rounds.last?.result?.outcome == .fixed {
@@ -31,6 +32,9 @@ final class ReviewLoopCoordinator {
                 if [.running, .waiting].contains(loops[index].phase) {
                     loops[index].phase = .paused
                     loops[index].message = "Dashboard restarted. Resume to reconcile the last round before continuing."
+                }
+                if loops[index] != previous {
+                    loops[index].updatedAt = Date.now.timeIntervalSince1970
                 }
             }
             for loop in loops where !loop.phase.isFinished {
@@ -423,6 +427,12 @@ final class ReviewLoopCoordinator {
     }
 
     private func persistAll(_ next: [ReviewLoop]) throws {
+        let now = Date.now.timeIntervalSince1970
+        let next = next.map { loop in
+            var updated = loop
+            if matchingLoop(loop.id) != loop { updated.updatedAt = now }
+            return updated
+        }
         do {
             try store.save(next)
             loops = next

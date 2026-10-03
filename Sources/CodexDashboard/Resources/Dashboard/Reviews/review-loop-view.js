@@ -25,6 +25,7 @@ const reviewLoopView = (() => {
       <section class="review-history" data-review-history aria-labelledby="review-history-title" hidden>
         <div class="review-region-heading"><h2 id="review-history-title">Previous loops</h2><span data-review-history-count class="review-count"></span></div>
         <label>Previous reviews<select data-review-history-select aria-label="Previous review loop"></select></label>
+        <p class="review-field-help" data-review-history-updated></p>
         <div class="review-history-actions">
           <button type="button" data-review-history-action="delete">Delete selected</button>
           <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete earlier reviews</button>
@@ -73,13 +74,15 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
     const selectedID = historySelect.value;
-    const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(reviewLoopCardView.phaseLabel(loop))} · ${loop.completedRoundCount} of ${loop.maxRounds} rounds</option>`).join('');
+    const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(reviewLoopCardView.phaseLabel(loop))} · ${loop.completedRoundCount} of ${loop.maxRounds} rounds · Last updated: ${escape(reviewPresentation.updatedAtLabel(loop.updatedAt))}</option>`).join('');
     if (historySelect.dataset.options !== options) {
       historySelect.innerHTML = options;
       historySelect.dataset.options = options;
       historySelect.value = history.some(loop => loop.id === selectedID) ? selectedID : history[0]?.id || '';
     }
     const selectedIndex = history.findIndex(loop => loop.id === historySelect.value);
+    root.querySelector('[data-review-history-updated]').textContent = selectedIndex < 0 ? ''
+      : `Last updated: ${reviewPresentation.updatedAtLabel(history[selectedIndex].updatedAt)}`;
     root.querySelectorAll('[data-review-history-action]').forEach(button => {
       button.disabled = !!pendingAction || (button.dataset.reviewHistoryAction === 'deleteOlder' && selectedIndex >= history.length - 1);
     });

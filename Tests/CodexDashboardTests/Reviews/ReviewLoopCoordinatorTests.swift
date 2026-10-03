@@ -53,6 +53,31 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         catch { XCTFail("Could not stop review loop: \(error)") }
     }
 
+    func testUpdateTimestampPersistsAndHistoryDeletionKeepsOtherTimestamps() throws {
+        let (_, store, _) = try make()
+        let startedAt = try XCTUnwrap(store.loops.first?.updatedAt)
+        XCTAssertEqual(startedAt, Date.now.timeIntervalSince1970, accuracy: 2)
+        store.loops[0].phase = .paused
+        store.loops[0].updatedAt = 1
+        let restored = ReviewLoopCoordinator(store: store)
+        XCTAssertEqual(restored.loops[0].updatedAt, 1)
+        stop(restored)
+        let stopped = try XCTUnwrap(store.loops.first)
+        XCTAssertGreaterThan(try XCTUnwrap(stopped.updatedAt), startedAt - 1)
+        let decoded = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(stopped))
+        XCTAssertEqual(decoded.updatedAt, stopped.updatedAt)
+        let display = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            ReviewLoopDisplaySnapshot(loop: stopped))) as? [String: Any])
+        XCTAssertEqual(display["updatedAt"] as? Double, stopped.updatedAt)
+
+        try restored.apply(startAction(id: "second", kind: .start, projectID: project.id,
+                                       promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
+        let active = try XCTUnwrap(store.loops.last)
+        try restored.apply(ReviewLoopAction(id: "delete", kind: .delete, projectID: nil,
+                                           promptContext: nil, maxRounds: nil, loopID: stopped.id), projects: [project])
+        XCTAssertEqual(store.loops, [active])
+    }
+
     func testDeletingPreviousReviewsPreservesActiveLoopsAndSelectedBoundary() throws {
         let store = ReviewTestStore()
         func loop(_ name: String, phase: ReviewLoopPhase) -> ReviewLoop {
