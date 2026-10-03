@@ -1,4 +1,4 @@
-const threadMarkup = (() => {
+const chatOverviewListView = (() => {
   function formatRelativeTime(recencyEpochMillis) {
     const seconds = Math.max(0, Math.round((Date.now() - Number(recencyEpochMillis || 0)) / 1000));
     if (seconds < 60) return 'just now';

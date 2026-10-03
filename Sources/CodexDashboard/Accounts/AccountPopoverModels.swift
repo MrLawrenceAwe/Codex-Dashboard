@@ -7,11 +7,17 @@ struct AccountPopoverSnapshot: Codable, Equatable, Sendable {
     let isBusy: Bool
 }
 
+/// A labelled usage value, or a status note when label is nil.
+struct AccountUsageRow: Codable, Equatable, Sendable {
+    let label: String?
+    let value: String
+}
+
 struct AccountPopoverItem: Codable, Equatable, Sendable {
     let id: UUID
     let name: String
     let isActive: Bool
-    let usageLines: [String]
+    let usageRows: [AccountUsageRow]
     let isRefreshing: Bool
     let requiresSignIn: Bool
     let errorMessage: String?

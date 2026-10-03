@@ -14,7 +14,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
             document.getElementById('codex-dashboard-todo-page').classList.contains('is-open'),
             document.querySelectorAll('[aria-current="page"]').length,
           ];
-          window.__codexDashboard.open();
+          window.__codexDashboard.openChatOverview();
           document.getElementById('codex-dashboard-todo-navigation').click();
           const todos = state();
           document.getElementById('codex-dashboard-todo-navigation').remove();

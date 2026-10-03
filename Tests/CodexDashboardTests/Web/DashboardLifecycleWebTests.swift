@@ -273,7 +273,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               };
               unreadRow.addEventListener('click', () => { window.__openedThreadID = 'thread-unread'; });
               window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
               const visibleThreads = document.querySelectorAll('[data-thread-list] .dashboard-thread');
               visibleThreads[0].click();
@@ -297,15 +297,15 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
         let closesForHostRouteChanges = try await webView.evaluateJavaScript(
             """
             (() => {
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               window.dispatchEvent(new MessageEvent('message', {
                 data: { type: 'navigate-to-route', path: '/local/another-thread' },
               }));
               const closedForMessage = !document.documentElement.classList.contains('codex-dashboard-open');
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               window.dispatchEvent(new PopStateEvent('popstate'));
               const closedForHistory = !document.documentElement.classList.contains('codex-dashboard-open');
-              window.__codexDashboard.open();
+              window.__codexDashboard.openChatOverview();
               document.dispatchEvent(new KeyboardEvent('keydown', {
                 key: 'n', metaKey: true, bubbles: true,
               }));

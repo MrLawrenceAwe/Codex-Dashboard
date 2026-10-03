@@ -145,7 +145,7 @@ enum UsageNotificationPlanner {
                     windowKind: kind,
                     current: kind.window(in: usage),
                     previous: kind.window(in: previous),
-                    usageSummary: usageSummary(for: usage),
+                    usageSummary: usageSummary(for: usage, excluding: kind),
                     now: now
                 )
             }
@@ -198,7 +198,7 @@ enum UsageNotificationPlanner {
                     current: kind.window(in: usage),
                     previous: kind.window(in: previous),
                     thresholds: kind.thresholds,
-                    usageSummary: usageSummary(for: usage),
+                    usageSummary: usageSummary(for: usage, excluding: kind),
                     now: now
                 )
             }
@@ -352,7 +352,7 @@ enum UsageNotificationPlanner {
             let remaining = max(0, min(100, 100 - fiveHour.usedPercent))
             body = "\(notification.accountName)’s 5-hour: \(remaining)% left · resets "
                 + "\(formattedDeadline(resetsAt, style: .todayOrTomorrow, relativeTo: now)).\n"
-                + usageSummary(for: usage)
+                + usageSummary(for: usage, excluding: .fiveHour)
         case .weeklyReset:
             guard hasWeeklyUsageRemaining(usage), let weekly = usage.weekly,
                   let resetsAt = weekly.resetsAt,
@@ -361,7 +361,7 @@ enum UsageNotificationPlanner {
             let remaining = max(0, min(100, 100 - weekly.usedPercent))
             body = "\(notification.accountName)’s Weekly: \(remaining)% left · resets "
                 + "\(formattedDeadline(resetsAt, style: .fullDate, relativeTo: now)).\n"
-                + usageSummary(for: usage)
+                + usageSummary(for: usage, excluding: .weekly)
         case .bankedResetExpiry:
             guard let resets = usage.bankedResets,
                   resets.availableCount > 0,
@@ -373,7 +373,7 @@ enum UsageNotificationPlanner {
                 : "\(resets.availableCount) banked resets"
             body = "\(notification.accountName): \(count) · next expires "
                 + "\(formattedDeadline(expiration)).\n"
-                + usageSummary(for: usage)
+                + usageSummary(for: usage, includesBankedResets: false)
         }
         return ImmediateUsageNotification(
             identifier: "\(notification.identifier)-fresh-\(Int(snapshot.fetchedAt.timeIntervalSince1970))",
@@ -391,14 +391,18 @@ enum UsageNotificationPlanner {
         "\(Int(leadTime / 60 / 60))h"
     }
 
-    private static func usageSummary(for usage: CodexAccountUsage) -> String {
-        let fiveHour = remainingUsage(for: usage.fiveHour)
-        let weekly = remainingUsage(for: usage.weekly)
-        var summary = "⏱ 5-hour \(fiveHour) · 📅 Weekly \(weekly)"
-        if let bankedResets = usage.bankedResets, bankedResets.availableCount > 0 {
-            summary += " · 🎟 Banked \(bankedResets.availableCount)"
+    private static func usageSummary(
+        for usage: CodexAccountUsage,
+        excluding windowKind: UsageWindowKind? = nil,
+        includesBankedResets: Bool = true
+    ) -> String {
+        var parts: [String] = []
+        if windowKind != .fiveHour { parts.append("⏱ 5-hour \(remainingUsage(for: usage.fiveHour))") }
+        if windowKind != .weekly { parts.append("📅 Weekly \(remainingUsage(for: usage.weekly))") }
+        if includesBankedResets, let bankedResets = usage.bankedResets, bankedResets.availableCount > 0 {
+            parts.append("🎟 Banked \(bankedResets.availableCount)")
         }
-        return summary
+        return parts.joined(separator: " · ")
     }
 
     private static func remainingUsage(for window: CodexUsageWindow?) -> String {

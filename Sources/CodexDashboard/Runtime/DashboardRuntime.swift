@@ -96,7 +96,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
     }
 
     func openChatOverview() async {
-        await renderer.open()
+        await renderer.openChatOverview()
     }
 
     func hasActiveSpeechInput() async -> Bool {

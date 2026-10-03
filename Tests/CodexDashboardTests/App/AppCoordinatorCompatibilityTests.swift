@@ -56,7 +56,7 @@ extension AppCoordinatorTests {
             coordinator.connectionNotice,
             "Dashboard enablement failed: A background snapshot could not be delivered."
         )
-        XCTAssertEqual(coordinator.statusPresentation.title, "Chat overview is live")
+        XCTAssertEqual(coordinator.statusPresentation.title, "Dashboard integration is live")
     }
 
     func testRestartDoesNotBypassBlockingCompatibilityReport() async {
