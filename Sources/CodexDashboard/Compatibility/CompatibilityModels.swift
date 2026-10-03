@@ -5,6 +5,15 @@ enum CompatibilityStatus: Sendable {
     case warning
     case incompatible
     case unavailable
+
+    var label: String {
+        switch self {
+        case .compatible: "Compatible"
+        case .warning: "Warning"
+        case .incompatible: "Incompatible"
+        case .unavailable: "Not checked"
+        }
+    }
 }
 
 struct CompatibilityCheck: Identifiable, Equatable, Sendable {
@@ -48,16 +57,7 @@ struct CompatibilityReport: Equatable, Sendable {
 
     var diagnosticLines: [String] {
         attentionChecks.map { check in
-            "\(Self.label(for: check.status)) — \(check.title): \(check.detail)"
-        }
-    }
-
-    private static func label(for status: CompatibilityStatus) -> String {
-        switch status {
-        case .compatible: "Compatible"
-        case .warning: "Warning"
-        case .incompatible: "Incompatible"
-        case .unavailable: "Not checked"
+            "\(check.status.label) — \(check.title): \(check.detail)"
         }
     }
 }

@@ -15,8 +15,8 @@ final class ReviewLoopFileStore: ReviewLoopStoring {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let document = ReviewLoopDocumentMigration.Document(
-            version: ReviewLoopDocumentMigration.Document.currentVersion,
+        let document = ReviewLoopsDocument(
+            version: ReviewLoopsDocument.currentVersion,
             loops: loops
         )
         try encoder.encode(document).write(to: url, options: .atomic)

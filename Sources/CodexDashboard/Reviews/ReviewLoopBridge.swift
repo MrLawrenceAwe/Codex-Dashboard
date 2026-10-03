@@ -115,13 +115,13 @@ final class ReviewLoopBridge {
     }
 
     private func deliver(to target: DevToolsTarget) async throws {
-        let snapshot = ReviewLoopSnapshot(projects: projects, models: models,
+        let snapshot = ReviewPageSnapshot(projects: projects, models: models,
                                          reviewTypes: ReviewFocus.allCases.map(ReviewTypeOption.init),
                                          loops: coordinator.loops.map { ReviewLoopDisplaySnapshot(loop: $0) },
                                          finishedLoopIDs: coordinator.loops.filter { $0.phase.isFinished }.map(\.id),
                                          progress: coordinator.progress,
                                          error: coordinator.error ?? actionError,
                                          acknowledgedActionID: acknowledgedActionID)
-        _ = try await devTools.evaluateBoolean(RendererScript.deliverReviewLoop(snapshot), in: target)
+        _ = try await devTools.evaluateBoolean(RendererScript.deliverReviewPageSnapshot(snapshot), in: target)
     }
 }

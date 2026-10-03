@@ -5,6 +5,29 @@ import XCTest
 
 @MainActor
 final class UsageNotificationHistoryTests: XCTestCase {
+    func testExistingObservationValuesKeepTheirEncodedShape() throws {
+        // The removed observation model encoded these three fields directly.
+        struct EarlierObservation: Codable {
+            let fiveHour: CodexUsageWindow?
+            let weekly: CodexUsageWindow?
+            let bankedResets: CodexBankedResetSummary?
+        }
+        let deadline = Date(timeIntervalSince1970: 2_000_000_000)
+        let previous = EarlierObservation(
+            fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: deadline),
+            weekly: CodexUsageWindow(usedPercent: 40, resetsAt: deadline),
+            bankedResets: CodexBankedResetSummary(availableCount: 2, nextExpiration: deadline)
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let saved = try encoder.encode(previous)
+        let usage = try JSONDecoder().decode(CodexAccountUsage.self, from: saved)
+        XCTAssertEqual(usage.fiveHour, previous.fiveHour)
+        XCTAssertEqual(usage.weekly, previous.weekly)
+        XCTAssertEqual(usage.bankedResets, previous.bankedResets)
+        XCTAssertEqual(try encoder.encode(usage), saved)
+    }
+
     func testDecodesEarlierObservationsWithoutBankedResetData() throws {
         struct EarlierObservation: Encodable {
             let fiveHour: CodexUsageWindow?
@@ -14,7 +37,7 @@ final class UsageNotificationHistoryTests: XCTestCase {
         let data = try JSONEncoder().encode([
             accountID: EarlierObservation(fiveHour: nil, weekly: nil)
         ])
-        let observations = try JSONDecoder().decode([UUID: UsageObservation].self, from: data)
+        let observations = try JSONDecoder().decode([UUID: CodexAccountUsage].self, from: data)
         XCTAssertNotNil(observations[accountID])
         XCTAssertNil(observations[accountID]?.bankedResets)
     }
@@ -31,7 +54,7 @@ final class UsageNotificationHistoryTests: XCTestCase {
             fiveHour: nil,
             weekly: CodexUsageWindow(usedPercent: 10, resetsAt: now.addingTimeInterval(96 * 60 * 60))
         )
-        let oldObservations = [account.id: UsageObservation(usage: oldUsage)]
+        let oldObservations = [account.id: oldUsage]
         defaults.set(try JSONEncoder().encode(oldObservations), forKey: "accountResetNotificationUsageObservations")
         defaults.set(["existing": now.timeIntervalSinceReferenceDate], forKey: "accountResetNotificationKnownDeadlines")
         let desktop = UsageNotificationHistory(userDefaults: defaults, channel: .desktop)
@@ -47,7 +70,7 @@ final class UsageNotificationHistoryTests: XCTestCase {
         )
         let snapshots = [account.id: CodexAccountUsageSnapshot(usage: currentUsage, fetchedAt: now)]
         desktop.saveObservations(for: [account], usageByAccountID: snapshots)
-        XCTAssertEqual(desktop.observations()[account.id], UsageObservation(usage: currentUsage))
+        XCTAssertEqual(desktop.observations()[account.id], currentUsage)
         XCTAssertTrue(phone.observations().isEmpty, "Desktop success must not acknowledge phone delivery")
 
         let alerts = UsageNotificationPlanner.deliverableNotifications(

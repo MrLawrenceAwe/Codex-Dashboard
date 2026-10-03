@@ -386,7 +386,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
 
     func testExistingTodoAssignmentUsesProjectsAvailableAfterTheTodoPageMounts() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -422,7 +422,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
 
     func testOpeningTodosRefreshesProjectsAfterTheSidebarIsReplaced() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )

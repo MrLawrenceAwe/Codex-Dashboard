@@ -36,9 +36,17 @@ enum CodexConfiguration {
     static let codexDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".codex", isDirectory: true)
 
-    private static let applicationSupportDirectory = FileManager.default.urls(
-        for: .applicationSupportDirectory, in: .userDomainMask
-    ).first!.appendingPathComponent("Codex Dashboard", isDirectory: true)
+    private static let applicationSupportDirectory = dashboardSupportDirectory()
+
+    static func dashboardSupportDirectory(fileManager: FileManager = .default) -> URL {
+        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+        return applicationSupport.appendingPathComponent("Codex Dashboard", isDirectory: true)
+    }
+
+    static func promptLibraryURL(fileManager: FileManager = .default) -> URL {
+        dashboardSupportDirectory(fileManager: fileManager).appendingPathComponent("prompt-library.json")
+    }
 
     static let reviewLoopURL = applicationSupportDirectory.appendingPathComponent("review-loop.json")
 

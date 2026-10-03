@@ -7,7 +7,7 @@ import XCTest
 final class TodoTagsWebTests: SerializedDashboardWebTestCase {
     func testTagsButtonClearsTitlebarAtReducedHostZoom() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -27,7 +27,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testTodoTagsCanBeCreatedPersistedAndRemoved() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -75,7 +75,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testTagCanBeAddedToAnExistingTodo() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -110,7 +110,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testTodoTagsHaveNoCharacterLimit() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -137,7 +137,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testManagedTagDeletionUnassignsItFromTodosAndPersists() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -181,7 +181,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testManagedTagCanBeRenamedAcrossTodos() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -232,7 +232,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testTagDialogIsCenteredAndItsCloseControlDismissesIt() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -261,7 +261,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
 
     func testTagDialogShowsManagedRowsAndCanCancelRename() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )

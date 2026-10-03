@@ -1090,7 +1090,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try store.save(coordinator.loops)
         XCTAssertEqual(try store.load(), coordinator.loops)
         let currentDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual(currentDocument["version"] as? Int, ReviewLoopDocumentMigration.Document.currentVersion)
+        XCTAssertEqual(currentDocument["version"] as? Int, ReviewLoopsDocument.currentVersion)
         XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
@@ -1107,7 +1107,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: [olderLoop]).write(to: url)
         XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
         var futureDocument = currentDocument
-        futureDocument["version"] = ReviewLoopDocumentMigration.Document.currentVersion + 1
+        futureDocument["version"] = ReviewLoopsDocument.currentVersion + 1
         try JSONSerialization.data(withJSONObject: futureDocument).write(to: url)
         XCTAssertThrowsError(try store.load())
         try Data("broken".utf8).write(to: url)

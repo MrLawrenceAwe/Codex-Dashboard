@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 enum DashboardWebTestHarness {
     private static var activeWebViews: [WKWebView] = []
-    static let basicTodoHTML = """
+    static let basicHostHTML = """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
           <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
           <main>Conversation surface</main>
@@ -133,12 +133,7 @@ enum DashboardWebTestHarness {
     }
 
     static func chatOverviewWebView() async throws -> WKWebView {
-        try await mountedWebView(html: """
-        <!doctype html><html><head><meta charset="utf-8"></head><body>
-          <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
-          <main>Conversation surface</main>
-        </body></html>
-        """)
+        try await mountedWebView(html: basicHostHTML)
     }
 
     static func snapshotPayload(for threads: [ThreadSummary]) throws -> String {

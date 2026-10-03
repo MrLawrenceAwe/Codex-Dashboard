@@ -71,7 +71,8 @@ Renderer resources are listed in `injection-manifest.json`:
 cards and actions.
 `dashboard-bridge.js` wires feature controllers to `createDashboardLifecycle` and
 catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
-their mounting and teardown. `todo-list-view.js` owns filter markup, and the to-do
+their mounting and teardown. `todo-list-view.js` owns filter markup; `todo-query.js` selects matching items,
+and `todo-form-values.js` reads model settings for new and existing to-dos. The to-do
 composer layout lives in CSS with a `has-image` class for the image draft.
 `codex-ui-contracts.js` owns speech detection and shares React fiber lookup and
 ancestor traversal while keeping committed-fiber resolution explicit for read-state inspection.
@@ -104,6 +105,8 @@ the renderer does not parse formatted strings.
 Review model cards resolve display names and use saved identifiers only when the
 model is no longer available. Navigation counts describe running or waiting loops.
 
+`ReviewPageSnapshot` supplies the review page through `applyReviewPageSnapshot`;
+`ReviewLoopsDocument` defines the current saved document independently of migrations.
 Review display snapshots add the computed `completedRoundCount`; saved documents
 retain round data without duplicating that count. Required runtime and DevTools
 operations have explicit implementations; test doubles supply their own stubs.

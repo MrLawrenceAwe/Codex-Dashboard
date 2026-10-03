@@ -22,7 +22,7 @@ struct ReviewLoopAction: Codable, Sendable {
     var priorityLimit: ReviewFinding.Priority? = nil
 }
 
-struct ReviewLoopSnapshot: Encodable, Sendable {
+struct ReviewPageSnapshot: Encodable, Sendable {
     let projects: [ReviewProject]
     let models: [ReviewModel]
     let reviewTypes: [ReviewTypeOption]

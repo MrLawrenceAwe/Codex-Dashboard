@@ -88,7 +88,7 @@ preserved so refactoring cannot resend alerts or discard phone settings.
 ## Review loops
 
 The sidebar includes a dedicated **Review loops** page beside **To-dos**. Choose a local,
-single-folder project, a review type (bugs and issues; performance and responsiveness; combined bugs and performance; simplification and structure; simplification and naming; or content and quality), Standard or Fast speed, required separate review and fix models with optional supported reasoning efforts, and a maximum of 1–20 rounds (default 5). Bugs and performance reviews offer project context (general or personal). Bugs and performance reviews also offer a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**); P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout. Multiple projects can have active loops, with one active loop per project and checkout.
+single-folder project, a review type (**Bugs and issues**; **Performance and responsiveness**; **Bugs, issues, performance and responsiveness**; **Simplification and structure**; **Simplification, structure and naming**; or **Content and quality**), Standard or Fast speed, required separate review and fix models with optional supported reasoning efforts, and a maximum of 1–20 rounds (default 5). Bugs and performance reviews offer project context (general or personal). Bugs and performance reviews also offer a priority limit (**P0 only**, **P0–P1**, **P0–P2**, or **P0–P3**); P0–P2 includes P0, P1, and P2. Each review starts in a new chat on the same branch and checkout. Multiple projects can have active loops, with one active loop per project and checkout.
 
 Bugs and issues, performance and responsiveness, and the combined review type offer optional **Live testing** (off by default). When enabled, review prompts add **Use code review and live testing to find bugs and issues.** Fix prompts add **Verify fixes for findings discovered through live testing using live testing.** The agent chooses the tools and methods. With live testing on, the **Browser extension** option adds **Use Computer Use to reload the browser extension before live testing.** The setting is saved with the loop and shown on its card. Existing saved loops migrate with live testing off.
 
@@ -118,7 +118,7 @@ is configured. New branch pushes record an upstream. Pushes are never forced; a 
 blocks the loop, and Resume retries the existing verified fix without another fix prompt.
 A restart during a push also reconciles and retries that same commit.
 Reaching the round limit ends the loop with a distinct
-green **Limit reached** status indicating that all configured rounds finished successfully.
+green **Round limit reached** status indicating that all configured rounds finished successfully.
 The absence of reported findings is the reviewer's assessment, not proof that
 all bugs have been eliminated.
 
