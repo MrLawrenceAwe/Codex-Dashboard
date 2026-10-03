@@ -95,17 +95,30 @@ final class ReviewLoopDriverTests: XCTestCase {
             let requests = try expressions.map {
                 try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any])
             }
-            XCTAssertEqual(requests.map { $0["method"] as? String }, status == "inProgress" ? ["thread/turns/list", "turn/interrupt"] : ["thread/turns/list"])
+            XCTAssertEqual(requests.map { $0["method"] as? String }, status == "inProgress" ? ["thread/turns/list", "turn/interrupt", "thread/turns/list"] : ["thread/turns/list"])
             let read = try XCTUnwrap(requests.first?["params"] as? [String: Any])
             XCTAssertEqual(read["threadId"] as? String, "thread")
             XCTAssertEqual(read["limit"] as? Int, 1)
             XCTAssertEqual(read["sortDirection"] as? String, "desc")
             XCTAssertEqual(read["itemsView"] as? String, "notLoaded")
             if status == "inProgress" {
-                let interrupt = try XCTUnwrap(requests.last?["params"] as? [String: String])
+                let interrupt = try XCTUnwrap(requests[1]["params"] as? [String: String])
                 XCTAssertEqual(interrupt, ["threadId": "thread", "turnId": "latest-turn"])
             }
         }
+    }
+
+    func testInterruptAcknowledgementDoesNotReleaseStillRunningTurn() async throws {
+        let connection = ReviewStopDevTools(status: "inProgress", confirmsInterruption: false)
+        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+        do {
+            try await driver.interruptLatestTurn("thread")
+            XCTFail("An acknowledgement alone must not confirm interruption")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("still stopping"))
+        }
+        let count = await connection.expressions.count
+        XCTAssertEqual(count, 3)
     }
 
     func testReadsFollowupTurnsWithOptionalMessagePhaseAndBoundsHistory() throws {
@@ -251,9 +264,13 @@ private actor ReviewReportDevTools: DevToolsServing {
 }
 
 private actor ReviewStopDevTools: DevToolsServing {
-    let status: String
+    var status: String
+    let confirmsInterruption: Bool
     var expressions: [String] = []
-    init(status: String) { self.status = status }
+    init(status: String, confirmsInterruption: Bool = true) {
+        self.status = status
+        self.confirmsInterruption = confirmsInterruption
+    }
     func mainRendererTargets() async -> [DevToolsTarget] { [] }
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
     func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
@@ -264,6 +281,7 @@ private actor ReviewStopDevTools: DevToolsServing {
             let turns: [[String: String]] = status == "empty" ? [] : [["id": "latest-turn", "status": status]]
             return String(data: try JSONSerialization.data(withJSONObject: ["result": ["data": turns]]), encoding: .utf8)
         }
+        if request["method"] as? String == "turn/interrupt", confirmsInterruption { status = "interrupted" }
         return "{\"result\":{}}"
     }
 }

@@ -22,6 +22,7 @@ enum ReviewLoopPresentation {
         case .completed: "Complete"
         case .limitReached: "Round limit reached"
         case .stopped: "Stopped"
+        case .stopping: "Stopping chat"
         case .blocked: "Needs attention"
         case .paused: "Paused"
         case .waiting: "Waiting to review"
@@ -47,7 +48,7 @@ enum ReviewLoopPresentation {
         unfinished: Bool
     ) -> (ReviewPromptPreview?, String) {
         let noNextPrompt = "No further prompts scheduled."
-        if loop.phase.isFinished { return (nil, noNextPrompt) }
+        if loop.phase.isFinished || loop.phase == .stopping { return (nil, noNextPrompt) }
         if loop.phase == .blocked {
             return (nil, "Open the review chat and provide the missing information or resolve its blocker, then Resume. The loop checks that chat's latest report and commit.")
         }

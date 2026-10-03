@@ -111,19 +111,27 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     func interruptLatestTurn(_ threadID: String) async throws {
         // Read only the latest turn metadata so stopping also works while the chat
         // is waiting for approval or input, without loading its report.
+        if let turn = try await latestTurn(threadID), turn.status == "inProgress" {
+            _ = try await request("turn/interrupt", ["threadId": threadID, "turnId": turn.id])
+            if let latest = try await latestTurn(threadID), latest.status == "inProgress" {
+                throw ReviewLoopError("The chat is still stopping. Its checkout stays reserved until the turn is inactive.")
+            }
+        }
+    }
+
+    private func latestTurn(_ threadID: String) async throws -> (id: String, status: String)? {
         let page = try await request("thread/turns/list", [
             "threadId": threadID, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
         ])
         guard let turns = page["data"] as? [[String: Any]] else {
             throw ReviewLoopError("Codex returned invalid review turn metadata.")
         }
-        guard let turn = turns.first else { return }
-        guard let id = turn["id"] as? String, let status = turn["status"] as? String else {
+        guard let turn = turns.first else { return nil }
+        guard let id = turn["id"] as? String, let status = turn["status"] as? String,
+              ["inProgress", "completed", "interrupted", "failed"].contains(status) else {
             throw ReviewLoopError("Codex returned an invalid review turn.")
         }
-        if status == "inProgress" {
-            _ = try await request("turn/interrupt", ["threadId": threadID, "turnId": id])
-        }
+        return (id, status)
     }
 
     func readThread(_ threadID: String) async throws -> ReviewThreadState {

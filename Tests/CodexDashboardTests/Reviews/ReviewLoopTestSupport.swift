@@ -70,6 +70,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var onRepository: (() -> Void)?
     var onCreateThread: (() -> Void)?
     var onStartTurn: (() -> Void)?
+    var onStartTurnAsync: (() async -> Void)?
     var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
     func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
@@ -105,6 +106,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
         let id = "turn-\(prompts.count)"
         thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
         onStartTurn?()
+        await onStartTurnAsync?()
         return id
     }
     func interruptLatestTurn(_ threadID: String) async throws {

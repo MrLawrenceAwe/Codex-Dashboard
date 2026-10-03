@@ -12,6 +12,7 @@ final class ReviewLoopCoordinator {
     private(set) var error: String?
     private var storageFailed = false
     private var advancingIDs: Set<UUID> = []
+    private var stoppingIDs: Set<UUID> = []
     private var checkoutOwners: [String: UUID] = [:]
 
     var threadIDs: Set<String> {
@@ -73,8 +74,10 @@ final class ReviewLoopCoordinator {
             }
             guard !updated.phase.isFinished else { return }
             if action.kind == .stop {
-                updated.phase = .stopped
-                updated.message = "Stopped loop. Stopping its running chat."
+                updated.phase = updated.rounds.last.map { $0.result == nil } == true ? .stopping : .stopped
+                updated.message = updated.phase == .stopping ? "Stopping its running chat." : "Stopped loop."
+            } else if updated.phase == .stopping {
+                return
             } else if action.kind == .resume, updated.phase == .blocked {
                 guard !loops.contains(where: { $0.id != id && !$0.phase.isFinished &&
                     ($0.project.id == updated.project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(updated.project.path))
@@ -130,25 +133,31 @@ final class ReviewLoopCoordinator {
     }
 
     func stopRunningTask(for id: UUID, using driver: any ReviewLoopDriving) async throws {
-        guard let loop = matchingLoop(id), loop.phase == .stopped else { return }
+        guard !advancingIDs.contains(id), !stoppingIDs.contains(id),
+              let loop = matchingLoop(id), loop.phase == .stopping else { return }
+        stoppingIDs.insert(id)
+        defer { stoppingIDs.remove(id) }
         do {
-            if let round = loop.rounds.last, round.result == nil, let threadID = round.threadID {
+            // No prompt is submitted until the created thread ID is saved.
+            // After advancement finishes, an unknown creation has no running turn.
+            if let threadID = loop.rounds.last?.threadID {
                 try await driver.interruptLatestTurn(threadID)
             }
         } catch {
-            if var updated = matchingLoop(id), updated.phase == .stopped {
-                updated.message = "Stopped loop, but could not stop its chat. Open its chat to stop it: \(error.localizedDescription)"
+            if var updated = matchingLoop(id), updated.phase == .stopping {
+                updated.message = "Stopping loop, but could not stop its chat. The checkout remains reserved; retry Stop or open its chat: \(error.localizedDescription)"
                 try persist(updated)
             }
             throw error
         }
-        guard var updated = matchingLoop(id), updated.phase == .stopped else { return }
+        guard var updated = matchingLoop(id), updated.phase == .stopping else { return }
+        updated.phase = .stopped
         updated.message = "Stopped loop and its running chat."
         try persist(updated)
     }
 
     func advance(using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
-        let ids = loops.filter { [.waiting, .running].contains($0.phase) }.map(\.id)
+        let ids = loops.filter { [.waiting, .running, .stopping].contains($0.phase) }.map(\.id)
         let tasks = ids.map { id in
             Task { @MainActor in
                 await self.advance(id: id, using: driver, threads: threads)
@@ -158,10 +167,18 @@ final class ReviewLoopCoordinator {
     }
 
     private func advance(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
-        guard !advancingIDs.contains(id), !storageFailed,
-              let current = activeLoop(matching: id) else { return }
+        guard !advancingIDs.contains(id), !storageFailed else { return }
         advancingIDs.insert(id)
-        defer { advancingIDs.remove(id) }
+        await advanceRound(id: id, using: driver, threads: threads)
+        advancingIDs.remove(id)
+        // A stop requested during creation/submission must wait until its IDs
+        // are saved. Otherwise a late turn can start after the checkout is released.
+        do { try await stopRunningTask(for: id, using: driver) }
+        catch { /* The stopping loop retains its checkout and its retry message. */ }
+    }
+
+    private func advanceRound(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
+        guard let current = activeLoop(matching: id) else { return }
         do {
             if current.phase == .waiting {
                 try await launch(id: id, using: driver, threads: threads)
@@ -219,7 +236,6 @@ final class ReviewLoopCoordinator {
         updated.rounds[updated.rounds.count - 1].threadID = threadID
         try persist(updated)
         guard updated.phase == .running else {
-            try await stopRunningTask(for: updated.id, using: driver)
             return
         }
         let turnID = try await driver.startTurn(threadID: threadID, projectPath: updated.project.path,
@@ -234,7 +250,6 @@ final class ReviewLoopCoordinator {
             updated.message = "Review \(round.number) is running in a fresh chat."
         }
         try persist(updated)
-        try await stopRunningTask(for: updated.id, using: driver)
     }
 
     private func reconcile(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
@@ -317,7 +332,6 @@ final class ReviewLoopCoordinator {
         updated = current
         updated.rounds[updated.rounds.count - 1].fixTurnID = id
         try persist(updated)
-        try await stopRunningTask(for: updated.id, using: driver)
     }
 
     private func completeRound(

@@ -86,15 +86,13 @@ extension AppCoordinator {
     }
 
     func updateProjectGitStatuses(
-        projectPaths: Set<String>? = nil,
-        forceRefresh: Bool = false
+        projectPaths: Set<String>? = nil
     ) async {
         guard !isPerformingAction else { return }
         if threads.isEmpty { await synchronizeDashboard() }
         let generation = refreshGeneration
-        let requestedPaths = forceRefresh ? Set(threads.map(\.checkoutPath)) : projectPaths
         guard let statusByProjectPath = await threadSnapshotService.updateProjectGitStatuses(
-            in: threads, projectPaths: requestedPaths
+            in: threads, projectPaths: projectPaths
         ) else { return }
         guard !isPerformingAction, generation == refreshGeneration else { return }
         applyThreadSnapshot(threads.map { thread in

@@ -127,8 +127,10 @@ never forced. A push failure blocks the loop; Resume retries that verified commi
 without another fix prompt.
 
 **Pause after round** finishes the current round. **Stop loop** prevents new work
-and interrupts its running turn; interruption failures remain visible. After a
-Dashboard restart, unfinished loops pause. **Resume** reconciles known work first
+and interrupts its running turn. While **Stopping**, its checkout stays reserved;
+interruption failures remain visible and retry automatically, or use **Retry Stop**.
+After a Dashboard restart, running and waiting loops pause while stopping loops
+continue stopping. **Resume** reconciles known work first
 and never duplicates an unconfirmed launch. For a blocked loop, open its chat,
 answer its question or resolve the blocker, then Resume. Follow-ups stay in the
 same round. An unconfirmed launch requires inspection before starting another loop;

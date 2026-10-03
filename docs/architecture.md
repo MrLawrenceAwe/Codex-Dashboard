@@ -19,8 +19,8 @@ snapshots to feature controllers and restores pages after host reloads. Feature
 controllers own mounting and teardown.
 
 Subprocess deadlines include termination and complete stdout/stderr draining.
-Nonblocking readers close on timeout or cancellation even if descendants retain
-pipe write ends.
+The shared `AsyncPipeReader` closes on timeout or cancellation even if descendants
+retain pipe write ends; account app-server reads use it as well.
 
 ## Thread snapshots
 
@@ -36,6 +36,8 @@ paths under Other chats. Worktree chats retain appropriate checkout grouping.
 `ThreadSnapshotService` applies cached Git status and unread state to the catalog.
 Git checks use local upstream refs, or all remote refs without an upstream, and
 never fetch. Optional Git locks are disabled to avoid observation generating events.
+Overlapping periodic Git reads share one scan per project. File events during a
+scan request one subsequent scan, coalescing bursts without dropping the final change.
 
 Unread state is scoped to the active authenticated principal, independently of
 saved accounts. Account changes invalidate its cache even if global state is
@@ -146,9 +148,13 @@ Retries and restart reconciliation reuse the same fix rather than requesting ano
 `ReviewLoopFileStore` atomically persists
 `~/Library/Application Support/Codex Dashboard/review-loop.json`. Launch intent is
 saved before each task/follow-up; unknown launches are never automatically resent.
-Restart pauses unfinished loops. Resume reconciles known tasks, including user
+Restart pauses running and waiting loops; stopping loops retain their checkout
+reservation and retry interruption. Resume reconciles known tasks, including user
 follow-up turns, under the same validation. Follow-ups do not consume another round.
 Stop also handles turns whose submission acknowledgment arrives after cancellation.
+A stopping loop keeps its checkout reserved until submission finishes and the latest
+turn is confirmed inactive. Failed interruptions stay visible and are retried; only
+confirmed stopped loops can be deleted or replaced.
 Storage failures prevent further remote side effects. Operational recovery and
 round-limit semantics are in the [usage guide](usage.md#review-loops).
 
