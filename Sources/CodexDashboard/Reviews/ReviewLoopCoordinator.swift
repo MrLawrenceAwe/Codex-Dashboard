@@ -61,7 +61,7 @@ final class ReviewLoopCoordinator {
             }
             let focus = action.focus ?? .bugs
             let promptContext = focus.supportsProjectContext ? action.promptContext ?? .general : .general
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, pushToRemote: action.pushToRemote ?? false))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: focus.supportsLiveTesting && (action.liveTesting ?? false), pushToRemote: action.pushToRemote ?? false))
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")
