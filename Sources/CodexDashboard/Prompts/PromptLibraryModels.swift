@@ -1,7 +1,7 @@
 import Foundation
 
 enum PromptLibrarySchema {
-    static let currentVersion = 3
+    static let currentVersion = 4
     static let defaultSection = "General"
 
     static var javascriptDeclaration: String {

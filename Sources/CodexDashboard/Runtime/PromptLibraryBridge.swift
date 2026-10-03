@@ -95,10 +95,10 @@ final class PromptLibraryBridge {
         guard
             let serialized = try? await devTools.evaluateString(expression, in: target),
             let data = serialized.data(using: .utf8),
-            let library = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data),
-            library.isValid
+            let storedLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data)
         else { return nil }
-        return library
+        let library = PromptLibraryNormalizer.normalize(storedLibrary)
+        return library.isValid ? library : nil
     }
 
     private func discardPendingLibrary(on targets: [DevToolsTarget]) async throws {

@@ -9,7 +9,7 @@ extension PromptLibraryWebTests {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let modelIdentifier = #"\"></option></select><img src=x onerror=\"window.__modelOptionXSS = true\">"#
         let library = PromptLibraryDocument(
-            version: 3,
+            version: PromptLibrarySchema.currentVersion,
             prompts: [SavedPrompt(
                 id: "unknown-model",
                 name: "Unknown model",
@@ -151,7 +151,7 @@ extension PromptLibraryWebTests {
                   if (event.key !== 'ArrowLeft') return;
                   setTimeout(() => {
                     trigger.dataset.selectedReasoningEffort = 'low';
-                    record('Effort:Light');
+                    record('Effort:Low');
                   }, 50);
                 });
                 const speed = document.createElement('div');
@@ -212,7 +212,7 @@ extension PromptLibraryWebTests {
               document.querySelector('[name="content"]').value = 'Review this change';
               document.querySelector('[name="hasPreset"]').click();
               document.querySelector('[name="presetModel"]').value = '\(model)';
-              document.querySelector('[name="presetReasoningEffort"]').value = 'light';
+              document.querySelector('[name="presetReasoningEffort"]').value = 'low';
               document.querySelector('[name="presetSpeed"]').value = 'fast';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
               const summary = [...document.querySelectorAll('.dashboard-prompt-preset-summary em')]
@@ -264,7 +264,7 @@ extension PromptLibraryWebTests {
             return
         }
 
-        XCTAssertEqual(values["version"] as? Int, 3)
+        XCTAssertEqual(values["version"] as? Int, PromptLibrarySchema.currentVersion)
         XCTAssertEqual(presetDefaults["modelValue"] as? String, "gpt-6.1-sol")
         XCTAssertEqual(presetDefaults["effortValue"] as? String, "medium")
         XCTAssertEqual(presetDefaults["speedValue"] as? String, "standard")
@@ -272,14 +272,14 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(presetDefaults["presetFieldsDisabled"] as? Bool, true)
         XCTAssertEqual(
             values["preset"] as? [String: String],
-            ["model": model, "reasoningEffort": "light", "speed": "fast"]
+            ["model": model, "reasoningEffort": "low", "speed": "fast"]
         )
-        XCTAssertEqual(values["summary"] as? [String], [label, "Light", "Fast"])
+        XCTAssertEqual(values["summary"] as? [String], [label, "Low", "Fast"])
         XCTAssertEqual(values["usesPresetByDefault"] as? Bool, false)
         XCTAssertEqual(values["usesPresetAfterToggle"] as? Bool, true)
         XCTAssertEqual(
             values["applied"] as? [String],
-            ["Model:\(label)", "Effort:Light", "Speed:Fast"]
+            ["Model:\(label)", "Effort:Low", "Speed:Fast"]
         )
         XCTAssertEqual(values["promptDialogStates"] as? [Bool], [false, false, false])
         XCTAssertEqual(values["triggerDialogStates"] as? [Bool], [false])
@@ -293,7 +293,7 @@ extension PromptLibraryWebTests {
             """
             (() => {
               window.__codexDashboard.applyPromptLibrary({
-                version: 3,
+                version: \(PromptLibrarySchema.currentVersion),
                 sections: ['General'],
                 prompts: [{
                   id: 'future-model',

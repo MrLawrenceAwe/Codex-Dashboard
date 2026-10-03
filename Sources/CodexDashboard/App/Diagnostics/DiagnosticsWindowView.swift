@@ -108,7 +108,7 @@ private struct CompatibilityCard: View {
                     .padding(.top, 6)
                 } label: {
                     Label {
-                        Text(report.summary)
+                        Text("Check details")
                             .font(.system(size: 11, weight: .medium))
                     } icon: {
                         Circle()

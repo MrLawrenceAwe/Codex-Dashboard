@@ -5,6 +5,33 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testLegacyCachedAndPendingPresetsMigrateWithoutLosingEdits() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.destroy();
+          const prompt = {id:'saved',name:'Saved',content:'Original',scope:{type:'global'},
+            preset:{model:'gpt-future',reasoningEffort:'light',speed:'fast'},usePreset:true};
+          const base = {version:3,prompts:[prompt],sections:['General']};
+          localStorage.setItem('codex-dashboard.prompt-library', JSON.stringify(base));
+          localStorage.setItem('codex-dashboard.pending-prompt-change.0000000000001.legacy',
+            JSON.stringify({base,desired:{...base,prompts:[{...prompt,content:'Unsaved edit'}]}}));
+        })()
+        """)
+        _ = try await webView.evaluateJavaScript(try InjectionBundle.load().mountExpression)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const pending = JSON.parse(api.exportPendingPromptLibrary());
+          api.acknowledgePendingPromptLibrary(pending);
+          return [pending.version,pending.prompts.length,pending.prompts[0].content,
+            pending.prompts[0].preset.model,pending.prompts[0].preset.reasoningEffort,
+            pending.prompts[0].usePreset,api.exportPendingPromptLibrary() === null];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [PromptLibrarySchema.currentVersion, 1, "Unsaved edit", "gpt-future", "low", true, true])
+    }
+
     func testStalePromptEditPreservesConcurrentPromptAndSectionDeletions() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript("""

@@ -2,8 +2,8 @@ const todoStore = (() => {
   const storageKey = 'codex-dashboard.todos';
   const tagsStorageKey = 'codex-dashboard.todo-tags';
   const legacyTagsStorageKey = 'codex-dashboard.todo-badges';
-  const version = 8;
-  const supportedVersions = new Set([1, 2, 3, 4, 5, 6, 7, version]);
+  const version = 9;
+  const supportedVersions = new Set([1, 2, 3, 4, 5, 6, 7, 8, version]);
   const maximumTags = 8;
   const maximumProjectNameLength = 40;
 
@@ -83,6 +83,9 @@ const todoStore = (() => {
   }
 
   function migrateItem(item, sourceVersion) {
+    if (sourceVersion < 9 && item?.preset?.reasoningEffort === 'light') {
+      item = { ...item, preset: { ...item.preset, reasoningEffort: 'low' } };
+    }
     if (sourceVersion < 7) item = { ...item, thread: item?.chat };
     if (sourceVersion < 4) {
       return { ...item, tags: item?.badges, project: item?.projectBadge };

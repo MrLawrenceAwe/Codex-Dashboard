@@ -54,7 +54,8 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-manage-tags { padding: 6px 9px; border: 1px solid var(--todo-line); border-radius: 6px; background: var(--todo-surface); color: var(--todo-muted); font-size: 11px; cursor: pointer; }
 #codex-dashboard-todo-page .todo-manage-tags:hover { background: var(--todo-active); color: var(--todo-text); }
 
-#codex-dashboard-todo-page .todo-add { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto !important; width: 100% !important; align-items: center; gap: 8px; min-height: 46px; margin-top: 28px; padding: 0 !important; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+#codex-dashboard-todo-page .todo-add { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; width: 100% !important; align-items: center; gap: 8px; min-height: 46px; margin-top: 28px; padding: 0 !important; border: 1px solid var(--todo-line-strong); border-radius: 12px; background: var(--todo-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+#codex-dashboard-todo-page .todo-add.has-image { grid-template-columns: auto minmax(0, 1fr) auto !important; }
 #codex-dashboard-todo-page .todo-add-image { position: relative; width: 44px; height: 38px; margin-left: 7px; overflow: visible; border: 1px solid var(--todo-line); border-radius: 7px; background: var(--todo-bg); }
 #codex-dashboard-todo-page .todo-add-image[hidden] { display: none; }
 #codex-dashboard-todo-page .todo-add-image-preview { display: block; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 6px; background: transparent; cursor: zoom-in; }
@@ -63,7 +64,7 @@ html.codex-todo-open aside.app-shell-left-panel { z-index: 2147483645; }
 #codex-dashboard-todo-page .todo-add .todo-add-image [data-todo-new-image-remove]:hover { background: var(--todo-active); color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add-fields { display: grid; min-width: 0; padding: 7px 0; gap: 2px; }
 #codex-dashboard-todo-page .todo-add input,
-#codex-dashboard-todo-page .todo-add textarea { width: 100% !important; max-width: none !important; min-width: 0; box-sizing: border-box; font-size: 14px; border: 0; background: transparent; color: var(--todo-text); }
+#codex-dashboard-todo-page .todo-add textarea { width: 100% !important; max-width: none !important; min-width: 0 !important; box-sizing: border-box; font-size: 14px; border: 0; background: transparent; color: var(--todo-text); }
 #codex-dashboard-todo-page .todo-add input { height: 24px !important; padding: 0 14px; }
 #codex-dashboard-todo-page .todo-add textarea { min-height: 20px; max-height: 96px; padding: 0 14px; resize: vertical; color: var(--todo-muted); font-size: 12px; line-height: 1.45; }
 #codex-dashboard-todo-page .todo-add input::placeholder,

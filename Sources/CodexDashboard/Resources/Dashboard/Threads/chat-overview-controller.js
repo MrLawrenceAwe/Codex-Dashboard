@@ -50,7 +50,7 @@ function createChatOverview({ catalog }) {
   }
 
   function openThread(thread) {
-    closeDashboard();
+    closeChatOverview();
     codexHost.navigateToThread(thread);
   }
 
@@ -90,7 +90,7 @@ function createChatOverview({ catalog }) {
     markAllReadPending = true;
     markAllReadError = '';
     commitDialogError = '';
-    renderDashboard();
+    renderChatOverview();
     try {
       const { available, failedIDs } = codexHost.markThreadsRead(unreadIDs);
       if (!available) {
@@ -110,7 +110,7 @@ function createChatOverview({ catalog }) {
       markAllReadError = 'Codex’s read-state action failed. Try again.';
     } finally {
       markAllReadPending = false;
-      if (!destroyed) renderDashboard();
+      if (!destroyed) renderChatOverview();
     }
   }
 
@@ -121,18 +121,18 @@ function createChatOverview({ catalog }) {
     );
     if (!thread) {
       commitDialogError = 'No idle chat is available for this project.';
-      renderDashboard();
+      renderChatOverview();
       return;
     }
-    closeDashboard();
+    closeChatOverview();
     const result = await codexHost.openCommitDialog(thread);
     if (result.opened) return;
     commitDialogError = result.reason;
     dashboardNavigation.openPage(chatOverview);
-    renderDashboard();
+    renderChatOverview();
   }
 
-  function renderDashboard() {
+  function renderChatOverview() {
     cancelScheduledRender();
     const state = deriveViewState();
     if (state.unreadCount === 0) markAllReadError = '';
@@ -163,7 +163,7 @@ function createChatOverview({ catalog }) {
     if (renderFrame !== undefined) return;
     renderFrame = requestAnimationFrame(() => {
       renderFrame = undefined;
-      renderDashboard();
+      renderChatOverview();
     });
     // WebKit may heavily throttle animation frames for an occluded renderer.
     // Keep state updates timely there without affecting the normal visible-frame
@@ -173,7 +173,7 @@ function createChatOverview({ catalog }) {
       cancelAnimationFrame(renderFrame);
       renderFrame = undefined;
       renderFallbackTimer = undefined;
-      renderDashboard();
+      renderChatOverview();
     }, 100);
   }
 
@@ -217,11 +217,11 @@ function createChatOverview({ catalog }) {
         filterMode = nextFilterMode;
         visibleLimit = pageSize;
         savePreferences();
-        renderDashboard();
+        renderChatOverview();
       },
       onLoadMore: () => {
         visibleLimit += pageSize;
-        renderDashboard();
+        renderChatOverview();
       },
       onListClick: (event) => {
         const projectIndicators = event.target.closest('[data-project-indicators]');
@@ -232,7 +232,7 @@ function createChatOverview({ catalog }) {
           else hiddenChangeIndicatorPaths.add(projectPath);
           commitDialogError = '';
           savePreferences();
-          renderDashboard();
+          renderChatOverview();
           return;
         }
         const projectCommit = event.target.closest('[data-project-commit]');
@@ -247,7 +247,7 @@ function createChatOverview({ catalog }) {
           if (collapsedProjectPaths.has(projectPath)) collapsedProjectPaths.delete(projectPath);
           else collapsedProjectPaths.add(projectPath);
           savePreferences();
-          renderDashboard();
+          renderChatOverview();
           return;
         }
         openThreadFromEvent(event);
@@ -265,15 +265,15 @@ function createChatOverview({ catalog }) {
     if (thread) openThread(thread);
   }
 
-  function openDashboard() {
+  function openChatOverview() {
     if (!pageState.open()) return;
     if (unreadState.syncUnread()) viewNeedsRender = true;
-    if (viewNeedsRender) renderDashboard();
+    if (viewNeedsRender) renderChatOverview();
     else chatOverviewView.updateSidebarStatus(deriveViewState());
     unreadState.scheduleUnreadSync(1500);
   }
 
-  function closeDashboard() {
+  function closeChatOverview() {
     pageState.close();
     unreadState.scheduleUnreadSync();
   }
@@ -316,8 +316,8 @@ function createChatOverview({ catalog }) {
     syncInterruptedSidebarMarkers: () => threadInterruptionIndicators.applyThreads(currentThreads()),
     syncUnread: unreadState.syncUnread,
     destroy,
-    open: openDashboard,
-    close: closeDashboard,
+    open: openChatOverview,
+    close: closeChatOverview,
     isOpen: pageState.isOpen,
     applyThreads,
   };

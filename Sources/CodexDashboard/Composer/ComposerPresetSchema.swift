@@ -4,7 +4,7 @@ enum ComposerPresetSchema {
     static let defaultModel = "gpt-6.1-sol"
     static let defaultReasoningEffort = "medium"
     static let defaultSpeed = "standard"
-    static let reasoningEfforts = ["light", "medium", "high", "xhigh", "max", "ultra"]
+    static let reasoningEfforts = ["low", "medium", "high", "xhigh", "max", "ultra"]
     static let speeds = ["standard", "fast"]
 
     static var javascriptDeclaration: String {

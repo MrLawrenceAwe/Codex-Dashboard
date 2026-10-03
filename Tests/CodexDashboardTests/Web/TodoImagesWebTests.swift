@@ -5,6 +5,48 @@ import XCTest
 
 @MainActor
 final class TodoImagesWebTests: SerializedDashboardWebTestCase {
+    func testComposerCSSOverridesHostStylesAndTracksImageDraft() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: DashboardWebTestHarness.basicTodoHTML,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.openTodos();
+          const style = document.createElement('style');
+          style.textContent = 'form {display:flex!important;width:20px!important;padding:30px!important}'
+            + 'input {width:20px!important;max-width:20px!important;min-width:20px!important}'
+            + 'button[type=submit] {width:20px!important}';
+          document.head.append(style);
+          const form = document.querySelector('[data-todo-form]');
+          const title = form.querySelector('[data-todo-new-title]');
+          const columns = () => getComputedStyle(form).gridTemplateColumns.split(' ').length;
+          const before = columns();
+          const nativeReader = window.FileReader;
+          window.FileReader = class {
+            constructor() { this.listeners = {}; }
+            addEventListener(type, handler) { this.listeners[type] = handler; }
+            readAsDataURL() {
+              this.result = 'data:image/png;base64,AA==';
+              this.listeners.load(); this.listeners.loadend();
+            }
+          };
+          try {
+            const event = new Event('paste', {bubbles:true,cancelable:true});
+            Object.defineProperty(event,'clipboardData',{value:{files:[new File([1],'draft.png',{type:'image/png'})]}});
+            title.dispatchEvent(event);
+          } finally { window.FileReader = nativeReader; }
+          const withImage = columns();
+          form.querySelector('[data-todo-new-image-remove]').click();
+          const rules = getComputedStyle(form);
+          return [rules.display,rules.padding,before,withImage,columns(),
+            getComputedStyle(title).maxWidth,getComputedStyle(title).minWidth,
+            form.style.getPropertyValue('display'),form.style.getPropertyValue('grid-template-columns')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["grid", "0px", 2, 3, 2, "none", "0px", "", ""])
+    }
+
     func testOlderImageReadCannotReplaceNewerPaste() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: DashboardWebTestHarness.basicTodoHTML,
