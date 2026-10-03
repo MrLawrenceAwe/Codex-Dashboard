@@ -46,14 +46,14 @@ enum DashboardWebTestHarness {
             )
         }
         let injection = try InjectionBundle.load()
-        let expression = trackTodoSaves ? trackedTodoInjection(injection) : injection.mountExpression
+        let expression = trackTodoSaves ? try trackedTodoInjection(injection) : injection.mountExpression
         _ = try await webView.evaluateJavaScript(expression)
         return webView
     }
 
     // Observe the real persistence promises without exposing a test API in production.
-    static func trackedTodoInjection(_ injection: InjectionBundle) -> String {
-        injection.mountExpression.replacingOccurrences(of: "function createTodoList({ threadReferencesForProject, findThread }) {", with: """
+    static func trackedTodoInjection(_ injection: InjectionBundle) throws -> String {
+        let trackedStore = try instrumentSource(injection.mountExpression, anchor: "function createTodoList({ threadReferencesForProject, findThread }) {", replacement: """
         window.__todoStoreForTests = todoStore;
         window.__todoImageStoreForTests = todoImageStore;
         const pendingTodoSaves = new Set();
@@ -69,7 +69,8 @@ enum DashboardWebTestHarness {
           await Promise.resolve();
         };
         function createTodoList({ threadReferencesForProject, findThread }) {
-        """).replacingOccurrences(of: "async function commitItems(nextItems, nextTags = availableTags) {", with: """
+        """)
+        return try instrumentSource(trackedStore, anchor: "async function commitItems(nextItems, nextTags = availableTags) {", replacement: """
         function commitItems(nextItems, nextTags = availableTags) {
           const save = commitTodoItems(nextItems, nextTags);
           pendingTodoSaves.add(save);
@@ -78,6 +79,16 @@ enum DashboardWebTestHarness {
         }
         async function commitTodoItems(nextItems, nextTags) {
         """)
+    }
+
+    static func instrumentSource(_ source: String, anchor: String, replacement: String) throws -> String {
+        let matches = source.components(separatedBy: anchor).count - 1
+        guard matches == 1 else {
+            throw NSError(domain: "DashboardWebTestInstrumentation", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "Expected one instrumentation anchor, found \(matches): \(anchor)"])
+        }
+        return source.replacingOccurrences(of: anchor, with: replacement)
     }
 
     static func todoWebView(
@@ -121,7 +132,7 @@ enum DashboardWebTestHarness {
         )
     }
 
-    static func taskDashboardWebView() async throws -> WKWebView {
+    static func chatOverviewWebView() async throws -> WKWebView {
         try await mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
           <aside role="navigation"><button class="sidebar-item">New chat</button></aside>

@@ -46,7 +46,7 @@ const codexHost = {
     const selectedProject = codexUIContracts.activeComposerProject();
     if (selectedProject) return selectedProject;
     const thread = findThread(codexUIContracts.activeComposerThreadID());
-    const projectPath = String(thread?.projectPath || '').trim();
+    const projectPath = String(thread?.checkoutPath || '').trim();
     if (!projectPath) return null;
     return {
       name: String(thread?.projectName || '').trim() || projectPath.split('/').filter(Boolean).at(-1) || projectPath,

@@ -72,7 +72,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let actions = coordinator.dashboardActions
         let openDashboard = actionItem(
             DashboardActionPresentation.openTitle,
-            action: #selector(openTaskDashboard)
+            action: #selector(openChatOverview)
         )
         openDashboard.isEnabled = actions.canOpen
         menu.addItem(openDashboard)
@@ -157,8 +157,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         showDiagnostics()
     }
 
-    @objc private func openTaskDashboard() {
-        Task { await coordinator.openTaskDashboard() }
+    @objc private func openChatOverview() {
+        Task { await coordinator.openChatOverview() }
     }
 
     @objc private func restartAndEnable() {

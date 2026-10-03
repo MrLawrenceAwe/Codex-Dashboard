@@ -12,9 +12,9 @@ struct UnreadStateUpdate: Sendable {
 
 actor ThreadSnapshotService {
     private let catalogProvider: any ThreadCatalogProviding
-    private let workingTreeStatusProvider: any WorkingTreeStatusProviding
+    private let projectGitStatusProvider: any ProjectGitStatusProviding
     private let unreadThreadIDProvider: any UnreadThreadIDProviding
-    private var workingTreeStatuses: [String: WorkingTreeStatus] = [:]
+    private var projectGitStatuses: [String: ProjectGitStatus] = [:]
     private var unreadThreadIDs: Set<String> = []
     private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
@@ -23,11 +23,11 @@ actor ThreadSnapshotService {
 
     init(
         catalogProvider: any ThreadCatalogProviding,
-        workingTreeStatusProvider: any WorkingTreeStatusProviding,
+        projectGitStatusProvider: any ProjectGitStatusProviding,
         unreadThreadIDProvider: any UnreadThreadIDProviding
     ) {
         self.catalogProvider = catalogProvider
-        self.workingTreeStatusProvider = workingTreeStatusProvider
+        self.projectGitStatusProvider = projectGitStatusProvider
         self.unreadThreadIDProvider = unreadThreadIDProvider
     }
 
@@ -54,7 +54,7 @@ actor ThreadSnapshotService {
         hasLoadedSnapshot = true
         let threads = catalog.threads.map { source in
             var thread = source
-            thread.workingTreeStatus = workingTreeStatuses[thread.registeredProjectPath ?? ""] ?? .notRepository
+            thread.projectGitStatus = projectGitStatuses[thread.projectGroupPath ?? ""] ?? .notRepository
             return thread
         }
         return ThreadSnapshotResult(
@@ -93,11 +93,11 @@ actor ThreadSnapshotService {
         )
     }
 
-    func updateWorkingTreeStatuses(
+    func updateProjectGitStatuses(
         in threads: [ThreadSummary],
         projectPaths requestedPaths: Set<String>? = nil
-    ) async -> [String: WorkingTreeStatus]? {
-        let allProjectPaths = Set(threads.compactMap(\.registeredProjectPath))
+    ) async -> [String: ProjectGitStatus]? {
+        let allProjectPaths = Set(threads.compactMap(\.projectGroupPath))
         // WorkingTreeChangeMonitor already coalesces bursts. Do not discard the final event:
         // it may be the commit that clears the project's change indicator.
         let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
@@ -110,8 +110,8 @@ actor ThreadSnapshotService {
             requestGenerations[path] = generation
         }
 
-        let policy: WorkingTreeStatusRefreshPolicy = requestedPaths == nil ? .useCached : .refresh
-        let latestStatuses = await workingTreeStatusProvider.loadStatuses(
+        let policy: ProjectGitStatusRefreshPolicy = requestedPaths == nil ? .useCached : .refresh
+        let latestStatuses = await projectGitStatusProvider.loadStatuses(
             for: projectPaths,
             policy: policy
         )
@@ -122,12 +122,12 @@ actor ThreadSnapshotService {
         guard !currentResults.isEmpty else { return nil }
 
         if requestedPaths == nil {
-            workingTreeStatuses = workingTreeStatuses.filter { allProjectPaths.contains($0.key) }
+            projectGitStatuses = projectGitStatuses.filter { allProjectPaths.contains($0.key) }
             workingTreeGenerationByPath = workingTreeGenerationByPath.filter { allProjectPaths.contains($0.key) }
         }
-        let changedResults = currentResults.filter { workingTreeStatuses[$0.key] != $0.value }
+        let changedResults = currentResults.filter { projectGitStatuses[$0.key] != $0.value }
         for (path, status) in currentResults {
-            workingTreeStatuses[path] = status
+            projectGitStatuses[path] = status
         }
         return changedResults.isEmpty ? nil : changedResults
     }

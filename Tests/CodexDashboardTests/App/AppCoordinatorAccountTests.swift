@@ -188,7 +188,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: CodexAccountManager(
                 metadataURL: directory.appendingPathComponent("accounts.json"),
@@ -219,7 +219,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: CodexAccountManager(
                 metadataURL: directory.appendingPathComponent("accounts.json"),
@@ -249,7 +249,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: CodexAccountManager(
                 metadataURL: directory.appendingPathComponent("accounts.json"),
@@ -296,7 +296,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
@@ -330,7 +330,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
@@ -380,7 +380,7 @@ extension AppCoordinatorTests {
         ])
         let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
@@ -430,7 +430,7 @@ extension AppCoordinatorTests {
         let runtime = StubDashboardRuntime(codexIsRunning: true)
         let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: StubAccountUsageProvider(),
@@ -475,7 +475,7 @@ extension AppCoordinatorTests {
                 ThreadCatalog(threads: [.fixture(runState: .idle)], totalThreadCount: 1),
                 ThreadCatalog(threads: [.fixture(runState: .running)], totalThreadCount: 1),
             ]),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: usageProvider,
@@ -528,7 +528,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             compatibilityChecker: StubCompatibilityChecker(checks: []),
             accountManager: accountManager,
@@ -593,7 +593,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             accountManager: accountManager,
             accountUsageProvider: provider,

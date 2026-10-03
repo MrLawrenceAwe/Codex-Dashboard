@@ -1,7 +1,7 @@
-function createTaskDashboard({ catalog }) {
+function createChatOverview({ catalog }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
   const currentThreads = catalog.currentThreads;
-  const storedPreferences = taskDashboardPreferences.loadPreferences();
+  const storedPreferences = chatOverviewPreferences.loadPreferences();
   let filterMode = storedPreferences.filterMode;
   const pageSize = 10;
   let visibleLimit = pageSize;
@@ -9,8 +9,8 @@ function createTaskDashboard({ catalog }) {
   let renderFrame;
   let renderFallbackTimer;
   const pageState = createPageVisibilityController({
-    pageID: dashboardElements.elementIDs.taskPage,
-    navigationID: dashboardElements.elementIDs.taskNavButton,
+    pageID: dashboardElements.elementIDs.chatOverviewPage,
+    navigationID: dashboardElements.elementIDs.chatOverviewNavButton,
     rootClass: 'codex-dashboard-open',
   });
   let viewNeedsRender = true;
@@ -38,7 +38,7 @@ function createTaskDashboard({ catalog }) {
   const isCompletionTickVisible = completionIndicators.isVisible;
 
   function savePreferences() {
-    taskDashboardPreferences.savePreferences({
+    chatOverviewPreferences.savePreferences({
       filterMode,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
@@ -46,7 +46,7 @@ function createTaskDashboard({ catalog }) {
   }
 
   function deriveViewState() {
-    return taskDashboardQuery.summarizeActivity(currentThreads(), isThreadUnread, hiddenChangeIndicatorPaths);
+    return chatOverviewQuery.summarizeActivity(currentThreads(), isThreadUnread, hiddenChangeIndicatorPaths);
   }
 
   function openThread(thread) {
@@ -117,7 +117,7 @@ function createTaskDashboard({ catalog }) {
   async function openCommitDialogForProject(projectPath) {
     commitDialogError = '';
     const thread = currentThreads().find(
-      (item) => item.runState !== 'running' && String(item.registeredProjectPath || '').trim() === projectPath,
+      (item) => item.runState !== 'running' && String(item.projectGroupPath || '').trim() === projectPath,
     );
     if (!thread) {
       commitDialogError = 'No idle chat is available for this project.';
@@ -128,7 +128,7 @@ function createTaskDashboard({ catalog }) {
     const result = await codexHost.openCommitDialog(thread);
     if (result.opened) return;
     commitDialogError = result.reason;
-    dashboardNavigation.openPage(taskDashboard);
+    dashboardNavigation.openPage(chatOverview);
     renderDashboard();
   }
 
@@ -136,7 +136,7 @@ function createTaskDashboard({ catalog }) {
     cancelScheduledRender();
     const state = deriveViewState();
     if (state.unreadCount === 0) markAllReadError = '';
-    const rendered = taskDashboardView.render({
+    const rendered = chatOverviewView.render({
       threads: currentThreads(),
       filterMode,
       visibleItemLimit: visibleLimit,
@@ -183,13 +183,13 @@ function createTaskDashboard({ catalog }) {
       return;
     }
     viewNeedsRender = true;
-    taskDashboardView.updateSidebarStatus(deriveViewState());
+    chatOverviewView.updateSidebarStatus(deriveViewState());
   }
 
-  function mountTaskNavigationButton() {
-    if (document.getElementById(dashboardElements.elementIDs.taskNavButton)) return true;
+  function mountChatOverviewNavigationButton() {
+    if (document.getElementById(dashboardElements.elementIDs.chatOverviewNavButton)) return true;
     if (!mountDashboardNavigationButton({
-      id: dashboardElements.elementIDs.taskNavButton,
+      id: dashboardElements.elementIDs.chatOverviewNavButton,
       label: 'Chat overview',
       markup: `
       <div class="dashboard-nav-copy">
@@ -202,15 +202,15 @@ function createTaskDashboard({ catalog }) {
         <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread chats" hidden>0</strong>
       </div>`,
     })) return false;
-    taskDashboardView.updateSidebarStatus(deriveViewState());
+    chatOverviewView.updateSidebarStatus(deriveViewState());
     pageState.applyVisibility();
     return true;
   }
 
-  function mountTaskDashboardPage() {
-    if (document.getElementById(dashboardElements.elementIDs.taskPage)) return true;
+  function mountChatOverviewPage() {
+    if (document.getElementById(dashboardElements.elementIDs.chatOverviewPage)) return true;
     viewNeedsRender = true;
-    const mounted = taskDashboardPage.mount({
+    const mounted = chatOverviewPage.mount({
       onMarkAllRead: () => { void markAllAsRead(); },
       onFilter: (nextFilterMode) => {
         if (filterMode === nextFilterMode) return;
@@ -269,7 +269,7 @@ function createTaskDashboard({ catalog }) {
     if (!pageState.open()) return;
     if (unreadState.syncUnread()) viewNeedsRender = true;
     if (viewNeedsRender) renderDashboard();
-    else taskDashboardView.updateSidebarStatus(deriveViewState());
+    else chatOverviewView.updateSidebarStatus(deriveViewState());
     unreadState.scheduleUnreadSync(1500);
   }
 
@@ -308,8 +308,8 @@ function createTaskDashboard({ catalog }) {
 
 
   return {
-    mountNavigation: mountTaskNavigationButton,
-    mountPage: mountTaskDashboardPage,
+    mountNavigation: mountChatOverviewNavigationButton,
+    mountPage: mountChatOverviewPage,
     applyVisibility: pageState.applyVisibility,
     startMonitoring: unreadState.startMonitoring,
     requestRender,

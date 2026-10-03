@@ -39,26 +39,26 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const tagPicker = form.querySelector('[data-todo-new-tag]');
               const unavailableBeforeCreation = tagPicker.options.length === 1;
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const tagDialog = document.querySelector('[data-todo-tag-dialog]');
               tagDialog.querySelector('[data-todo-tag-dialog-close]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const closesFromControl = !tagDialog.open;
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               tagDialog.querySelector('[data-todo-tag-name]').value = 'Work';
               tagDialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               tagPicker.value = 'Work';
               tagPicker.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               const renderedTag = document.querySelector('[data-todo-id] .todo-tag').textContent.trim();
               document.querySelector('[data-todo-tag-remove]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [unavailableBeforeCreation, closesFromControl, JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')), stored.tags, renderedTag, JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0].tags];
             })()
             """
@@ -86,17 +86,17 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const form = document.querySelector('[data-todo-form]');
               form.querySelector('[data-todo-new-title]').value = 'Follow up';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Important';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const picker = document.querySelector('[data-todo-id] [data-todo-tag]');
               picker.value = 'Important';
               picker.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [stored.tags, document.querySelector('[data-todo-id] .todo-tag').textContent.trim()];
             })()
@@ -120,11 +120,11 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const tag = 'A'.repeat(80);
               window.__codexDashboard.openTodos();
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const input = document.querySelector('[data-todo-tag-name]');
               input.value = tag;
               input.form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [input.maxLength, JSON.parse(localStorage.getItem('codex-dashboard.todo-tags'))[0]];
             })()
             """
@@ -147,21 +147,21 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-tag]').value = 'Work';
               form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const deleteButton = dialog.querySelector('[data-todo-managed-tag-remove="Work"]');
               const accessible = deleteButton.getAttribute('aria-label');
               deleteButton.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
                 accessible,
                 JSON.parse(localStorage.getItem('codex-dashboard.todo-tags')),
@@ -191,26 +191,26 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openTodos();
               const form = document.querySelector('[data-todo-form]');
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-tag]').value = 'Work';
               form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               form.querySelector('[data-todo-new-title]').value = 'Send update';
               form.requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const renameButton = dialog.querySelector('[data-todo-managed-tag-edit="Work"]');
               const accessible = renameButton.getAttribute('aria-label');
               renameButton.click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const name = dialog.querySelector('[data-todo-tag-name]');
               const savesRename = dialog.querySelector('[data-todo-tag-form] button').textContent === 'Save tag';
               name.value = 'Client';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [
                 accessible,
                 savesRename,
@@ -241,13 +241,13 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
             (async () => {
               window.__codexDashboard.openTodos();
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               const rect = dialog.getBoundingClientRect();
               const centered = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2) < 1
                 && Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2) < 1;
               dialog.querySelector('[data-todo-tag-dialog-close]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               return [dialog.parentElement.id, centered, !dialog.open];
             })()
             """
@@ -274,7 +274,7 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const empty = dialog.querySelector('.todo-tag-empty')?.textContent.includes('No tags yet');
               dialog.querySelector('[data-todo-tag-name]').value = 'A long tag name that should stay readable';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const row = dialog.querySelector('.todo-managed-tag');
               const details = [row.querySelector('.todo-managed-tag-name').textContent.trim(),
                 row.querySelector('.todo-managed-tag-usage').textContent.trim(),
@@ -324,22 +324,22 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const add = async (title, projectID = '', tag = '') => {
                 form.querySelector('[data-todo-new-project]').value = projectID;
                 form.querySelector('[data-todo-new-project]').dispatchEvent(new Event('change', { bubbles: true }));
-                await window.__waitForTodoSaves?.();
+                await window.__waitForTodoSaves();
                 if (tag) {
                   form.querySelector('[data-todo-new-tag]').value = tag;
                   form.querySelector('[data-todo-new-tag]').dispatchEvent(new Event('change', { bubbles: true }));
-                  await window.__waitForTodoSaves?.();
+                  await window.__waitForTodoSaves();
                 }
                 form.querySelector('[data-todo-new-title]').value = title;
                 form.requestSubmit();
-                await window.__waitForTodoSaves?.();
+                await window.__waitForTodoSaves();
               };
               document.querySelector('[data-todo-manage-tags]').click();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const dialog = document.querySelector('[data-todo-tag-dialog]');
               dialog.querySelector('[data-todo-tag-name]').value = 'Work';
               dialog.querySelector('[data-todo-tag-form]').requestSubmit();
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               await add('Project A work', 'project-a', 'Work');
               await add('Project B task', 'project-b');
               await add('Unassigned work', '', 'Work');
@@ -350,19 +350,19 @@ final class TodoTagsWebTests: SerializedDashboardWebTestCase {
               const tagOptions = [...tag.options].map((option) => option.textContent);
               project.value = 'project-a';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const projectOnly = titles();
               tag.value = 'Work';
               tag.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const combined = titles();
               project.value = '';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const tagOnly = titles();
               project.value = '__none__';
               project.dispatchEvent(new Event('change', { bubbles: true }));
-              await window.__waitForTodoSaves?.();
+              await window.__waitForTodoSaves();
               const unassignedOnly = titles();
               return [projectOptions, tagOptions, projectOnly, combined, tagOnly, unassignedOnly];
             })()

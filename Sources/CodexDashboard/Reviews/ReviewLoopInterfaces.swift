@@ -33,7 +33,7 @@ protocol ReviewLoopDriving: Sendable {
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
     func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String
     func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
-    func stopThread(_ threadID: String) async throws
+    func interruptLatestTurn(_ threadID: String) async throws
     func readThread(_ threadID: String) async throws -> ReviewThreadState
 }
 

@@ -11,36 +11,36 @@ struct StubCatalogProvider: ThreadCatalogProviding {
     }
 }
 
-struct StubWorkingTreeStatusProvider: WorkingTreeStatusProviding {
+struct StubProjectGitStatusProvider: ProjectGitStatusProviding {
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) async -> [String: WorkingTreeStatus] {
+        policy: ProjectGitStatusRefreshPolicy
+    ) async -> [String: ProjectGitStatus] {
         [:]
     }
 }
 
-actor MutableWorkingTreeStatusProvider: WorkingTreeStatusProviding {
-    private var status: WorkingTreeStatus
-    private var policies: [WorkingTreeStatusRefreshPolicy] = []
+actor MutableProjectGitStatusProvider: ProjectGitStatusProviding {
+    private var status: ProjectGitStatus
+    private var policies: [ProjectGitStatusRefreshPolicy] = []
 
-    init(status: WorkingTreeStatus) {
+    init(status: ProjectGitStatus) {
         self.status = status
     }
 
     func loadStatuses(
         for projectPaths: Set<String>,
-        policy: WorkingTreeStatusRefreshPolicy
-    ) -> [String: WorkingTreeStatus] {
+        policy: ProjectGitStatusRefreshPolicy
+    ) -> [String: ProjectGitStatus] {
         policies.append(policy)
         return Dictionary(uniqueKeysWithValues: projectPaths.map { ($0, status) })
     }
 
-    func setStatus(_ status: WorkingTreeStatus) {
+    func setStatus(_ status: ProjectGitStatus) {
         self.status = status
     }
 
-    func latestPolicy() -> WorkingTreeStatusRefreshPolicy? { policies.last }
+    func latestPolicy() -> ProjectGitStatusRefreshPolicy? { policies.last }
     func requestCount() -> Int { policies.count }
 }
 
@@ -385,7 +385,7 @@ final class StubDashboardRuntime: DashboardRuntime {
         if let synchronizationError { throw synchronizationError }
     }
     func disableIntegration() async throws -> DashboardDisableOutcome { .rendererUnavailable }
-    func openTaskDashboard() async {}
+    func openChatOverview() async {}
     func openThread(_ threadID: String) async { openedThreadIDs.append(threadID) }
     func hasActiveSpeechInput() async -> Bool { speechInputIsActive }
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
@@ -405,7 +405,7 @@ extension XCTestCase {
         catalogProvider: any ThreadCatalogProviding = StubCatalogProvider(
             catalog: ThreadCatalog(threads: [], totalThreadCount: 0)
         ),
-        workingTreeStatusProvider: any WorkingTreeStatusProviding = StubWorkingTreeStatusProvider(),
+        projectGitStatusProvider: any ProjectGitStatusProviding = StubProjectGitStatusProvider(),
         unreadThreadIDProvider: any UnreadThreadIDProviding = StubUnreadIDProvider(
             unreadThreadIDs: []
         ),
@@ -433,7 +433,7 @@ extension XCTestCase {
         )
         let coordinator = AppCoordinator(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: workingTreeStatusProvider,
+            projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: unreadThreadIDProvider,
             compatibilityChecker: compatibilityChecker,
             userDefaults: userDefaults,

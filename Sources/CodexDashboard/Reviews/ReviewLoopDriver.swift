@@ -108,7 +108,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return id
     }
 
-    func stopThread(_ threadID: String) async throws {
+    func interruptLatestTurn(_ threadID: String) async throws {
         // Read only the latest turn metadata so stopping also works while the chat
         // is waiting for approval or input, without loading its report.
         let page = try await request("thread/turns/list", [

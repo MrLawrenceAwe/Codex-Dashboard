@@ -4,9 +4,9 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension TaskDashboardWebTests {
+extension ChatOverviewWebTests {
     func testMarkAllAsReadAppearsOnlyOnUnreadFilter() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: true),
         ])
@@ -30,7 +30,7 @@ extension TaskDashboardWebTests {
     }
 
     func testMarkAllAsReadReportsUnavailableHostActionWithoutOpeningTasks() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: true),
         ])
@@ -46,7 +46,7 @@ extension TaskDashboardWebTests {
               document.querySelector('[data-filter="unread"]').click();
               document.querySelector('[data-mark-all-read]').click();
               return [
-                document.querySelector('[data-task-notice]').textContent,
+                document.querySelector('[data-chat-overview-notice]').textContent,
                 document.querySelector('[data-filter-count="unread"]').textContent,
                 window.__unexpectedNavigation,
               ];
@@ -69,13 +69,13 @@ extension TaskDashboardWebTests {
             in: webView
         )
         let notice = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-task-notice]').textContent"
+            "document.querySelector('[data-chat-overview-notice]').textContent"
         ) as? String
         XCTAssertEqual(notice, "")
     }
 
     func testMarkAllAsReadAcknowledgesEveryUnreadThreadIncludingOffSidebar() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: true),
             .fixture(id: "two", isUnread: true),
@@ -127,7 +127,7 @@ extension TaskDashboardWebTests {
             [window.__markedReadIDs.join(','),
              Boolean(window.__unexpectedNavigation),
              document.querySelector('[data-navigation-count]').hidden,
-             document.getElementById('codex-dashboard-task-page').classList.contains('is-open')]
+             document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open')]
             """
         ) as? [Any]
         XCTAssertEqual(result?[0] as? String, "one,two")
@@ -137,7 +137,7 @@ extension TaskDashboardWebTests {
     }
 
     func testMarkAllAsReadAcceptsLiveReadStateWhileSnapshotLags() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: true),
         ])
@@ -174,13 +174,13 @@ extension TaskDashboardWebTests {
             in: webView
         )
         let notice = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-task-notice]').textContent"
+            "document.querySelector('[data-chat-overview-notice]').textContent"
         ) as? String
         XCTAssertEqual(notice, "")
     }
 
     func testMarkAllAsReadClearsStaleSidebarUnreadWhenSavedStateIsRead() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: false),
         ])
@@ -210,13 +210,13 @@ extension TaskDashboardWebTests {
             in: webView
         )
         let notice = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-task-notice]').textContent"
+            "document.querySelector('[data-chat-overview-notice]').textContent"
         ) as? String
         XCTAssertEqual(notice, "")
     }
 
     func testStaleSidebarUnreadObservationExpiresWithoutNewSnapshot() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", isUnread: false),
         ])

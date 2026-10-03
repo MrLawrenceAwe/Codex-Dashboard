@@ -1,10 +1,10 @@
 const threadCatalog = createThreadCatalog();
-const taskDashboard = createTaskDashboard({ catalog: threadCatalog });
+const chatOverview = createChatOverview({ catalog: threadCatalog });
 const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject, findThread: threadCatalog.findThread });
 const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
 const dashboardPages = [
-  { controller: taskDashboard, pageID: dashboardElements.elementIDs.taskPage,
-    navigationID: dashboardElements.elementIDs.taskNavButton },
+  { controller: chatOverview, pageID: dashboardElements.elementIDs.chatOverviewPage,
+    navigationID: dashboardElements.elementIDs.chatOverviewNavButton },
   { controller: todoList, pageID: dashboardElements.elementIDs.todoPage,
     navigationID: dashboardElements.elementIDs.todoNavButton },
   { controller: reviewLoopPage, pageID: dashboardElements.elementIDs.reviewPage,
@@ -28,9 +28,9 @@ const dashboardLifecycle = createDashboardLifecycle({
     promptLibraryButton.scheduleSync();
   },
   syncComposer: promptLibraryButton.scheduleSync,
-  requestRender: taskDashboard.requestRender,
-  syncInterruptedSidebarMarkers: taskDashboard.syncInterruptedSidebarMarkers,
-  syncUnread: taskDashboard.syncUnread,
+  requestRender: chatOverview.requestRender,
+  syncInterruptedSidebarMarkers: chatOverview.syncInterruptedSidebarMarkers,
+  syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
@@ -42,7 +42,7 @@ const dashboardLifecycle = createDashboardLifecycle({
 
 function ensureDashboardMounted() {
   const mounted = dashboardLifecycle.ensureMounted();
-  taskDashboard.startMonitoring();
+  chatOverview.startMonitoring();
   return mounted;
 }
 
@@ -57,13 +57,13 @@ window.__codexDashboard = {
     threadCatalog.clear();
     delete window.__codexDashboard;
   },
-  open: () => dashboardNavigation.openPage(taskDashboard),
+  open: () => dashboardNavigation.openPage(chatOverview),
   isOpen: dashboardNavigation.isOpen,
   openReviews: () => dashboardNavigation.openPage(reviewLoopPage),
   openTodos: () => dashboardNavigation.openPage(todoList),
   applyThreads(nextThreads) {
     threadCatalog.applyThreads(nextThreads);
-    taskDashboard.applyThreads();
+    chatOverview.applyThreads();
     todoList.refreshThreadOptions();
     todoList.refreshSidebarActions();
     return true;

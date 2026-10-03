@@ -4,14 +4,14 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension TaskDashboardWebTests {
+extension ChatOverviewWebTests {
     func testRemovedProjectHasNoChangeIndicatorAndAliasesShareOneGroup() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
-        var removed = ThreadSummary.fixture(id: "removed", projectName: "Other chats", projectPath: "/tmp/removed", isUnread: true, workingTreeStatus: .hasChanges)
-        removed.registeredProjectPath = nil
-        var alias = ThreadSummary.fixture(id: "alias", projectName: "Mail Verify", projectPath: "/tmp/old-name", isUnread: true, workingTreeStatus: .hasChanges)
-        alias.registeredProjectPath = "/tmp/mail"
-        let current = ThreadSummary.fixture(id: "current", projectName: "Mail Verify", projectPath: "/tmp/mail", isUnread: true, workingTreeStatus: .hasChanges)
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        var removed = ThreadSummary.fixture(id: "removed", projectName: "Other chats", checkoutPath: "/tmp/removed", isUnread: true, projectGitStatus: .uncommittedChanges)
+        removed.projectGroupPath = nil
+        var alias = ThreadSummary.fixture(id: "alias", projectName: "Mail Verify", checkoutPath: "/tmp/old-name", isUnread: true, projectGitStatus: .uncommittedChanges)
+        alias.projectGroupPath = "/tmp/mail"
+        let current = ThreadSummary.fixture(id: "current", projectName: "Mail Verify", checkoutPath: "/tmp/mail", isUnread: true, projectGitStatus: .uncommittedChanges)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [removed, alias, current])
         let result = try await webView.evaluateJavaScript("""
         (() => {
@@ -33,11 +33,11 @@ extension TaskDashboardWebTests {
     }
 
     func testUnpushedCommitsAppearInLocalChangesWithPushAction() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "unpushed", projectPath: "/tmp/unpushed", workingTreeStatus: .unpushedCommits),
-            .fixture(id: "both", projectPath: "/tmp/both", workingTreeStatus: .hasChangesAndUnpushedCommits),
-            .fixture(id: "clean", projectPath: "/tmp/clean", workingTreeStatus: .clean),
+            .fixture(id: "unpushed", checkoutPath: "/tmp/unpushed", projectGitStatus: .unpushedCommits),
+            .fixture(id: "both", checkoutPath: "/tmp/both", projectGitStatus: .uncommittedChangesAndUnpushedCommits),
+            .fixture(id: "clean", checkoutPath: "/tmp/clean", projectGitStatus: .clean),
         ])
         let result = try await webView.evaluateJavaScript("""
         (() => {
@@ -70,16 +70,16 @@ extension TaskDashboardWebTests {
                 title: "First changed project thread",
                 preview: "First",
                 projectName: "Changed Project",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: 3,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             ThreadSummary.fixture(
                 id: "changed-project-thread-two",
                 title: "Second changed project thread",
                 preview: "Second",
                 projectName: "Changed Project",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: 2
             ),
             ThreadSummary.fixture(
@@ -87,7 +87,7 @@ extension TaskDashboardWebTests {
                 title: "Clean project thread",
                 preview: "Clean",
                 projectName: "Clean Project",
-                projectPath: "/tmp/clean-project",
+                checkoutPath: "/tmp/clean-project",
                 recencyEpochMillis: 1
             ),
         ]
@@ -119,14 +119,14 @@ extension TaskDashboardWebTests {
     }
 
     func testChangedProjectsDoesNotOfferLoadMoreForAdditionalTasksInOneProject() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let threads = (0..<11).map { index in
             ThreadSummary.fixture(
                 id: "changed-project-thread-\(index)",
                 projectName: "Changed Project",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: Int64(11 - index),
-                workingTreeStatus: index == 0 ? .hasChanges : .clean
+                projectGitStatus: index == 0 ? .uncommittedChanges : .clean
             )
         }
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -160,7 +160,7 @@ extension TaskDashboardWebTests {
         )
         let projectPath = "/tmp/muted-project"
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(projectPath: projectPath, workingTreeStatus: .hasChanges),
+            .fixture(checkoutPath: projectPath, projectGitStatus: .uncommittedChanges),
         ])
 
         let result = try await webView.evaluateJavaScript(
@@ -224,8 +224,8 @@ extension TaskDashboardWebTests {
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "idle-thread",
-                projectPath: "/tmp/changed-project",
-                workingTreeStatus: .hasChanges
+                checkoutPath: "/tmp/changed-project",
+                projectGitStatus: .uncommittedChanges
             ),
         ])
 
@@ -243,9 +243,9 @@ extension TaskDashboardWebTests {
         let state = try await webView.evaluateJavaScript(
             """
             [
-              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
-              document.querySelector('[data-task-notice]').hidden,
-              document.querySelector('[data-task-notice]').textContent,
+              document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
+              document.querySelector('[data-chat-overview-notice]').hidden,
+              document.querySelector('[data-chat-overview-notice]').textContent,
             ]
             """
         ) as? [Any]
@@ -315,31 +315,31 @@ extension TaskDashboardWebTests {
             ThreadSummary.fixture(
                 id: "running-thread",
                 title: "Newer running thread",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: 5,
                 runState: .running,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             ThreadSummary.fixture(
                 id: "off-sidebar-idle-thread",
                 title: "Newest idle thread not mounted in the sidebar",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: 4,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             ThreadSummary.fixture(
                 id: "idle-thread",
                 title: "Older idle thread",
-                projectPath: "/tmp/changed-project",
+                checkoutPath: "/tmp/changed-project",
                 recencyEpochMillis: 2,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
             ThreadSummary.fixture(
                 id: "clean-thread",
                 title: "Clean project thread",
-                projectPath: "/tmp/clean-project",
+                checkoutPath: "/tmp/clean-project",
                 recencyEpochMillis: 1,
-                workingTreeStatus: .clean
+                projectGitStatus: .clean
             ),
         ]
         let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
@@ -364,7 +364,7 @@ extension TaskDashboardWebTests {
               document.documentElement.dataset.selectedThread,
               document.documentElement.dataset.gitMenuCount,
               document.documentElement.dataset.commitOpened,
-              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
+              document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
             ]
             """
         ) as? [Any]
@@ -427,7 +427,7 @@ extension TaskDashboardWebTests {
             """,
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "idle-thread", projectPath: "/tmp/changed", workingTreeStatus: .hasChanges),
+            .fixture(id: "idle-thread", checkoutPath: "/tmp/changed", projectGitStatus: .uncommittedChanges),
         ])
 
         _ = try await webView.evaluateJavaScript(
@@ -449,7 +449,7 @@ extension TaskDashboardWebTests {
             """
             [
               document.documentElement.dataset.commitOpened,
-              document.getElementById('codex-dashboard-task-page').classList.contains('is-open'),
+              document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
             ]
             """
         ) as? [Any]
@@ -458,13 +458,13 @@ extension TaskDashboardWebTests {
     }
 
     func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {
-        let webView = try await DashboardWebTestHarness.taskDashboardWebView()
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "running-dirty",
-                projectPath: "/tmp/running-dirty",
+                checkoutPath: "/tmp/running-dirty",
                 runState: .running,
-                workingTreeStatus: .hasChanges
+                projectGitStatus: .uncommittedChanges
             ),
         ])
 

@@ -46,7 +46,7 @@ extension AppCoordinatorTests {
         )
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(threads: [], totalThreadCount: 0)),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             runtimeFactory: { _ in runtime }
         )
@@ -66,7 +66,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: StubAccountUsageProvider(),
@@ -88,7 +88,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 4)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: [thread.id]),
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
@@ -109,7 +109,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: unreadThreadIDProvider,
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
@@ -121,36 +121,36 @@ extension AppCoordinatorTests {
     }
 
     func testActivationRefreshUsesWorkingTreeCache() async {
-        let thread = ThreadSummary.fixture(id: "thread-1", workingTreeStatus: .notRepository)
-        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
+        let thread = ThreadSummary.fixture(id: "thread-1", projectGitStatus: .notRepository)
+        let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .uncommittedChanges)
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: workingTreeStatusProvider,
+            projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.refreshAfterActivation()
-        XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .hasChanges)
+        XCTAssertEqual(coordinator.threads.first?.projectGitStatus, .uncommittedChanges)
 
-        await workingTreeStatusProvider.setStatus(.clean)
+        await projectGitStatusProvider.setStatus(.clean)
         await coordinator.refreshAfterActivation()
-        XCTAssertEqual(coordinator.threads.first?.workingTreeStatus, .clean)
-        let latestPolicy = await workingTreeStatusProvider.latestPolicy()
+        XCTAssertEqual(coordinator.threads.first?.projectGitStatus, .clean)
+        let latestPolicy = await projectGitStatusProvider.latestPolicy()
         XCTAssertEqual(latestPolicy, .useCached)
     }
 
     func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsAvailable() async {
         let thread = ThreadSummary.fixture(id: "thread-1")
-        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .clean)
+        let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .clean)
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: workingTreeStatusProvider,
+            projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: true,
             runtimeFactory: { _ in StubDashboardRuntime() }
@@ -158,7 +158,7 @@ extension AppCoordinatorTests {
 
         await coordinator.refreshAfterActivation()
 
-        let requestCount = await workingTreeStatusProvider.requestCount()
+        let requestCount = await projectGitStatusProvider.requestCount()
         XCTAssertEqual(requestCount, 1)
     }
 
@@ -184,26 +184,26 @@ extension AppCoordinatorTests {
     func testNewlyDiscoveredProjectGetsImmediateWorkingTreeRefresh() async throws {
         let thread = ThreadSummary.fixture(
             id: "new-project",
-            projectPath: "/tmp/new-project",
-            workingTreeStatus: .notRepository
+            checkoutPath: "/tmp/new-project",
+            projectGitStatus: .notRepository
         )
-        let workingTreeStatusProvider = MutableWorkingTreeStatusProvider(status: .hasChanges)
+        let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .uncommittedChanges)
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: workingTreeStatusProvider,
+            projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
         await coordinator.synchronizeDashboard()
         try await waitUntil {
-            await workingTreeStatusProvider.requestCount() == 1
-                && coordinator.threads.first?.workingTreeStatus == .hasChanges
+            await projectGitStatusProvider.requestCount() == 1
+                && coordinator.threads.first?.projectGitStatus == .uncommittedChanges
         }
 
-        let latestPolicy = await workingTreeStatusProvider.latestPolicy()
+        let latestPolicy = await projectGitStatusProvider.latestPolicy()
         XCTAssertEqual(latestPolicy, .refresh)
     }
 
@@ -237,7 +237,7 @@ extension AppCoordinatorTests {
             catalogProvider: StubCatalogProvider(
                 catalog: ThreadCatalog(threads: [thread], totalThreadCount: 1)
             ),
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: FailingViewModelUnreadIDProvider(),
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
@@ -252,7 +252,7 @@ extension AppCoordinatorTests {
         let catalogProvider = SuspendedCatalogProvider()
         let coordinator = makeAppCoordinator(
             catalogProvider: catalogProvider,
-            workingTreeStatusProvider: StubWorkingTreeStatusProvider(),
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
             unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
             observeFileChanges: false,
             accountUsageProvider: StubAccountUsageProvider(),

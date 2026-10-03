@@ -36,7 +36,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'blocked',project,phase:'blocked',maxRounds:1,
+          const loop = {id:'blocked',project,phase:'blocked',completedRoundCount:0,maxRounds:1,
             rounds:[{number:1,result:{outcome:'blocked',summary:'Missing evidence'}}]};
           api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null});
           const count = document.querySelector('[data-review-round-count]').textContent;
@@ -55,7 +55,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const projects = [{id:'a',name:'A',path:'/tmp/a'},{id:'b',name:'B',path:'/tmp/b'},{id:'c',name:'C',path:'/tmp/c'}];
-          const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',priorityLimit:'P2',maxRounds:5,rounds:[],message:project.name}));
+          const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:project.name}));
           api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null});
           const cards = document.querySelectorAll('[data-review-activity]');
           const setup = document.querySelector('[data-review-project]');
@@ -79,7 +79,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const projects = ['Dashboard', 'Website', 'Archive'].map((name, i) => ({id:String(i),name,path:'/tmp/' + i}));
-          const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',maxRounds:5,
+          const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             message:i === 2 ? 'Review complete' : 'Reviewing changes',rounds:[{number:1,result:{outcome:'fixed',summary:'Fixed issue',commit:'1234567890'}}]}));
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['2'],error:null};
           api.applyReviewLoop(snapshot); api.openReviews();
@@ -128,7 +128,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const projects = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => ({id,name:id,path:'/tmp/' + id}));
           const loops = projects.map((project, i) => ({id:project.id,project,
             phase:['running','paused','completed','limitReached','stopped','blocked'][i],
-            priorityLimit:'P2',maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
+            priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['C','D','E','F'],error:null};
           const apply = () => api.applyReviewLoop(snapshot);
           const active = () => [...document.querySelectorAll('[data-review-board] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
@@ -161,7 +161,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],finishedLoopIDs:['finished'],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',maxRounds:5,
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],finishedLoopIDs:['finished'],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
           api.applyReviewLoop(snapshot);
           const history = document.querySelector('[data-review-history]');
@@ -198,7 +198,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'waiting',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Waiting'};
+          const loop = {id:'loop-1',project,phase:'waiting',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           const spinner = () => document.querySelector('[data-review-navigation-running]');
           const states = [spinner().hidden];
@@ -209,7 +209,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.getElementById('codex-dashboard-review-navigation').remove();
           api.ensureMounted();
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
-          const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Waiting'};
+          const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
           api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
           states.push(spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'), spinner().getAttribute('title'));
           loop.phase = 'paused'; api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
@@ -294,7 +294,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           window.__codexDashboard.applyReviewLoop({reviewTypes,projects:[project],models:[],
-            loops:[{id:'loop',project,focus:'naming',phase:'paused',rounds:[],maxRounds:5}],error:null});
+            loops:[{id:'loop',project,focus:'naming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
           const select = document.querySelector('[data-review-focus]');
           const labels = [...select.options].map(option => option.textContent);
           const namingHidesPriorities = document.querySelector('.review-priority').hidden;
@@ -426,7 +426,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example <project>',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',maxRounds:5,message:'Reviewing changes',rounds:[
+          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Reviewing changes',rounds:[
             {number:1,threadID:'task-1',result:{outcome:'fixed',commit:'1234567890',summary:'Fixed <issue>'}},
             {number:2,threadID:'task-2',fixRequested:false}
           ]};
@@ -465,7 +465,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',maxRounds:1,rounds:[],message:'Reviewing'};
+          const loop = {id:'loop-1',project,phase:'running',completedRoundCount:0,maxRounds:1,rounds:[],message:'Reviewing'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null};
           const board = () => document.querySelector('[data-review-board]');
           const history = () => document.querySelector('[data-review-history]');
@@ -503,7 +503,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',maxRounds:3,message:'Reviewing',rounds:[
+          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:3,message:'Reviewing',rounds:[
             {number:1,review:{findings:[
               {priority:'P1',title:'Broken <link>',body:'Fails on the first click.'},
               {priority:'P2',title:'Stale confirmation',body:'Can open the wrong step.'}
@@ -534,7 +534,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]},result:{outcome:'fixed',summary:'Fixed'}});
-          const loop = {id:'loop',project,phase:'running',maxRounds:3,rounds:[round(1),round(2)]};
+          const loop = {id:'loop',project,phase:'running',completedRoundCount:2,maxRounds:3,rounds:[round(1),round(2)]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           api.applyReviewLoop(snapshot); api.openReviews();
           const findings = () => [...document.querySelectorAll('.review-findings-details')];
@@ -559,7 +559,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'completed',maxRounds:1,rounds:[{number:1,
+          const loop = {id:'loop-1',project,phase:'completed',completedRoundCount:0,maxRounds:1,rounds:[{number:1,
             review:{findings:[{priority:'P2',title:'A <bug>',body:'See [source](/tmp/example/Sources/File.swift:12), [relative](File.swift:4), [docs](https://example.com/guide), and [unsafe](javascript:alert(1)).'}]}}]};
           window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:['loop-1'],error:null});
           window.__codexDashboard.openReviews();
@@ -584,7 +584,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',maxRounds:1,
+          const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',completedRoundCount:1,maxRounds:1,
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
@@ -614,7 +614,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],error:null,
-            loops:[{id:'live',project,phase:'running',priorityLimit:'P2',maxRounds:5,rounds:[],message:'Reviewing'}],
+            loops:[{id:'live',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
             progress:{live:{step:'Reviewing',currentLabel:'Current prompt',threadID:'task-1',nextMessage:'',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};

@@ -129,4 +129,8 @@ After an intentional visual change, regenerate them with:
 UPDATE_VISUAL_BASELINES=1 swift test --filter DashboardVisualRegressionTests
 ```
 
-Review page controls live in `Reviews/review-loop-page.js`; status rendering lives in `Reviews/review-loop-view.js`, and app-server requests live in `Reviews/review-rpc-client.js`.
+Review page controls live in `Reviews/review-loop-page.js`; overview and history rendering live in `Reviews/review-loop-view.js`, setup rendering lives in `Reviews/review-loop-setup-view.js`, card and round rendering live in `Reviews/review-loop-card-view.js`, and app-server requests live in `Reviews/review-rpc-client.js`.
+
+The chat overview uses `chatOverview` names for its UI/controller modules and `Thread` for Codex data. Thread snapshots expose `checkoutPath` for the original chat directory, `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for both uncommitted changes and unpushed commits. Existing view-preference storage keys remain unchanged to retain saved filters and collapsed projects.
+
+Review display snapshots include Swift's computed `completedRoundCount`; persisted loop documents retain round data without storing the derived count. Web persistence instrumentation requires each source anchor to match exactly once and throws on missing or duplicate anchors. Save waiters are required calls, so absent instrumentation fails the test.

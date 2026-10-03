@@ -21,7 +21,7 @@ protocol DashboardRuntime: AnyObject {
         forceRemount: Bool
     ) async throws
     func disableIntegration() async throws -> DashboardDisableOutcome
-    func openTaskDashboard() async
+    func openChatOverview() async
     func openThread(_ threadID: String) async
     func hasActiveSpeechInput() async -> Bool
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult
@@ -95,7 +95,7 @@ final class LocalCodexDashboardRuntime: DashboardRuntime {
         try await renderer.disable()
     }
 
-    func openTaskDashboard() async {
+    func openChatOverview() async {
         await renderer.open()
     }
 

@@ -6,6 +6,27 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
     private let reviewBoundary = "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted."
     private let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
+    func testDisplayCountIncludesCompletedRoundsAndExcludesBlockedAndPendingRounds() throws {
+        var loop = ReviewLoop(id: UUID(), startActionID: "display", project: project,
+                              promptContext: .general, maxRounds: 5)
+        loop.rounds = [
+            ReviewRound(number: 1, baseCommit: "base", result: ReviewRoundResult(
+                outcome: .fixed, findingCount: 1, commit: "fixed", summary: "Fixed")),
+            ReviewRound(number: 2, baseCommit: "fixed", result: ReviewRoundResult(
+                outcome: .withdrawn, findingCount: 0, commit: "", summary: "Withdrawn")),
+            ReviewRound(number: 3, baseCommit: "fixed", result: ReviewRoundResult(
+                outcome: .blocked, findingCount: 0, commit: "", summary: "Blocked")),
+            ReviewRound(number: 4, baseCommit: "fixed"),
+        ]
+        let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            ReviewLoopDisplaySnapshot(loop: loop))) as? [String: Any]
+        XCTAssertEqual(display?["completedRoundCount"] as? Int, 2)
+        XCTAssertEqual(display?["id"] as? String, loop.id.uuidString)
+        XCTAssertEqual((display?["rounds"] as? [Any])?.count, 4)
+        let saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any]
+        XCTAssertNil(saved?["completedRoundCount"], "Derived counts must not be persisted")
+    }
+
     private func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,
                              promptContext: ReviewPromptContext?, maxRounds: Int?, loopID: UUID?) -> ReviewLoopAction {
         var action = ReviewLoopAction(id: id, kind: kind, projectID: projectID,
@@ -499,7 +520,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
 
     func testWaitsForOtherRunningTaskIncludingProjectSubdirectory() async throws {
         let (coordinator, _, driver) = try make()
-        let thread = ThreadSummary(id: "other", title: "Other", preview: "Other", projectName: "Example", projectPath: "/tmp/example/Sources", recencyEpochMillis: 1, isPinned: false, model: nil, runState: .running, latestLifecycleEvent: nil, workingTreeStatus: .clean)
+        let thread = ThreadSummary(id: "other", title: "Other", preview: "Other", projectName: "Example", checkoutPath: "/tmp/example/Sources", recencyEpochMillis: 1, isPinned: false, model: nil, runState: .running, latestLifecycleEvent: nil, projectGitStatus: .clean)
         await coordinator.advance(using: driver, threads: [RendererThread(thread)])
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
         XCTAssertTrue(driver.createdThreads.isEmpty)
@@ -1063,7 +1084,7 @@ private final class ReviewTestDriver: ReviewLoopDriving {
         onStartTurn?()
         return id
     }
-    func stopThread(_ threadID: String) async throws {
+    func interruptLatestTurn(_ threadID: String) async throws {
         if failStopThread { throw ReviewLoopError("Connection timed out") }
         guard let last = thread.turns.last, last.status == "inProgress" else { return }
         interruptedTurns.append(last.id)

@@ -212,7 +212,7 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
                 title: refreshed.title,
                 message: refreshed.body
             )
-            if notification.identifier.contains("-deadline-update-") {
+            if notification.isDeadlineUpdate {
                 history.saveDeadlines([notification], for: .known)
                 history.saveDeadlines([notification], for: .updates)
             }

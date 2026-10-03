@@ -1,5 +1,5 @@
-const taskDashboardQuery = (() => {
-  const hasLocalChanges = thread => !!thread.registeredProjectPath && ['hasChanges', 'unpushedCommits', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus);
+const chatOverviewQuery = (() => {
+  const hasLocalChanges = thread => !!thread.projectGroupPath && ['uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
 
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
@@ -11,7 +11,7 @@ const taskDashboardQuery = (() => {
       if (thread.runState === 'running') runningCount += 1;
       if (isThreadUnread(thread)) unreadCount += 1;
       if (hasLocalChanges(thread)) {
-        const projectPath = String(thread.registeredProjectPath || '').trim();
+        const projectPath = String(thread.projectGroupPath || '').trim();
         allChangedProjectPaths.add(projectPath);
         if (!hiddenChangeIndicatorPaths.has(projectPath)) indicatedChangedProjectPaths.add(projectPath);
       }
@@ -30,13 +30,13 @@ const taskDashboardQuery = (() => {
       filterMode === 'all'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
-          && allChangedProjectPaths.has(String(thread.registeredProjectPath || '').trim())));
+          && allChangedProjectPaths.has(String(thread.projectGroupPath || '').trim())));
     if (filterMode === 'changedProjects') {
-      const projectPaths = [...new Set(matchingThreads.map((thread) => String(thread.registeredProjectPath || '').trim()))];
+      const projectPaths = [...new Set(matchingThreads.map((thread) => String(thread.projectGroupPath || '').trim()))];
       const displayedProjectPaths = new Set(projectPaths.slice(0, visibleItemLimit));
       return {
         matchingThreads,
-        displayedThreads: matchingThreads.filter((thread) => displayedProjectPaths.has(String(thread.registeredProjectPath || '').trim())),
+        displayedThreads: matchingThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectGroupPath || '').trim())),
         leadingRunningThreadCount: 0,
         hasMore: visibleItemLimit < projectPaths.length,
       };

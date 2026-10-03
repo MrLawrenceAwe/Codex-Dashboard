@@ -1,4 +1,5 @@
-const taskDashboardPreferences = (() => {
+const chatOverviewPreferences = (() => {
+  // Preserve durable keys so naming changes retain saved view preferences.
   const preferencesKey = 'codex-dashboard.task-preferences';
   const legacyPreferencesKey = 'codex-dashboard.thread-preferences';
 

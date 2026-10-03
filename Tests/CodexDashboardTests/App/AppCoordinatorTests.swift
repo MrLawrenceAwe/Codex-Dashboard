@@ -21,16 +21,16 @@ final class AppCoordinatorTests: XCTestCase {
         let historicalThreads = (0..<70).map { index in
             ThreadSummary.fixture(
                 id: "historical-\(index)",
-                projectPath: "/tmp/historical-\(index)",
+                checkoutPath: "/tmp/historical-\(index)",
                 recencyEpochMillis: Int64(1_000 - index)
             )
         }
         let priorityThreads = [
             ThreadSummary.fixture(
-                id: "running", projectPath: "/tmp/running", recencyEpochMillis: 1, runState: .running
+                id: "running", checkoutPath: "/tmp/running", recencyEpochMillis: 1, runState: .running
             ),
             ThreadSummary.fixture(
-                id: "unread", projectPath: "/tmp/unread", recencyEpochMillis: 2, isUnread: true
+                id: "unread", checkoutPath: "/tmp/unread", recencyEpochMillis: 2, isUnread: true
             ),
         ]
 

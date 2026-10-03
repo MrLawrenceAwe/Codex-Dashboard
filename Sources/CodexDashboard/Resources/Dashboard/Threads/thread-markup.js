@@ -56,7 +56,7 @@ const threadMarkup = (() => {
   function groupThreadsByProject(threads) {
     const groups = new Map();
     threads.forEach((thread) => {
-      const path = String(thread.registeredProjectPath || '').trim();
+      const path = String(thread.projectGroupPath || '').trim();
       if (!groups.has(path)) groups.set(path, { path, name: thread.projectName, threads: [] });
       groups.get(path).threads.push(thread);
     });
@@ -64,7 +64,7 @@ const threadMarkup = (() => {
   }
 
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
-    if (!projectThreads.some(taskDashboardQuery.hasLocalChanges)) return '';
+    if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
     const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
@@ -80,14 +80,14 @@ const threadMarkup = (() => {
   }
 
   function renderChangeStatus(projectThreads, indicatorsHidden, showHiddenStatus) {
-    if (!projectThreads.some(taskDashboardQuery.hasLocalChanges)) return '';
+    if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
     if (indicatorsHidden) {
       return showHiddenStatus
         ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'
         : '';
     }
-    const dirty = projectThreads.some(thread => ['hasChanges', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus));
-    const unpushed = projectThreads.some(thread => ['unpushedCommits', 'hasChangesAndUnpushedCommits'].includes(thread.workingTreeStatus));
+    const dirty = projectThreads.some(thread => ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
+    const unpushed = projectThreads.some(thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
     const label = dirty && unpushed ? 'Uncommitted · Unpushed' : unpushed ? 'Unpushed' : 'Uncommitted';
     return `<span class="dashboard-git-changes" title="${label}">${dashboardIcons.render('gitChanges')}<span>${label}</span></span>`;
   }
@@ -110,11 +110,11 @@ const threadMarkup = (() => {
       const running = displayedThreads.slice(0, leadingRunningThreadCount);
       if (!running.length) return renderRows(displayedThreads);
       const recent = displayedThreads.slice(leadingRunningThreadCount);
-      return `<section class="dashboard-task-section" data-dashboard-section="running" aria-label="Running chats">
-        <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
+      return `<section class="dashboard-chat-section" data-dashboard-section="running" aria-label="Running chats">
+        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
         ${renderRows(running)}
-      </section>${recent.length ? `<section class="dashboard-task-section" data-dashboard-section="recent" aria-label="Recent chats">
-        <h2 class="dashboard-task-section-heading" data-dashboard-section-heading>Recents</h2>
+      </section>${recent.length ? `<section class="dashboard-chat-section" data-dashboard-section="recent" aria-label="Recent chats">
+        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Recents</h2>
         ${renderRows(recent)}
       </section>` : ''}`;
     }

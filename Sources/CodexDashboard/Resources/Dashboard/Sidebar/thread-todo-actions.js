@@ -20,7 +20,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
       || [...row.childNodes].filter((node) => !(node instanceof Element)
         || !node.matches('button, svg'))
         .map((node) => node.textContent).join('')).trim();
-    return id && title ? { id, title, projectPath: thread?.projectPath } : null;
+    return id && title ? { id, title, projectPath: thread?.checkoutPath } : null;
   }
 
   function alreadyAdded(id) {
@@ -65,7 +65,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     const projects = codexUIContracts.projects();
     const projectRow = row.closest('[data-app-action-sidebar-project-id]');
     const project = projects.find((candidate) => candidate.id === projectRow?.getAttribute('data-app-action-sidebar-project-id'))
-      || projects.find((candidate) => candidate.path && candidate.path === thread.projectPath)
+      || projects.find((candidate) => candidate.path && candidate.path === thread.checkoutPath)
       || null;
     menuContext = {
       draft: { title: thread.title, thread, project },

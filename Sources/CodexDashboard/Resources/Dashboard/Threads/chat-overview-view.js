@@ -1,4 +1,4 @@
-const taskDashboardView = (() => {
+const chatOverviewView = (() => {
   const renderedMarkup = new WeakMap();
 
   function childKey(element) {
@@ -99,9 +99,9 @@ const taskDashboardView = (() => {
     state,
   }) {
     updateSidebarStatus(state);
-    const page = document.getElementById(dashboardElements.elementIDs.taskPage);
+    const page = document.getElementById(dashboardElements.elementIDs.chatOverviewPage);
     if (!page) return false;
-    const notice = page.querySelector('[data-task-notice]');
+    const notice = page.querySelector('[data-chat-overview-notice]');
     if (notice) {
       notice.textContent = markAllReadError || commitDialogError;
       notice.hidden = !markAllReadError && !commitDialogError;
@@ -124,7 +124,7 @@ const taskDashboardView = (() => {
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
-    const { matchingThreads, displayedThreads, leadingRunningThreadCount, hasMore } = taskDashboardQuery.selectThreads({
+    const { matchingThreads, displayedThreads, leadingRunningThreadCount, hasMore } = chatOverviewQuery.selectThreads({
       threads,
       allChangedProjectPaths: state.allChangedProjectPaths,
       filterMode,
