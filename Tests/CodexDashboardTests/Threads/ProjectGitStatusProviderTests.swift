@@ -57,7 +57,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         XCTAssertEqual(clean[projectURL.path], .clean)
     }
 
-    func testOlderRefreshCannotOverwriteNewerCachedStatus() async throws {
+    func testOverlappingRefreshesSerializeAndKeepLatestCachedStatus() async throws {
         let projectURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-git-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
@@ -76,16 +76,75 @@ final class ProjectGitStatusProviderTests: XCTestCase {
             await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
         }
         await loader.waitForFirstCall()
-        let newer = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
+        let newerRefresh = Task {
+            await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
+        }
+        await Task.yield()
         await loader.releaseFirstCall()
-        let older = await olderRefresh.value
+        let newer = await newerRefresh.value
+        _ = await olderRefresh.value
         let cached = await provider.loadStatuses(for: [projectURL.path], policy: .useCached)
 
         XCTAssertEqual(newer[projectURL.path], .clean)
-        XCTAssertEqual(older[projectURL.path], .clean)
         XCTAssertEqual(cached[projectURL.path], .clean)
         let callCount = await loader.calls()
         XCTAssertEqual(callCount, 2)
+    }
+
+    private actor CountingStatusLoader {
+        private var callCount = 0
+        private var activeCount = 0
+        private var maximumActiveCount = 0
+        func load() async -> ProjectGitStatus {
+            callCount += 1
+            let call = callCount
+            activeCount += 1
+            maximumActiveCount = max(maximumActiveCount, activeCount)
+            try? await Task.sleep(for: .milliseconds(100))
+            activeCount -= 1
+            return call == 1 ? .uncommittedChanges : .clean
+        }
+        func counts() -> (calls: Int, concurrent: Int) { (callCount, maximumActiveCount) }
+    }
+
+    func testOverlappingPeriodicReadsShareOneScan() async throws {
+        let (provider, loader, path) = try makeCountingProvider()
+        let results = await withTaskGroup(of: ProjectGitStatus?.self) { group in
+            for _ in 0..<20 {
+                group.addTask { await provider.loadStatuses(for: [path], policy: .useCached)[path] }
+            }
+            var results: [ProjectGitStatus?] = []
+            for await result in group { results.append(result) }
+            return results
+        }
+        XCTAssertTrue(results.allSatisfy { $0 == .uncommittedChanges })
+        let counts = await loader.counts()
+        XCTAssertEqual(counts.calls, 1)
+        XCTAssertEqual(counts.concurrent, 1)
+    }
+
+    func testBurstOfRefreshesSharesFollowupWithoutConcurrentScans() async throws {
+        let (provider, loader, path) = try makeCountingProvider()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<20 {
+                group.addTask { _ = await provider.loadStatuses(for: [path], policy: .refresh) }
+            }
+        }
+        let counts = await loader.counts()
+        XCTAssertGreaterThanOrEqual(counts.calls, 2)
+        XCTAssertLessThan(counts.calls, 20)
+        XCTAssertEqual(counts.concurrent, 1)
+        let cached = await provider.loadStatuses(for: [path], policy: .useCached)
+        XCTAssertEqual(cached[path], .clean)
+    }
+
+    private func makeCountingProvider() throws -> (ProjectGitStatusProvider, CountingStatusLoader, String) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("DashboardGitCoalescing-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let loader = CountingStatusLoader()
+        let provider = ProjectGitStatusProvider(statusLoader: { _, _ in await loader.load() })
+        return (provider, loader, directory.path)
     }
 
     func testReportsUncommittedChanges() async throws {

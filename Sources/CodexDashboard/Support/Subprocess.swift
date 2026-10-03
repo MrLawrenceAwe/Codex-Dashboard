@@ -44,12 +44,12 @@ enum Subprocess {
         defer { runningProcess.terminate() }
         try outputPipe.fileHandleForWriting.close()
         try errorPipe.fileHandleForWriting.close()
-        let outputReader = try SubprocessPipeReader(handle: outputPipe.fileHandleForReading)
-        let errorReader = try SubprocessPipeReader(handle: errorPipe.fileHandleForReading)
+        let outputReader = try AsyncPipeReader(handle: outputPipe.fileHandleForReading)
+        let errorReader = try AsyncPipeReader(handle: errorPipe.fileHandleForReading)
         return try await withThrowingTaskGroup(of: Event.self) { group in
             group.addTask { .exited(await runningProcess.waitForExit()) }
-            group.addTask { .output(try await outputReader.read()) }
-            group.addTask { .error(try await errorReader.read()) }
+            group.addTask { .output(try await outputReader.readToEnd()) }
+            group.addTask { .error(try await errorReader.readToEnd()) }
             group.addTask {
                 try await Task.sleep(for: .seconds(timeout))
                 throw SubprocessError.timedOut(executableURL)
@@ -76,70 +76,6 @@ enum Subprocess {
             }
             throw SubprocessError.missingTerminationStatus(executableURL)
         }
-    }
-}
-
-/// Nonblocking reads let cancellation close a pipe even when a descendant retains
-/// its write end. All reader state and descriptor access belong to this queue.
-private final class SubprocessPipeReader: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "codex-dashboard.subprocess-pipe")
-    private let source: any DispatchSourceRead
-    private let descriptor: Int32
-    private var data = Data()
-    private var result: Result<Data, any Error>?
-    private var continuation: CheckedContinuation<Data, any Error>?
-
-    init(handle: FileHandle) throws {
-        descriptor = handle.fileDescriptor
-        let flags = fcntl(descriptor, F_GETFL)
-        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
-            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-        }
-        source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: queue)
-        source.setEventHandler { [weak self] in self?.drain() }
-        source.setCancelHandler { try? handle.close() }
-        source.resume()
-    }
-
-    deinit { source.cancel() }
-
-    func read() async throws -> Data {
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                queue.async {
-                    if let result = self.result { continuation.resume(with: result) }
-                    else { self.continuation = continuation }
-                }
-            }
-        } onCancel: { self.cancel() }
-    }
-
-    func cancel() {
-        queue.async { self.finish(.failure(CancellationError())) }
-    }
-
-    private func drain() {
-        guard result == nil else { return }
-        var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
-        // Yield periodically so a continuously writing process cannot starve cancellation.
-        for _ in 0..<16 {
-            let count = Darwin.read(descriptor, &buffer, buffer.count)
-            if count > 0 { data.append(contentsOf: buffer.prefix(count)) }
-            else if count == 0 { finish(.success(data)); return }
-            else if errno == EAGAIN { return }
-            else if errno != EINTR {
-                finish(.failure(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)))
-                return
-            }
-        }
-    }
-
-    private func finish(_ result: Result<Data, any Error>) {
-        guard self.result == nil else { return }
-        self.result = result
-        source.cancel()
-        continuation?.resume(with: result)
-        continuation = nil
     }
 }
 

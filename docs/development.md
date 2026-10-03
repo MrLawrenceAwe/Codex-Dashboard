@@ -133,7 +133,8 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
-Review-loop version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.
+Review-loop version 8 adds the durable `stopping` phase so checkout reservations
+survive interruption failures and restarts. Version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.
 Version 6 renames saved round-result `findings` to
 `addressedFindingCount`, preserving existing history at the migration boundary.
 Version 3 renames the `naming` focus to `organisationAndNaming`.

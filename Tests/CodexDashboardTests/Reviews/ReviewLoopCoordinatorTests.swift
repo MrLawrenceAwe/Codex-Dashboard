@@ -99,9 +99,9 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops.map(\.phase), [.running, .running])
         XCTAssertEqual(Set(coordinator.loops.compactMap { $0.rounds.last?.threadID }).count, 2)
         try coordinator.apply(action(.stop, for: coordinator), projects: [project, second])
-        XCTAssertEqual(coordinator.loops.map(\.phase), [.running, .stopped])
+        XCTAssertEqual(coordinator.loops.map(\.phase), [.running, .stopping])
         let recovered = ReviewLoopCoordinator(store: store)
-        XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .stopped])
+        XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .stopping])
         XCTAssertEqual(recovered.loops.map(\.id), coordinator.loops.map(\.id))
     }
 
@@ -562,7 +562,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.thread.turns.last?.status, "completed")
     }
 
-    func testInterruptFailureKeepsLoopStoppedAndCanBeRetried() async throws {
+    func testInterruptFailureKeepsCheckoutReservedAndCanBeRetried() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
         driver.failStopThread = true
@@ -571,7 +571,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
             XCTFail("Expected interrupt failure")
         } catch { }
-        XCTAssertEqual(store.loops.last?.phase, .stopped)
+        XCTAssertEqual(store.loops.last?.phase, .stopping)
         XCTAssertTrue(store.loops.last!.message.contains("could not stop its chat"))
         driver.failStopThread = false
         try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)

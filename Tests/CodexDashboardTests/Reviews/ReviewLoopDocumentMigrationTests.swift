@@ -3,6 +3,27 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testVersionSevenUnconfirmedStopsKeepTheirCheckoutReservation() throws {
+        for (message, expectedPhase) in [
+            ("Stopped loop. Stopping its running chat.", ReviewLoopPhase.stopping),
+            ("Stopped loop, but could not stop its chat. Open its chat to stop it: offline", .stopping),
+            ("Stopped loop and its running chat.", .stopped),
+        ] {
+            var loop = ReviewLoop(id: UUID(), startActionID: "stop", project: project,
+                                  promptContext: .general, maxRounds: 2)
+            loop.phase = .stopped
+            loop.checkoutRoot = project.path
+            loop.message = message
+            loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
+            let data = try JSONEncoder().encode(ReviewLoopsDocument(version: 7, loops: [loop]))
+            let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+            XCTAssertEqual(migrated.phase, expectedPhase)
+            XCTAssertEqual(migrated.checkoutRoot, project.path)
+            XCTAssertEqual(migrated.rounds, loop.rounds)
+            XCTAssertEqual(migrated.message, message)
+        }
+    }
+
     func testVersionSixPreservesExtensionReloadPreference() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "migration", project: project,
                               promptContext: .general, maxRounds: 5,

@@ -33,7 +33,11 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
     private let cacheLifetime: TimeInterval
     private let statusLoader: @Sendable (String, TimeInterval) async -> ProjectGitStatus
     private var statusByProjectPath: [String: CachedStatus] = [:]
-    private var refreshGenerationByProjectPath: [String: UInt64] = [:]
+    private struct InFlightStatus {
+        let task: Task<ProjectGitStatus, Never>
+        var refreshRequested = false
+    }
+    private var inFlightStatuses: [String: InFlightStatus] = [:]
 
     init(
         subprocessTimeout: TimeInterval = 3,
@@ -53,46 +57,17 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
     ) async -> [String: ProjectGitStatus] {
         guard !projectPaths.isEmpty else { return [:] }
 
-        let now = Date()
         let resolutions = Dictionary(uniqueKeysWithValues: projectPaths.map { path in
             (path, Self.resolveRepository(at: path))
         })
-        let timeout = subprocessTimeout
-
         let repositoryProjectPaths = projectPaths.filter { path in
             guard case .repository = resolutions[path] else { return false }
             return true
         }
-        let staleProjectPaths = repositoryProjectPaths.filter { path in
-            if policy == .refresh { return true }
-            guard let cached = statusByProjectPath[path] else { return true }
-            return now.timeIntervalSince(cached.loadedAt) >= cacheLifetime
+        let statuses = await Self.concurrentMap(repositoryProjectPaths) { path in
+            (path, await self.loadStatus(at: path, policy: policy))
         }
-        var requestGenerations: [String: UInt64] = [:]
-        for path in staleProjectPaths {
-            let generation = (refreshGenerationByProjectPath[path] ?? 0) &+ 1
-            refreshGenerationByProjectPath[path] = generation
-            requestGenerations[path] = generation
-        }
-        let statusLoader = statusLoader
-        let refreshed = await Self.concurrentMap(staleProjectPaths) { path in
-            (path, await statusLoader(path, timeout))
-        }
-        var statusesByProjectPath: [String: ProjectGitStatus] = [:]
-        for path in repositoryProjectPaths {
-            guard let cached = statusByProjectPath[path],
-                  now.timeIntervalSince(cached.loadedAt) < cacheLifetime
-            else { continue }
-            statusesByProjectPath[path] = cached.value
-        }
-        for (path, status) in refreshed {
-            if refreshGenerationByProjectPath[path] == requestGenerations[path] {
-                statusByProjectPath[path] = CachedStatus(value: status, loadedAt: Date())
-                statusesByProjectPath[path] = status
-            } else {
-                statusesByProjectPath[path] = statusByProjectPath[path]?.value ?? status
-            }
-        }
+        let statusesByProjectPath = Dictionary(uniqueKeysWithValues: statuses)
 
         return Dictionary(uniqueKeysWithValues: projectPaths.map { path in
             let status: ProjectGitStatus
@@ -106,6 +81,35 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
             }
             return (path, status)
         })
+    }
+
+    private func loadStatus(at path: String, policy: ProjectGitStatusRefreshPolicy) async -> ProjectGitStatus {
+        if let pending = inFlightStatuses[path] {
+            // File events arriving during a scan require a subsequent scan. Many
+            // such events share one follow-up; periodic reads just join the worker.
+            if policy == .refresh { inFlightStatuses[path]?.refreshRequested = true }
+            return await pending.task.value
+        }
+        if policy == .useCached, let cached = statusByProjectPath[path],
+           Date().timeIntervalSince(cached.loadedAt) < cacheLifetime {
+            return cached.value
+        }
+        let task = Task { await self.refreshStatus(at: path) }
+        inFlightStatuses[path] = InFlightStatus(task: task)
+        return await task.value
+    }
+
+    private func refreshStatus(at path: String) async -> ProjectGitStatus {
+        while true {
+            let status = await statusLoader(path, subprocessTimeout)
+            if inFlightStatuses[path]?.refreshRequested == true {
+                inFlightStatuses[path]?.refreshRequested = false
+                continue
+            }
+            statusByProjectPath[path] = CachedStatus(value: status, loadedAt: Date())
+            inFlightStatuses[path] = nil
+            return status
+        }
     }
 
     private static func concurrentMap<Element: Sendable, Result: Sendable>(

@@ -22,6 +22,13 @@ enum ReviewLoopDocumentMigration {
 
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
+        // Earlier readers marked Stop finished before interruption succeeded.
+        // Preserve checkout ownership for those unfinished saved requests.
+        if loop["phase"] as? String == "stopped", let message = loop["message"] as? String,
+           message == "Stopped loop. Stopping its running chat." ||
+            message.hasPrefix("Stopped loop, but could not stop its chat.") {
+            loop["phase"] = "stopping"
+        }
         if let rounds = loop["rounds"] as? [[String: Any]] {
             loop["rounds"] = rounds.map { savedRound in
                 var round = savedRound

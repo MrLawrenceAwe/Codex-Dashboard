@@ -78,6 +78,26 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["0 of 1", true, "resume", "blocked"])
     }
 
+    func testStoppingLoopKeepsProjectBusyAndOffersOnlyRetryStop() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'stopping',project,phase:'stopping',completedRoundCount:0,maxRounds:2,rounds:[]};
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],finishedLoopIDs:[],error:null});
+          const stop = document.querySelector('[data-review-action="stop"]');
+          const values = [stop.textContent,
+            !!document.querySelector('[data-review-action="resume"]'),
+            !!document.querySelector('[data-review-action="pause"]'),
+            document.querySelector('[data-review-start]').disabled];
+          stop.click();
+          return [...values,JSON.parse(api.pendingReviewAction()).kind];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Retry Stop", false, false, true, "stop"])
+    }
+
     func testConcurrentCardsTargetControlsAndExcludeBusyProjects() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

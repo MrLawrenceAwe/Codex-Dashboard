@@ -4,7 +4,7 @@ import Foundation
 final class CodexAppServerSession: @unchecked Sendable {
     private let process: Process
     private let inputHandle: FileHandle
-    private let outputHandle: FileHandle
+    private let outputReader: AsyncPipeReader
     private let lifecycleLock = NSLock()
     private var terminated = false
     private var readBuffer = Data()
@@ -26,11 +26,12 @@ final class CodexAppServerSession: @unchecked Sendable {
         environment["CODEX_HOME"] = codexHomeURL.path
         process.environment = environment
 
+        let outputReader = try AsyncPipeReader(handle: outputPipe.fileHandleForReading)
         try process.run()
         try outputPipe.fileHandleForWriting.close()
         self.process = process
         inputHandle = inputPipe.fileHandleForWriting
-        outputHandle = outputPipe.fileHandleForReading
+        self.outputReader = outputReader
     }
 
     deinit { terminate() }
@@ -44,7 +45,11 @@ final class CodexAppServerSession: @unchecked Sendable {
         var payload: [String: Any] = ["id": id, "method": method]
         if let params { payload["params"] = params }
         try write(payload)
-        return try await response(id: id, timeout: timeout)
+        do { return try await response(id: id, timeout: timeout) }
+        catch {
+            terminate()
+            throw error
+        }
     }
 
     func notify(method: String) throws {
@@ -58,6 +63,7 @@ final class CodexAppServerSession: @unchecked Sendable {
             return true
         }
         guard shouldTerminate else { return }
+        outputReader.cancel()
         try? inputHandle.close()
         if process.isRunning {
             process.terminate()
@@ -79,10 +85,9 @@ final class CodexAppServerSession: @unchecked Sendable {
     private func response(id: Int, timeout: Duration) async throws -> Data {
         try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(of: Data.self, returning: Data.self) { group in
-                group.addTask { try self.readResponse(id: id) }
+                group.addTask { try await self.readResponse(id: id) }
                 group.addTask {
                     try await Task.sleep(for: timeout)
-                    self.terminate()
                     throw CodexAccountUsageError.unavailable
                 }
                 defer { group.cancelAll() }
@@ -96,7 +101,7 @@ final class CodexAppServerSession: @unchecked Sendable {
         }
     }
 
-    private func readResponse(id: Int) throws -> Data {
+    private func readResponse(id: Int) async throws -> Data {
         while true {
             while let newline = readBuffer.firstIndex(of: 0x0A) {
                 let line = Data(readBuffer[..<newline])
@@ -116,7 +121,7 @@ final class CodexAppServerSession: @unchecked Sendable {
                 return line
             }
 
-            let chunk = outputHandle.availableData
+            let chunk = try await outputReader.readChunk()
             guard !chunk.isEmpty else { throw CodexAccountUsageError.unavailable }
             readBuffer.append(chunk)
         }
