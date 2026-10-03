@@ -39,12 +39,14 @@ const reviewLoopPage = (() => {
       queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
         focus,
         liveTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true',
+        isExtension: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
         priorityLimit: reviewLoopSetupView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
+    details.querySelector('[data-review-live-testing]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     for (const kind of ['review', 'fix']) {
       const model = details.querySelector(`[data-${kind}-model]`);

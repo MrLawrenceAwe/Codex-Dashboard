@@ -19,9 +19,12 @@ enum ReviewPrompts {
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
-            ? "\n\nAlso include live testing."
+            ? "\n\nAlso use live testing to find bugs and issues."
             : ""
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting
+        let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.isExtension
+            ? "\n\nUse Computer Use to reload the browser extension before live testing."
+            : ""
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReload
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -39,7 +42,10 @@ enum ReviewPrompts {
         case .organisation, .organisationAndNaming, .content, .performance:
             task = "Address \(findings) and commit"
         }
-        let prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+        var prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+        if loop.liveTesting && loop.focus.supportsLiveTesting {
+            prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
+        }
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
         let scope = review.findings.enumerated().compactMap { index, finding -> String? in
             guard accepted.contains(finding) else { return nil }

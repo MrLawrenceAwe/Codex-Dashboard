@@ -12,6 +12,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let maxRounds: Int?
     let loopID: UUID?
     var liveTesting: Bool? = nil
+    var isExtension: Bool? = nil
     var pushToRemote: Bool? = nil
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil

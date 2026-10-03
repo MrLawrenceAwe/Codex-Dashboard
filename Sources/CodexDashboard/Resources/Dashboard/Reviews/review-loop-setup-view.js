@@ -27,6 +27,8 @@ const reviewLoopSetupView = (() => {
         </select></label>
         <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
         <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
+        <label class="review-extension">Browser extension<select data-review-extension aria-label="Browser extension" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
+        <p id="review-extension-help" class="review-field-help review-extension-help">Use Computer Use to reload the extension before live testing.</p>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
@@ -59,6 +61,10 @@ const reviewLoopSetupView = (() => {
     liveTesting.hidden = !supportsLiveTesting(focus);
     root.querySelector('.review-live-testing-help').hidden = liveTesting.hidden;
     if (liveTesting.hidden) liveTesting.querySelector('select').value = 'false';
+    const extension = root.querySelector('.review-extension');
+    extension.hidden = liveTesting.hidden || liveTesting.querySelector('select').value !== 'true';
+    root.querySelector('.review-extension-help').hidden = extension.hidden;
+    if (extension.hidden) extension.querySelector('select').value = 'false';
     const context = root.querySelector('.review-project-context');
     context.hidden = !supportsProjectContext(focus);
     if (context.hidden) context.querySelector('select').value = '';
