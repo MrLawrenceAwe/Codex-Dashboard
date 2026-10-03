@@ -894,7 +894,7 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
         XCTAssertEqual(driver.speeds, [.fast, .fast, .fast, .fast, .fast])
     }
 
-    func testLiveTestingPersistsAndReachesReviewsWithoutChangingFixPrompt() async throws {
+    func testLiveTestingPersistsAndReachesReviewsAndFixVerification() async throws {
         for focus in ReviewFocus.allCases {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
@@ -902,24 +902,54 @@ final class ReviewLoopCoordinatorTests: XCTestCase {
                                     promptContext: .general, maxRounds: 3, loopID: nil)
             start.focus = focus
             start.liveTesting = true
+            start.isExtension = true
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
             XCTAssertEqual(saved.liveTesting, focus.supportsLiveTesting)
+            XCTAssertEqual(saved.isExtension, focus.supportsLiveTesting)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[0].contains("Also include live testing."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[0].contains("Also use live testing to find bugs and issues."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[0].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
             if focus.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             var withoutLiveTesting = saved
             withoutLiveTesting.liveTesting = false
-            XCTAssertEqual(driver.prompts[1], ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last)))
+            let baseFix = ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last))
+            let liveVerification = focus.supportsLiveTesting
+                ? "\n\nVerify fixes for findings discovered through live testing using live testing." : ""
+            XCTAssertEqual(driver.prompts[1], baseFix + liveVerification)
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[2].contains("Also include live testing."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Also use live testing to find bugs and issues."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
         }
+    }
+
+    func testExtensionOptionRequiresLiveTesting() throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "extension", kind: .start, projectID: project.id,
+                                promptContext: .general, maxRounds: 3, loopID: nil)
+        start.isExtension = true
+        try coordinator.apply(start, projects: [project])
+        XCTAssertFalse(try XCTUnwrap(store.loops.first).isExtension)
+        var loop = try XCTUnwrap(store.loops.first)
+        loop.isExtension = true
+        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Computer Use"))
+    }
+
+    func testVersionFourLoopsMigrateWithoutExtensionReload() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "old", project: project,
+                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance,
+                              liveTesting: true)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "isExtension")
+        let data = try JSONSerialization.data(withJSONObject: ["version": 4, "loops": [saved]])
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
     }
 
     func testVersionThreeLoopsMigrateWithLiveTestingOff() throws {

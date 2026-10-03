@@ -286,6 +286,39 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
                                 false, "true", true, true, true, "false", false, true, "false", false])
     }
 
+    func testExtensionReloadOptionRequiresLiveTestingAndQueuesSelection() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
+          api.applyReviewLoop(snapshot);
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
+          const live = document.querySelector('[data-review-live-testing]');
+          const extension = document.querySelector('[data-review-extension]');
+          const results = [extension.parentElement.hidden, extension.value];
+          live.value = 'true';
+          live.dispatchEvent(new Event('change'));
+          extension.value = 'true';
+          results.push(extension.parentElement.hidden);
+          document.querySelector('[data-review-start]').click();
+          const action = JSON.parse(api.pendingReviewAction());
+          results.push(action.isExtension, extension.disabled);
+          api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
+          results.push(extension.value);
+          live.value = 'false';
+          live.dispatchEvent(new Event('change'));
+          results.push(extension.parentElement.hidden, extension.value);
+          extension.value = 'true';
+          document.querySelector('[data-review-start]').click();
+          results.push(JSON.parse(api.pendingReviewAction()).isExtension);
+          return results;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "false", false, true, true, "true", true, "false", false])
+    }
+
     func testReviewTypesQueueSelectedFocusAndKeepPromptContextOptional() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

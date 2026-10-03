@@ -3,7 +3,7 @@ import Foundation
 /// Converts the unversioned single-loop and array formats into the current document.
 enum ReviewLoopDocumentMigration {
     struct Document: Codable {
-        static let currentVersion = 4
+        static let currentVersion = 5
         let version: Int
         let loops: [ReviewLoop]
     }
@@ -29,6 +29,7 @@ enum ReviewLoopDocumentMigration {
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
         if loop["focus"] as? String == "naming" { loop["focus"] = "organisationAndNaming" }
+        if loop["isExtension"] == nil { loop["isExtension"] = false }
         if loop["liveTesting"] == nil { loop["liveTesting"] = false }
         if loop["pushToRemote"] == nil { loop["pushToRemote"] = false }
         if loop["promptContext"] == nil {

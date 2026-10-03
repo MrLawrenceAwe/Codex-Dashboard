@@ -152,6 +152,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority? = nil
     var liveTesting = false
+    var isExtension = false
     var pushToRemote = false
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
