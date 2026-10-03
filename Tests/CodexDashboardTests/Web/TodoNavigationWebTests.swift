@@ -90,7 +90,7 @@ final class TodoNavigationWebTests: SerializedDashboardWebTestCase {
 
     func testTodoCanBeEditedCompletedFilteredAndDeleted() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )

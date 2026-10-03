@@ -52,18 +52,6 @@ struct ScheduledUsageNotification: Equatable, Sendable {
     }
 }
 
-struct UsageObservation: Codable, Equatable, Sendable {
-    let fiveHour: CodexUsageWindow?
-    let weekly: CodexUsageWindow?
-    let bankedResets: CodexBankedResetSummary?
-
-    init(usage: CodexAccountUsage) {
-        fiveHour = usage.fiveHour
-        weekly = usage.weekly
-        bankedResets = usage.bankedResets
-    }
-}
-
 struct ImmediateUsageNotification: Equatable, Sendable {
     let identifier: String
     let title: String

@@ -1,21 +1,15 @@
 import Foundation
 
-/// Converts the unversioned single-loop and array formats into the current document.
+/// Converts earlier versioned, single-loop, and array formats into current loop models.
 enum ReviewLoopDocumentMigration {
-    struct Document: Codable {
-        static let currentVersion = 5
-        let version: Int
-        let loops: [ReviewLoop]
-    }
-
     static func decode(_ data: Data) throws -> [ReviewLoop] {
         let value = try JSONSerialization.jsonObject(with: data)
         if let document = value as? [String: Any], let version = document["version"] as? Int {
-            guard (1...Document.currentVersion).contains(version) else {
+            guard (1...ReviewLoopsDocument.currentVersion).contains(version) else {
                 throw ReviewLoopError("Unsupported review-loop document version \(version).")
             }
-            if version == Document.currentVersion {
-                return try JSONDecoder().decode(Document.self, from: data).loops
+            if version == ReviewLoopsDocument.currentVersion {
+                return try JSONDecoder().decode(ReviewLoopsDocument.self, from: data).loops
             }
             guard let saved = document["loops"] as? [[String: Any]] else { throw ReviewLoopError("Invalid review-loop document.") }
             return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map(migrate)))

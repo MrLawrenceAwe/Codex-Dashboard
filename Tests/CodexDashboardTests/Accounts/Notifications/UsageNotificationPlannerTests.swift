@@ -23,7 +23,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             )
             let plan = UsageNotificationPlanner.plan(
                 for: [savedAccount], usageByAccountID: [savedAccount.id: current],
-                previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+                previousObservations: [savedAccount.id: previous],
                 previousDeadlines: [:], sentUpdates: [:], now: now
             )
             XCTAssertEqual(plan.scheduled.count, 7)
@@ -53,7 +53,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
         let plan = UsageNotificationPlanner.plan(
             for: [savedAccount], usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            previousObservations: [savedAccount.id: previous],
             previousDeadlines: [:], sentUpdates: [:], now: now
         )
         XCTAssertEqual(plan.scheduled.count, 14)
@@ -80,7 +80,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         )
         let plan = UsageNotificationPlanner.plan(
             for: [account], usageByAccountID: [account.id: current],
-            previousObservations: [account.id: UsageObservation(usage: previous)],
+            previousObservations: [account.id: previous],
             previousDeadlines: [:], sentUpdates: [:], now: now
         )
 
@@ -103,7 +103,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             )
         }
         let current = snapshot(2)
-        let previous = UsageObservation(usage: snapshot(3).usage)
+        let previous = snapshot(3).usage
 
         XCTAssertTrue(UsageNotificationPlanner.bankedResetNotifications(
             for: [account], usageByAccountID: [account.id: current], previousObservations: [:]
@@ -118,7 +118,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         ).isEmpty)
         XCTAssertEqual(UsageNotificationPlanner.bankedResetNotifications(
             for: [account], usageByAccountID: [account.id: current],
-            previousObservations: [account.id: UsageObservation(usage: snapshot(1).usage)]
+            previousObservations: [account.id: snapshot(1).usage]
         ).first?.title, "Banked Codex reset added")
     }
 
@@ -296,10 +296,10 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let refreshed = UsageNotificationPlanner.refreshedContent(for: reminder, using: current, now: now)
         XCTAssertTrue(refreshed?.body.hasSuffix("⏱ 5-hour 40%") == true)
 
-        let previous = UsageObservation(usage: CodexAccountUsage(
+        let previous = CodexAccountUsage(
             fiveHour: CodexUsageWindow(usedPercent: 20, resetsAt: fiveHourReset),
             weekly: current.usage.weekly
-        ))
+        )
         let thresholds = UsageNotificationPlanner.usageThresholdNotifications(
             for: [account], usageByAccountID: [account.id: current],
             previousObservations: [account.id: previous], now: now
@@ -477,7 +477,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ),
             fetchedAt: now
         )
-        let observations = [savedAccount.id: UsageObservation(usage: previous)]
+        let observations = [savedAccount.id: previous]
 
         XCTAssertTrue(
             UsageNotificationPlanner.resetNotifications(
@@ -522,7 +522,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let alerts = UsageNotificationPlanner.resetNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: previous.usage)],
+            previousObservations: [savedAccount.id: previous.usage],
             now: now
         )
 
@@ -550,7 +550,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let alerts = UsageNotificationPlanner.resetNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            previousObservations: [savedAccount.id: previous],
             now: now
         )
 
@@ -572,11 +572,9 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ),
             fetchedAt: now
         )
-        let previous = UsageObservation(
-            usage: CodexAccountUsage(
-                fiveHour: CodexUsageWindow(usedPercent: 80, resetsAt: now.addingTimeInterval(-30)),
-                weekly: nil
-            )
+        let previous = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 80, resetsAt: now.addingTimeInterval(-30)),
+            weekly: nil
         )
 
         let alerts = UsageNotificationPlanner.resetNotifications(
@@ -602,11 +600,9 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ),
             fetchedAt: now
         )
-        let previous = UsageObservation(
-            usage: CodexAccountUsage(
-                fiveHour: nil,
-                weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(-30))
-            )
+        let previous = CodexAccountUsage(
+            fiveHour: nil,
+            weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(-30))
         )
 
         let alerts = UsageNotificationPlanner.resetNotifications(
@@ -624,10 +620,10 @@ final class UsageNotificationPlannerTests: XCTestCase {
     func testDoesNotCallAShortDeadlineExtensionAReset() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
-        let previous = UsageObservation(usage: CodexAccountUsage(
+        let previous = CodexAccountUsage(
             fiveHour: nil,
             weekly: CodexUsageWindow(usedPercent: 20, resetsAt: now.addingTimeInterval(-30))
-        ))
+        )
         let current = CodexAccountUsageSnapshot(
             usage: CodexAccountUsage(
                 fiveHour: nil,
@@ -661,7 +657,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let alerts = UsageNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            previousObservations: [savedAccount.id: previous],
             now: now
         )
 
@@ -680,7 +676,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let repeatAlerts = UsageNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: current.usage)],
+            previousObservations: [savedAccount.id: current.usage],
             now: now
         )
         XCTAssertTrue(repeatAlerts.isEmpty)
@@ -705,7 +701,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             UsageNotificationPlanner.usageThresholdNotifications(
                 for: [savedAccount],
                 usageByAccountID: [savedAccount.id: current],
-                previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+                previousObservations: [savedAccount.id: previous],
                 now: now
             ).isEmpty
         )
@@ -729,7 +725,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let alerts = UsageNotificationPlanner.usageThresholdNotifications(
             for: [savedAccount],
             usageByAccountID: [savedAccount.id: current],
-            previousObservations: [savedAccount.id: UsageObservation(usage: previous)],
+            previousObservations: [savedAccount.id: previous],
             now: now
         )
 

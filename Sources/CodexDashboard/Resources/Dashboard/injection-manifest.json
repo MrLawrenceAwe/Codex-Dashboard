@@ -29,6 +29,8 @@
     "Threads/chat-overview-page",
     "Todos/todo-image-store",
     "Todos/todo-store",
+    "Todos/todo-query",
+    "Todos/todo-form-values",
     "Todos/todo-list-view",
     "Todos/todo-image-controller",
     "Todos/todo-tag-controller",

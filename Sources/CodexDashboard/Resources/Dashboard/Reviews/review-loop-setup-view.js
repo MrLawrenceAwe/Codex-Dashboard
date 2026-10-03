@@ -115,7 +115,7 @@ const reviewLoopSetupView = (() => {
     const signature = JSON.stringify([projects, [...busyProjects]]);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}" ${busyProjects.has(project.id) ? 'disabled' : ''}>${escape(project.name)}${busyProjects.has(project.id) ? ' · Loop active' : ''}</option>`).join('') : '<option value="">No local projects available</option>';
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}" ${busyProjects.has(project.id) ? 'disabled' : ''}>${escape(project.name)}${busyProjects.has(project.id) ? ' · Loop active' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
       select.value = availableProjects.some(project => project.id === selected) ? selected : availableProjects[0]?.id || '';
       projectsSignature = signature;
     }
@@ -125,7 +125,7 @@ const reviewLoopSetupView = (() => {
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
     const availability = root.querySelector('[data-review-availability]');
     availability.hidden = availableProjects.length > 0;
-    availability.textContent = projects.length ? 'Every project already has an active loop. Finish or stop a loop to start another.' : 'No local projects available. Add a local project in Codex to start a loop.';
+    availability.textContent = projects.length ? 'Every project already has an active loop. Finish or stop a loop to start another.' : 'Review loops require a local project with one folder. Add or choose a single-folder project in Codex.';
   }
 
   function reset() {

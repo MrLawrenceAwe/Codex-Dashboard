@@ -23,9 +23,6 @@ enum UsageNotificationPlanner {
         func window(in usage: CodexAccountUsage) -> CodexUsageWindow? {
             self == .fiveHour ? usage.fiveHour : usage.weekly
         }
-        func window(in observation: UsageObservation) -> CodexUsageWindow? {
-            self == .fiveHour ? observation.fiveHour : observation.weekly
-        }
     }
 
     private static let windowKinds: [UsageWindowKind] = [.fiveHour, .weekly]
@@ -39,7 +36,7 @@ enum UsageNotificationPlanner {
     static func plan(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        previousObservations: [UUID: UsageObservation],
+        previousObservations: [UUID: CodexAccountUsage],
         previousDeadlines: [String: Date],
         sentUpdates: [String: Date],
         now: Date
@@ -131,7 +128,7 @@ enum UsageNotificationPlanner {
     static func resetNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        previousObservations: [UUID: UsageObservation],
+        previousObservations: [UUID: CodexAccountUsage],
         now: Date = .now
     ) -> [ImmediateUsageNotification] {
         accounts.flatMap { account -> [ImmediateUsageNotification] in
@@ -155,7 +152,7 @@ enum UsageNotificationPlanner {
     static func bankedResetNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        previousObservations: [UUID: UsageObservation]
+        previousObservations: [UUID: CodexAccountUsage]
     ) -> [ImmediateUsageNotification] {
         accounts.compactMap { account in
             guard let snapshot = usageByAccountID[account.id],
@@ -183,7 +180,7 @@ enum UsageNotificationPlanner {
     static func usageThresholdNotifications(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
-        previousObservations: [UUID: UsageObservation],
+        previousObservations: [UUID: CodexAccountUsage],
         now: Date = .now
     ) -> [ImmediateUsageNotification] {
         accounts.flatMap { account -> [ImmediateUsageNotification] in
@@ -208,9 +205,9 @@ enum UsageNotificationPlanner {
     static func observations(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot]
-    ) -> [UUID: UsageObservation] {
+    ) -> [UUID: CodexAccountUsage] {
         Dictionary(uniqueKeysWithValues: accounts.compactMap { account in
-            usageByAccountID[account.id].map { (account.id, UsageObservation(usage: $0.usage)) }
+            usageByAccountID[account.id].map { (account.id, $0.usage) }
         })
     }
 

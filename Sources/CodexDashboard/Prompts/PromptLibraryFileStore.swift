@@ -16,11 +16,8 @@ final class PromptLibraryFileStore {
         self.fileManager = fileManager
         self.now = now
         self.maximumBackupCount = max(0, maximumBackupCount)
-        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
-        let directory = documentURL?.deletingLastPathComponent()
-            ?? applicationSupport.appendingPathComponent("Codex Dashboard", isDirectory: true)
-        self.documentURL = documentURL ?? directory.appendingPathComponent("prompt-library.json")
+        self.documentURL = documentURL ?? CodexConfiguration.promptLibraryURL(fileManager: fileManager)
+        let directory = self.documentURL.deletingLastPathComponent()
         backupDirectoryURL = directory.appendingPathComponent("Prompt Library Backups", isDirectory: true)
     }
 

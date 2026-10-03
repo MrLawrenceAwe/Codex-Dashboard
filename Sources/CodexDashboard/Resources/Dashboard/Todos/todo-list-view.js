@@ -112,19 +112,6 @@ const todoListView = (() => {
     )).join('')}`;
   }
 
-  function visibleItems(items, filterMode, projectFilter, tagFilter) {
-    return items.filter((item) => {
-      const matchesStatus = filterMode === 'all'
-        || (filterMode === 'open' && !item.completed)
-        || (filterMode === 'completed' && item.completed);
-      const matchesProject = !projectFilter
-        || (projectFilter === '__none__' && !item.project)
-        || item.project?.id === projectFilter;
-      const matchesTag = !tagFilter || item.tags.includes(tagFilter);
-      return matchesStatus && matchesProject && matchesTag;
-    });
-  }
-
   function updateNavigation(openCount) {
     const count = document.querySelector('[data-todo-navigation-count]');
     if (!count) return;
@@ -156,7 +143,7 @@ const todoListView = (() => {
     page.querySelector('[data-todo-clear-completed]').hidden = completedCount === 0;
     updateFilterOptions(projects, availableTags, items, filters);
     const list = page.querySelector('[data-todo-list]');
-    const visible = visibleItems(items, filterMode, filters.project, filters.tag);
+    const visible = todoQuery.visibleItems(items, filterMode, filters.project, filters.tag);
     if (!visible.length) {
       const message = !items.length ? 'No to-dos yet'
         : filters.project || filters.tag ? 'No matching to-dos'
@@ -381,14 +368,5 @@ const todoListView = (() => {
     dialog.showModal();
   }
 
-  function readPreset(toggle, fields) {
-    if (!toggle.checked) return null;
-    return composerPresets.normalize({
-      model: fields.querySelector('[data-todo-new-preset-model], [data-todo-item-preset-model]').value,
-      reasoningEffort: fields.querySelector('[data-todo-new-preset-effort], [data-todo-item-preset-effort]').value,
-      speed: fields.querySelector('[data-todo-new-preset-speed], [data-todo-item-preset-speed]').value,
-    }) || null;
-  }
-
-  return { readPreset, createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
+  return { createPage, ensureDialogHost, updateTopInset, render, showHydratedImages, showImage, sizeTitle, updateTagDraft, updateTagOptions, updateImageDraft, updateManagedTags, updateNavigation, updateProjectOptions, updateThreadOptions, updateFilterOptions };
 })();

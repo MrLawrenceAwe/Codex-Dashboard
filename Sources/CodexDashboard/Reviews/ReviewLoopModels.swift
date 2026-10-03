@@ -168,3 +168,9 @@ struct ReviewLoop: Codable, Equatable, Sendable {
         rounds.filter { $0.result.map { $0.outcome != .blocked } == true }.count
     }
 }
+
+struct ReviewLoopsDocument: Codable {
+    static let currentVersion = 5
+    let version: Int
+    let loops: [ReviewLoop]
+}

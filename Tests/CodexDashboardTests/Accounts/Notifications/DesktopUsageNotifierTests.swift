@@ -220,7 +220,7 @@ final class DesktopUsageNotifierTests: XCTestCase {
             "Codex Weekly: less than 50% remaining",
             "Codex Weekly: less than 20% remaining",
         ])
-        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: current.usage))
+        XCTAssertEqual(history.observations()[account.id], current.usage)
     }
 
     func testRetriesOnlyFailedImmediateAlertsBeforeSavingObservation() async throws {
@@ -234,12 +234,12 @@ final class DesktopUsageNotifierTests: XCTestCase {
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 1)
-        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: previous.usage))
+        XCTAssertEqual(history.observations()[account.id], previous.usage)
 
         let retryAfterRestart = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
         await retryAfterRestart.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 2)
-        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: current.usage))
+        XCTAssertEqual(history.observations()[account.id], current.usage)
 
         let reopened = DesktopUsageNotifier(notificationCenter: center, userDefaults: defaults)
         await reopened.updateNotifications(for: [account], usageByAccountID: [account.id: current])
@@ -257,12 +257,12 @@ final class DesktopUsageNotifierTests: XCTestCase {
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertTrue(center.immediateTitles.isEmpty)
-        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: previous.usage))
+        XCTAssertEqual(history.observations()[account.id], previous.usage)
 
         center.authorized = true
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: current])
         XCTAssertEqual(center.immediateTitles.count, 2)
-        XCTAssertEqual(history.observations()[account.id], UsageObservation(usage: current.usage))
+        XCTAssertEqual(history.observations()[account.id], current.usage)
     }
 
     private func makeThresholdSnapshots() -> (

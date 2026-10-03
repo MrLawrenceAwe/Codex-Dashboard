@@ -7,7 +7,7 @@ import XCTest
 final class TodoImagesWebTests: SerializedDashboardWebTestCase {
     func testComposerCSSOverridesHostStylesAndTracksImageDraft() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true)
         let result = try await webView.evaluateJavaScript("""
@@ -49,7 +49,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
 
     func testOlderImageReadCannotReplaceNewerPaste() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -171,7 +171,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
 
     func testTodoImageCanBePastedDuringAdditionReplacedAndPreservedWhenCompleted() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -287,7 +287,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
 
     func testTodoImagePasteShowsAnErrorForOversizedImages() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -318,7 +318,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
 
     func testTodoImageDoesNotStoreItsDataURLInLocalStorage() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
@@ -390,7 +390,7 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
 
     func testPastedTodoImageCanBeRemovedFromTheAddBar() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )

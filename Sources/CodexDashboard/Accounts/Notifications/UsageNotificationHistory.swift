@@ -77,9 +77,9 @@ struct UsageNotificationHistory {
         userDefaults.set(delivered, forKey: deliveredDeadlinesKey)
     }
 
-    func observations() -> [UUID: UsageObservation] {
+    func observations() -> [UUID: CodexAccountUsage] {
         guard let data = userDefaults.data(forKey: observationsKey) else { return [:] }
-        return (try? JSONDecoder().decode([UUID: UsageObservation].self, from: data)) ?? [:]
+        return (try? JSONDecoder().decode([UUID: CodexAccountUsage].self, from: data)) ?? [:]
     }
 
     func saveObservations(

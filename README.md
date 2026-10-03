@@ -22,8 +22,9 @@ The project explores reliable desktop workflow automation, including file-change
 monitoring, scheduled refresh, asynchronous persistence and recovery after failed
 writes. Test fixtures use synthetic data.
 
-The DevTools connection is limited to the local machine and uses a new high port each
-time the dashboard launches, but Chromium DevTools does not authenticate local clients.
+The DevTools connection is limited to the local machine. New Codex launches use a new
+high port; Dashboard reuses that port when reconnecting to the running Codex process.
+Chromium DevTools does not authenticate local clients.
 Use this utility only on a trusted personal macOS account; do not leave Codex running
 with the dashboard enabled when untrusted local software has access to your account.
 
@@ -41,21 +42,16 @@ new build, or `--skip-tests` during local iteration. `--no-launch` is the
 default and is also accepted explicitly.
 
 Local installs create and reuse a **Codex Dashboard Local Development** signing
-certificate in your login Keychain. This keeps the app's designated signing
-requirement stable, but does not prevent Keychain prompts after changed builds:
-macOS still assigns self-signed apps a build-specific Keychain partition identity.
-Saved-account credentials are accessed by a separately signed Keychain helper.
-Dashboard code and UI rebuilds leave this helper's build hash unchanged, allowing
-its approvals to persist without Xcode or an Apple Developer account. Approve the
-helper with **Always Allow** when macOS first asks to access an existing saved
-account; each account is a separate Keychain item. Changes to the helper itself
-or the signing certificate may require approval again.
-An Apple-issued development or Developer ID Application certificate can also be
-selected via `SIGNING_IDENTITY`.
-The local certificate is trusted
-only for code signing; its private key is available to `/usr/bin/codesign`.
+certificate in your login Keychain. Saved-account credentials are accessed by a
+separately signed helper whose approvals persist across Dashboard-only rebuilds.
+Choose **Always Allow** when macOS first asks the helper to access a saved account;
+each account is a separate Keychain item. Changes to the helper or signing
+certificate may require approval again.
+
 To use an existing signing certificate, set `SIGNING_IDENTITY` to its name or SHA-1
 fingerprint when running the installer. The installer stops if signing fails.
+See [local signing](docs/development.md#local-signing) for certificate trust,
+Keychain partition identities, and approval persistence details.
 
 To uninstall without permanently deleting the bundle, run `./uninstall.sh`.
 It moves the installed app to the Trash.

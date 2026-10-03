@@ -12,7 +12,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
 
     func testCardsResolveLabelsWithoutRenderingSetupAndPreserveUnavailableIdentifiers() async throws {
         let webView = DashboardWebTestHarness.makeWebView()
-        webView.loadHTMLString(DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        webView.loadHTMLString(DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
         // History cards must resolve labels even when the setup view never renders.
         let injection = try InjectionBundle.load()
@@ -28,7 +28,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const loop = {id:'saved',project,phase:'paused',focus:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
             reviewSelection:{modelID:'model-a',reasoningEffort:'low'},
             fixSelection:{modelID:'retired-model',reasoningEffort:'xhigh'}};
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),
             projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null});
           const text = document.querySelector('[data-review-context]').textContent;
           return [text.includes('Review: Model A · Low'),
@@ -40,11 +40,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testStartIncludesOptInRemotePushPreference() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let values = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),
             projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[],error:null});
           api.openReviews();
           const select = document.querySelector('[data-review-push]');
@@ -60,14 +60,14 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testBlockedLoopOffersResumeAndDoesNotCountBlockedAttempts() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const loop = {id:'blocked',project,phase:'blocked',completedRoundCount:0,maxRounds:1,
             rounds:[{number:1,result:{outcome:'blocked',summary:'Missing evidence'}}]};
-          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null});
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null});
           const count = document.querySelector('[data-review-round-count]').textContent;
           const stop = !!document.querySelector('[data-review-action="stop"]');
           document.querySelector('[data-review-action="resume"]').click();
@@ -79,13 +79,13 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testConcurrentCardsTargetControlsAndExcludeBusyProjects() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const projects = [{id:'a',name:'A',path:'/tmp/a'},{id:'b',name:'B',path:'/tmp/b'},{id:'c',name:'C',path:'/tmp/c'}];
           const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:project.name}));
-          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null});
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null});
           const cards = document.querySelectorAll('[data-review-activity]');
           const setup = document.querySelector('[data-review-project]');
           const before = [cards.length,setup.value,...[...setup.options].map(option => option.disabled),document.querySelector('[data-review-start]').disabled,document.querySelector('[data-review-form]').hidden];
@@ -111,16 +111,16 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             message:i === 2 ? 'Review complete' : 'Reviewing changes',rounds:[{number:1,result:{outcome:'fixed',summary:'Fixed issue',commit:'1234567890'}}]}));
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['2'],error:null};
-          api.applyReviewLoop(snapshot); api.openReviews();
+          api.applyReviewPageSnapshot(snapshot); api.openReviews();
           const cards = () => [...document.querySelectorAll('[data-review-activity]')];
           const first = cards()[0];
           first.querySelector('details').open = true;
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const preserved = cards()[0] === first && first.querySelector('details').open && !cards()[1].querySelector('details').open;
           cards()[1].querySelector('[data-review-action="pause"]').click();
           const action = JSON.parse(api.pendingReviewAction());
           const scoped = first.querySelector('[data-review-status]').textContent === 'Reviewing changes' && cards()[1].querySelector('[data-review-status]').textContent === 'Requesting pause…';
-          api.applyReviewLoop({...snapshot,acknowledgedActionID:action.id});
+          api.applyReviewPageSnapshot({...snapshot,acknowledgedActionID:action.id});
           const a = cards()[0].getBoundingClientRect(), b = cards()[1].getBoundingClientRect();
           return [preserved,action.loopID,scoped,a.top === b.top,b.left > a.left,document.querySelector('[data-review-overview]').textContent];
         })()
@@ -143,14 +143,14 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         """) as? Bool
         XCTAssertEqual(narrow, true)
         _ = try await webView.evaluateAsyncJavaScript("""
-        window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[],loops:[],error:null})
+        window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[],loops:[],error:null})
         """)
         let remaining = try await webView.evaluateAsyncJavaScript("document.querySelectorAll('[data-review-activity]').length") as? Int
         XCTAssertEqual(remaining, 0)
     }
 
     func testHistoryShowsOneSelectionAndHandlesSnapshotChanges() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -159,7 +159,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             phase:['running','paused','completed','limitReached','stopped','blocked'][i],
             priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['C','D','E','F'],error:null};
-          const apply = () => api.applyReviewLoop(snapshot);
+          const apply = () => api.applyReviewPageSnapshot(snapshot);
           const active = () => [...document.querySelectorAll('[data-review-board] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
           const history = () => [...document.querySelectorAll('[data-review-history-card] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
           apply();
@@ -185,20 +185,20 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPreviousReviewDetailsStartCollapsedAndStayOpenDuringRefresh() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],finishedLoopIDs:['finished'],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const history = document.querySelector('[data-review-history]');
           const details = document.querySelector('[data-review-history-details]');
           const card = document.querySelector('[data-review-history-card]');
           const initial = [history.hidden,details.open,card.getBoundingClientRect().height];
           details.querySelector('summary').click();
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           return [...initial,details.open,card.getBoundingClientRect().height > 0];
         })()
         """) as? [AnyHashable]
@@ -206,7 +206,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testHistoryUpdateDatesFollowSelectionAndRefresh() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -214,19 +214,20 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const loops = ['old','new'].map((id,index) => ({id,project,focus:index ? 'performance' : 'organisationAndNaming',phase:'completed',completedRoundCount:1,maxRounds:5,rounds:[]}));
           loops[1].updatedAt = Date.UTC(2026,9,3,14,35) / 1000;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['old','new'],error:null};
-          const expected = timestamp => 'Last updated: ' + new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
+          const dateText = timestamp => new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
+          const expected = timestamp => 'Last updated: ' + dateText(timestamp);
           const label = () => document.querySelector('[data-review-history-updated]').textContent;
           const type = () => document.querySelector('[data-review-history-type]').textContent;
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const select = document.querySelector('[data-review-history-select]');
-          const states = [label() === expected(loops[1].updatedAt),select.selectedOptions[0].textContent.includes(expected(loops[1].updatedAt)),document.querySelector('[data-review-history-details]').open];
-          states.push(type(),select.selectedOptions[0].textContent.includes('Performance and responsiveness'));
+          const states = [label() === expected(loops[1].updatedAt),select.selectedOptions[0].textContent.includes(dateText(loops[1].updatedAt)),document.querySelector('[data-review-history-details]').open];
+          states.push(type(),select.selectedOptions[0].textContent === `Example · Performance and responsiveness · ${dateText(loops[1].updatedAt)}`);
           select.value = 'old'; select.dispatchEvent(new Event('change'));
           states.push(label());
           states.push(type(),select.selectedOptions[0].textContent.includes('Simplification, structure and naming'));
           loops[0].updatedAt = Date.UTC(2026,9,4,9,10) / 1000;
-          api.applyReviewLoop(snapshot);
-          states.push(select.value,label() === expected(loops[0].updatedAt),select.selectedOptions[0].textContent.includes(expected(loops[0].updatedAt)));
+          api.applyReviewPageSnapshot(snapshot);
+          states.push(select.value,label() === expected(loops[0].updatedAt),select.selectedOptions[0].textContent.includes(dateText(loops[0].updatedAt)));
           return states;
         })()
         """) as? [AnyHashable]
@@ -237,7 +238,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
 
     func testPriorityOptionsDescribeIncludedFindings() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://review-loop.test")
         )
         let labels = try await webView.evaluateAsyncJavaScript("""
@@ -252,7 +253,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testSidebarSpinnerCountsActiveLoopsAndNavigationRemount() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let states = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -261,21 +262,21 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           const spinner = () => document.querySelector('[data-review-navigation-running]');
           const states = [spinner().hidden];
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'));
-          loop.phase = 'running'; api.applyReviewLoop(snapshot);
+          loop.phase = 'running'; api.applyReviewPageSnapshot(snapshot);
           states.push(spinner().hidden);
           document.getElementById('codex-dashboard-review-navigation').remove();
           api.ensureMounted();
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
           const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
-          api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          api.applyReviewPageSnapshot({...snapshot,loops:[loop,secondLoop]});
           states.push(spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'), spinner().getAttribute('title'));
-          loop.phase = 'paused'; api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          loop.phase = 'paused'; api.applyReviewPageSnapshot({...snapshot,loops:[loop,secondLoop]});
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
-          secondLoop.phase = 'completed'; api.applyReviewLoop({...snapshot,loops:[loop,secondLoop]});
+          secondLoop.phase = 'completed'; api.applyReviewPageSnapshot({...snapshot,loops:[loop,secondLoop]});
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
-          api.applyReviewLoop({...snapshot,loops:[]});
+          api.applyReviewPageSnapshot({...snapshot,loops:[]});
           states.push(spinner().hidden);
           return states;
         })()
@@ -284,12 +285,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testLiveTestingAvailabilitySelectionResetAndSubmission() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
           const focus = document.querySelector('[data-review-focus]');
@@ -303,7 +304,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
             results.push(action.liveTesting, live.disabled);
-            api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
+            api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           }
           focus.value = 'bugs';
           focus.dispatchEvent(new Event('change'));
@@ -317,12 +318,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testExtensionReloadOptionRequiresLiveTestingAndQueuesSelection() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
           const live = document.querySelector('[data-review-live-testing]');
@@ -335,7 +336,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.querySelector('[data-review-start]').click();
           const action = JSON.parse(api.pendingReviewAction());
           results.push(action.isExtension, extension.disabled);
-          api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
+          api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           results.push(extension.value);
           live.value = 'false';
           live.dispatchEvent(new Event('change'));
@@ -350,12 +351,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testReviewTypesQueueSelectedFocusAndKeepPromptContextOptional() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
           const select = document.querySelector('[data-review-focus]');
@@ -367,7 +368,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
             results.push(action.focus, hidden, action.priorityLimit);
-            api.applyReviewLoop({...snapshot, acknowledgedActionID:action.id});
+            api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           }
           return results;
         })()
@@ -377,12 +378,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testProjectContextAppearsForSupportedReviewTypes() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
           const focus = document.querySelector('[data-review-focus]');
@@ -396,7 +397,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
             states.push(action.promptContext.kind);
-            api.applyReviewLoop({...snapshot,acknowledgedActionID:action.id});
+            api.applyReviewPageSnapshot({...snapshot,acknowledgedActionID:action.id});
           }
           return states;
         })()
@@ -408,7 +409,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
 
     func testReviewTypeLabelsAndPriorityBehaviorComeFromSnapshot() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(
-            html: DashboardWebTestHarness.basicTodoHTML,
+            html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://review-loop.test")
         )
         let result = try await webView.evaluateAsyncJavaScript("""
@@ -418,7 +419,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             {id:'bugs',label:'Bug audit',usesPriorities:true},
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          window.__codexDashboard.applyReviewLoop({reviewTypes,projects:[project],models:[],
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes,projects:[project],models:[],
             loops:[{id:'loop',project,focus:'organisationAndNaming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
           const select = document.querySelector('[data-review-focus]');
           const labels = [...select.options].map(option => option.textContent);
@@ -433,10 +434,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testPanelQueuesOnceAndAcknowledgesWithoutTouchingComposer() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
           window.__codexDashboard.openReviews();
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
@@ -446,7 +447,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const first = JSON.parse(window.__codexDashboard.pendingReviewAction());
           document.querySelector('[data-review-start]').click();
           const same = first.id === JSON.parse(window.__codexDashboard.pendingReviewAction()).id;
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:'Dirty checkout',acknowledgedActionID:first.id});
           return [first.kind,first.projectID,first.maxRounds,first.promptContext.kind,first.priorityLimit,same,window.__codexDashboard.pendingReviewAction() === null,document.querySelector('[data-review-error]').textContent];
         })()
         """) as? [AnyHashable]
@@ -454,11 +455,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testStartRequiresExplicitReviewAndFixModels() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}],models:\(Self.modelsJSON),loops:[],error:null});
           const review = document.querySelector('[data-review-model]');
           const fix = document.querySelector('[data-fix-model]');
           const options = [...review.options].map(option => option.textContent);
@@ -492,7 +493,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateAsyncJavaScript("""
         (() => {
         window.__codexDashboard.openReviews();
-        window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example project',path:'/tmp/example-project'}],loops:[],error:null});
+        window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example project',path:'/tmp/example-project'}],loops:[],error:null});
         window.__codexDashboard.openReviews();
         return true;
         })()
@@ -509,11 +510,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testReviewPageNavigationRepairAndModelSelection() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          api.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}], models:[{modelID:'model-a',displayName:'Model A',supportedReasoningEfforts:['low','high']},{modelID:'model-b',displayName:'Model B',supportedReasoningEfforts:['medium']}],loops:[],error:null});
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[{id:'p',name:'Example',path:'/tmp/example'}], models:[{modelID:'model-a',displayName:'Model A',supportedReasoningEfforts:['low','high']},{modelID:'model-b',displayName:'Model B',supportedReasoningEfforts:['medium']}],loops:[],error:null});
           const nav = document.getElementById('codex-dashboard-review-navigation');
           const placed = nav.previousElementSibling.id === 'codex-dashboard-todo-navigation';
           const sameWidth = Math.abs(nav.getBoundingClientRect().width - nav.previousElementSibling.getBoundingClientRect().width) < 1;
@@ -546,7 +547,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testActivityPreservesExpandedSummaryAndShowsLoopState() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -556,10 +557,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             {number:2,threadID:'task-2',fixRequested:false}
           ]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           api.openReviews();
           document.querySelector('.review-round-details').open = true;
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const active = [document.querySelector('[data-review-form]').hidden,
             !document.querySelector('[data-review-activity]').hidden,
             document.querySelector('[data-review-project-name]').textContent,
@@ -570,12 +571,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-round-count]').textContent,
             !!(document.querySelector('[data-review-activity]').compareDocumentPosition(document.querySelector('[data-review-form]')) & Node.DOCUMENT_POSITION_FOLLOWING)];
           loop.pauseRequested = true;
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           active.push(document.querySelector('[data-review-action="pause"]').disabled,
             document.querySelector('[data-review-action="pause"]').textContent);
           loop.phase = 'completed';
           snapshot.finishedLoopIDs = [loop.id];
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           return [...active,document.querySelector('[data-review-form]').hidden,
             document.querySelector('[data-review-controls]').children.length,
             document.querySelector('[data-review-badge]').textContent];
@@ -585,7 +586,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testFinishedLoopStaysOnBoardUntilClearedOrPageCloses() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -594,13 +595,13 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null};
           const board = () => document.querySelector('[data-review-board]');
           const history = () => document.querySelector('[data-review-history]');
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           api.openReviews();
           loop.phase = 'completed';
           loop.message = 'No findings remain.';
           snapshot.finishedLoopIDs = [loop.id];
-          api.applyReviewLoop(snapshot);
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const retained = [board().children.length, board().querySelector('[data-review-status]').textContent,
             !!board().querySelector('[data-review-clear]'), history().hidden];
           board().querySelector('[data-review-clear]').click();
@@ -610,10 +611,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const reopened = [board().children.length, history().hidden];
           loop.phase = 'running';
           snapshot.finishedLoopIDs = [];
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           loop.phase = 'limitReached';
           snapshot.finishedLoopIDs = [loop.id];
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const retainedAgain = board().children.length;
           api.openTodos();
           api.openReviews();
@@ -624,7 +625,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testRoundsShowFindingsAndTheirPriorities() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
@@ -636,7 +637,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             {number:2,review:{findings:[{priority:null,title:'Unranked issue',body:'Still actionable.'}]},fixRequested:true},
             {number:3,fixRequested:false}
           ]};
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null});
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null});
           window.__codexDashboard.openReviews();
           const rounds = [...document.querySelectorAll('[data-review-rounds] > li')];
           const findings = [...document.querySelectorAll('.review-round-findings li')];
@@ -653,7 +654,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testFindingsStartVisibleAndPreservePerRoundVisibilityDuringRefresh() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -661,18 +662,18 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]},result:{outcome:'fixed',summary:'Fixed'}});
           const loop = {id:'loop',project,phase:'running',completedRoundCount:2,maxRounds:3,rounds:[round(1),round(2)]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
-          api.applyReviewLoop(snapshot); api.openReviews();
+          api.applyReviewPageSnapshot(snapshot); api.openReviews();
           const findings = () => [...document.querySelectorAll('.review-findings-details')];
           const visible = details => details.querySelector('ul').getBoundingClientRect().height > 0;
           const initial = findings().every(details => details.open && visible(details));
           findings()[0].querySelector('summary').click();
           document.querySelector('.review-round-details').open = true;
           loop.rounds.push(round(3));
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const refreshed = [findings()[0].open,visible(findings()[0]),findings()[1].open,findings()[2].open,
             document.querySelector('.review-round-details').open];
           findings()[0].querySelector('summary').click();
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           return [initial,...refreshed,findings()[0].open,visible(findings()[0])];
         })()
         """) as? [AnyHashable]
@@ -680,13 +681,13 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testFindingFileLinksOpenThroughReviewActionAndUnsafeSchemesStayText() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const loop = {id:'loop-1',project,phase:'completed',completedRoundCount:0,maxRounds:1,rounds:[{number:1,
             review:{findings:[{priority:'P2',title:'A <bug>',body:'See [source](/tmp/example/Sources/File.swift:12), [relative](File.swift:4), [docs](https://example.com/guide), and [unsafe](javascript:alert(1)).'}]}}]};
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:['loop-1'],error:null});
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:['loop-1'],error:null});
           window.__codexDashboard.openReviews();
           const finding = document.querySelector('.review-round-findings p');
           const file = finding.querySelector('[data-review-file]');
@@ -705,14 +706,14 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testRoundLimitShowsFinalStatusWithoutResume() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',completedRoundCount:1,maxRounds:1,
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
-          window.__codexDashboard.applyReviewLoop({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
             progress:{[loop.id]:{step:'Round limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
@@ -733,7 +734,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testLivePromptsStayVisibleAfterRefreshAndRenderAsText() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
@@ -743,10 +744,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             progress:{live:{step:'Reviewing',currentLabel:'Current prompt',threadID:'task-1',nextMessage:'',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const current = document.querySelector('[data-review-current-prompt]');
           const upcoming = document.querySelector('[data-review-upcoming-prompt]');
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           const active = [!document.querySelector('[data-review-live]').hidden,
             current.tagName,upcoming.tagName,!current.hidden,!upcoming.hidden,
             document.querySelector('[data-review-current-text]').textContent,
@@ -757,7 +758,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           snapshot.finishedLoopIDs = ['live'];
           snapshot.progress.live.upcoming = null;
           snapshot.progress.live.nextMessage = 'No further prompts scheduled.';
-          api.applyReviewLoop(snapshot);
+          api.applyReviewPageSnapshot(snapshot);
           return [...active,document.querySelector('[data-review-upcoming-prompt]').hidden,
             document.querySelector('[data-review-next-message]').textContent];
         })()
@@ -766,7 +767,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testRequestUsesLocalDesktopConnectionAndCorrelatesResponses() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (async () => {
           window.electronBridge = {sendMessageFromView: async request => {
@@ -783,7 +784,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     }
 
     func testTeardownSettlesPendingRequestWithoutRetry() async throws {
-        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicTodoHTML, baseURL: URL(string: "https://review-loop.test"))
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (async () => {
           let sent = 0;

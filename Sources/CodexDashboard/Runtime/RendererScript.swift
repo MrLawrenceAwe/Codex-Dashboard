@@ -76,8 +76,8 @@ enum RendererScript {
 
     static let pendingReviewAction = "window.__codexDashboard?.pendingReviewAction?.() ?? null"
 
-    static func deliverReviewLoop(_ snapshot: ReviewLoopSnapshot) throws -> String {
-        "window.__codexDashboard?.applyReviewLoop?.(\(try encodeJSON(snapshot))) === true"
+    static func deliverReviewPageSnapshot(_ snapshot: ReviewPageSnapshot) throws -> String {
+        "window.__codexDashboard?.applyReviewPageSnapshot?.(\(try encodeJSON(snapshot))) === true"
     }
 
     static func reviewRequest(method: String, params: [String: Any]) throws -> String {

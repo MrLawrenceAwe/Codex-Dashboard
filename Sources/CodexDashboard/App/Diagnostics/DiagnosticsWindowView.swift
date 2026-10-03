@@ -48,15 +48,6 @@ private struct CompatibilityCard: View {
         }
     }
 
-    private func label(for status: CompatibilityStatus) -> String {
-        switch status {
-        case .compatible: "Compatible"
-        case .warning: "Warning"
-        case .incompatible: "Incompatible"
-        case .unavailable: "Not checked"
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -90,7 +81,7 @@ private struct CompatibilityCard: View {
                                         HStack(spacing: 6) {
                                             Text(check.title)
                                                 .font(.system(size: 11, weight: .medium))
-                                            Text(label(for: check.status))
+                                            Text(check.status.label)
                                                 .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(color(for: check.status))
                                         }
