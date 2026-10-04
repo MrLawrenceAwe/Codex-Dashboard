@@ -239,7 +239,11 @@ extension ChatOverviewWebTests {
             })()
             """
         )
-        try await Task.sleep(for: .milliseconds(5500))
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-chat-overview-notice]').textContent === 'Codex did not show Git actions for the project chat.'",
+            in: webView,
+            timeout: .seconds(15)
+        )
         let state = try await webView.evaluateJavaScript(
             """
             [
