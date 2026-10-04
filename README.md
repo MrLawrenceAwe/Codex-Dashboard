@@ -1,10 +1,22 @@
 # Codex Dashboard
 
-Codex Dashboard is a native macOS menu-bar utility that adds a chat overview
-to the local Codex app. It relaunches Codex with a loopback-only DevTools connection
-and injects a removable dashboard into the main renderer.
+[![CI](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml)
+
+A native macOS menu-bar utility that brings chat activity, unfinished work and project changes into one dashboard inside Codex.
+
+**Stack:** Swift 6, AppKit, JavaScript, XCTest and WebKit.
 
 This is an independent personal project and is not affiliated with OpenAI.
+
+![Chat overview showing running work, unread chats and project changes](docs/images/chat-overview.png)
+
+*Screenshot from the automated visual test fixture; all chats and projects are synthetic.*
+
+## Engineering highlights
+
+- Coordinates native filesystem monitoring with a modular web interface.
+- Saves prompts, to-dos and review-loop progress with recovery after failed writes.
+- Includes state, persistence, cancellation and visual regression tests.
 
 ## Project overview
 
@@ -29,6 +41,8 @@ Use this utility only on a trusted personal macOS account; do not leave Codex ru
 with the dashboard enabled when untrusted local software has access to your account.
 
 ## Install
+
+Requires macOS 14+, the Codex desktop app, and a Swift 6 toolchain. CI uses macOS 26 and Xcode 26.6 for WebKit visual baselines.
 
 Run:
 

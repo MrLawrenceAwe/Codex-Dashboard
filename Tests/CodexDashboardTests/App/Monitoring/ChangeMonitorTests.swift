@@ -369,37 +369,21 @@ final class ChangeMonitorTests: XCTestCase {
         let worktreeURL = root.appendingPathComponent("worktree", isDirectory: true)
         try FileManager.default.createDirectory(at: repositoryURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
-        _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: ["-C", repositoryURL.path, "init", "--quiet"],
-            timeout: 3
-        )
+        try await runFixtureGit(arguments: ["-C", repositoryURL.path, "init", "--quiet"])
         try Data("initial\n".utf8).write(to: repositoryURL.appendingPathComponent("tracked.txt"))
-        _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: [
-                "-C", repositoryURL.path,
-                "-c", "user.name=Codex Dashboard Tests",
-                "-c", "user.email=tests@example.invalid",
-                "add", "tracked.txt",
-            ],
-            timeout: 3
-        )
-        _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: [
-                "-C", repositoryURL.path,
-                "-c", "user.name=Codex Dashboard Tests",
-                "-c", "user.email=tests@example.invalid",
-                "commit", "--quiet", "-m", "Initial",
-            ],
-            timeout: 3
-        )
-        _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: ["-C", repositoryURL.path, "worktree", "add", "--quiet", worktreeURL.path],
-            timeout: 3
-        )
+        try await runFixtureGit(arguments: [
+            "-C", repositoryURL.path,
+            "-c", "user.name=Codex Dashboard Tests",
+            "-c", "user.email=tests@example.invalid",
+            "add", "tracked.txt",
+        ])
+        try await runFixtureGit(arguments: [
+            "-C", repositoryURL.path,
+            "-c", "user.name=Codex Dashboard Tests",
+            "-c", "user.email=tests@example.invalid",
+            "commit", "--quiet", "-m", "Initial",
+        ])
+        try await runFixtureGit(arguments: ["-C", repositoryURL.path, "worktree", "add", "--quiet", worktreeURL.path])
 
         let metadataURL = try XCTUnwrap(GitMetadataLocator.metadataURL(for: worktreeURL))
         let pointerURL = worktreeURL.appendingPathComponent(".git")
@@ -409,6 +393,16 @@ final class ChangeMonitorTests: XCTestCase {
         var isDirectory: ObjCBool = false
         XCTAssertTrue(FileManager.default.fileExists(atPath: metadataURL.path, isDirectory: &isDirectory))
         XCTAssertTrue(isDirectory.boolValue)
+    }
+
+    /// Fixture setup has a generous deadline for shared CI runners; runtime deadlines are tested separately.
+    private func runFixtureGit(arguments: [String]) async throws {
+        let output = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"] + arguments,
+            timeout: 30
+        )
+        XCTAssertEqual(output.terminationStatus, 0, String(decoding: output.standardError, as: UTF8.self))
     }
 
     private func waitUntil(
