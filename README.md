@@ -1,6 +1,6 @@
 # Codex Dashboard
 
-[![CI](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml)
+[![CI](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml)
 
 A native macOS menu-bar utility that brings chat activity, unfinished work and project changes into one dashboard inside Codex.
 
