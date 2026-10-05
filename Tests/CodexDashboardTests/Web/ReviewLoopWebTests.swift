@@ -673,31 +673,41 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [3, 3, "Broken <link>|Stale confirmation|Unranked issue", "P1|P2|", "Fails on the first click.", true, false, true])
     }
 
-    func testFindingsStartVisibleAndPreservePerRoundVisibilityDuringRefresh() async throws {
+    func testFindingsCollapseOnCompletionAndPreserveManualVisibilityDuringRefresh() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]},result:{outcome:'fixed',summary:'Fixed'}});
-          const loop = {id:'loop',project,phase:'running',completedRoundCount:2,maxRounds:3,rounds:[round(1),round(2)]};
+          const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]}});
+          const loop = {id:'loop',project,phase:'running',completedRoundCount:0,maxRounds:3,rounds:[round(1),round(2)]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           api.applyReviewPageSnapshot(snapshot); api.openReviews();
           const findings = () => [...document.querySelectorAll('.review-findings-details')];
           const visible = details => details.querySelector('ul').getBoundingClientRect().height > 0;
           const initial = findings().every(details => details.open && visible(details));
           findings()[0].querySelector('summary').click();
-          document.querySelector('.review-round-details').open = true;
+          loop.rounds[0].result = {outcome:'fixed',summary:'Fixed'};
           loop.rounds.push(round(3));
           api.applyReviewPageSnapshot(snapshot);
           const refreshed = [findings()[0].open,visible(findings()[0]),findings()[1].open,findings()[2].open,
             document.querySelector('.review-round-details').open];
           findings()[0].querySelector('summary').click();
           api.applyReviewPageSnapshot(snapshot);
-          return [initial,...refreshed,findings()[0].open,visible(findings()[0])];
+          const reopened = [findings()[0].open,visible(findings()[0])];
+          loop.rounds[1].result = {outcome:'fixed',summary:'Fixed'};
+          api.applyReviewPageSnapshot(snapshot);
+          const completed = [findings()[1].open,visible(findings()[1]),findings()[2].open];
+          loop.phase = 'stopped';
+          snapshot.finishedLoopIDs = [loop.id];
+          api.applyReviewPageSnapshot(snapshot);
+          const stopped = [findings()[2].open,visible(findings()[2])];
+          findings()[2].querySelector('summary').click();
+          api.applyReviewPageSnapshot(snapshot);
+          return [initial,...refreshed,...reopened,...completed,...stopped,findings()[2].open];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, false, false, true, true, true, true, true])
+        XCTAssertEqual(result, [true, false, false, true, true, false, true, true, false, false, true, false, false, true])
     }
 
     func testFindingFileLinksOpenThroughReviewActionAndUnsafeSchemesStayText() async throws {
