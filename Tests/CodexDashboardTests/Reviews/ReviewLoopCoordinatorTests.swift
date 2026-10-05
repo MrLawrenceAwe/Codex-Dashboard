@@ -814,6 +814,43 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         }
     }
 
+    func testPersonalBugsAndPerformanceLiveTestingPromptsReachNextRound() async throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "combined-personal", kind: .start,
+                                projectID: project.id, promptContext: .personal,
+                                maxRounds: 2, loopID: nil)
+        start.focus = .bugsAndPerformance
+        start.liveTesting = true
+        start.reloadExtensionBeforeTesting = true
+        try coordinator.apply(start, projects: [project])
+
+        let expectedReview =
+            "Review project for bugs, issues, performance and responsiveness (this is a project for personal use)."
+            + reviewBoundary
+            + "\n\nUse code review and live testing to find bugs and issues."
+            + "\n\nUse Computer Use to reload the browser extension before live testing."
+        let expectedFix =
+            "Fix the finding and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+            + "\n\nVerify fixes for findings discovered through live testing using live testing."
+
+        let driver = ReviewTestDriver()
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts, [expectedReview])
+
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: []) // accept review
+        await coordinator.advance(using: driver, threads: []) // send fix
+        XCTAssertEqual(driver.prompts, [expectedReview, expectedFix])
+
+        driver.finish(findings: 1, commit: "fixed")
+        await coordinator.advance(using: driver, threads: []) // verify fix
+        XCTAssertEqual(coordinator.loops.last?.completedRoundCount, 1)
+        await coordinator.advance(using: driver, threads: []) // launch next review
+        XCTAssertEqual(driver.createdThreads, ["thread-1", "thread-2"])
+        XCTAssertEqual(driver.prompts, [expectedReview, expectedFix, expectedReview])
+    }
+
     func testExtensionOptionRequiresLiveTesting() throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
