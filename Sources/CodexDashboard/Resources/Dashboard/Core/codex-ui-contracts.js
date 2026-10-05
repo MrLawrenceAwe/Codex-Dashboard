@@ -129,9 +129,11 @@ const codexUIContracts = (() => {
   }
 
   function threadRow(threadID) {
-    return document.querySelector(
+    // Codex retains hidden workspace/sidebar copies. Clicking those rows can
+    // select a stale chat surface instead of navigating the visible workspace.
+    return [...document.querySelectorAll(
       `[data-app-action-sidebar-thread-id="${CSS.escape(`local:${threadID}`)}"]`,
-    );
+    )].find(isVisible) || null;
   }
 
   function isThreadSelected(threadID) {

@@ -260,7 +260,7 @@ extension ChatOverviewWebTests {
         )
     }
 
-    func testProjectCommitActionUsesCodexGitActionsMenu() async throws {
+    func testProjectCommitRoutesPastHiddenSidebarCopyAndUsesCodexGitActionsMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -269,6 +269,9 @@ extension ChatOverviewWebTests {
                 <button class="sidebar-item">New chat</button>
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:idle-thread">Idle thread</button>
                 <button class="sidebar-item" data-app-action-sidebar-thread-id="local:running-thread">Running thread</button>
+                <div hidden>
+                  <button class="sidebar-item" data-app-action-sidebar-thread-id="local:off-sidebar-idle-thread">Stale workspace chat</button>
+                </div>
               </aside>
               <main>
                 <button type="button" aria-label="Git actions">Git</button>
@@ -290,6 +293,7 @@ extension ChatOverviewWebTests {
                 });
                 document.querySelectorAll('[data-app-action-sidebar-thread-id]').forEach((row) => {
                   row.addEventListener('click', () => {
+                    if (row.closest('[hidden]')) document.documentElement.dataset.staleRowClicked = 'true';
                     document.querySelectorAll('[data-app-action-sidebar-thread-id]')
                       .forEach((candidate) => candidate.removeAttribute('aria-current'));
                     row.setAttribute('aria-current', 'page');
@@ -369,6 +373,7 @@ extension ChatOverviewWebTests {
               document.documentElement.dataset.gitMenuCount,
               document.documentElement.dataset.commitOpened,
               document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
+              document.documentElement.dataset.staleRowClicked || 'false',
             ]
             """
         ) as? [Any]
@@ -381,6 +386,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[1] as? String, "1")
         XCTAssertEqual(values[2] as? String, "true")
         XCTAssertEqual(values[3] as? Bool, false)
+        XCTAssertEqual(values[4] as? String, "false")
     }
 
     func testProjectCommitWaitsForGitActionsMenu() async throws {
