@@ -32,3 +32,15 @@
 #codex-accounts-panel.is-light header button,#codex-accounts-panel.is-light .codex-accounts-actions button { color:#666; }
 #codex-accounts-panel.is-light .codex-accounts-list,#codex-accounts-panel.is-light .codex-accounts-card,#codex-accounts-panel.is-light .codex-accounts-status { border-color:rgba(0,0,0,.1); }
 #codex-accounts-panel.is-light .codex-accounts-avatar { background:rgba(0,0,0,.07); color:#555; }
+
+#codex-usage-blockage { position:fixed; z-index:2147483645; top:64px; right:20px; box-sizing:border-box; width:min(350px,calc(100vw - 40px)); padding:16px; border:1px solid #b88a3c; border-radius:14px; background:#302719; color:#ffe7bc; box-shadow:0 8px 28px rgba(0,0,0,.28); font:12px/1.5 system-ui,sans-serif; }
+#codex-usage-blockage > strong { display:block; font-size:13px; }
+#codex-usage-blockage [data-reset-countdown] { margin:5px 0 8px; font-size:24px; font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums; }
+#codex-usage-blockage [data-reset-detail] { white-space:pre-line; }
+#codex-usage-blockage [data-reset-date] { margin-top:6px; opacity:.8; }
+.codex-usage-reset-footer { display:flex; align-items:center; gap:10px; margin-top:12px; }
+.codex-usage-reset-footer > span { flex:1; font-size:11px; }
+#codex-usage-blockage button { flex-shrink:0; padding:6px 9px; border:1px solid #b88a3c; border-radius:7px; background:rgba(255,255,255,.07); color:inherit; font:inherit; cursor:pointer; }
+#codex-usage-blockage button:disabled { opacity:.5; cursor:default; }
+#codex-usage-blockage button:hover:not(:disabled) { background:rgba(255,255,255,.15); }
+#codex-usage-blockage.is-light { background:#fff5e3; color:#654310; border-color:#b68330; }

@@ -5,6 +5,36 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testResetNoticeRefreshesUnsavedActiveAccountAndPublishesBlockage() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ResetNoticeRefreshTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let usage = CodexAccountUsage(
+            fiveHour: CodexUsageWindow(usedPercent: 100, resetsAt: nil),
+            weekly: CodexUsageWindow(usedPercent: 40, resetsAt: nil)
+        )
+        let runtime = StubDashboardRuntime(
+            codexIsRunning: true, maintainsDashboard: true,
+            accountPopoverActionWaitResult: .action(AccountPopoverAction(kind: .updateUsage, accountID: nil))
+        )
+        let coordinator = makeAppCoordinator(
+            accountManager: CodexAccountManager(
+                metadataURL: directory.appendingPathComponent("accounts.json"),
+                authenticationURL: directory.appendingPathComponent("auth.json"),
+                vault: CoordinatorMemoryCredentialVault()
+            ),
+            accountUsageProvider: SequencedAccountUsageProvider(outcomes: [usage]),
+            runtimeFactory: { _ in runtime }
+        )
+        let outcome = await coordinator.handleAccountPopoverAction()
+        XCTAssertEqual(outcome, .handled)
+        let snapshot = try XCTUnwrap(runtime.lastAccountPopoverSnapshot)
+        XCTAssertTrue(snapshot.accounts.isEmpty)
+        XCTAssertNil(snapshot.activeAccountID)
+        XCTAssertEqual(snapshot.usageBlockage?.windows.map(\.label), ["5-hour"])
+        XCTAssertEqual(snapshot.usageBlockage?.isStale, false)
+    }
+
     func testBusyCoordinatorDoesNotConsumeQueuedAccountRequest() async throws {
         let runtime = StubDashboardRuntime(accountPopoverActionWaitResult: .action(
             AccountPopoverAction(kind: .saveCurrentAccount, accountID: nil)

@@ -107,6 +107,10 @@ To-do views receive project choices from their controller; removed assigned
 projects remain visible as unavailable.
 Account popover snapshots carry labelled usage rows and separate status notes;
 the renderer does not parse formatted strings.
+They also carry the active account's exhausted windows with Unix reset timestamps
+in milliseconds, independently of saved accounts. The persistent usage notice
+counts down to the latest blocking reset and retains the exhausted state until
+fresh usage confirms recovery.
 `review-presentation.js` supplies shared labels independently of setup rendering.
 Reasoning order and labels come from the shared composer preset schema and
 presentation helpers. Chat rows and review model cards resolve display names and

@@ -12,6 +12,68 @@ const accountPopover = (() => {
   let queuedActionTimer;
   let queuedActionDeadline = 0;
   let queuedAction = null;
+  let countdownTimer;
+  const countdownID = 'codex-usage-blockage';
+
+  function resetCountdown(deadline) {
+    const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainder = seconds % 60;
+    return [days ? `${days}d` : '', hours ? `${hours}h` : '',
+      minutes ? `${minutes}m` : '', `${remainder}s`].filter(Boolean).join(' ');
+  }
+
+  function renderCountdown() {
+    const blockage = snapshot.usageBlockage;
+    if (!blockage?.windows.length) {
+      document.getElementById(countdownID)?.remove();
+      if (countdownTimer !== undefined) clearInterval(countdownTimer);
+      countdownTimer = undefined;
+      return;
+    }
+    let notice = document.getElementById(countdownID);
+    if (!notice) {
+      notice = document.createElement('section');
+      notice.id = countdownID;
+      notice.setAttribute('aria-label', 'Codex usage reset countdown');
+      document.body.append(notice);
+    }
+    notice.classList.toggle('is-light', usesLightHostSurface(document.querySelector('main') || document.body));
+    const windows = blockage.windows;
+    const deadlines = windows.map((window) => window.resetsAtMilliseconds);
+    const hasAllDeadlines = deadlines.every((deadline) => Number.isFinite(deadline));
+    const latestReset = hasAllDeadlines ? Math.max(...deadlines) : null;
+    const resetDue = latestReset !== null && latestReset <= Date.now();
+    const title = resetDue ? 'Reset due — awaiting usage update'
+      : blockage.isStale ? 'Last known allowance exhausted' : 'Codex allowance exhausted';
+    const countdown = latestReset === null ? 'Reset time unavailable'
+      : resetDue ? 'Awaiting usage update…' : `Available in ${resetCountdown(latestReset)}`;
+    const detail = windows.map((window) => {
+      const deadline = window.resetsAtMilliseconds;
+      const timing = !Number.isFinite(deadline) ? 'reset time unavailable'
+        : deadline <= Date.now() ? 'reset due'
+          : `resets in ${resetCountdown(deadline)}`;
+      return `${window.label}: 0% remaining · ${timing}`;
+    }).join('\n');
+    const absolute = latestReset !== null && !resetDue
+      ? `Expected reset: ${new Date(latestReset).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : '';
+    // Update text in place so the ticking clock never steals focus from Refresh.
+    if (!notice.firstElementChild) {
+      notice.innerHTML = '<strong data-reset-title></strong><div data-reset-countdown role="timer" aria-live="off"></div><div data-reset-detail></div><div data-reset-date></div><div class="codex-usage-reset-footer"><span data-reset-status></span><button type="button">Refresh usage</button></div>';
+      notice.querySelector('button').addEventListener('click', () => queue('updateUsage', snapshot.activeAccountID));
+    }
+    notice.querySelector('[data-reset-title]').textContent = title;
+    notice.querySelector('[data-reset-countdown]').textContent = countdown;
+    notice.querySelector('[data-reset-detail]').textContent = detail;
+    notice.querySelector('[data-reset-date]').textContent = absolute;
+    notice.querySelector('[data-reset-date]').hidden = !absolute;
+    notice.querySelector('[data-reset-status]').textContent = actionProgress || snapshot.statusMessage
+      || (blockage.isStale ? 'Usage may be stale. Refresh to confirm.' : '');
+    notice.querySelector('button').disabled = Boolean(snapshot.isBusy || actionProgress || queuedAction);
+    if (countdownTimer === undefined) countdownTimer = setInterval(renderCountdown, 1000);
+  }
 
   function expireQueuedAction() {
     if (!queuedAction) return;
@@ -21,6 +83,7 @@ const accountPopover = (() => {
     actionProgress = null;
     snapshot = { ...snapshot, statusMessage: 'Account request could not reach the dashboard. Please try again.' };
     renderPanel();
+    renderCountdown();
   }
 
   function queue(kind, accountID = null) {
@@ -37,6 +100,7 @@ const accountPopover = (() => {
       ? 'Sign-in request queued…'
       : 'Account request queued…';
     renderPanel();
+    renderCountdown();
   }
 
   function takeQueuedAction() {
@@ -48,6 +112,7 @@ const accountPopover = (() => {
     if (action) {
       actionProgress = 'Request received. Checking Codex state…';
       renderPanel();
+      renderCountdown();
     }
     return JSON.stringify(action);
   }
@@ -285,6 +350,7 @@ const accountPopover = (() => {
     }
     mountTrigger();
     if (changed || hadActionProgress) renderPanel();
+    renderCountdown();
     return true;
   }
 
@@ -306,9 +372,13 @@ const accountPopover = (() => {
       observeMutations();
     }
     mountTrigger();
+    renderCountdown();
   }
 
   function unmount() {
+    if (countdownTimer !== undefined) clearInterval(countdownTimer);
+    countdownTimer = undefined;
+    document.getElementById(countdownID)?.remove();
     if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
     queuedActionTimer = undefined;
     queuedAction = null;

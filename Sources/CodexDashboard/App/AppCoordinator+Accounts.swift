@@ -19,8 +19,11 @@ extension AppCoordinator {
         let presentationAlreadyUpdated: Bool
         switch action.kind {
         case .updateUsage:
-            guard let accountID = action.accountID else { return .unavailable }
-            _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
+            if let accountID = action.accountID {
+                _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
+            } else {
+                await refreshAccountUsage()
+            }
             presentationAlreadyUpdated = true
         case .refreshInactiveUsage:
             await refreshInactiveAccountUsage(interactionAllowed: true)

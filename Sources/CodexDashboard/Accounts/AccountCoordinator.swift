@@ -357,7 +357,8 @@ final class AccountCoordinator: ObservableObject {
             },
             activeAccountID: activeSavedAccountID,
             statusMessage: statusMessage,
-            isBusy: isBusy || !refreshingUsageAccountIDs.isEmpty
+            isBusy: isBusy || !refreshingUsageAccountIDs.isEmpty,
+            usageBlockage: AccountUsageFormatter.blockage(for: activeUsageStatus)
         )
     }
 }

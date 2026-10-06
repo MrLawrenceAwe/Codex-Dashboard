@@ -64,8 +64,15 @@ active account leaves Codex signed in. Save it again explicitly to restore it to
 the list. Do not commit, export, or manually copy `~/.codex/auth.json`.
 
 The panel shows five-hour and weekly allowance remaining, reset countdowns, and
-available banked resets with their nearest known expiry. Refresh individual accounts
-or other saved accounts without switching. Background refreshes may require a
+available banked resets with their nearest known expiry.
+
+When the active account reaches 0% allowance, a prominent notice stays visible in
+Codex with a live reset countdown and the exhausted limit. If both limits are
+exhausted, availability uses the later reset. The notice marks stale usage and
+waits for a usage update after the reset time instead of claiming allowance has
+returned. Use **Refresh usage** directly from the notice to check again.
+
+Refresh individual accounts or other saved accounts without switching. Background refreshes may require a
 manual Keychain approval. An account request that cannot reach Dashboard within
 15 seconds expires and can be retried; it cannot switch accounts later.
 

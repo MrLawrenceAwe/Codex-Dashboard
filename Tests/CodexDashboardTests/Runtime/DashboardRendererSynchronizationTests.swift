@@ -32,7 +32,8 @@ extension DashboardRendererTests {
                     accounts: [],
                     activeAccountID: nil,
                     statusMessage: "Updated",
-                    isBusy: false
+                    isBusy: false,
+                    usageBlockage: nil
                 )
             ),
             on: [target]

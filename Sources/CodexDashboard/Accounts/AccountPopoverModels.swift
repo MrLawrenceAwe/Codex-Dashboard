@@ -5,6 +5,17 @@ struct AccountPopoverSnapshot: Codable, Equatable, Sendable {
     let activeAccountID: UUID?
     let statusMessage: String?
     let isBusy: Bool
+    let usageBlockage: AccountUsageBlockage?
+}
+
+struct AccountUsageBlockage: Codable, Equatable, Sendable {
+    struct Window: Codable, Equatable, Sendable {
+        let label: String
+        let resetsAtMilliseconds: Double?
+    }
+
+    let windows: [Window]
+    let isStale: Bool
 }
 
 /// A labelled usage value, or a status note when label is nil.

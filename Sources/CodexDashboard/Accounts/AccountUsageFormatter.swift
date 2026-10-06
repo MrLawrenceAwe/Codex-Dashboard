@@ -1,6 +1,21 @@
 import Foundation
 
 enum AccountUsageFormatter {
+    static func blockage(for status: CodexAccountUsageStatus) -> AccountUsageBlockage? {
+        guard let usage = status.snapshot?.usage else { return nil }
+        let windows = [("5-hour", usage.fiveHour), ("Weekly", usage.weekly)].compactMap { label, window in
+            guard let window, window.usedPercent >= 100 else { return nil as AccountUsageBlockage.Window? }
+            return AccountUsageBlockage.Window(
+                label: label,
+                resetsAtMilliseconds: window.resetsAt.map { $0.timeIntervalSince1970 * 1_000 }
+            )
+        }
+        guard !windows.isEmpty else { return nil }
+        let isStale: Bool
+        if case .available = status { isStale = false } else { isStale = true }
+        return AccountUsageBlockage(windows: windows, isStale: isStale)
+    }
+
     static func rows(
         for status: CodexAccountUsageStatus,
         now: Date = .now,
