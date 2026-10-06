@@ -40,6 +40,72 @@ extension ChatOverviewWebTests {
         }
     }
 
+    func testUsageNoticeCollapseAndDragSurviveRefreshAndStayWithinWindow() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML)
+        webView.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = {
+            accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
+            usageBlockage: { windows: [{ label: '5-hour', resetsAtMilliseconds: Date.now() + 7200000 }], isStale: false },
+          };
+          const apply = () => window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          apply();
+          const notice = document.querySelector('#codex-usage-blockage');
+          const toggle = notice.querySelector('[data-reset-toggle]');
+          const details = notice.querySelector('#codex-usage-reset-details');
+          const expandedHeight = notice.getBoundingClientRect().height;
+          toggle.focus();
+          toggle.click();
+          apply();
+          const collapsed = details.hidden && toggle.getAttribute('aria-expanded') === 'false'
+            && notice.getBoundingClientRect().height < expandedHeight
+            && document.activeElement === toggle
+            && notice.querySelector('[data-reset-countdown]').textContent.includes('Available in');
+          snapshot.isBusy = true;
+          apply();
+          const busyControls = notice.querySelector('[data-reset-refresh]').disabled && !toggle.disabled;
+          toggle.click();
+          const expanded = !details.hidden && toggle.getAttribute('aria-expanded') === 'true';
+          const header = notice.querySelector('header');
+          // Synthetic pointer events have no native active pointer to capture.
+          header.setPointerCapture = () => {};
+          const start = notice.getBoundingClientRect();
+          header.dispatchEvent(new PointerEvent('pointerdown', {
+            pointerId: 1, button: 0, clientX: start.left + 10, clientY: start.top + 10,
+          }));
+          header.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 110, clientY: 130 }));
+          header.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
+          apply();
+          const moved = notice.getBoundingClientRect();
+          const retained = moved.left === 100 && moved.top === 120;
+          header.dispatchEvent(new PointerEvent('pointerdown', {
+            pointerId: 2, button: 0, clientX: moved.left + 10, clientY: moved.top + 10,
+          }));
+          header.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientX: 10000, clientY: 10000 }));
+          header.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 2 }));
+          const clamped = notice.getBoundingClientRect();
+          const inside = clamped.right <= innerWidth - 12 && clamped.bottom <= innerHeight - 12
+            && !notice.classList.contains('is-dragging');
+          // Expanding at the bottom repositions the larger card above the edge.
+          toggle.click();
+          const compact = notice.getBoundingClientRect();
+          header.dispatchEvent(new PointerEvent('pointerdown', {
+            pointerId: 3, button: 0, clientX: compact.left + 10, clientY: compact.top + 10,
+          }));
+          header.dispatchEvent(new PointerEvent('pointermove', { pointerId: 3, clientX: 10000, clientY: 10000 }));
+          header.dispatchEvent(new PointerEvent('pointerup', { pointerId: 3 }));
+          toggle.click();
+          const expandedInside = notice.getBoundingClientRect().bottom <= innerHeight - 12;
+          window.__codexDashboard.destroy();
+          window.dispatchEvent(new Event('resize'));
+          return [collapsed, busyControls, expanded, retained, inside, expandedInside,
+            !document.querySelector('#codex-usage-blockage')];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, Array(repeating: true, count: 7))
+    }
+
     func testUsageResetNoticeSelectsBlockingDeadlineAndClearsOnRecovery() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML)
         let result = try await webView.evaluateJavaScript("""
@@ -66,7 +132,7 @@ extension ChatOverviewWebTests {
           const due = text().includes('awaiting usage update') && !text().includes('Available in');
           apply([windowFor('Weekly', 172800000)], true);
           const stale = text().includes('Last known') && text().includes('Usage may be stale');
-          document.querySelector('#codex-usage-blockage button').click();
+          document.querySelector('#codex-usage-blockage [data-reset-refresh]').click();
           const queued = JSON.parse(window.__codexDashboard.takeQueuedAccountPopoverAction());
           apply(null);
           const recovered = !document.querySelector('#codex-usage-blockage');
@@ -91,7 +157,7 @@ extension ChatOverviewWebTests {
             accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
             usageBlockage: { windows: [{ label: '5-hour', resetsAtMilliseconds: now + 65000 }], isStale: false },
           });
-          const button = document.querySelector('#codex-usage-blockage button');
+          const button = document.querySelector('#codex-usage-blockage [data-reset-refresh]');
           button.focus();
           const before = document.querySelector('[data-reset-countdown]').textContent;
           now += 10000;
