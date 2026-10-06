@@ -101,7 +101,9 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         // This is the last local checkpoint before the renderer can start a turn.
         // It also covers the time spent creating and naming a new review thread.
         let current = try await repositoryCheckpoint.repository(at: projectPath)
-        guard current.clean, current == expectedRepository else {
+        let permitsUnfinishedFixes: Bool
+        if case .fixAfterReload = kind { permitsUnfinishedFixes = true } else { permitsUnfinishedFixes = false }
+        guard (current.clean || permitsUnfinishedFixes), current == expectedRepository else {
             throw ReviewLoopError("The checkout changed before the review chat started. Inspect its changes before continuing.")
         }
         let response = try await request("turn/start", params)

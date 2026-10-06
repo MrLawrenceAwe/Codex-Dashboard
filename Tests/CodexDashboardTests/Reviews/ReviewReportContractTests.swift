@@ -105,6 +105,19 @@ final class ReviewReportContractTests: XCTestCase {
         XCTAssertEqual(try ReviewReportContract.fix(allWithdrawn).result.outcome, .withdrawn)
     }
 
+    func testExtensionReloadRequestRequiresDedicatedCompleteReport() throws {
+        let request = "# Extension reload required\n\n## Summary\nReload Example in Chrome."
+        XCTAssertEqual(try ReviewReportContract.extensionReloadRequest(request), "Reload Example in Chrome.")
+        XCTAssertEqual(try ReviewReportContract.extensionReloadRequest(request.replacingOccurrences(of: "\n", with: "\r\n")), "Reload Example in Chrome.")
+        XCTAssertNil(try ReviewReportContract.extensionReloadRequest("Please reload the extension."))
+        for invalid in ["# Extension reload required", request + "\n## Extra\nOther", request.replacingOccurrences(of: "Reload Example in Chrome.", with: "")] {
+            XCTAssertThrowsError(try ReviewReportContract.extensionReloadRequest(invalid))
+        }
+        for kind in [ReviewTurnKind.review(.p2), .review(nil), .fix, .fixAfterReload] {
+            XCTAssertTrue(ReviewReportContract.instructions(for: kind).contains("# Extension reload required"))
+        }
+    }
+
     func testRoundResultUsesAddressedFindingCount() throws {
         let stored = Data(#"{"outcome":"fixed","addressedFindingCount":2,"commit":"abc1234","summary":"Done"}"#.utf8)
         let result = try JSONDecoder().decode(ReviewRoundResult.self, from: stored)

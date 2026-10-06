@@ -90,3 +90,5 @@ accounts, usage alerts, review loops, and recovery instructions.
 See [architecture and behaviour](docs/architecture.md) for runtime, storage, refresh,
 and notification details. See [development and testing](docs/development.md) for
 renderer previews, resource organisation, migrations, and visual baselines.
+
+Review Loop supports manual browser extension reloads during reviews and fix verification. If Codex cannot reload an extension, it returns `# Extension reload required` with a `## Summary` containing the browser, extension, steps, and reason. The loop displays those instructions as **Waiting for extension reload**. After reloading, select **Extension reloaded — continue** to resume the same chat and round, preserving unfinished fixes. Final review and commit checks still run before the round can complete.

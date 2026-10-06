@@ -7,6 +7,13 @@ enum ReviewPrompts {
             : ""
     }
 
+    static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
+        "The user confirmed that the browser extension has been manually reloaded. Continue the unfinished "
+            + (round.fixRequested ? "fix and verification task. Preserve existing changes, finish verification, and return the final fix report." : "read-only review and return the final review report.")
+            + " If another manual reload is needed, return the extension reload request again."
+            + mutedMediaInstruction(for: loop)
+    }
+
     static func reviewPrompt(for loop: ReviewLoop) -> String {
         let context = loop.focus.supportsProjectContext ? loop.promptContext.promptSuffix : ""
         let task: String

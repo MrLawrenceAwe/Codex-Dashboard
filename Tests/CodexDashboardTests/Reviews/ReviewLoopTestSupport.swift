@@ -141,6 +141,9 @@ final class ReviewTestDriver: ReviewLoopDriving {
             ReviewTurnState(id: "followup-\(thread.turns.count + 1)", status: "inProgress", finalMessage: nil)
         ])
     }
+    func requestExtensionReload() {
+        finishTurn("# Extension reload required\n\n## Summary\nReload Example in Chrome at chrome://extensions. Automatic reload was unavailable.")
+    }
     func blockFix() {
         finishTurn("# Fixes blocked\nFindings addressed: 0\nFindings withdrawn: none\nCommit: `none`\n\n## Summary\nMissing evidence")
     }

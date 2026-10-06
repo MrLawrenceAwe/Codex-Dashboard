@@ -75,6 +75,7 @@ const reviewLoopCardView = (() => {
   }
 
   function phaseLabel(loop) {
+    if (loop.phase === 'awaitingExtensionReload') return 'Waiting for extension reload';
     return loop.phase === 'limitReached' ? 'Round limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
   }
 
@@ -109,7 +110,9 @@ const reviewLoopCardView = (() => {
     meter.value = completedRounds;
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${['paused', 'blocked'].includes(loop.phase)
+    controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
+      ? '<button type="button" data-review-action="resume">Extension reloaded — continue</button>'
+      : ['paused', 'blocked'].includes(loop.phase)
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
       <button type="button" data-review-action="stop">Stop loop</button>`;

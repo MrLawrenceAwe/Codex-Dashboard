@@ -87,6 +87,10 @@ final class ReviewLoopCoordinator {
                 updated.message = updated.phase == .stopping ? "Stopping its running chat." : "Stopped loop."
             } else if updated.phase == .stopping {
                 return
+            } else if action.kind == .resume, updated.phase == .awaitingExtensionReload {
+                updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = true
+                updated.phase = .running
+                updated.message = "Extension reload confirmed. Preparing to continue the same chat."
             } else if action.kind == .resume, updated.phase == .blocked {
                 guard !loops.contains(where: { $0.id != id && !$0.phase.isFinished &&
                     ($0.project.id == updated.project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(updated.project.path))
@@ -278,6 +282,10 @@ final class ReviewLoopCoordinator {
               round.continuationRequested == true || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
             throw ReviewLoopError("The review chat has an unexpected turn. Inspect it before starting a new loop.")
         }
+        if round.reloadContinuationRequested == true {
+            try await continueAfterExtensionReload(loop: updated, round: round, thread: thread, using: driver, threads: threads, threadID: threadID)
+            return
+        }
         if round.review == nil {
             try await acceptReviewReport(round.continuationRequested == true ? thread.turns.last! : reviewTurn, loop: updated, round: round,
                                          using: driver, threads: threads, threadID: threadID)
@@ -298,6 +306,7 @@ final class ReviewLoopCoordinator {
         var round = round
         if reviewTurn.status == "inProgress" { return }
         try requireCompleted(reviewTurn)
+        if try await waitForExtensionReload(reviewTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
         guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
         let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID, reviewOnly: true)
@@ -361,6 +370,7 @@ final class ReviewLoopCoordinator {
         }
         if fixTurn.status == "inProgress" { return }
         try requireCompleted(fixTurn)
+        if try await waitForExtensionReload(fixTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let fixReport = try ReviewReportContract.fix(fixTurn.finalMessage)
         let result = fixReport.result
         guard result.outcome != .blocked else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
@@ -419,6 +429,56 @@ final class ReviewLoopCoordinator {
             outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: repo.commit, summary: result.summary)
         updated.expectedCommit = repo.commit
         try persist(updated)
+    }
+
+    private func waitForExtensionReload(
+        _ turn: ReviewTurnState, loop: ReviewLoop, using driver: any ReviewLoopDriving,
+        threads: [RendererThread], threadID: String
+    ) async throws -> Bool {
+        guard let instructions = try ReviewReportContract.extensionReloadRequest(turn.finalMessage) else { return false }
+        let fixing = loop.rounds.last?.fixRequested == true
+        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
+        guard repo.branch == loop.branch,
+              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
+              fixing || (repo.clean && repo.commit == loop.rounds.last?.baseCommit) else {
+            throw ReviewLoopError("The checkout changed during the review. Inspect its chat before continuing.")
+        }
+        guard var updated = activeLoop(matching: loop.id, phase: .running) else { return true }
+        updated.phase = .awaitingExtensionReload
+        updated.message = instructions
+        try persist(updated)
+        return true
+    }
+
+    private func continueAfterExtensionReload(
+        loop: ReviewLoop, round: ReviewRound, thread: ReviewThreadState,
+        using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
+    ) async throws {
+        guard let latest = thread.turns.last, latest.status == "completed",
+              try ReviewReportContract.extensionReloadRequest(latest.finalMessage) != nil else {
+            throw ReviewLoopError("The chat changed while waiting for extension reload. Inspect its chat before resuming.")
+        }
+        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
+        guard repo.branch == loop.branch,
+              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
+              round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
+            throw ReviewLoopError("The checkout changed while waiting for extension reload. Inspect its chat before continuing.")
+        }
+        guard var updated = activeLoop(matching: loop.id, phase: .running) else { return }
+        // Save submission intent before starting the continuation; never resend an unknown launch.
+        updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
+        updated.rounds[updated.rounds.count - 1].continuationRequested = true
+        updated.message = "Continuing after the manual extension reload."
+        try persist(updated)
+        let turnID = try await driver.startTurn(
+            threadID: threadID, projectPath: updated.project.path, expectedRepository: repo,
+            prompt: ReviewPrompts.extensionReloadContinuation(for: updated, round: round),
+            kind: round.fixRequested ? .fixAfterReload : .review(updated.priorityLimit),
+            selection: round.fixRequested ? updated.fixSelection : updated.reviewSelection, speed: updated.speed)
+        guard var current = matchingLoop(loop.id) else { return }
+        if round.fixRequested { current.rounds[current.rounds.count - 1].fixTurnID = turnID }
+        else { current.rounds[current.rounds.count - 1].reviewTurnID = turnID }
+        try persist(current)
     }
 
     private func validateCheckout(using driver: any ReviewLoopDriving, loop: ReviewLoop,

@@ -39,6 +39,26 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, true, false, true])
     }
 
+    func testExtensionReloadCardShowsInstructionsAndConfirmationAction() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'reload',project,phase:'awaitingExtensionReload',message:'Reload Example in Chrome.',completedRoundCount:0,maxRounds:3,rounds:[]};
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),models:\(Self.modelsJSON),projects:[project],loops:[loop],error:null});
+          const badge = document.querySelector('[data-review-badge]').textContent;
+          const status = document.querySelector('[data-review-status]').textContent;
+          const button = document.querySelector('[data-review-action="resume"]');
+          const label = button.textContent;
+          button.click();
+          const action = JSON.parse(api.pendingReviewAction());
+          return [badge,status,label,action.kind,action.loopID];
+        })()
+        """) as? [String]
+        XCTAssertEqual(result, ["Waiting for extension reload", "Reload Example in Chrome.", "Extension reloaded — continue", "resume", "reload"])
+    }
+
     func testMuteMediaSetupAndActiveCardActions() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateJavaScript("""

@@ -92,12 +92,12 @@ struct ReviewProject: Codable, Equatable, Sendable {
 }
 
 enum ReviewLoopPhase: String, Codable, Sendable {
-    case waiting, running, paused, completed, limitReached, stopping, stopped, blocked
+    case waiting, running, paused, completed, limitReached, stopping, stopped, blocked, awaitingExtensionReload
 
     var isFinished: Bool {
         switch self {
         case .completed, .limitReached, .stopped: true
-        case .waiting, .running, .paused, .stopping, .blocked: false
+        case .waiting, .running, .paused, .stopping, .blocked, .awaitingExtensionReload: false
         }
     }
 }
@@ -110,6 +110,7 @@ struct ReviewRound: Codable, Equatable, Sendable {
     var fixTurnID: String?
     var fixRequested = false
     var continuationRequested: Bool? = nil
+    var reloadContinuationRequested: Bool? = nil
     var review: ReviewReport?
     var result: ReviewRoundResult?
 }
@@ -136,7 +137,7 @@ struct ReviewReport: Codable, Equatable, Sendable {
     }
 }
 
-enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix }
+enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix, fixAfterReload }
 
 struct ReviewRoundResult: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Sendable { case clean, fixed, withdrawn, blocked }

@@ -24,6 +24,7 @@ enum ReviewLoopPresentation {
         case .stopped: "Stopped"
         case .stopping: "Stopping chat"
         case .blocked: "Needs attention"
+        case .awaitingExtensionReload: "Waiting for extension reload"
         case .paused: "Paused"
         case .waiting: "Waiting to review"
         case .running:
@@ -49,6 +50,11 @@ enum ReviewLoopPresentation {
     ) -> (ReviewPromptPreview?, String) {
         let noNextPrompt = "No further prompts scheduled."
         if loop.phase.isFinished || loop.phase == .stopping { return (nil, noNextPrompt) }
+        if loop.phase == .awaitingExtensionReload, let round {
+            return (ReviewPromptPreview(title: "Continue · round \(round.number)",
+                                        text: ReviewPrompts.extensionReloadContinuation(for: loop, round: round),
+                                        note: "Reload the extension manually, then select Extension reloaded — continue."), "")
+        }
         if loop.phase == .blocked {
             return (nil, "Open the review chat and provide the missing information or resolve its blocker, then Resume. The loop checks that chat's latest report and commit.")
         }
