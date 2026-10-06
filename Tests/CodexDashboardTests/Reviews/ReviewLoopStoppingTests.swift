@@ -3,6 +3,23 @@ import XCTest
 
 @MainActor
 final class ReviewLoopStoppingTests: ReviewLoopTestCase {
+    func testDeletedChatReleasesStoppingLoopAndCheckoutAfterRestart() async throws {
+        let (coordinator, store, driver) = try make()
+        await coordinator.advance(using: driver, threads: [])
+        driver.failStopThread = true
+        stop(coordinator)
+        await coordinator.advance(using: driver, threads: [])
+        let recovered = ReviewLoopCoordinator(store: store)
+        driver.stopChatMissing = true
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(recovered.loops.last?.phase, .stopped)
+        XCTAssertTrue(recovered.loops.last?.message.contains("deleted") == true)
+        XCTAssertEqual(ReviewLoopCoordinator(store: store).loops.last?.phase, .stopped)
+        XCTAssertTrue(driver.interruptedTurns.isEmpty)
+        try recovered.apply(startAction(id: "replacement", kind: .start, projectID: project.id,
+                                       promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
+    }
+
     func testFailedStopReservesCheckoutAcrossRestartAndRetriesAutomatically() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])

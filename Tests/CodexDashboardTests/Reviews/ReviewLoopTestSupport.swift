@@ -60,6 +60,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var repositoryRoot: String?
     var failReadThread = false
     var failStopThread = false
+    var stopChatMissing = false
     var interruptedTurns: [String] = []
     var createCalls = 0
     var createdThreads: [String] = []
@@ -110,6 +111,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
         return id
     }
     func interruptLatestTurn(_ threadID: String) async throws {
+        if stopChatMissing { throw ReviewChatMissingError() }
         if failStopThread { throw ReviewLoopError("Connection timed out") }
         guard let last = thread.turns.last, last.status == "inProgress" else { return }
         interruptedTurns.append(last.id)

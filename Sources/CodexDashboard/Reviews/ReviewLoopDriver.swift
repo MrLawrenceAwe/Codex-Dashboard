@@ -7,11 +7,14 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     private let devTools: any DevToolsServing
     private let target: DevToolsTarget
     private let repositoryCheckpoint: any ReviewRepositoryChecking
+    private let stateDatabaseURL: URL
     init(devTools: any DevToolsServing, target: DevToolsTarget,
-         repositoryCheckpoint: any ReviewRepositoryChecking = ReviewRepositoryCheckpoint()) {
+         repositoryCheckpoint: any ReviewRepositoryChecking = ReviewRepositoryCheckpoint(),
+         stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL) {
         self.devTools = devTools
         self.target = target
         self.repositoryCheckpoint = repositoryCheckpoint
+        self.stateDatabaseURL = stateDatabaseURL
     }
 
     func projects() async throws -> [ReviewProject] {
@@ -120,9 +123,17 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     }
 
     private func latestTurn(_ threadID: String) async throws -> (id: String, status: String)? {
-        let page = try await request("thread/turns/list", [
-            "threadId": threadID, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
-        ])
+        let page: [String: Any]
+        do {
+            page = try await request("thread/turns/list", [
+                "threadId": threadID, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
+            ])
+        } catch let error as ReviewLoopError where error.message == "thread not loaded: \(threadID)" {
+            // The app-server cannot read deleted or unloaded chats. Confirm
+            // absence in the local catalog; unloading alone must not release it.
+            guard try await chatIsMissingFromCatalog(threadID) else { throw error }
+            throw ReviewChatMissingError()
+        }
         guard let turns = page["data"] as? [[String: Any]] else {
             throw ReviewLoopError("Codex returned invalid review turn metadata.")
         }
@@ -132,6 +143,21 @@ final class ReviewLoopDriver: ReviewLoopDriving {
             throw ReviewLoopError("Codex returned an invalid review turn.")
         }
         return (id, status)
+    }
+
+    private func chatIsMissingFromCatalog(_ threadID: String) async throws -> Bool {
+        let literal = threadID.replacingOccurrences(of: "'", with: "''")
+        let result = try await Subprocess.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: ["-readonly", stateDatabaseURL.path,
+                        "SELECT EXISTS(SELECT 1 FROM threads WHERE id = '\(literal)');"],
+            timeout: 5
+        )
+        let output = String(data: result.standardOutput, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard result.terminationStatus == 0, output == "0" || output == "1" else {
+            throw ReviewLoopError("Could not verify whether the review chat still exists. Retry Stop when the local chat catalog is available.")
+        }
+        return output == "0"
     }
 
     func readThread(_ threadID: String) async throws -> ReviewThreadState {

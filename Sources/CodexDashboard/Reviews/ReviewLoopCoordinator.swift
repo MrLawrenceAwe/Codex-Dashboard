@@ -137,12 +137,15 @@ final class ReviewLoopCoordinator {
               let loop = matchingLoop(id), loop.phase == .stopping else { return }
         stoppingIDs.insert(id)
         defer { stoppingIDs.remove(id) }
+        var chatMissing = false
         do {
             // No prompt is submitted until the created thread ID is saved.
             // After advancement finishes, an unknown creation has no running turn.
             if let threadID = loop.rounds.last?.threadID {
                 try await driver.interruptLatestTurn(threadID)
             }
+        } catch is ReviewChatMissingError {
+            chatMissing = true
         } catch {
             if var updated = matchingLoop(id), updated.phase == .stopping {
                 updated.message = "Stopping loop, but could not stop its chat. The checkout remains reserved; retry Stop or open its chat: \(error.localizedDescription)"
@@ -152,7 +155,7 @@ final class ReviewLoopCoordinator {
         }
         guard var updated = matchingLoop(id), updated.phase == .stopping else { return }
         updated.phase = .stopped
-        updated.message = "Stopped loop and its running chat."
+        updated.message = chatMissing ? "Stopped loop. Its review chat was deleted or is no longer available." : "Stopped loop and its running chat."
         try persist(updated)
     }
 

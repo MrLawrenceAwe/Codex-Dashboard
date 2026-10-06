@@ -136,6 +136,8 @@ without another fix prompt.
 **Pause after round** finishes the current round. **Stop loop** prevents new work
 and interrupts its running turn. While **Stopping**, its checkout stays reserved;
 interruption failures remain visible and retry automatically, or use **Retry Stop**.
+If its chat was deleted, Stop confirms its absence in the local chat catalog
+and releases the checkout. Catalog failures retain the checkout for another retry.
 After a Dashboard restart, running and waiting loops pause while stopping loops
 continue stopping. **Resume** reconciles known work first
 and never duplicates an unconfirmed launch. For a blocked loop, open its chat,

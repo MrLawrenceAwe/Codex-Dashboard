@@ -121,6 +121,39 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertEqual(count, 3)
     }
 
+    func testUnloadedChatNeedsVerifiedCatalogAbsenceBeforeReleasingCheckout() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("review-catalog-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let database = directory.appendingPathComponent("state.sqlite")
+        for exists in [false, true] {
+            let setup = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+                arguments: [database.path, "CREATE TABLE IF NOT EXISTS threads (id TEXT); DELETE FROM threads;" + (exists ? "INSERT INTO threads VALUES ('thread');" : "")], timeout: 5)
+            XCTAssertEqual(setup.terminationStatus, 0)
+            let connection = ReviewStopDevTools(status: "notLoaded")
+            let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil), stateDatabaseURL: database)
+            do {
+                try await driver.interruptLatestTurn("thread")
+                XCTFail("An unloaded chat must either confirm absence or retain the checkout")
+            } catch is ReviewChatMissingError {
+                XCTAssertFalse(exists)
+            } catch {
+                XCTAssertTrue(exists)
+            }
+        }
+        try FileManager.default.removeItem(at: database)
+        let connection = ReviewStopDevTools(status: "notLoaded")
+        let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil), stateDatabaseURL: database)
+        do {
+            try await driver.interruptLatestTurn("thread")
+            XCTFail("A missing database cannot confirm deletion")
+        } catch is ReviewChatMissingError {
+            XCTFail("Database failures must retain the checkout")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("Could not verify"))
+        }
+    }
+
     func testReadsFollowupTurnsWithOptionalMessagePhaseAndBoundsHistory() throws {
         let turn: [String: Any] = ["id": "review", "status": "completed", "items": [
             ["type": "agentMessage", "phase": "commentary", "text": "Working"],
@@ -278,6 +311,7 @@ private actor ReviewStopDevTools: DevToolsServing {
         let request = try JSONSerialization.jsonObject(with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as! [String: Any]
         expressions.append(expression)
         if request["method"] as? String == "thread/turns/list" {
+            if status == "notLoaded" { return #"{"error":{"message":"thread not loaded: thread"}}"# }
             let turns: [[String: String]] = status == "empty" ? [] : [["id": "latest-turn", "status": status]]
             return String(data: try JSONSerialization.data(withJSONObject: ["result": ["data": turns]]), encoding: .utf8)
         }

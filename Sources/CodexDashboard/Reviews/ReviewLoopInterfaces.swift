@@ -24,6 +24,10 @@ struct ReviewLoopError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+struct ReviewChatMissingError: LocalizedError {
+    var errorDescription: String? { "The review chat was deleted or is no longer available." }
+}
+
 @MainActor
 protocol ReviewLoopDriving: Sendable {
     func projects() async throws -> [ReviewProject]
