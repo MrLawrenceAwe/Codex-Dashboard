@@ -22,6 +22,11 @@ private actor RecordingNtfyPublisher: NtfyPublishing {
 private actor FailOnceNtfyPublisher: NtfyPublishing {
     private var failuresRemaining = 1
     private var messages: [String] = []
+    private let onDelivery: @Sendable () -> Void
+
+    init(onDelivery: @escaping @Sendable () -> Void = {}) {
+        self.onDelivery = onDelivery
+    }
 
     func publish(topic: String, title: String, message: String) throws {
         if failuresRemaining > 0 {
@@ -29,6 +34,7 @@ private actor FailOnceNtfyPublisher: NtfyPublishing {
             throw URLError(.cannotConnectToHost)
         }
         messages.append(message)
+        onDelivery()
     }
 
     func messageCount() -> Int { messages.count }
@@ -430,11 +436,17 @@ final class NtfyUsageNotifierTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
         defaults.set(true, forKey: NtfyUsageNotifier.enabledKey)
-        let publisher = FailOnceNtfyPublisher()
+        let retryScheduled = expectation(description: "Failed delivery has scheduled its retry")
+        let delivered = expectation(description: "Revised deadline delivered after refresh")
+        let publisher = FailOnceNtfyPublisher(onDelivery: { delivered.fulfill() })
         let notifier = NtfyUsageNotifier(
             userDefaults: defaults,
             publisher: publisher,
-            now: { now }
+            now: { now },
+            retryDelay: { _ in
+                retryScheduled.fulfill()
+                return .seconds(60)
+            }
         )
         let account = SavedAccount(
             id: UUID(), name: "Personal", createdAt: now, lastUsedAt: now, codexAccountID: nil
@@ -457,13 +469,12 @@ final class NtfyUsageNotifierTests: XCTestCase {
 
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: initialUsage])
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: revisedUsage])
-        try? await Task.sleep(for: .seconds(1.1))
+        // Refresh only after the failed attempt has entered backoff. A fixed
+        // sleep can refresh before delivery starts on a busy CI runner.
+        await fulfillment(of: [retryScheduled], timeout: 10)
         await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: revisedUsage])
-        try? await Task.sleep(for: .seconds(1.1))
-        for _ in 0..<50 {
-            if await publisher.messageCount() == 1 { break }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
+        // A refresh must retry immediately rather than wait for the 60s backoff.
+        await fulfillment(of: [delivered], timeout: 10)
 
         let messageCount = await publisher.messageCount()
         XCTAssertEqual(messageCount, 1)

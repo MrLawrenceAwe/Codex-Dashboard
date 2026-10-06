@@ -143,8 +143,8 @@ extension AppCoordinatorTests {
         XCTAssertEqual(latestPolicy, .useCached)
     }
 
-    func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsAvailable() async {
-        let thread = ThreadSummary.fixture(id: "thread-1")
+    func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsAvailable() async throws {
+        let thread = ThreadSummary.fixture(id: "thread-1", projectGitStatus: .notRepository)
         let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .clean)
         let coordinator = makeAppCoordinator(
             catalogProvider: StubCatalogProvider(
@@ -156,6 +156,13 @@ extension AppCoordinatorTests {
             runtimeFactory: { _ in StubDashboardRuntime() }
         )
 
+        await coordinator.refreshAfterActivation()
+        // Newly discovered projects refresh in a separate task. Wait for its
+        // published result before checking that activation avoids duplication.
+        try await waitUntil(timeout: .seconds(10)) {
+            let requestCount = await projectGitStatusProvider.requestCount()
+            return requestCount >= 1 && coordinator.threads.first?.projectGitStatus == .clean
+        }
         await coordinator.refreshAfterActivation()
 
         let requestCount = await projectGitStatusProvider.requestCount()
