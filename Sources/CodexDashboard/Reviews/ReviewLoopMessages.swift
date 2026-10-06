@@ -2,7 +2,7 @@ import Foundation
 
 struct ReviewLoopAction: Codable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case start, pause, resume, stop, openFile, delete, deleteOlder, deleteAll
+        case start, pause, resume, stop, setMuteMedia, openFile, delete, deleteOlder, deleteAll
     }
 
     let id: String
@@ -13,6 +13,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let loopID: UUID?
     var liveTesting: Bool? = nil
     var reloadExtensionBeforeTesting: Bool? = nil
+    var muteMedia: Bool? = nil
     var pushToRemote: Bool? = nil
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil

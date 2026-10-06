@@ -1,6 +1,12 @@
 import Foundation
 
 enum ReviewPrompts {
+    private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
+        loop.liveTesting && loop.focus.supportsLiveTesting && loop.muteMedia
+            ? "\n\nMute media in test tabs or players before starting playback and keep it muted throughout live testing, including after navigation or extension reloads. Verify that test media is muted."
+            : ""
+    }
+
     static func reviewPrompt(for loop: ReviewLoop) -> String {
         let context = loop.focus.supportsProjectContext ? loop.promptContext.promptSuffix : ""
         let task: String
@@ -24,7 +30,7 @@ enum ReviewPrompts {
         let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting
             ? "\n\nUse Computer Use to reload the browser extension before live testing."
             : ""
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReload
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReload + mutedMediaInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -46,6 +52,7 @@ enum ReviewPrompts {
         if loop.liveTesting && loop.focus.supportsLiveTesting {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
         }
+        prompt += mutedMediaInstruction(for: loop)
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
         let scope = review.findings.enumerated().compactMap { index, finding -> String? in
             guard accepted.contains(finding) else { return nil }

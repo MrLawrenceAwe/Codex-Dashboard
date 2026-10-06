@@ -39,6 +39,38 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, true, false, true])
     }
 
+    func testMuteMediaSetupAndActiveCardActions() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON), projects:[project],loops:[],error:null};
+          api.applyReviewPageSnapshot(snapshot); api.openReviews();
+          const mute = document.querySelector('[data-review-mute-media]');
+          const hiddenBefore = mute.closest('label').hidden;
+          const live = document.querySelector('[data-review-live-testing]');
+          live.value = 'true'; live.dispatchEvent(new Event('change'));
+          const visible = !mute.closest('label').hidden;
+          mute.value = 'true';
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
+          document.querySelector('[data-review-form]').requestSubmit();
+          const start = JSON.parse(api.pendingReviewAction());
+          const loop = {id:'blocked',project,phase:'blocked',liveTesting:true,muteMedia:false,completedRoundCount:0,maxRounds:3,rounds:[]};
+          api.applyReviewPageSnapshot({...snapshot,loops:[loop],acknowledgedActionID:start.id});
+          const toggle = document.querySelector('[data-review-loop-mute-media]');
+          toggle.click();
+          const update = JSON.parse(api.pendingReviewAction());
+          api.applyReviewPageSnapshot({...snapshot,loops:[{...loop,muteMedia:true}],acknowledgedActionID:update.id});
+          return [hiddenBefore,visible,start.muteMedia,update.kind,update.loopID,update.muteMedia,
+            document.querySelector('[data-review-loop-mute-media]').checked,
+            document.querySelector('[data-review-context]').textContent.includes('Media muted')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [true,true,true,"setMuteMedia","blocked",true,true,true])
+    }
+
     func testStartIncludesOptInRemotePushPreference() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let values = try await webView.evaluateAsyncJavaScript("""

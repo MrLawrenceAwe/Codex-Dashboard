@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testMuteMediaAppliesToReviewAndFixOnlyWithLiveTesting() {
+        var loop = ReviewLoop(id: UUID(), startActionID: "muted", project: project,
+                              promptContext: .general, maxRounds: 3, liveTesting: true, muteMedia: true)
+        let round = ReviewRound(number: 1, baseCommit: "base")
+        for focus in ReviewFocus.allCases {
+            loop.focus = focus
+            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media in test tabs"), focus.supportsLiveTesting)
+            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute media in test tabs"), focus.supportsLiveTesting)
+        }
+        loop.focus = .bugs
+        loop.liveTesting = false
+        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media"))
+        XCTAssertFalse(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute media"))
+        loop.liveTesting = true
+        loop.muteMedia = false
+        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media"))
+    }
+
     func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {
         let payload = Data("""
         {"id":"start","kind":"start","projectID":"project","promptContext":{"kind":"personal"},"maxRounds":3,"reviewSelection":{"modelID":"review-model"},"fixSelection":{"modelID":"fix-model"}}

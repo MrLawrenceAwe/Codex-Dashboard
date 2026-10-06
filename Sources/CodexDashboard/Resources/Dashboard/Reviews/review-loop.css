@@ -155,3 +155,7 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
   .dashboard-review-loop .review-round-heading { align-items:flex-start; flex-direction:column; gap:4px; }
   .dashboard-review-loop .review-round-heading span { text-align:left; }
 }
+
+.dashboard-review-loop [data-review-media-setting] { margin-top:16px; }
+.dashboard-review-loop [data-review-media-setting] label { display:flex; align-items:center; gap:8px; width:fit-content; font-size:13px; }
+.dashboard-review-loop [data-review-media-setting] input { appearance:auto; width:16px; min-height:16px; height:16px; margin:0; padding:0; }

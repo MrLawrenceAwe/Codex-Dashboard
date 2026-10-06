@@ -3,6 +3,20 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testVersionEightAddsMuteMediaWithoutLosingSavedRound() throws {
+        var loop = ReviewLoop(id: UUID(), startActionID: "mute", project: project,
+                              promptContext: .personal, maxRounds: 3, liveTesting: true)
+        loop.phase = .blocked
+        loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "muteMedia")
+        let data = try JSONSerialization.data(withJSONObject: ["version": 8, "loops": [saved]])
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
+        loop.muteMedia = true
+        let current = try JSONEncoder().encode(ReviewLoopsDocument(version: ReviewLoopsDocument.currentVersion, loops: [loop]))
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(current), [loop])
+    }
+
     func testVersionSevenUnconfirmedStopsKeepTheirCheckoutReservation() throws {
         for (message, expectedPhase) in [
             ("Stopped loop. Stopping its running chat.", ReviewLoopPhase.stopping),
@@ -99,7 +113,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
         savedResult["findings"] = savedResult.removeValue(forKey: "addressedFindingCount")
         savedRounds[0]["result"] = savedResult
         saved["rounds"] = savedRounds
-        let formats: [Any] = [saved, [saved]] + (1..<ReviewLoopsDocument.currentVersion).map {
+        let formats: [Any] = [saved, [saved]] + (1...7).map {
             ["version": $0, "loops": [saved]] as [String: Any]
         }
         for format in formats {

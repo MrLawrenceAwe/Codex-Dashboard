@@ -12,7 +12,14 @@ enum ReviewLoopDocumentMigration {
                 return try JSONDecoder().decode(ReviewLoopsDocument.self, from: data).loops
             }
             guard let saved = document["loops"] as? [[String: Any]] else { throw ReviewLoopError("Invalid review-loop document.") }
-            return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map(migrate)))
+            return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map { loop in
+                if version == 8 {
+                    var current = loop
+                    current["muteMedia"] = current["muteMedia"] ?? false
+                    return current
+                }
+                return migrate(loop)
+            }))
         }
         let savedLoops = value as? [[String: Any]] ?? (value as? [String: Any]).map { [$0] }
         guard let savedLoops else { throw ReviewLoopError("Invalid review-loop document.") }
@@ -43,6 +50,7 @@ enum ReviewLoopDocumentMigration {
         if loop["focus"] as? String == "naming" { loop["focus"] = "organisationAndNaming" }
         loop["reloadExtensionBeforeTesting"] = loop.removeValue(forKey: "isExtension")
             ?? loop["reloadExtensionBeforeTesting"] ?? false
+        if loop["muteMedia"] == nil { loop["muteMedia"] = false }
         if loop["liveTesting"] == nil { loop["liveTesting"] = false }
         if loop["pushToRemote"] == nil { loop["pushToRemote"] = false }
         if loop["promptContext"] == nil {

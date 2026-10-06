@@ -40,6 +40,7 @@ const reviewLoopPage = (() => {
         focus,
         liveTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true',
         reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
+        muteMedia: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').value === 'true',
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
@@ -53,6 +54,10 @@ const reviewLoopPage = (() => {
       model.addEventListener('change', () => reviewLoopSetupView.renderReasoningOptions(snapshot, pendingAction, kind));
       model.addEventListener('invalid', () => { details.querySelector('.review-execution-options').open = true; });
     }
+    details.addEventListener('change', event => {
+      const control = event.target.closest('[data-review-loop-mute-media]');
+      if (control) queue({ kind: 'setMuteMedia', loopID: control.dataset.reviewLoopId, muteMedia: control.checked });
+    });
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
       const historyAction = event.target.closest('[data-review-history-action]');

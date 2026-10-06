@@ -67,7 +67,16 @@ final class ReviewLoopCoordinator {
             let focus = action.focus ?? .bugs
             let promptContext = focus.supportsProjectContext ? action.promptContext ?? .general : .general
             let liveTesting = focus.supportsLiveTesting && (action.liveTesting ?? false)
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), pushToRemote: action.pushToRemote ?? false))
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteMedia: liveTesting && (action.muteMedia ?? false), pushToRemote: action.pushToRemote ?? false))
+        case .setMuteMedia:
+            guard let id = action.loopID, var updated = matchingLoop(id),
+                  !updated.phase.isFinished, updated.phase != .stopping,
+                  updated.liveTesting, updated.focus.supportsLiveTesting,
+                  let muteMedia = action.muteMedia else {
+                throw ReviewLoopError("Mute media requires an active loop with live testing enabled.")
+            }
+            updated.muteMedia = muteMedia
+            try persist(updated)
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
                 throw ReviewLoopError("This review loop has changed. Refresh its controls.")

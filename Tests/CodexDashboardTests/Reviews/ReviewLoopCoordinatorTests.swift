@@ -814,6 +814,47 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         }
     }
 
+    func testMuteMediaCanBeEnabledOnBlockedLoopWithoutResuming() throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "mute", kind: .start, projectID: project.id,
+                                promptContext: .general, maxRounds: 3, loopID: nil)
+        start.liveTesting = true
+        start.muteMedia = true
+        try coordinator.apply(start, projects: [project])
+        var loop = try XCTUnwrap(store.loops.first)
+        XCTAssertTrue(loop.muteMedia)
+        loop.phase = .blocked
+        loop.muteMedia = false
+        loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
+        store.loops = [loop]
+        let restored = ReviewLoopCoordinator(store: store)
+        var action = startAction(id: "mute-update", kind: .setMuteMedia, projectID: nil,
+                                 promptContext: nil, maxRounds: nil, loopID: loop.id)
+        action.muteMedia = true
+        try restored.apply(action, projects: [project])
+        XCTAssertTrue(store.loops[0].muteMedia)
+        XCTAssertEqual(store.loops[0].phase, .blocked)
+        XCTAssertEqual(store.loops[0].rounds, loop.rounds)
+        action.muteMedia = false
+        try restored.apply(action, projects: [project])
+        XCTAssertFalse(store.loops[0].muteMedia)
+    }
+
+    func testMuteMediaRequiresLiveTesting() throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "mute-no-live", kind: .start, projectID: project.id,
+                                promptContext: .general, maxRounds: 3, loopID: nil)
+        start.muteMedia = true
+        try coordinator.apply(start, projects: [project])
+        XCTAssertFalse(store.loops[0].muteMedia)
+        var action = startAction(id: "mute-update", kind: .setMuteMedia, projectID: nil,
+                                 promptContext: nil, maxRounds: nil, loopID: store.loops[0].id)
+        action.muteMedia = true
+        XCTAssertThrowsError(try coordinator.apply(action, projects: [project]))
+    }
+
     func testExtensionOptionRequiresLiveTesting() throws {
         let store = ReviewTestStore()
         let coordinator = ReviewLoopCoordinator(store: store)
