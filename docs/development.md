@@ -137,7 +137,7 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
-Review-loop version 9 adds `muteMedia`, defaulting existing loops to off while preserving all other version 8 fields. Review and fix prompts include muting instructions when live testing and this preference are enabled. Active cards save changes through `setMuteMedia` for the next prompt.
+Review-loop version 9 adds `muteMedia`, defaulting existing loops to off while preserving all other version 8 fields. Review and fix prompts scope muting to playback started by the agent, including autoplay in its test tabs, and explicitly preserve existing user playback and mute/volume settings. They prohibit browser-wide or system muting. These instructions are included when live testing and this preference are enabled. Active cards save changes through `setMuteMedia` for the next prompt.
 
 Version 8 adds the durable `stopping` phase so checkout reservations
 survive interruption failures and restarts. Version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.

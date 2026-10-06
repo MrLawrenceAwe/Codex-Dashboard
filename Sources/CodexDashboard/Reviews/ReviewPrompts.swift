@@ -3,7 +3,7 @@ import Foundation
 enum ReviewPrompts {
     private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
         loop.liveTesting && loop.focus.supportsLiveTesting && loop.muteMedia
-            ? "\n\nMute media in test tabs or players before starting playback and keep it muted throughout live testing, including after navigation or extension reloads. Verify that test media is muted."
+            ? "\n\nMute only media playback that you start or cause to start for live testing, including autoplay in test tabs you open. Mute that specific test tab or player before playback and keep it muted after navigation or extension reloads. Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture. Never mute the entire browser or system audio. Use separate test tabs when needed and verify that only your test playback is muted."
             : ""
     }
 

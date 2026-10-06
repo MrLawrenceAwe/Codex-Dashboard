@@ -52,7 +52,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const live = document.querySelector('[data-review-live-testing]');
           live.value = 'true'; live.dispatchEvent(new Event('change'));
           const visible = !mute.closest('label').hidden;
-          mute.value = 'true';
+          mute.checked = true;
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
           document.querySelector('[data-review-form]').requestSubmit();
@@ -65,10 +65,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot({...snapshot,loops:[{...loop,muteMedia:true}],acknowledgedActionID:update.id});
           return [hiddenBefore,visible,start.muteMedia,update.kind,update.loopID,update.muteMedia,
             document.querySelector('[data-review-loop-mute-media]').checked,
-            document.querySelector('[data-review-context]').textContent.includes('Media muted')];
+            document.querySelector('[data-review-media-setting]').querySelector('p') === null,
+            mute.type === 'checkbox'];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true,true,true,"setMuteMedia","blocked",true,true,true])
+        XCTAssertEqual(result, [true,true,true,"setMuteMedia","blocked",true,true,true,true])
     }
 
     func testStartIncludesOptInRemotePushPreference() async throws {

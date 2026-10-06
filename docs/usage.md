@@ -106,7 +106,7 @@ available even when usage alerts are suppressed.
 
 ## Review loops
 
-Enable **Mute media** with live testing to ask review and fix agents to mute test tabs or players before playback and keep them muted throughout testing. Active loop cards also let you change this preference for the next prompt.
+Enable **Mute media** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
 
 Choose a local, single-folder project on **Review loops**, then a review type:
 **Bugs and issues**, **Performance**, **Bugs and performance**, **Structure**,

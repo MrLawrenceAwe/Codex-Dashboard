@@ -9,16 +9,21 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
         let round = ReviewRound(number: 1, baseCommit: "base")
         for focus in ReviewFocus.allCases {
             loop.focus = focus
-            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media in test tabs"), focus.supportsLiveTesting)
-            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute media in test tabs"), focus.supportsLiveTesting)
+            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback that you start"), focus.supportsLiveTesting)
+            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute only media playback that you start"), focus.supportsLiveTesting)
         }
         loop.focus = .bugs
+        for prompt in [ReviewPrompts.reviewPrompt(for: loop), ReviewPrompts.fixPrompt(for: loop, round: round)] {
+            XCTAssertTrue(prompt.contains("including autoplay in test tabs you open"))
+            XCTAssertTrue(prompt.contains("Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture"))
+            XCTAssertTrue(prompt.contains("Never mute the entire browser or system audio"))
+        }
         loop.liveTesting = false
-        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media"))
-        XCTAssertFalse(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute media"))
+        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback"))
+        XCTAssertFalse(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute only media playback"))
         loop.liveTesting = true
         loop.muteMedia = false
-        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute media"))
+        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback"))
     }
 
     func testRendererPromptContextDecodesAndBuildsPersonalPrompt() throws {

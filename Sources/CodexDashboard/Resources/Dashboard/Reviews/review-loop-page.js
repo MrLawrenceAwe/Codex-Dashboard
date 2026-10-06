@@ -40,7 +40,7 @@ const reviewLoopPage = (() => {
         focus,
         liveTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true',
         reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
-        muteMedia: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').value === 'true',
+        muteMedia: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').checked,
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
         promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
