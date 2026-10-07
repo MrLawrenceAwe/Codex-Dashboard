@@ -3,6 +3,23 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testExtensionReloadRequiresEnabledPreferenceAndLiveTesting() {
+        var loop = ReviewLoop(id: UUID(), startActionID: "extension", project: project,
+                              promptContext: .general, maxRounds: 3, liveTesting: true)
+        let round = ReviewRound(number: 1, baseCommit: "base")
+        for (liveTesting, reload) in [(true, true), (true, false), (false, true), (false, false)] {
+            loop.liveTesting = liveTesting
+            loop.reloadExtensionBeforeTesting = reload
+            for prompt in [ReviewPrompts.reviewPrompt(for: loop), ReviewPrompts.fixPrompt(for: loop, round: round)] {
+                XCTAssertEqual(prompt.contains("chrome-devtools MCP server"), liveTesting && reload)
+                if liveTesting && reload {
+                    XCTAssertTrue(prompt.contains("Verify reload success"))
+                    XCTAssertTrue(prompt.contains("return # Extension reload required"))
+                }
+            }
+        }
+    }
+
     func testMuteMediaAppliesToReviewAndFixOnlyWithLiveTesting() {
         var loop = ReviewLoop(id: UUID(), startActionID: "muted", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true, muteMedia: true)

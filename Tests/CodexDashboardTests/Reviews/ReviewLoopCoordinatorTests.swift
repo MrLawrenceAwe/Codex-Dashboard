@@ -795,7 +795,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[0].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[0].contains("Use the globally configured chrome-devtools MCP server"), focus.supportsLiveTesting)
             if focus.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
@@ -805,12 +805,13 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             let baseFix = ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last))
             let liveVerification = focus.supportsLiveTesting
                 ? "\n\nVerify fixes for findings discovered through live testing using live testing." : ""
-            XCTAssertEqual(driver.prompts[1], baseFix + liveVerification)
+            XCTAssertTrue(driver.prompts[1].hasPrefix(baseFix + liveVerification))
+            XCTAssertEqual(driver.prompts[1].contains("After changes, run any required build and reload the same extension before live verification."), focus.supportsLiveTesting)
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts[2].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[2].contains("Use Computer Use to reload the browser extension before live testing."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Use the globally configured chrome-devtools MCP server"), focus.supportsLiveTesting)
         }
     }
 

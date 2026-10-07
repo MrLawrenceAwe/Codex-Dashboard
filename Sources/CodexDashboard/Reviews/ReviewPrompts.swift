@@ -1,6 +1,14 @@
 import Foundation
 
 enum ReviewPrompts {
+    private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
+        guard loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting else { return "" }
+        let timing = verifyingFixes
+            ? "After changes, run any required build and reload the same extension before live verification."
+            : "Reload the browser extension before live testing to establish the current behaviour."
+        return "\n\nUse the globally configured chrome-devtools MCP server for Chrome extension reloads. Identify the installed extension ID and source folder with list_extensions and project context, then use reload_extension. Prefer these tools over Computer Use on chrome://extensions. \(timing) Verify reload success, refresh affected test pages, and reopen the popup or side panel as needed with trigger_extension_action. If the tools are unavailable or reload fails, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete."
+    }
+
     private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
         loop.liveTesting && loop.focus.supportsLiveTesting && loop.muteMedia
             ? "\n\nMute only media playback that you start or cause to start for live testing, including autoplay in test tabs you open. Mute that specific test tab or player before playback and keep it muted after navigation or extension reloads. Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture. Never mute the entire browser or system audio. Use separate test tabs when needed and verify that only your test playback is muted."
@@ -34,10 +42,7 @@ enum ReviewPrompts {
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
             ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
-        let extensionReload = loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting
-            ? "\n\nUse Computer Use to reload the browser extension before live testing."
-            : ""
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReload + mutedMediaInstruction(for: loop)
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -59,7 +64,7 @@ enum ReviewPrompts {
         if loop.liveTesting && loop.focus.supportsLiveTesting {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
         }
-        prompt += mutedMediaInstruction(for: loop)
+        prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + mutedMediaInstruction(for: loop)
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
         let scope = review.findings.enumerated().compactMap { index, finding -> String? in
             guard accepted.contains(finding) else { return nil }

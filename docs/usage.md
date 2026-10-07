@@ -123,6 +123,15 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 **Reload browser extension** before testing. Review models come from Codex's live
 model list.
 
+With **Reload browser extension** enabled, Codex uses Chrome DevTools to reload
+Chrome extensions before live testing and again after building fixes. It checks
+that the reload succeeded, refreshes affected test pages, and reopens extension
+UI as needed. The `chrome-devtools` MCP server must be configured in Codex with
+extension tools enabled; Chrome may ask you to approve the connection. If the
+tools are unavailable or a reload fails, the loop waits for a manual reload and
+shows the reason and steps. Select **Extension reloaded — continue** after
+reloading to resume the unfinished task.
+
 Each round starts a read-only review in a new chat on the current branch and
 checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that
 chat. Excluded priorities remain visible but are not fixed. Findings are verified
