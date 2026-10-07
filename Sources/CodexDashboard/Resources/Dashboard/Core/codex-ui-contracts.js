@@ -154,7 +154,7 @@ const codexUIContracts = (() => {
     return null;
   }
 
-  function activeComposerProject() {
+  function activeComposerProjectID() {
     const activeComposer = composer();
     let host = activeComposer?.parentElement;
     let projectID;
@@ -173,6 +173,11 @@ const codexUIContracts = (() => {
       }
       host = host.parentElement;
     }
+    return projectID || null;
+  }
+
+  function activeComposerProject() {
+    const projectID = activeComposerProjectID();
     if (!projectID) return null;
 
     const projectRow = document.querySelector(
@@ -402,6 +407,7 @@ const codexUIContracts = (() => {
     threadRow,
     isThreadSelected,
     activeComposerThreadID,
+    activeComposerProjectID,
     activeComposerProject,
     threadUnreadStates,
     markThreadsRead,

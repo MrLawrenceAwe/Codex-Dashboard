@@ -70,7 +70,7 @@ enum DashboardWebTestHarness {
         };
         function createTodoList({ threadReferencesForProject, findThread }) {
         """)
-        return try instrumentSource(trackedStore, anchor: "async function commitItems(nextItems, nextTags = availableTags) {", replacement: """
+        let trackedCommits = try instrumentSource(trackedStore, anchor: "async function commitItems(nextItems, nextTags = availableTags) {", replacement: """
         function commitItems(nextItems, nextTags = availableTags) {
           const save = commitTodoItems(nextItems, nextTags);
           pendingTodoSaves.add(save);
@@ -78,6 +78,19 @@ enum DashboardWebTestHarness {
           return save;
         }
         async function commitTodoItems(nextItems, nextTags) {
+        """)
+        return try instrumentSource(trackedCommits, anchor: "async function openTodoInNewThread(item) {", replacement: """
+        const pendingTodoTransfers = new Set();
+        window.__waitForTodoTransfers = async () => {
+          while (pendingTodoTransfers.size) await Promise.all([...pendingTodoTransfers]);
+        };
+        function openTodoInNewThread(item) {
+          const transfer = transferTodoToNewThread(item);
+          pendingTodoTransfers.add(transfer);
+          void transfer.finally(() => pendingTodoTransfers.delete(transfer));
+          return transfer;
+        }
+        async function transferTodoToNewThread(item) {
         """)
     }
 

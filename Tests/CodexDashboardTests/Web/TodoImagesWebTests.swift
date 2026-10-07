@@ -152,10 +152,15 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
                   window.__todoHandoffImage = file ? [file.name, file.type, file.size] : null;
                   event.preventDefault();
                 });
-                document.body.append(composer);
+                const host = document.createElement('form');
+                host['__reactFiber$test'] = { memoizedProps: {
+                  selectedProject: { type: 'local', projectId: 'dashboard' },
+                } };
+                host.append(composer);
+                document.body.append(host);
               });
               document.querySelector('[data-todo-new-thread]').click();
-              await window.__waitForTodoSaves();
+              await window.__waitForTodoTransfers();
             })()
             """
         )

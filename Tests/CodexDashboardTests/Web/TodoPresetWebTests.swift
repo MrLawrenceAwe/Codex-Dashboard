@@ -79,13 +79,15 @@ final class TodoPresetWebTests: SerializedDashboardWebTestCase {
           document.getElementById('new-chat').addEventListener('click', () => {
             const composer = document.createElement('textarea');
             composer.placeholder = 'Do anything';
-            document.body.append(composer);
+            const host = document.createElement('form');
+            host['__reactFiber$test'] = { memoizedProps: {
+              selectedProject: { type: 'local', projectId: 'dashboard' },
+            } };
+            host.append(composer);
+            document.body.append(host);
           });
           document.querySelector('[data-todo-new-thread]').click();
-          const deadline = Date.now() + 5000;
-          while (!document.querySelector('[data-todo-preset-warning]') && Date.now() < deadline) {
-            await new Promise((resolve) => setTimeout(resolve, 25));
-          }
+          await window.__waitForTodoTransfers();
           return [document.querySelector('textarea[placeholder="Do anything"]').value,
             document.querySelector('[data-todo-preset-warning]')?.textContent,
             document.documentElement.classList.contains('codex-todo-open')];

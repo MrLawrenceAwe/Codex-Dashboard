@@ -14,9 +14,9 @@ function createThreadCatalog() {
   }
 
   function threadReferencesForProject(project) {
-    const projectPath = String(project?.path || '').trim();
-    if (!projectPath) return [];
-    return threads.filter((thread) => String(thread.projectGroupPath || '').trim() === projectPath)
+    const projectID = String(project?.id || '').trim();
+    if (!projectID) return [];
+    return threads.filter((thread) => thread.projectID === projectID)
       .map((thread) => ({ id: thread.id, title: thread.title }));
   }
   return { applyThreads, clear, currentThreads: () => threads, findThread: (id) => threadsByID.get(id), threadReferencesForProject };

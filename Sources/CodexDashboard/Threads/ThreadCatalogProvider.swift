@@ -189,6 +189,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 latestLifecycleEvent: latestLifecycleEvent,
                 projectGitStatus: .notRepository
             )
+            summary.projectID = root?.id
             if let root {
                 let cwd = Self.canonicalPath(thread.checkoutPath)
                 // Worktree chats can be assigned to a project outside its saved root.

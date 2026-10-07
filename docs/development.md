@@ -90,7 +90,8 @@ map. User-facing instructions belong in [Using Codex Dashboard](usage.md).
 Internal Codex data uses `Thread`; UI copy uses **chat** and **to-do**. Chat overview
 operations, including the renderer’s `openChatOverview` entry point, use
 `ChatOverview` names so they do not imply control of every dashboard page.
-`RendererThread` exposes `checkoutPath` for the original directory,
+`RendererThread` exposes `projectID` for saved-project identity,
+`checkoutPath` for the original directory,
 `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
 uncommitted changes and unpushed commits. Preview fixtures include the same fields.
 

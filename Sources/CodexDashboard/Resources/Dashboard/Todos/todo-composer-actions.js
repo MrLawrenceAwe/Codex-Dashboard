@@ -65,9 +65,11 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null } = {}) {
+  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null, newProjectID = null } = {}) {
     const isDestination = () => !isDestroyed()
-      && (!threadID || codexUIContracts.activeComposerThreadID() === threadID);
+      && (!threadID || codexUIContracts.activeComposerThreadID() === threadID)
+      && (!newProjectID || (!codexUIContracts.activeComposerThreadID()
+        && codexUIContracts.activeComposerProjectID() === newProjectID));
     const destinationComposer = () => isDestination() ? activeComposer() : null;
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
@@ -171,9 +173,17 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
   }
 
   async function openTodoInNewThread(item) {
-    if (isDestroyed() || !item?.project || !await codexHost.newChat(item.project.id) || isDestroyed()) return;
-    pageState.close();
-    await insertTodoIntoComposer(item, { failurePolicy: 'stayInChat', waitForStableComposer: true });
+    if (isDestroyed() || transferring || !item?.project) return;
+    transferring = true;
+    try {
+      if (!await codexHost.newChat(item.project.id) || isDestroyed()) return;
+      pageState.close();
+      await insertTodoIntoComposer(item, {
+        failurePolicy: 'stayInChat', waitForStableComposer: true, newProjectID: item.project.id,
+      });
+    } finally {
+      transferring = false;
+    }
   }
 
   async function pasteTodoInThread(item, thread) {

@@ -17,7 +17,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         DELETE FROM project_roots;
         DELETE FROM projects;
         INSERT INTO projects (id, name) VALUES ('mail', 'Mail Verify');
-        INSERT INTO project_roots (project_id, path) VALUES ('mail', \(sql(project.path)));
+        INSERT INTO project_roots (project_id, path) VALUES ('mail', \(sql(alias.path)));
         UPDATE threads SET cwd = \(sql(alias.path)) WHERE id = 'running';
         UPDATE threads SET cwd = \(sql(project.path)) WHERE id = 'updated';
         """
@@ -28,6 +28,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
         let grouped = initial.threads.filter { ["running", "updated"].contains($0.id) }
         XCTAssertEqual(grouped.map(\.projectName), ["Mail Verify", "Mail Verify"])
+        XCTAssertEqual(Set(grouped.compactMap(\.projectID)), ["mail"])
         XCTAssertEqual(Set(grouped.compactMap(\.projectGroupPath)), [project.resolvingSymlinksInPath().path])
         XCTAssertEqual(initial.threads.first { $0.id == "running" }?.checkoutPath, alias.path, "Keep the original chat checkout for review-loop isolation")
         XCTAssertNil(initial.threads.first { $0.id == "idle" }?.projectGroupPath)
@@ -36,7 +37,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(removal.terminationStatus, 0)
         let removed = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
         XCTAssertEqual(removed.threads.map(\.id), initial.threads.map(\.id))
-        XCTAssertTrue(removed.threads.allSatisfy { $0.projectGroupPath == nil && $0.projectName == "Other chats" })
+        XCTAssertTrue(removed.threads.allSatisfy { $0.projectID == nil && $0.projectGroupPath == nil && $0.projectName == "Other chats" })
     }
 
     func testEmptyCatalogReturnsEmptySnapshotAfterArchivingAllThreads() async throws {

@@ -97,11 +97,16 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
                   const composer = document.createElement('textarea');
                   composer.id = 'new-composer';
                   composer.placeholder = 'Do anything';
-                  document.body.append(composer);
+                  const host = document.createElement('form');
+                  host['__reactFiber$test'] = { memoizedProps: {
+                    selectedProject: { type: 'local', projectId: 'dashboard' },
+                  } };
+                  host.append(composer);
+                  document.body.append(host);
                 }, 200);
               });
               document.querySelector('[data-todo-new-thread]').click();
-              await window.__waitForTodoSaves();
+              await window.__waitForTodoTransfers();
             })()
             """
         )
@@ -220,9 +225,9 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             clearLocalStorage: true
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "dashboard-new", title: "Newest dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 3),
-            .fixture(id: "dashboard-old", title: "Older dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 2),
-            .fixture(id: "other-chat", title: "Other project chat", projectName: "Other Project", checkoutPath: "/tmp/other", recencyEpochMillis: 1),
+            .fixture(id: "dashboard-new", title: "Newest dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", projectID: "dashboard", recencyEpochMillis: 3),
+            .fixture(id: "dashboard-old", title: "Older dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", projectID: "dashboard", recencyEpochMillis: 2),
+            .fixture(id: "other-chat", title: "Other project chat", projectName: "Other Project", checkoutPath: "/tmp/other", projectID: "other", recencyEpochMillis: 1),
         ])
 
         let result = try await webView.evaluateAsyncJavaScript(
@@ -293,7 +298,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
             clearLocalStorage: true
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "dashboard-chat", title: "Dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", recencyEpochMillis: 1),
+            .fixture(id: "dashboard-chat", title: "Dashboard chat", projectName: "Codex Dashboard", checkoutPath: "/tmp/dashboard", projectID: "dashboard", recencyEpochMillis: 1),
         ])
 
         let result = try await webView.evaluateAsyncJavaScript(
@@ -352,7 +357,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         )
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "one", title: "First project", projectName: "shared", checkoutPath: "/tmp/one/shared"),
-            .fixture(id: "two", title: "Second project", projectName: "shared", checkoutPath: "/tmp/two/shared"),
+            .fixture(id: "two", title: "Second project", projectName: "shared", checkoutPath: "/tmp/two/shared", projectID: "opaque-project"),
         ])
         let choices = try await webView.evaluateJavaScript(
             """

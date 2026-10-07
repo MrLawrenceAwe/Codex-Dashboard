@@ -9,6 +9,7 @@ extension ThreadSummary {
         preview: String = "Preview",
         projectName: String = "Project",
         checkoutPath: String = "/tmp/project",
+        projectID: String? = nil,
         recencyEpochMillis: Int64 = 1,
         isPinned: Bool = false,
         isUnread: Bool = false,
@@ -30,6 +31,7 @@ extension ThreadSummary {
             latestLifecycleEvent: latestLifecycleEvent,
             projectGitStatus: projectGitStatus
         )
+        thread.projectID = projectID ?? checkoutPath
         thread.projectGroupPath = checkoutPath
         thread.isUnread = isUnread
         return thread

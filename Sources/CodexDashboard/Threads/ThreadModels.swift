@@ -38,6 +38,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEvent: ThreadLifecycleEvent?
+    var projectID: String? = nil
     var projectGroupPath: String? = nil
     var projectGitStatus: ProjectGitStatus
 
@@ -63,6 +64,7 @@ struct RendererThread: Codable, Equatable, Sendable {
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEventKind: ThreadLifecycleEventKind?
+    let projectID: String?
     let projectGroupPath: String?
     let projectGitStatus: ProjectGitStatus
 
@@ -78,6 +80,7 @@ struct RendererThread: Codable, Equatable, Sendable {
         model = thread.model
         runState = thread.runState
         latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
+        projectID = thread.projectID
         projectGroupPath = thread.projectGroupPath
         projectGitStatus = thread.projectGitStatus
     }

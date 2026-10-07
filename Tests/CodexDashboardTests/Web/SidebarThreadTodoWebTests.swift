@@ -84,6 +84,29 @@ final class SidebarThreadTodoWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(completed, false)
     }
 
+    func testPinnedChatRetainsItsProjectWhenAddedToTodos() async throws {
+        let view = try await webView()
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "linked", title: "Project chat", projectID: "project"),
+        ])
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const threads = (\(payload)).threads;
+          window.__codexDashboard.applyThreads(threads);
+          const project = document.querySelector('[data-app-action-sidebar-project-id="project"]');
+          project['__reactFiber$test'] = { memoizedProps: {
+            group: { projectId: 'project', projectKind: 'local', path: '/tmp/project' },
+          } };
+          const row = document.querySelector('[data-app-action-sidebar-thread-id="local:linked"]');
+          document.querySelector('aside').append(row);
+          (await window.__openTodoMenu('linked')).click();
+          await window.__waitForTodoSaves();
+          return window.__todoStoreForTests.load()[0].project?.id || null;
+        })()
+        """) as? String
+        XCTAssertEqual(result, "project")
+    }
+
     func testUncataloguedChatAndReplacedSidebarAreSupportedAndCleanedUp() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""
