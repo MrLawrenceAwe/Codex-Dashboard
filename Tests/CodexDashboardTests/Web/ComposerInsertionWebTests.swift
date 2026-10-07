@@ -5,6 +5,57 @@ import XCTest
 
 @MainActor
 final class ComposerInsertionWebTests: SerializedDashboardWebTestCase {
+    func testMultilineTodoTransfersOnceIntoParagraphComposer() async throws {
+        let webView = try await transferWebView()
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
+          const fixture = window.__transferFixture;
+          fixture.props.conversationId = null;
+          fixture.props.selectedProject = { type: 'local', projectId: 'project' };
+          fixture.item.body = 'First line\\nSecond line\\n\\nLast paragraph';
+          const editor = document.createElement('div');
+          editor.contentEditable = 'true';
+          editor.setAttribute('role', 'textbox');
+          editor.classList.add('ProseMirror');
+          fixture.composer.replaceWith(editor);
+          class Slice { constructor(content) { this.content = content; } }
+          const transaction = {
+            replaceSelection(slice) { this.slice = slice; return this; },
+            scrollIntoView() { return this; },
+          };
+          let insertions = 0;
+          fixture.props.composerController = { view: {
+            dom: editor,
+            focus: () => editor.focus(),
+            state: {
+              schema: {
+                text: text => ({ text }),
+                nodes: {
+                  paragraph: { create: (_, child) => ({ text: child?.text || '' }) },
+                  doc: { create: (_, paragraphs) => ({ content: paragraphs }) },
+                },
+              },
+              doc: { slice: () => new Slice([]) },
+              tr: transaction,
+            },
+            dispatch: ({ slice }) => {
+              insertions += 1;
+              for (const paragraph of slice.content) {
+                const node = document.createElement('p');
+                node.textContent = paragraph.text;
+                if (!paragraph.text) node.append(document.createElement('br'));
+                editor.append(node);
+              }
+            },
+          } };
+          await fixture.actions.openTodoInNewThread(fixture.item);
+          return [insertions, [...editor.querySelectorAll('p')].map(node => node.textContent).join('\\n'),
+            !!document.querySelector('[data-todo-preset-warning]')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [1, "Todo title\n\nFirst line\nSecond line\n\nLast paragraph", false])
+    }
+
     func testPromptPlaceholdersPreserveLiteralSelectionAndClipboardText() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateAsyncJavaScript("""

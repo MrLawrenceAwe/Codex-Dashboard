@@ -128,9 +128,12 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     if (notice) notice.hidden = true;
     const content = [item.title, item.body].filter(Boolean).join('\n\n');
     const image = loadedItem?.image;
+    // Rendered text preserves paragraph boundaries; textContent joins them.
+    // Browsers can render paragraph spacing as multiple newlines.
+    const normalizeText = (text) => text.replace(/\r\n?/g, '\n').replace(/\n+/g, '\n');
     const containsText = (editor) => {
-      const text = editor?.value ?? editor?.textContent ?? '';
-      return text.includes(item.title) && (!item.body || text.includes(item.body));
+      const text = normalizeText(editor?.value ?? editor?.innerText ?? '');
+      return text.includes(normalizeText(item.title)) && (!item.body || text.includes(normalizeText(item.body)));
     };
     const reportTransferFailure = () => {
       if (failurePolicy === 'stayInChat' && activeComposer()) showComposerWarning(
