@@ -137,7 +137,7 @@ const accountPopover = (() => {
     notice.querySelector('[data-reset-detail]').textContent = detail;
     notice.querySelector('[data-reset-date]').textContent = absolute;
     notice.querySelector('[data-reset-date]').hidden = !absolute;
-    notice.querySelector('[data-reset-status]').textContent = actionProgress || snapshot.statusMessage
+    notice.querySelector('[data-reset-status]').textContent = actionProgress
       || (blockage.isStale ? 'Usage may be stale. Refresh to confirm.' : '');
     notice.querySelector('[data-reset-refresh]').disabled = Boolean(snapshot.isBusy || actionProgress || queuedAction);
     const position = countdownPosition || notice.getBoundingClientRect();
