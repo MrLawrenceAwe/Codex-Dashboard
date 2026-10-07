@@ -5,6 +5,128 @@ import XCTest
 
 @MainActor
 final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
+    func testPromptInsertionCancelsWhenDestinationChangesDuringAsyncWork() async throws {
+        for operation in ["clipboard", "preset"] {
+            for destination in ["chat", "project", "editor", "unmount", "reopen", "unchanged"] {
+                let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+                _ = try await webView.evaluateJavaScript("window.__codexDashboard.destroy()")
+                let injection = try InjectionBundle.load()
+                let exposedPicker = try DashboardWebTestHarness.instrumentSource(
+                    injection.mountExpression, anchor: "return { applyPreset };",
+                    replacement: "return window.__promptPickerForTests = { applyPreset };")
+                let trackedInsertion = try DashboardWebTestHarness.instrumentSource(
+                    exposedPicker, anchor: "void insertSavedPrompt(prompt).then((inserted) => {",
+                    replacement: "void (window.__promptInsertionForTests = insertSavedPrompt(prompt)).then((inserted) => {")
+                _ = try await webView.evaluateJavaScript(trackedInsertion)
+                let result = try await webView.evaluateAsyncJavaScript("""
+                (async () => {
+                  const shell = document.querySelector('.composer-shell');
+                  const props = { conversationId: \(destination == "project" || destination == "editor" ? "null" : "'chat-a'"),
+                    selectedProject: { type: 'local', projectId: \(destination == "editor" ? "null" : "'project-a'") } };
+                  shell.__reactFiber$promptDestination = { memoizedProps: props, return: null };
+                  let release;
+                  const gate = new Promise(resolve => { release = resolve; });
+                  let applied = false;
+                  if ('\(operation)' === 'clipboard') {
+                    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+                      value: { readText: async () => { await gate; return 'Clipboard text'; } } });
+                  } else {
+                    window.__promptPickerForTests.applyPreset = async (preset, options) => {
+                      await gate;
+                      if (options && !options.isCurrent()) return false;
+                      applied = true;
+                      return true;
+                    };
+                  }
+                  window.__codexDashboard.applyPromptLibrary({
+                    version: \(PromptLibrarySchema.currentVersion), sections: ['General'],
+                    prompts: [{ id: 'prompt', name: 'Prompt', scope: { type: 'global' },
+                      content: '\(operation == "clipboard" ? "Prompt {{clipboard}}" : "Prompt content")',
+                      \(operation == "preset" ? "preset: { reasoningEffort: 'low' }, usePreset: true," : "")
+                    }],
+                  });
+                  document.querySelector('[data-codex-prompt-library-button]').click();
+                  document.querySelector('[data-prompt-use]').click();
+                  if ('\(destination)' === 'chat') props.conversationId = 'chat-b';
+                  if ('\(destination)' === 'project') props.selectedProject.projectId = 'project-b';
+                  if ('\(destination)' === 'editor') {
+                    const editor = document.querySelector('textarea');
+                    editor.replaceWith(editor.cloneNode());
+                  }
+                  if ('\(destination)' === 'unmount') window.__codexDashboard.destroy();
+                  if ('\(destination)' === 'reopen') document.querySelector('[data-codex-prompt-library-button]').click();
+                  release();
+                  const inserted = await window.__promptInsertionForTests;
+                  return [inserted, document.querySelector('textarea').value, applied,
+                    !!document.getElementById('codex-dashboard-prompt-library-dialog')];
+                })()
+                """) as? [AnyHashable]
+                let unchanged = destination == "unchanged"
+                let content = operation == "clipboard" ? "Prompt Clipboard text" : "Prompt content"
+                XCTAssertEqual(result, [unchanged, unchanged ? content : "",
+                                        unchanged && operation == "preset", destination == "reopen"],
+                               "\(operation), \(destination)")
+            }
+        }
+    }
+
+    func testSavingPromptDraftPreservesConcurrentChangesToUntouchedFields() async throws {
+        let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const library = { version: \(PromptLibrarySchema.currentVersion), sections: ['Original section'],
+            prompts: [{ id: 'prompt', name: 'Original name', content: 'Original body',
+              section: 'Original section', scope: { type: 'global' },
+              preset: { reasoningEffort: 'medium' }, usePreset: true }] };
+          api.applyPromptLibrary(library);
+          document.querySelector('[data-codex-prompt-library-button]').click();
+          document.querySelector('[data-prompt-edit]').click();
+          document.querySelector('[name="name"]').value = 'Local name';
+          api.applyPromptLibrary({ ...library, sections: ['Remote section'], prompts: [{
+            ...library.prompts[0], content: 'Remote body', section: 'Remote section',
+            scope: { type: 'project', projectPath: '/remote/project' },
+            preset: { reasoningEffort: 'high' }, usePreset: false,
+          }] });
+          document.querySelector('[data-prompt-form]').requestSubmit();
+          const pending = JSON.parse(api.exportPendingPromptLibrary());
+          const saved = pending.prompts[0];
+          return [saved.name, saved.content, saved.section, saved.scope.projectPath,
+            saved.preset.reasoningEffort, !!saved.usePreset, pending.sections.includes('Original section')];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Local name", "Remote body", "Remote section", "/remote/project", "high", false, false])
+    }
+
+    func testPromptDraftChangesAndPresetRemovalPreserveRemoteEditsAndDeletion() async throws {
+        for deleted in [false, true] {
+            let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+            let result = try await webView.evaluateJavaScript("""
+            (() => {
+              const api = window.__codexDashboard;
+              const library = { version: \(PromptLibrarySchema.currentVersion), sections: ['Original section'],
+                prompts: [{ id: 'prompt', name: 'Original name', content: 'Original body',
+                  section: 'Original section', scope: { type: 'global' },
+                  preset: { reasoningEffort: 'medium' }, usePreset: true }] };
+              api.applyPromptLibrary(library);
+              document.querySelector('[data-codex-prompt-library-button]').click();
+              document.querySelector('[data-prompt-edit]').click();
+              document.querySelector('[name="content"]').value = 'Local body';
+              document.querySelector('[name="hasPreset"]').click();
+              api.applyPromptLibrary({ ...library, sections: ['Remote section'], prompts: \(deleted ? "[]" : "[{ ...library.prompts[0], name: 'Remote name', section: 'Remote section' }]") });
+              document.querySelector('[data-prompt-form]').requestSubmit();
+              const pending = JSON.parse(api.exportPendingPromptLibrary());
+              if (\(deleted)) return [pending.prompts.length, pending.sections.includes('Original section')];
+              const saved = pending.prompts[0];
+              return [saved.name, saved.content, saved.section, !!saved.preset, !!saved.usePreset,
+                pending.sections.includes('Original section')];
+            })()
+            """) as? [AnyHashable]
+            XCTAssertEqual(result, deleted ? [0, false]
+                           : ["Remote name", "Local body", "Remote section", false, false, false])
+        }
+    }
+
     func testLegacyCachedAndPendingPresetsMigrateWithoutLosingEdits() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         _ = try await webView.evaluateJavaScript("""

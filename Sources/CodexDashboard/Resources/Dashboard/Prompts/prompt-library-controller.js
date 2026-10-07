@@ -6,6 +6,8 @@ function createPromptLibrary({ findThread }) {
   let searchTerm = '';
   let capturedSelectionText = '';
   let composerProject;
+  let libraryGeneration = 0;
+  let editedPromptValues;
 
   function showDialogError(message) {
     const error = document.querySelector('[data-prompt-storage-error]');
@@ -51,6 +53,7 @@ function createPromptLibrary({ findThread }) {
   }
 
   function openLibrary() {
+    libraryGeneration += 1;
     const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
     if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
       const start = composer.selectionStart ?? 0;
@@ -79,6 +82,7 @@ function createPromptLibrary({ findThread }) {
   }
 
   function closeLibrary({ restoreFocus = true } = {}) {
+    libraryGeneration += 1;
     dialogState = { mode: 'list' };
     document.getElementById(dashboardElements.elementIDs.promptDialog)?.remove();
     const returnFocus = returnFocusElement;
@@ -86,11 +90,10 @@ function createPromptLibrary({ findThread }) {
     if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
   }
 
-  function stagePrompt(form) {
+  function readPromptValues(form) {
     const values = new FormData(form);
     const name = String(values.get('name') || '').trim();
     const content = String(values.get('content') || '').trim();
-    if (!name || !content) return;
     const section = promptStore.resolveSection(values.get('section'));
     const scope = values.get('scope') === 'project' && composerProject
       ? { type: 'project', projectPath: composerProject.path }
@@ -102,27 +105,34 @@ function createPromptLibrary({ findThread }) {
         speed: String(values.get('presetSpeed') || ''),
       })
       : undefined;
+    return { name, content, section, scope, preset };
+  }
+
+  function stagePrompt(form) {
+    const values = readPromptValues(form);
+    if (!values.name || !values.content) return;
     let nextPrompts;
     if (dialogState.mode === 'edit') {
-      nextPrompts = promptStore.prompts.map((prompt) => (
-        prompt.id === dialogState.promptID
-          ? { ...prompt, name, section, scope, content, preset }
-          : prompt
-      ));
+      // The form stays untouched during shared-library refreshes. Compare with
+      // its opening values so untouched fields retain those newer updates.
+      nextPrompts = promptStore.prompts.map((prompt) => {
+        if (prompt.id !== dialogState.promptID) return prompt;
+        const merged = { ...prompt };
+        for (const key of Object.keys(values)) {
+          if (JSON.stringify(values[key]) === JSON.stringify(editedPromptValues[key])) continue;
+          if (values[key] === undefined) delete merged[key];
+          else merged[key] = values[key];
+        }
+        return merged;
+      });
     } else {
       nextPrompts = [...promptStore.prompts, {
         id: globalThis.crypto?.randomUUID?.() || `prompt-${Date.now()}`,
-        name,
-        section,
-        scope,
-        content,
-        preset,
+        ...values,
       }];
     }
-    const nextSections = promptStore.sections.includes(section)
-      ? promptStore.sections
-      : [...promptStore.sections, section];
-    if (!stageLibraryUpdate(nextPrompts, nextSections)) return;
+    // Section normalization adds only sections used by the merged prompts.
+    if (!stageLibraryUpdate(nextPrompts)) return;
     dialogState = { mode: 'list' };
     renderDialog();
   }
@@ -172,7 +182,20 @@ function createPromptLibrary({ findThread }) {
   }
 
   async function insertSavedPrompt(prompt) {
+    const generation = libraryGeneration;
+    const composer = codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
+    const threadID = codexUIContracts.activeComposerThreadID();
+    const projectID = codexUIContracts.activeComposerProjectID();
+    const isCurrent = () => generation === libraryGeneration && !!composer
+      && codexUIContracts.composer(dashboardElements.elementIDs.promptDialog) === composer
+      && codexUIContracts.activeComposerThreadID() === threadID
+      && codexUIContracts.activeComposerProjectID() === projectID;
+    const cancel = () => {
+      if (generation === libraryGeneration) hideDialog();
+      return false;
+    };
     const insert = (clipboardText = '') => {
+      if (!isCurrent()) return cancel();
       if (!composerAdapter.insert(expandedPromptContent(prompt.content, clipboardText))) return false;
       closeLibrary({ restoreFocus: false });
       return true;
@@ -182,8 +205,10 @@ function createPromptLibrary({ findThread }) {
     if (prompt.content.includes('{{clipboard}}')) {
       try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* use empty text */ }
     }
+    if (!isCurrent()) return cancel();
     hideDialog();
-    if (!await composerModelPicker.applyPreset(prompt.usePreset ? prompt.preset : undefined)) {
+    if (!await composerModelPicker.applyPreset(prompt.usePreset ? prompt.preset : undefined, { isCurrent })) {
+      if (!isCurrent()) return cancel();
       restoreDialog('Could not apply this prompt’s model settings. The prompt was not inserted.');
       return false;
     }
@@ -219,6 +244,8 @@ function createPromptLibrary({ findThread }) {
   function setDialogState(state) {
     dialogState = state;
     renderDialog();
+    editedPromptValues = state.mode === 'edit'
+      ? readPromptValues(document.querySelector('[data-prompt-form]')) : undefined;
   }
 
   function togglePreset(checkbox) {
