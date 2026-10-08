@@ -64,7 +64,7 @@ extension ChatOverviewWebTests {
             && notice.querySelector('[data-reset-countdown]').textContent.includes('Available in');
           snapshot.isBusy = true;
           apply();
-          const busyControls = notice.querySelector('[data-reset-refresh]').disabled && !toggle.disabled;
+          const busyControls = !toggle.disabled;
           toggle.click();
           const expanded = !details.hidden && toggle.getAttribute('aria-expanded') === 'true';
           const header = notice.querySelector('header');
@@ -118,12 +118,12 @@ extension ChatOverviewWebTests {
           const windowFor = (label, offset) => ({ label, resetsAtMilliseconds: offset === null ? null : now + offset });
           const text = () => document.querySelector('#codex-usage-blockage').textContent;
           apply([windowFor('5-hour', 7200000)]);
-          const fiveHour = text().includes('Available in 2h') && text().includes('5-hour: 0%');
+          const fiveHour = text().includes('Available in 2h') && text().includes('Codex allowance depleted');
           const fontSize = parseFloat(getComputedStyle(document.querySelector('[data-reset-countdown]')).fontSize);
           apply([windowFor('Weekly', 172800000)]);
-          const weekly = text().includes('Available in 2d') && text().includes('Weekly: 0%');
+          const weekly = text().includes('Available in 2d') && text().includes('Reset:');
           apply([windowFor('5-hour', 7200000), windowFor('Weekly', 172800000)]);
-          const both = text().includes('Available in 2d') && text().includes('5-hour: 0%');
+          const both = text().includes('Available in 2d') && text().includes('Codex allowance depleted');
           apply([windowFor('5-hour', 172800000), windowFor('Weekly', 7200000)]);
           const laterFiveHour = text().includes('Available in 2d');
           apply([windowFor('Weekly', null)]);
@@ -132,21 +132,22 @@ extension ChatOverviewWebTests {
           const due = text().includes('awaiting usage update') && !text().includes('Available in');
           apply([windowFor('Weekly', 172800000)], true);
           const stale = text().includes('Last known') && text().includes('Usage may be stale');
-          document.querySelector('#codex-usage-blockage [data-reset-refresh]').click();
-          const queued = JSON.parse(window.__codexDashboard.takeQueuedAccountPopoverAction());
+          const simplified = !document.querySelector('#codex-usage-blockage [data-reset-refresh]')
+            && !document.querySelector('#codex-usage-blockage [data-reset-detail]')
+            && !text().includes('Expected') && !text().includes('exhausted');
           apply(null);
           const recovered = !document.querySelector('#codex-usage-blockage');
           apply([windowFor('Weekly', 172800000)]);
           window.__codexDashboard.destroy();
           return [fiveHour, fontSize >= 24, weekly, both, laterFiveHour, unknown, due, stale,
-            queued.kind === 'updateUsage' && queued.accountID === null, recovered,
+            simplified, recovered,
             !document.querySelector('#codex-usage-blockage')];
         })()
         """) as? [Bool]
         XCTAssertEqual(result, Array(repeating: true, count: 11))
     }
 
-    func testUsageResetCountdownTicksWithoutReplacingFocusedRefreshButton() async throws {
+    func testUsageResetCountdownTicksWithoutReplacingFocusedCollapseButton() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML)
         let result = try await webView.callAsyncJavaScript("""
         const originalNow = Date.now;
@@ -157,7 +158,7 @@ extension ChatOverviewWebTests {
             accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
             usageBlockage: { windows: [{ label: '5-hour', resetsAtMilliseconds: now + 65000 }], isStale: false },
           });
-          const button = document.querySelector('#codex-usage-blockage [data-reset-refresh]');
+          const button = document.querySelector('#codex-usage-blockage [data-reset-toggle]');
           button.focus();
           const before = document.querySelector('[data-reset-countdown]').textContent;
           now += 10000;

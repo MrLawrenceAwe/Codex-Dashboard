@@ -67,12 +67,12 @@ The panel shows five-hour and weekly allowance remaining, reset countdowns, and
 available banked resets with their nearest known expiry.
 
 When the active account reaches 0% allowance, a prominent notice stays visible in
-Codex with a live reset countdown and the exhausted limit. If both limits are
-exhausted, availability uses the later reset. Drag the notice by its heading to
+Codex with a live reset countdown and reset timestamp. If both limits are
+depleted, availability uses the later reset. Drag the notice by its heading to
 move it, or use the chevron to collapse it to a compact countdown. Its position
 and collapsed state stay in place during dashboard refreshes. The notice marks stale usage and
 waits for a usage update after the reset time instead of claiming allowance has
-returned. Use **Refresh usage** directly from the notice to check again.
+returned. Use **Refresh usage** in the Accounts panel to check again.
 
 Refresh individual accounts or other saved accounts without switching. Background refreshes may require a
 manual Keychain approval. An account request that cannot reach Dashboard within

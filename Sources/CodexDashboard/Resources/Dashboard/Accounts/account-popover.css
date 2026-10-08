@@ -39,10 +39,8 @@
 #codex-usage-blockage { --reset-muted:#aaa; --reset-hover:rgba(255,255,255,.08); --reset-border:rgba(255,255,255,.12); }
 #codex-usage-blockage.is-dragging .codex-usage-reset-header { cursor:grabbing; }
 #codex-usage-blockage [data-reset-countdown] { margin:7px 0 10px; font-size:24px; font-weight:600; letter-spacing:-.5px; line-height:1.25; font-variant-numeric:tabular-nums; }
-#codex-usage-blockage [data-reset-detail] { white-space:pre-line; color:var(--reset-muted); font-size:11px; }
 #codex-usage-blockage [data-reset-date] { margin-top:5px; color:var(--reset-muted); font-size:11px; }
-.codex-usage-reset-footer { display:flex; align-items:center; gap:10px; margin-top:12px; }
-.codex-usage-reset-footer > span { flex:1; font-size:11px; color:var(--reset-muted); }
+#codex-usage-blockage [data-reset-status] { margin-top:5px; font-size:11px; color:var(--reset-muted); }
 #codex-usage-blockage button { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; padding:5px 9px; border:1px solid var(--reset-border); border-radius:6px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
 #codex-usage-blockage [data-reset-toggle] { width:24px; height:24px; padding:0; border:0; color:var(--reset-muted); }
 #codex-usage-blockage button:disabled { opacity:.5; cursor:default; }

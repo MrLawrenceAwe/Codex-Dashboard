@@ -42,15 +42,13 @@ const accountPopover = (() => {
       <strong data-reset-title></strong>
       <button type="button" data-reset-toggle aria-controls="codex-usage-reset-details"></button>
       </header><div data-reset-countdown role="timer" aria-live="off"></div>
-      <div id="codex-usage-reset-details"><div data-reset-detail></div><div data-reset-date></div>
-      <div class="codex-usage-reset-footer"><span data-reset-status></span>
-      <button type="button" data-reset-refresh>Refresh usage</button></div></div>`;
+      <div id="codex-usage-reset-details"><div data-reset-date></div>
+      <div data-reset-status></div></div>`;
     const toggle = notice.querySelector('[data-reset-toggle]');
     toggle.addEventListener('click', () => {
       countdownCollapsed = !countdownCollapsed;
       renderCountdown();
     });
-    notice.querySelector('[data-reset-refresh]').addEventListener('click', () => queue('updateUsage', snapshot.activeAccountID));
     const header = notice.querySelector('header');
     let drag = null;
     header.addEventListener('pointerdown', (event) => {
@@ -110,19 +108,12 @@ const accountPopover = (() => {
     const latestReset = hasAllDeadlines ? Math.max(...deadlines) : null;
     const resetDue = latestReset !== null && latestReset <= Date.now();
     const title = resetDue ? 'Reset due — awaiting usage update'
-      : blockage.isStale ? 'Last known allowance exhausted' : 'Codex allowance exhausted';
+      : blockage.isStale ? 'Last known allowance depleted' : 'Codex allowance depleted';
     const countdown = latestReset === null ? 'Reset time unavailable'
       : resetDue ? 'Awaiting usage update…' : `Available in ${resetCountdown(latestReset)}`;
-    const detail = windows.map((window) => {
-      const deadline = window.resetsAtMilliseconds;
-      const timing = !Number.isFinite(deadline) ? 'reset time unavailable'
-        : deadline <= Date.now() ? 'reset due'
-          : `resets in ${resetCountdown(deadline)}`;
-      return `${window.label}: 0% remaining · ${timing}`;
-    }).join('\n');
     const absolute = latestReset !== null && !resetDue
-      ? `Expected reset: ${new Date(latestReset).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : '';
-    // Update text in place so the ticking clock never steals focus from Refresh.
+      ? `Reset: ${new Date(latestReset).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : '';
+    // Update text in place so the ticking clock never steals focus from the collapse control.
     notice.classList.toggle('is-collapsed', countdownCollapsed);
     notice.querySelector('#codex-usage-reset-details').hidden = countdownCollapsed;
     const toggle = notice.querySelector('[data-reset-toggle]');
@@ -134,12 +125,11 @@ const accountPopover = (() => {
       : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 10 4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     notice.querySelector('[data-reset-title]').textContent = title;
     notice.querySelector('[data-reset-countdown]').textContent = countdown;
-    notice.querySelector('[data-reset-detail]').textContent = detail;
     notice.querySelector('[data-reset-date]').textContent = absolute;
     notice.querySelector('[data-reset-date]').hidden = !absolute;
-    notice.querySelector('[data-reset-status]').textContent = actionProgress
-      || (blockage.isStale ? 'Usage may be stale. Refresh to confirm.' : '');
-    notice.querySelector('[data-reset-refresh]').disabled = Boolean(snapshot.isBusy || actionProgress || queuedAction);
+    const status = notice.querySelector('[data-reset-status]');
+    status.textContent = blockage.isStale ? 'Usage may be stale.' : '';
+    status.hidden = !blockage.isStale;
     const position = countdownPosition || notice.getBoundingClientRect();
     positionCountdown(notice, position.left, position.top);
     if (countdownTimer === undefined) countdownTimer = setInterval(renderCountdown, 1000);
