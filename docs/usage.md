@@ -123,6 +123,8 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 **Reload browser extension** before testing. Review models come from Codex's live
 model list.
 
+Structure, naming, and content reviews do not request extension reloads.
+
 With **Reload browser extension** enabled, Codex uses Chrome DevTools to reload
 Chrome extensions before live testing and again after building fixes. It checks
 that the reload succeeded, refreshes affected test pages, and reopens extension

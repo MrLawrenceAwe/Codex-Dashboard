@@ -54,6 +54,11 @@ enum ReviewReportContract {
         return """
         Apply this format only to your final response, after completing the work. Use Markdown in this structure:
         \(format)
+        Keep fixed headings and labels; replace placeholders. No code fences or other level-one or level-two headings.
+        """
+    }
+
+    static let extensionReloadInstructions = """
         If a browser extension cannot be reloaded automatically and you need the user to reload it, stop work and use this alternative final response instead of the review or fix report:
         # Extension reload required
 
@@ -61,9 +66,7 @@ enum ReviewReportContract {
         Explain which browser and extension to reload, the manual steps, and why automatic reload failed.
 
         Review Loop will show these instructions and wait for the user to confirm the reload before continuing this same task. Preserve unfinished work; do not claim that review, verification, or fixes are complete. Use this report whenever manual extension reload is necessary, including during fix verification.
-        Keep fixed headings and labels; replace placeholders. No code fences or other level-one or level-two headings.
         """
-    }
 
     static func extensionReloadRequest(_ text: String?) throws -> String? {
         guard text?.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("# Extension reload required") == true else { return nil }

@@ -155,7 +155,7 @@ final class ReviewReportContractTests: XCTestCase {
             XCTAssertThrowsError(try ReviewReportContract.extensionReloadRequest(invalid))
         }
         for kind in [ReviewTurnKind.review(.p2), .review(nil), .fix, .fixAfterReload] {
-            XCTAssertTrue(ReviewReportContract.instructions(for: kind).contains("# Extension reload required"))
+            XCTAssertFalse(ReviewReportContract.instructions(for: kind).contains("# Extension reload required"))
         }
     }
 

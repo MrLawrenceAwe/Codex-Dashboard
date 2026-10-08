@@ -6,7 +6,7 @@ enum ReviewPrompts {
         let timing = verifyingFixes
             ? "After changes, run any required build and reload the same extension before live verification."
             : "Reload the browser extension before live testing to establish the current behaviour."
-        return "\n\nUse the globally configured chrome-devtools MCP server for Chrome extension reloads. Identify the installed extension ID and source folder with list_extensions and project context, then use reload_extension. Prefer these tools over Computer Use on chrome://extensions. \(timing) Verify reload success, refresh affected test pages, and reopen the popup or side panel as needed with trigger_extension_action. If the tools are unavailable or reload fails, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete."
+        return "\n\nUse the globally configured chrome-devtools MCP server for Chrome extension reloads. Identify the installed extension ID and source folder with list_extensions and project context, then use reload_extension. Prefer these tools over Computer Use on chrome://extensions. \(timing) Verify reload success, refresh affected test pages, and reopen the popup or side panel as needed with trigger_extension_action. If the tools are unavailable or reload fails, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete." + "\n\n" + ReviewReportContract.extensionReloadInstructions
     }
 
     private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
@@ -19,6 +19,7 @@ enum ReviewPrompts {
         "The user confirmed that the browser extension has been manually reloaded. Continue the unfinished "
             + (round.fixRequested ? "fix and verification task. Preserve existing changes, finish verification, and return the final fix report." : "read-only review and return the final review report.")
             + " If another manual reload is needed, return the extension reload request again."
+            + "\n\n" + ReviewReportContract.extensionReloadInstructions
             + mutedMediaInstruction(for: loop)
     }
 
