@@ -5,8 +5,6 @@ final class ReviewReportContractTests: XCTestCase {
     private let review = """
     # Review complete
 
-    Findings: 2
-
     ## Summary
     Found two issues. Validation passed.
 
@@ -29,13 +27,13 @@ final class ReviewReportContractTests: XCTestCase {
     }
 
     func testCleanAndBlockedReviewsAreDistinct() throws {
-        let clean = "# Review complete\nFindings: 0\n\n## Summary\nNo issues found."
+        let clean = "# Review complete\n\n## Summary\nNo issues found."
         XCTAssertEqual(try ReviewReportContract.review(clean, priorityLimit: .p3).findings, [])
         XCTAssertEqual(try ReviewReportContract.review(clean.replacingOccurrences(of: "complete", with: "blocked"), priorityLimit: .p3).outcome, .blocked)
     }
 
     func testUnprioritisedReportAcceptsPlainFindingsAndRejectsPriorityLabels() throws {
-        let text = "# Review complete\nFindings: 1\n\n## Summary\nOne improvement.\n\n## Simplify the layout\nThe duplicated layout code can be shared."
+        let text = "# Review complete\n\n## Summary\nOne improvement.\n\n## Simplify the layout\nThe duplicated layout code can be shared."
         let report = try ReviewReportContract.review(text, priorityLimit: nil)
         XCTAssertEqual(report.findings.count, 1)
         XCTAssertNil(report.findings[0].priority)
@@ -54,6 +52,47 @@ final class ReviewReportContractTests: XCTestCase {
         }
     }
 
+    func testFindingSectionsDetermineTotalRegardlessOfSummaryCount() throws {
+        for priority: ReviewFinding.Priority? in [nil, .p2] {
+            let findings = (1...22).map { number in
+                "## \(priority.map { "[\($0.rawValue)] " } ?? "")Improvement \(number)\nImpact and location."
+            }.joined(separator: "\n\n")
+            let text = "# Review complete\n\n## Summary\nFound 21 improvements.\n\n" + findings
+            let report = try ReviewReportContract.review(text, priorityLimit: priority)
+            XCTAssertEqual(report.findings.count, 22)
+            XCTAssertEqual(report.findings.last?.title, "Improvement 22")
+            XCTAssertEqual(report.findings.last?.priority, priority)
+        }
+    }
+
+    func testReviewInstructionsDelegateCountingToDashboard() {
+        for kind in [ReviewTurnKind.review(.p2), .review(nil)] {
+            let instructions = ReviewReportContract.instructions(for: kind)
+            XCTAssertFalse(instructions.contains("Findings:"))
+            XCTAssertTrue(instructions.contains("counts finding sections automatically"))
+            XCTAssertTrue(instructions.contains("If there are no findings, omit finding sections"))
+        }
+    }
+
+    func testMalformedReportsExplainHowToCorrectThem() {
+        let cases: [(String?, String)] = [
+            (nil, "no final response"),
+            ("# Review complete", "needs a '## Summary' section"),
+            (review.replacingOccurrences(of: "# Review complete", with: "# Review complete\nFindings: 21"), "omit the findings total"),
+            (review.replacingOccurrences(of: "## Summary", with: "## Other"), "first section must be '## Summary'"),
+            ("# Review complete\n\n## Summary\n", "section is empty"),
+            (review + "\n\n## [P2] Missing description", "Finding 3 needs a title and a description"),
+            (review.replacingOccurrences(of: "[P1]", with: "[P4]"), "Finding 1 needs a [P0]"),
+            ("```markdown\n" + review + "\n```", "no code fences")
+        ]
+        for (text, reason) in cases {
+            XCTAssertThrowsError(try ReviewReportContract.review(text, priorityLimit: .p3)) { error in
+                XCTAssertTrue(error.localizedDescription.contains(reason), error.localizedDescription)
+                XCTAssertTrue(error.localizedDescription.contains("corrected report, then Resume"))
+            }
+        }
+    }
+
     func testReviewInstructionsDoNotRequestEvidence() {
         for kind in [ReviewTurnKind.review(.p2), .review(nil)] {
             let instructions = ReviewReportContract.instructions(for: kind)
@@ -63,12 +102,14 @@ final class ReviewReportContractTests: XCTestCase {
     }
 
     func testMalformedOrIncompleteReviewsFailClosed() {
-        for text: String? in [nil, "Done", "{}", review.replacingOccurrences(of: "Findings: 2", with: "Findings: 0"),
+        for text: String? in [nil, "Done", "{}",
                             review.replacingOccurrences(of: "[P1]", with: "[P4]"),
                             review.replacingOccurrences(of: "## Summary", with: "## Other"),
                             "```markdown\n" + review + "\n```",
-                            "# Review complete\nFindings: 0\n\n## Summary\n",
-                            review + "\n# Review complete\nFindings: 0"] {
+                            "# Review complete\n\n## Summary\n",
+                            review + "\n# Review complete",
+                            review + "\n\n## [P2] Empty finding\n\n",
+                            review.replacingOccurrences(of: "[P1] Stop can be undone", with: "[P1] ")] {
             XCTAssertThrowsError(try ReviewReportContract.review(text, priorityLimit: .p3))
         }
     }

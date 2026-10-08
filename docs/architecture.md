@@ -127,8 +127,10 @@ failed refreshes. Alert schedules and suppression rules are in the [usage guide]
 `ReviewLoopCoordinator` owns the state machine, separating review acceptance, fix
 submission, and round completion. `ReviewPrompts` supplies execution prompts;
 `ReviewReportContract` supplies and parses final Markdown contracts. It validates
-explicit status, counts, addressed/withdrawn findings, and commits rather than
-inferring success from prose. Investigation and progress messages remain unrestricted.
+explicit status, finding sections, addressed/withdrawn findings, and commits rather than
+inferring success from prose. Review totals are derived from the parsed finding sections;
+the review response does not include a separate total. Malformed reports explain the
+format correction needed before resuming. Investigation and progress messages remain unrestricted.
 `ReviewLoopPresentation` builds progress and previews; the renderer submits actions
 and displays snapshots without owning execution.
 

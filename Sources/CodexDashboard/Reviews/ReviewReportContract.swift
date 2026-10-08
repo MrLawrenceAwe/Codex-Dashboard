@@ -1,6 +1,7 @@
 import Foundation
 
-/// A readable Markdown contract. Missing or inconsistent fields stop the loop;
+/// A readable Markdown contract. Review totals come from parsed finding sections.
+/// Missing or inconsistent required fields stop the loop;
 /// prose alone must never be mistaken for a clean review or a committed fix.
 enum ReviewReportContract {
     struct FixReport {
@@ -15,7 +16,6 @@ enum ReviewReportContract {
             if let limit {
                 format = """
             # Review complete
-            Findings: N
 
             ## Summary
             Brief summary.
@@ -23,12 +23,11 @@ enum ReviewReportContract {
             ## [P?] Short title
             Impact and linked file location.
 
-            Report only priorities \(ReviewFinding.Priority.allCases.filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")). Omit lower-priority findings. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            Report only priorities \(ReviewFinding.Priority.allCases.filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")). Omit lower-priority findings. The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
             """
             } else {
                 format = """
             # Review complete
-            Findings: N
 
             ## Summary
             Brief summary.
@@ -36,7 +35,7 @@ enum ReviewReportContract {
             ## Short title
             Impact and linked file location.
 
-            Report all actionable findings without priority labels or rankings. N is the number reported; if zero, omit finding sections. If blocked, use # Review blocked and explain why in Summary.
+            Report all actionable findings without priority labels or rankings. The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
             """
             }
         case .fix, .fixAfterReload:
@@ -76,34 +75,44 @@ enum ReviewReportContract {
     static func review(_ text: String?, priorityLimit: ReviewFinding.Priority?) throws -> ReviewReport {
         let sections = try sections(text)
         let header = lines(sections[0])
-        guard header.count == 2,
-              let outcome = ["# Review complete": ReviewReport.Outcome.reviewed, "# Review blocked": .blocked][header[0]],
-              let count = count(header[1], prefix: "Findings: "),
-              sections[1].hasPrefix("Summary\n") else { throw invalid() }
+        guard header.count == 1,
+              let outcome = ["# Review complete": ReviewReport.Outcome.reviewed, "# Review blocked": .blocked][header[0]] else {
+            throw invalid("Expected only '# Review complete' or '# Review blocked' before '## Summary'. The dashboard counts finding sections automatically; omit the findings total.")
+        }
+        guard sections[1] == "Summary" || sections[1].hasPrefix("Summary\n") else {
+            throw invalid("The first section must be '## Summary'.")
+        }
         let summary = try content(sections[1], prefix: "Summary\n")
-        let findings = try sections.dropFirst(2).map { section -> ReviewFinding in
-            guard let newline = section.firstIndex(of: "\n") else { throw invalid() }
+        let findings = try sections.dropFirst(2).enumerated().map { index, section -> ReviewFinding in
+            guard let newline = section.firstIndex(of: "\n") else {
+                throw invalid("Finding \(index + 1) needs a title and a description.")
+            }
             let titleLine = String(section[..<newline])
             let priority: ReviewFinding.Priority?
             let title: String
             if priorityLimit != nil {
                 guard titleLine.count > 5, titleLine.hasPrefix("["),
                       titleLine.dropFirst(3).hasPrefix("] "),
-                      let parsed = ReviewFinding.Priority(rawValue: String(titleLine.dropFirst().prefix(2))) else { throw invalid() }
+                      let parsed = ReviewFinding.Priority(rawValue: String(titleLine.dropFirst().prefix(2))) else {
+                    throw invalid("Finding \(index + 1) needs a [P0], [P1], [P2], or [P3] priority before its title.")
+                }
                 priority = parsed
                 title = String(titleLine.dropFirst(5)).trimmingCharacters(in: .whitespaces)
             } else {
                 guard !titleLine.isEmpty, !titleLine.hasPrefix("[P0] "),
                       !titleLine.hasPrefix("[P1] "), !titleLine.hasPrefix("[P2] "),
-                      !titleLine.hasPrefix("[P3] ") else { throw invalid() }
+                      !titleLine.hasPrefix("[P3] ") else {
+                    throw invalid("Finding \(index + 1) needs a title without a priority label for this review type.")
+                }
                 priority = nil
                 title = titleLine.trimmingCharacters(in: .whitespaces)
             }
             let body = String(section[section.index(after: newline)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty, !body.isEmpty else { throw invalid() }
+            guard !title.isEmpty, !body.isEmpty else {
+                throw invalid("Finding \(index + 1) needs a title and a description.")
+            }
             return ReviewFinding(priority: priority, title: title, body: body)
         }
-        guard count == findings.count else { throw invalid() }
         return ReviewReport(outcome: outcome, findings: findings, summary: summary)
     }
 
@@ -142,12 +151,14 @@ enum ReviewReportContract {
     }
 
     private static func sections(_ text: String?) throws -> [String] {
-        guard let text else { throw invalid() }
+        guard let text else { throw invalid("The completed turn has no final response.") }
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.contains("```"), !normalized.contains("~~~"),
-              !normalized.contains("\n# ") else { throw invalid() }
+              !normalized.contains("\n# ") else {
+            throw invalid("Use one level-one status heading and no code fences.")
+        }
         let sections = normalized.components(separatedBy: "\n## ")
-        guard sections.count >= 2 else { throw invalid() }
+        guard sections.count >= 2 else { throw invalid("The report needs a '## Summary' section.") }
         return sections
     }
 
@@ -163,13 +174,16 @@ enum ReviewReportContract {
     }
 
     private static func content(_ text: String, prefix: String) throws -> String {
-        guard text.hasPrefix(prefix) else { throw invalid() }
+        guard text != prefix.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            throw invalid("The '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section is empty.")
+        }
+        guard text.hasPrefix(prefix) else { throw invalid("Expected a '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section.") }
         let body = text.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else { throw invalid() }
+        guard !body.isEmpty else { throw invalid("The '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section is empty.") }
         return body
     }
 
-    private static func invalid() -> ReviewLoopError {
-        ReviewLoopError("The chat did not return a complete review-loop report. Open its chat to inspect the result.")
+    private static func invalid(_ reason: String = "Required fields are missing or inconsistent.") -> ReviewLoopError {
+        ReviewLoopError("Invalid review-loop report: \(reason) Ask the chat to return the corrected report, then Resume.")
     }
 }

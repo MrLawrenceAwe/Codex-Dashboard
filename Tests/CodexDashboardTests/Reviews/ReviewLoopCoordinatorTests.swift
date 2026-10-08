@@ -203,6 +203,31 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
 
+    func testReviewCountsAllSectionsAndFixesThemDespiteIncorrectSummaryTotal() async throws {
+        let store = ReviewTestStore()
+        let coordinator = ReviewLoopCoordinator(store: store)
+        var start = startAction(id: "count-sections", kind: .start, projectID: project.id,
+                                promptContext: .general, maxRounds: 1, loopID: nil)
+        start.focus = .organisationAndNaming
+        try coordinator.apply(start, projects: [project])
+        let driver = ReviewTestDriver()
+        await coordinator.advance(using: driver, threads: [])
+        let findings = (1...22).map { "## Improvement \($0)\nDescription and location." }.joined(separator: "\n\n")
+        driver.finishTurn("# Review complete\n\n## Summary\nFound 21 improvements.\n\n" + findings)
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .running)
+        XCTAssertEqual(store.loops.last?.rounds.last?.review?.findings.count, 22)
+        XCTAssertEqual(store.loops.last?.rounds.last?.review?.findings.last?.title, "Improvement 22")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertTrue(driver.prompts[1].hasPrefix("Address all findings and commit"))
+        driver.finish(findings: 22, commit: "fixed")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
+        XCTAssertEqual(coordinator.loops.last?.completedRoundCount, 1)
+        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.addressedFindingCount, 22)
+    }
+
     func testOneFalsePositiveAndOneFixContinueToNextReview() async throws {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])

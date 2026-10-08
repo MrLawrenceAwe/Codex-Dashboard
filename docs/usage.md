@@ -140,6 +140,12 @@ reviews finish without a commit. A clean review is an assessment, not proof that
 all defects are absent. Multiple projects can run loops, with one active loop per
 project and checkout. Avoid other edits in that checkout while a loop runs.
 
+The dashboard counts the finding sections in a review automatically. Review responses
+use a completion or blocked heading, a summary, and one section per finding, without
+a separate findings total. If an existing chat used the previous format, ask it to
+return the same report with the `Findings: N` line removed, then select **Resume**.
+Malformed reports show the specific format problem and how to correct it.
+
 **Remote push** defaults to keeping commits local. When enabled, verified fix
 commits are pushed after each round to the upstream branch, or the current branch
 on `origin` or the sole remote. New branch pushes record an upstream. Pushes are

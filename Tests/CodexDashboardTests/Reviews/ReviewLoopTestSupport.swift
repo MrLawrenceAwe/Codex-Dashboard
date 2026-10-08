@@ -126,10 +126,10 @@ final class ReviewTestDriver: ReviewLoopDriving {
     }
     func review(priorities: [ReviewFinding.Priority]) {
         let findings = priorities.map { "## [\($0.rawValue)] Example issue\nEvidence and impact" }.joined(separator: "\n\n")
-        finishTurn("# Review complete\n\nFindings: \(priorities.count)\n\n## Summary\nReview finished\n\n" + findings)
+        finishTurn("# Review complete\n\n## Summary\nReview finished\n\n" + findings)
     }
     func reviewWithoutPriorities() {
-        finishTurn("# Review complete\n\nFindings: 1\n\n## Summary\nReview finished\n\n## Simplify the layout\nEvidence and impact")
+        finishTurn("# Review complete\n\n## Summary\nReview finished\n\n## Simplify the layout\nEvidence and impact")
     }
     func finish(findings: Int, commit: String, withdrawn: [Int] = []) {
         if commit != "none" { self.commit = commit }
@@ -147,7 +147,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     func blockFix() {
         finishTurn("# Fixes blocked\nFindings addressed: 0\nFindings withdrawn: none\nCommit: `none`\n\n## Summary\nMissing evidence")
     }
-    private func finishTurn(_ report: String) {
+    func finishTurn(_ report: String) {
         let last = thread.turns.last!
         thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
             ReviewTurnState(id: last.id, status: "completed", finalMessage: report)
