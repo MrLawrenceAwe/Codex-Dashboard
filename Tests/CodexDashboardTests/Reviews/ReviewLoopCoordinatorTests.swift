@@ -915,10 +915,10 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
                 expectedReview = "Review project for bugs, issues, performance and responsiveness."
                 expectedFix = "Fix the finding and commit"
             case .organisation:
-                expectedReview = "Do a code and content minimisation and organisation review."
+                expectedReview = "Review code and content for simplification and organisation."
                 expectedFix = "Address the finding and commit"
             case .organisationAndNaming:
-                expectedReview = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading."
+                expectedReview = "Review code and content for simplification, organisation, and unclear, verbose, over-abbreviated, or misleading names."
                 expectedFix = "Address the finding and commit"
             case .content:
                 expectedReview = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose."
@@ -935,7 +935,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             await coordinator.advance(using: driver, threads: [])
             let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
             func taskParagraphs(_ prompt: String) -> String {
-                prompt.components(separatedBy: "\n\nKeep this task within the ").first!
+                prompt.components(separatedBy: "\n\nScope: ").first!
             }
             XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")

@@ -44,14 +44,21 @@ const reviewLoopView = (() => {
   }
 
   function renderNavigationStatus(snapshot) {
-    const spinner = document.querySelector('[data-review-navigation-running]');
-    if (!spinner) return;
-    const runningCount = snapshot.loops.filter(loop => ['waiting', 'running'].includes(loop.phase)).length;
-    const label = `${runningCount} running or waiting review ${runningCount === 1 ? 'loop' : 'loops'}`;
-    spinner.hidden = runningCount === 0;
-    spinner.setAttribute('aria-label', label);
-    spinner.setAttribute('title', label);
-    spinner.querySelector('[data-review-navigation-running-count]').textContent = String(runningCount);
+    const statuses = [
+      { kind: 'running', phases: ['waiting', 'running'], label: 'running or waiting' },
+      { kind: 'blocked', phases: ['blocked', 'awaitingExtensionReload'], label: 'blocked or awaiting extension reload' },
+      { kind: 'done', phases: ['completed', 'limitReached'], label: 'done (completed or round limit reached)' },
+    ];
+    for (const { kind, phases, label } of statuses) {
+      const marker = document.querySelector(`[data-review-navigation-${kind}]`);
+      if (!marker) continue;
+      const count = snapshot.loops.filter(loop => phases.includes(loop.phase)).length;
+      const description = `${count} ${label} review ${count === 1 ? 'loop' : 'loops'}`;
+      marker.hidden = count === 0;
+      marker.setAttribute('aria-label', description);
+      marker.setAttribute('title', description);
+      marker.querySelector(`[data-review-navigation-${kind}-count]`).textContent = String(count);
+    }
   }
 
   function render(snapshot, pendingAction, retainedLoopIDs = new Set()) {

@@ -14,7 +14,11 @@ const reviewLoopPage = (() => {
       id: dashboardElements.elementIDs.reviewNavButton,
       afterID: dashboardElements.elementIDs.todoNavButton,
       label: 'Review loops',
-      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loops</span></span><span class="review-nav-spinner" data-review-navigation-running role="status" aria-label="0 running or waiting review loops" title="0 running or waiting review loops" hidden><span data-review-navigation-running-count aria-hidden="true">0</span></span>`,
+      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loops</span></span><span class="review-nav-statuses">
+        <span class="review-nav-spinner" data-review-navigation-running role="status" hidden><span data-review-navigation-running-count aria-hidden="true">0</span></span>
+        <span class="review-nav-marker" data-review-navigation-blocked role="status" hidden><span aria-hidden="true">!</span><span data-review-navigation-blocked-count aria-hidden="true">0</span></span>
+        <span class="review-nav-marker" data-review-navigation-done role="status" hidden><span aria-hidden="true">✓</span><span data-review-navigation-done-count aria-hidden="true">0</span></span>
+      </span>`,
     });
     if (mounted) reviewLoopView.renderNavigationStatus(snapshot);
     return mounted;

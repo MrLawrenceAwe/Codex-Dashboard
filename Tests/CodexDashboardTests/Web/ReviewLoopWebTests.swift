@@ -325,6 +325,45 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
                                 "All priorities · P0–P3"])
     }
 
+    func testSidebarBlockedAndDoneMarkersTrackTransitionsAndRemount() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let states = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const phases = ['running','blocked','awaitingExtensionReload','completed','limitReached','stopped','paused','stopping'];
+          const loops = phases.map((phase,index) => ({id:`loop-${index}`,project,phase,completedRoundCount:0,maxRounds:5,rounds:[]}));
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['loop-3','loop-4','loop-5'],error:null};
+          const marker = kind => document.querySelector(`[data-review-navigation-${kind}]`);
+          const count = kind => marker(kind).querySelector(`[data-review-navigation-${kind}-count]`).textContent;
+          const hidden = kind => marker(kind).hidden && getComputedStyle(marker(kind)).display === 'none';
+          const states = [hidden('blocked'),hidden('done')];
+          api.applyReviewPageSnapshot(snapshot);
+          states.push(!marker('running').hidden,!marker('blocked').hidden,!marker('done').hidden,
+            count('blocked'),count('done'),marker('blocked').getAttribute('aria-label'),marker('done').title,
+            getComputedStyle(marker('blocked')).color !== getComputedStyle(marker('done')).color);
+          document.getElementById('codex-dashboard-review-navigation').remove();
+          api.ensureMounted();
+          states.push(count('blocked'),count('done'),!marker('blocked').hidden,!marker('done').hidden);
+          loops[1].phase = 'running'; loops[2].phase = 'completed';
+          api.applyReviewPageSnapshot(snapshot);
+          states.push(hidden('blocked'),count('done'),count('running'));
+          api.applyReviewPageSnapshot({...snapshot,loops:[loops[3]]});
+          states.push(marker('done').getAttribute('aria-label'),marker('done').title);
+          api.applyReviewPageSnapshot({...snapshot,loops:[]});
+          states.push(hidden('blocked'),hidden('done'),hidden('running'),count('done'));
+          return states;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(states, [true, true, true, true, true, "2", "2",
+                                "2 blocked or awaiting extension reload review loops",
+                                "2 done (completed or round limit reached) review loops", true,
+                                "2", "2", true, true, true, "3", "2",
+                                "1 done (completed or round limit reached) review loop",
+                                "1 done (completed or round limit reached) review loop",
+                                true, true, true, "0"])
+    }
+
     func testSidebarSpinnerCountsActiveLoopsAndNavigationRemount() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let states = try await webView.evaluateAsyncJavaScript("""

@@ -4,9 +4,9 @@ enum ReviewPrompts {
     private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
         guard loop.focus == .organisation || loop.focus == .organisationAndNaming else { return "" }
         let verification = verifyingFixes
-            ? "Verify findings and changes by inspecting source, call sites, tests, documentation, and manifests. Run relevant builds, type checks, and automated checks that do not launch or drive a browser or application UI."
-            : "Review source files, call sites, tests, documentation, and manifests statically."
-        return "\n\nKeep this task within the \(loop.focus.label.lowercased()) review scope: \(loop.focus.scopeDescription) \(verification) Do not perform live testing, browser or UI testing, Computer Use, or extension reloads unless the user explicitly requests them for this task. General extension-development verification instructions do not require live testing for this structure review loop."
+            ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
+            : "Statically inspect source, call sites, tests, docs, and manifests."
+        return "\n\nScope: \(loop.focus.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task, even under general extension-development instructions."
     }
 
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
@@ -46,9 +46,9 @@ enum ReviewPrompts {
         case .bugsAndPerformance:
             task = "Review project for bugs, issues, performance and responsiveness\(context)."
         case .organisation:
-            task = "Do a code and content minimisation and organisation review\(context)."
+            task = "Review code and content for simplification and organisation\(context)."
         case .organisationAndNaming:
-            task = "Do a code and content minimisation and organisation review, and suggest improvements where naming (e.g. folders, files, classes, variables, functions, UI, etc.) is undescriptive, too long, overly abbreviated, or misleading\(context)."
+            task = "Review code and content for simplification, organisation, and unclear, verbose, over-abbreviated, or misleading names\(context)."
         case .performance:
             task = "Review project for performance and responsiveness\(context)."
         case .content:
@@ -57,7 +57,7 @@ enum ReviewPrompts {
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
             ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
+        return task + "\n\nRead-only review; fixes follow after acceptance." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
