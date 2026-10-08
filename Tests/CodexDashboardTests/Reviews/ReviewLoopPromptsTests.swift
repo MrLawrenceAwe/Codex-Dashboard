@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testStructureScopePersistsThroughReviewFixAndReloadContinuation() {
+        for focus in [ReviewFocus.organisation, .organisationAndNaming] {
+            for liveTesting in [false, true] {
+                let loop = ReviewLoop(id: UUID(), startActionID: "structure", project: project,
+                                      promptContext: .general, maxRounds: 3, focus: focus,
+                                      liveTesting: liveTesting, reloadExtensionBeforeTesting: true)
+                var round = ReviewRound(number: 1, baseCommit: "base")
+                let review = ReviewPrompts.reviewPrompt(for: loop)
+                let fix = ReviewPrompts.fixPrompt(for: loop, round: round)
+                for fixRequested in [false, true] {
+                    round.fixRequested = fixRequested
+                    let continuation = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
+                    for prompt in [review, fix, continuation] {
+                        XCTAssertTrue(prompt.contains(focus.scopeDescription))
+                        XCTAssertTrue(prompt.contains("Do not perform live testing, browser or UI testing, Computer Use, or extension reloads"))
+                        XCTAssertFalse(prompt.contains("# Extension reload required"))
+                        XCTAssertFalse(prompt.contains("chrome-devtools MCP server"))
+                    }
+                    XCTAssertEqual(continuation.contains("Run relevant builds"), fixRequested)
+                }
+                XCTAssertTrue(review.contains("statically"))
+                XCTAssertFalse(review.contains("Run relevant builds"))
+                XCTAssertTrue(fix.contains("automated checks that do not launch or drive a browser or application UI"))
+            }
+        }
+    }
+
     func testExtensionReloadRequiresEnabledPreferenceAndLiveTesting() {
         var loop = ReviewLoop(id: UUID(), startActionID: "extension", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true)

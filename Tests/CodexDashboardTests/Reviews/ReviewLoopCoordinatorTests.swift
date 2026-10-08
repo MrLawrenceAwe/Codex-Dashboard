@@ -934,11 +934,14 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
-            XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt])
+            func taskParagraphs(_ prompt: String) -> String {
+                prompt.components(separatedBy: "\n\nKeep this task within the ").first!
+            }
+            XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts, [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
+            XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
         }
     }
 }

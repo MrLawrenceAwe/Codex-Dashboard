@@ -124,6 +124,10 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 model list.
 
 Structure, naming, and content reviews do not request extension reloads.
+Structure and naming loops explicitly use static review in both review and fix
+turns. Fix verification can use relevant builds, type checks, and automated checks
+that do not launch or drive a browser or application UI. Live browser testing,
+Computer Use, and extension reloads require an explicit request for that task.
 
 With **Reload browser extension** enabled, Codex uses Chrome DevTools to reload
 Chrome extensions before live testing and again after building fixes. It checks

@@ -257,7 +257,8 @@ final class ReviewLoopDriverTests: XCTestCase {
                 round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
                     ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
                 }, summary: "Findings")
-                XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round), expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+                let prompt = ReviewPrompts.fixPrompt(for: loop, round: round)
+                XCTAssertEqual(prompt.components(separatedBy: "\n\n").first, expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
             }
         }
     }

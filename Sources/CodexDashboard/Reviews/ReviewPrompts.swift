@@ -1,6 +1,14 @@
 import Foundation
 
 enum ReviewPrompts {
+    private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
+        guard loop.focus == .organisation || loop.focus == .organisationAndNaming else { return "" }
+        let verification = verifyingFixes
+            ? "Verify findings and changes by inspecting source, call sites, tests, documentation, and manifests. Run relevant builds, type checks, and automated checks that do not launch or drive a browser or application UI."
+            : "Review source files, call sites, tests, documentation, and manifests statically."
+        return "\n\nKeep this task within the \(loop.focus.label.lowercased()) review scope: \(loop.focus.scopeDescription) \(verification) Do not perform live testing, browser or UI testing, Computer Use, or extension reloads unless the user explicitly requests them for this task. General extension-development verification instructions do not require live testing for this structure review loop."
+    }
+
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
         guard loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting else { return "" }
         let timing = verifyingFixes
@@ -16,7 +24,13 @@ enum ReviewPrompts {
     }
 
     static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
-        "The user confirmed that the browser extension has been manually reloaded. Continue the unfinished "
+        if loop.focus == .organisation || loop.focus == .organisationAndNaming {
+            return (round.fixRequested
+                ? "Continue the unfinished fix task. Preserve existing changes and return the final fix report."
+                : "Continue the unfinished read-only review and return the final review report.")
+                + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
+        }
+        return "The user confirmed that the browser extension has been manually reloaded. Continue the unfinished "
             + (round.fixRequested ? "fix and verification task. Preserve existing changes, finish verification, and return the final fix report." : "read-only review and return the final review report.")
             + " If another manual reload is needed, return the extension reload request again."
             + "\n\n" + ReviewReportContract.extensionReloadInstructions
@@ -43,7 +57,7 @@ enum ReviewPrompts {
         let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
             ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
-        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
+        return task + "\n\nThis is a read-only review. Fixes will be requested in a separate follow-up after the review is accepted." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -62,6 +76,7 @@ enum ReviewPrompts {
             task = "Address \(findings) and commit"
         }
         var prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+        prompt += structureReviewInstruction(for: loop, verifyingFixes: true)
         if loop.liveTesting && loop.focus.supportsLiveTesting {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
         }
