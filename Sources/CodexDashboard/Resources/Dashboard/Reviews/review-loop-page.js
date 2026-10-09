@@ -20,7 +20,7 @@ const reviewLoopPage = (() => {
         <span class="review-nav-marker" data-review-navigation-done role="status" hidden><span aria-hidden="true">✓</span><span data-review-navigation-done-count aria-hidden="true">0</span></span>
       </span>`,
     });
-    if (mounted) reviewLoopView.renderNavigationStatus(snapshot);
+    if (mounted) reviewLoopView.renderNavigationStatus(snapshot, retainedLoopIDs);
     return mounted;
   }
 

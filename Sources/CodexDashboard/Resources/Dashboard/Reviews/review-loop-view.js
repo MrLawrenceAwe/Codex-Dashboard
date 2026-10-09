@@ -43,7 +43,13 @@ const reviewLoopView = (() => {
     return page;
   }
 
-  function renderNavigationStatus(snapshot) {
+  function currentLoops(snapshot, retainedLoopIDs) {
+    const finished = new Set(snapshot.finishedLoopIDs || []);
+    return snapshot.loops.filter(loop => !finished.has(loop.id) || retainedLoopIDs.has(loop.id));
+  }
+
+  function renderNavigationStatus(snapshot, retainedLoopIDs = new Set()) {
+    const loops = currentLoops(snapshot, retainedLoopIDs);
     const statuses = [
       { kind: 'running', phases: ['waiting', 'running'], label: 'running or waiting' },
       { kind: 'blocked', phases: ['blocked', 'awaitingExtensionReload'], label: 'blocked or awaiting extension reload' },
@@ -52,7 +58,7 @@ const reviewLoopView = (() => {
     for (const { kind, phases, label } of statuses) {
       const marker = document.querySelector(`[data-review-navigation-${kind}]`);
       if (!marker) continue;
-      const count = snapshot.loops.filter(loop => phases.includes(loop.phase)).length;
+      const count = loops.filter(loop => phases.includes(loop.phase)).length;
       const description = `${count} ${label} review ${count === 1 ? 'loop' : 'loops'}`;
       marker.hidden = count === 0;
       marker.setAttribute('aria-label', description);
@@ -63,13 +69,13 @@ const reviewLoopView = (() => {
 
   function render(snapshot, pendingAction, retainedLoopIDs = new Set()) {
     finishedLoopIDs = new Set(snapshot.finishedLoopIDs || []);
-    renderNavigationStatus(snapshot);
+    renderNavigationStatus(snapshot, retainedLoopIDs);
     const root = panel();
     if (!root) return;
     const { loops, error } = snapshot;
     reviewLoopSetupView.render(snapshot, pendingAction, isFinished);
     const activeCount = loops.filter(loop => !isFinished(loop)).length;
-    const current = loops.filter(loop => !isFinished(loop) || retainedLoopIDs.has(loop.id));
+    const current = currentLoops(snapshot, retainedLoopIDs);
     root.querySelector('[data-review-empty]').hidden = current.length > 0;
     root.querySelector('[data-review-active-count]').textContent = current.length;
     root.querySelector('[data-review-overview]').textContent = loops.length ? `${activeCount} active · ${loops.length} total` : '';

@@ -112,8 +112,9 @@ available even when usage alerts are suppressed.
 
 The sidebar shows separate counts for running or waiting loops, an amber **!** for
 blocked loops or loops awaiting an extension reload, and a green **✓** for completed
-loops or loops that reached their round limit. Done counts include saved history;
-stopped loops are excluded. Hover over a marker for its description.
+loops or loops that reached their round limit. Counts include only current loops;
+moving a finished loop to history removes it from the count. Stopped loops are
+excluded. Hover over a marker for its description.
 
 Enable **Mute media** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
 

@@ -333,7 +333,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const phases = ['running','blocked','awaitingExtensionReload','completed','limitReached','stopped','paused','stopping'];
           const loops = phases.map((phase,index) => ({id:`loop-${index}`,project,phase,completedRoundCount:0,maxRounds:5,rounds:[]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['loop-3','loop-4','loop-5'],error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:[],error:null};
           const marker = kind => document.querySelector(`[data-review-navigation-${kind}]`);
           const count = kind => marker(kind).querySelector(`[data-review-navigation-${kind}-count]`).textContent;
           const hidden = kind => marker(kind).hidden && getComputedStyle(marker(kind)).display === 'none';
@@ -348,7 +348,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           loops[1].phase = 'running'; loops[2].phase = 'completed';
           api.applyReviewPageSnapshot(snapshot);
           states.push(hidden('blocked'),count('done'),count('running'));
-          api.applyReviewPageSnapshot({...snapshot,loops:[loops[3]]});
+          api.applyReviewPageSnapshot({...snapshot,loops:[loops[3]],finishedLoopIDs:['loop-3']});
           states.push(marker('done').getAttribute('aria-label'),marker('done').title);
           api.applyReviewPageSnapshot({...snapshot,loops:[]});
           states.push(hidden('blocked'),hidden('done'),hidden('running'),count('done'));
@@ -359,8 +359,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
                                 "2 blocked or awaiting extension reload review loops",
                                 "2 done (completed or round limit reached) review loops", true,
                                 "2", "2", true, true, true, "3", "2",
-                                "1 done (completed or round limit reached) review loop",
-                                "1 done (completed or round limit reached) review loop",
+                                "0 done (completed or round limit reached) review loops",
+                                "0 done (completed or round limit reached) review loops",
                                 true, true, true, "0"])
     }
 
@@ -707,6 +707,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null};
           const board = () => document.querySelector('[data-review-board]');
           const history = () => document.querySelector('[data-review-history]');
+          const done = () => document.querySelector('[data-review-navigation-done]');
+          const doneCount = () => done().querySelector('[data-review-navigation-done-count]').textContent;
           api.applyReviewPageSnapshot(snapshot);
           api.openReviews();
           loop.phase = 'completed';
@@ -715,9 +717,17 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           api.applyReviewPageSnapshot(snapshot);
           const retained = [board().children.length, board().querySelector('[data-review-status]').textContent,
-            !!board().querySelector('[data-review-clear]'), history().hidden];
+            !!board().querySelector('[data-review-clear]'), history().hidden, done().hidden, doneCount()];
+          document.getElementById('codex-dashboard-review-navigation').remove();
+          api.ensureMounted();
+          retained.push(done().hidden, doneCount());
           board().querySelector('[data-review-clear]').click();
-          const cleared = [board().children.length, history().hidden, document.querySelector('[data-review-history-select]').value];
+          const cleared = [board().children.length, history().hidden, document.querySelector('[data-review-history-select]').value,
+            done().hidden, doneCount()];
+          api.applyReviewPageSnapshot(snapshot);
+          document.getElementById('codex-dashboard-review-navigation').remove();
+          api.ensureMounted();
+          cleared.push(done().hidden, doneCount());
           api.openTodos();
           api.openReviews();
           const reopened = [board().children.length, history().hidden];
@@ -727,13 +737,16 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           loop.phase = 'limitReached';
           snapshot.finishedLoopIDs = [loop.id];
           api.applyReviewPageSnapshot(snapshot);
-          const retainedAgain = board().children.length;
+          const retainedAgain = [board().children.length, done().hidden, doneCount()];
           api.openTodos();
           api.openReviews();
-          return [...retained, ...cleared, ...reopened, retainedAgain, board().children.length, history().hidden];
+          return [...retained, ...cleared, ...reopened, ...retainedAgain, board().children.length, history().hidden,
+            done().hidden, doneCount()];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [1, "No findings remain.", true, true, 0, false, "loop-1", 0, false, 1, 0, false])
+        XCTAssertEqual(result, [1, "No findings remain.", true, true, false, "1", false, "1",
+                                0, false, "loop-1", true, "0", true, "0", 0, false,
+                                1, false, "1", 0, false, true, "0"])
     }
 
     func testRoundsShowFindingsAndTheirPriorities() async throws {
