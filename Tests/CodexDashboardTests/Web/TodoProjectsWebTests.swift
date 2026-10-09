@@ -434,7 +434,7 @@ final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[2] as? String, "Project B")
         XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertTrue(values[4] is NSNull)
-        XCTAssertEqual(values[5] as? Bool, false)
+        XCTAssertEqual(values[5] as? Bool, true)
     }
 
     func testExistingTodoAssignmentUsesProjectsAvailableAfterTheTodoPageMounts() async throws {

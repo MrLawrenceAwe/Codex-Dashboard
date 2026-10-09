@@ -154,6 +154,19 @@ const codexUIContracts = (() => {
     return null;
   }
 
+  function activeComposerHasNoProject() {
+    const activeComposer = composer();
+    let host = activeComposer?.parentElement;
+    while (host && host !== document.body) {
+      for (const fiber of parentFibers(host)) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        if (props && Object.hasOwn(props, 'selectedProject')) return props.selectedProject === null;
+      }
+      host = host.parentElement;
+    }
+    return false;
+  }
+
   function activeComposerProjectID() {
     const activeComposer = composer();
     let host = activeComposer?.parentElement;
@@ -407,6 +420,7 @@ const codexUIContracts = (() => {
     threadRow,
     isThreadSelected,
     activeComposerThreadID,
+    activeComposerHasNoProject,
     activeComposerProjectID,
     activeComposerProject,
     threadUnreadStates,

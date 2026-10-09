@@ -115,7 +115,7 @@ const todoListView = (() => {
           </div>` : ''}
           ${!item.completed ? `<div class="todo-item-actions">
             <button type="button" class="todo-thread-action" data-todo-paste-in-thread aria-expanded="false" aria-label="Choose a chat to paste this to-do into" title="${item.project ? 'Choose a chat from this project' : 'Assign a project to choose a chat'}"${item.project ? '' : ' disabled'}>Paste into chat…</button>
-            ${!item.thread && item.project ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="Start a new chat for ${domUtils.escapeHTML(item.project.name)}" title="Start a new chat">New chat</button>` : ''}
+            ${!item.thread ? `<button type="button" class="todo-thread-action" data-todo-new-thread aria-label="${item.project ? `Start a new chat for ${domUtils.escapeHTML(item.project.name)}` : 'Start a new chat with no project'}" title="Start a new chat">New chat</button>` : ''}
             <select class="todo-paste-thread-picker" data-todo-paste-thread aria-label="Chat to paste this to-do into" hidden disabled></select>
           </div>` : ''}
         </div>

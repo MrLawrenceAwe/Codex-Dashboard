@@ -65,11 +65,12 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null, newProjectID = null } = {}) {
+  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null, newProjectID } = {}) {
     const isDestination = () => !isDestroyed()
       && (!threadID || codexUIContracts.activeComposerThreadID() === threadID)
-      && (!newProjectID || (!codexUIContracts.activeComposerThreadID()
-        && codexUIContracts.activeComposerProjectID() === newProjectID));
+      && (newProjectID === undefined || (!codexUIContracts.activeComposerThreadID()
+        && (newProjectID === null ? codexUIContracts.activeComposerHasNoProject()
+          : codexUIContracts.activeComposerProjectID() === newProjectID)));
     const destinationComposer = () => isDestination() ? activeComposer() : null;
     if (isDestroyed()) return false;
     document.querySelector('[data-todo-preset-warning]')?.remove();
@@ -176,13 +177,14 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
   }
 
   async function openTodoInNewThread(item) {
-    if (isDestroyed() || transferring || !item?.project) return;
+    if (isDestroyed() || transferring || !item) return;
     transferring = true;
     try {
-      if (!await codexHost.newChat(item.project.id) || isDestroyed()) return;
+      const projectID = item.project?.id || null;
+      if (!await codexHost.newChat(projectID) || isDestroyed()) return;
       pageState.close();
       await insertTodoIntoComposer(item, {
-        failurePolicy: 'stayInChat', waitForStableComposer: true, newProjectID: item.project.id,
+        failurePolicy: 'stayInChat', waitForStableComposer: true, newProjectID: projectID,
       });
     } finally {
       transferring = false;

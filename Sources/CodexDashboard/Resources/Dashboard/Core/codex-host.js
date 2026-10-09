@@ -32,9 +32,18 @@ const codexHost = {
     return fallbackButton?.parentElement ? { element: fallbackButton, insertAfter: false } : null;
   },
 
-  async newChat(projectID = '') {
-    if (projectID && !codexUIContracts.selectProject(projectID)) return false;
-    if (projectID) await new Promise((resolve) => setTimeout(resolve, 0));
+  async newChat(projectID = null) {
+    if (!projectID) {
+      // Codex's projectless action explicitly clears the active project.
+      // The sidebar New chat button can retain the current project.
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'new-projectless-task' },
+        source: null,
+      }));
+      return true;
+    }
+    if (!codexUIContracts.selectProject(projectID)) return false;
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const button = [...(this.sidebar()?.querySelectorAll('button') || [])]
       .find((candidate) => candidate.textContent.trim() === 'New chat');
     if (!button || button.disabled) return false;

@@ -48,8 +48,10 @@ linked to an open to-do shows **Already in To-dos**. Tasks can be edited, comple
 filtered, or deleted. Deleting a tag removes it from all to-dos.
 
 For an open to-do with a project, **Paste into chat…** lets you choose a project
-chat; linked chats are labelled. **New chat** populates a new project chat. Transfers
-include text, image, and model settings without sending. If a new-chat transfer
+chat; linked chats are labelled. For an open to-do without a linked chat, **New chat**
+populates a new chat in its assigned project, or a chat with no project when the
+to-do has no project. Transfers include text, image, and model settings without
+sending. If a new-chat transfer
 cannot apply the preset, check the warning and model settings before sending.
 
 ## Accounts
