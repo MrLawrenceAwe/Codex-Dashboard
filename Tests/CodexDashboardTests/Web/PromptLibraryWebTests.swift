@@ -405,6 +405,39 @@ final class PromptLibraryWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, "alpha Selected: beta gamma")
     }
 
+    func testPlaceholderExpansionPreservesTokensInsideSelectedAndClipboardText() async throws {
+        for includesClipboard in [false, true] {
+            let webView = try await DashboardWebTestHarness.promptLibraryWebView()
+            let result = try await webView.evaluateAsyncJavaScript(
+                """
+                (async () => {
+                  const composer = document.querySelector('textarea[placeholder="Do anything"]');
+                  composer.value = 'Literal {{clipboard}} and {{selection}} $&';
+                  composer.focus();
+                  composer.setSelectionRange(0, composer.value.length);
+                  Object.defineProperty(navigator, 'clipboard', { configurable: true,
+                    value: { readText: async () => 'Clipboard {{selection}} {{clipboard}} $&' } });
+                  document.querySelector('[data-codex-prompt-library-button]').click();
+                  document.querySelector('[data-prompt-new]').click();
+                  document.querySelector('[name="name"]').value = 'Literal placeholders';
+                  document.querySelector('[name="content"]').value =
+                    'Selected: {{selection}}\(includesClipboard ? " | Copied: {{clipboard}}" : "")';
+                  document.querySelector('[data-prompt-form] button[type="submit"]').click();
+                  document.querySelector('[data-prompt-use]').click();
+                  for (let attempt = 0; attempt < 50; attempt += 1) {
+                    if (!document.querySelector('[data-prompt-use]')) break;
+                    await new Promise((resolve) => setTimeout(resolve, 10));
+                  }
+                  return composer.value;
+                })()
+                """
+            ) as? String
+
+            XCTAssertEqual(result, "Selected: Literal {{clipboard}} and {{selection}} $&"
+                + (includesClipboard ? " | Copied: Clipboard {{selection}} {{clipboard}} $&" : ""))
+        }
+    }
+
     func testLibraryRefreshDoesNotReplaceAnActivePromptEdit() async throws {
         let webView = try await DashboardWebTestHarness.promptLibraryWebView()
         let result = try await webView.evaluateJavaScript(

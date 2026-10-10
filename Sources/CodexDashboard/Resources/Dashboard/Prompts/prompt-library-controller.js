@@ -76,9 +76,10 @@ function createPromptLibrary({ findThread }) {
   }
 
   function expandedPromptContent(content, clipboardText = '') {
-    return content
-      .replaceAll('{{selection}}', () => capturedSelectionText)
-      .replaceAll('{{clipboard}}', () => clipboardText);
+    // Expand only template tokens; inserted text may contain literal tokens.
+    return content.replace(/\{\{(selection|clipboard)\}\}/g, (_, placeholder) => (
+      placeholder === 'selection' ? capturedSelectionText : clipboardText
+    ));
   }
 
   function closeLibrary({ restoreFocus = true } = {}) {

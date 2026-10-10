@@ -169,6 +169,9 @@ final class NtfyUsageNotifier: PhoneUsageNotifying {
             !history.deliveredImmediateIdentifiers().contains($0.identifier)
         }
         for notification in immediateNotifications {
+            // Disabling can occur while the preceding publish is suspended.
+            // Keep undelivered alerts eligible for a later enabled update.
+            guard isEnabled else { return }
             do {
                 try await publisher.publish(topic: topic, title: notification.title, message: notification.body)
                 history.recordImmediateDelivery(notification.identifier)

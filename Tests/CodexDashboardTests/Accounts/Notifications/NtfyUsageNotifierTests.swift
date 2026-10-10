@@ -180,6 +180,42 @@ final class NtfyUsageNotifierTests: XCTestCase {
         XCTAssertEqual(deliveredCount, 1)
     }
 
+    func testDisablingDuringImmediateDeliveryStopsRemainingAlertsUntilReenabled() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let defaults = try makeDefaults()
+        let publisher = SuspendedNtfyPublisher()
+        let notifier = NtfyUsageNotifier(userDefaults: defaults, publisher: publisher, now: { now })
+        notifier.setEnabled(true)
+        let account = SavedAccount(id: UUID(), name: "Personal", createdAt: now,
+                                   lastUsedAt: now, codexAccountID: nil)
+        let reset = now.addingTimeInterval(5 * 60 * 60)
+        func snapshot(_ usedPercent: Int) -> CodexAccountUsageSnapshot {
+            CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(
+                    fiveHour: CodexUsageWindow(usedPercent: usedPercent, resetsAt: reset), weekly: nil
+                ), fetchedAt: now
+            )
+        }
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(19)])
+        let update = Task {
+            await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(81)])
+        }
+        await publisher.waitForFirstAttempt()
+        notifier.setEnabled(false)
+        await publisher.release()
+        await update.value
+
+        let attemptsWhileDisabled = await publisher.attemptCount()
+        XCTAssertEqual(attemptsWhileDisabled, 1)
+
+        notifier.setEnabled(true)
+        await notifier.updateNotifications(for: [account], usageByAccountID: [account.id: snapshot(81)])
+        let attemptsAfterReenabling = await publisher.attemptCount()
+        let deliveredCount = await publisher.messageCount()
+        XCTAssertEqual(attemptsAfterReenabling, 2)
+        XCTAssertEqual(deliveredCount, 2)
+    }
+
     func testCancelsFailedLimitRetryWhenWeeklyUsageBecomesExhausted() async throws {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let defaults = try makeDefaults()
