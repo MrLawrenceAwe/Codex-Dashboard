@@ -1,4 +1,4 @@
-function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, composerActions, readPreset, render, setExpandedPresetTodoID }) {
+function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, composerActions, readPreset, setExpandedPresetTodoID }) {
   function bindItemEditing(page) {
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
       if (event.target.matches('[data-todo-preset-details] > summary')) {
@@ -17,7 +17,10 @@ function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, com
       } else if (event.target.matches('[data-todo-title]')) {
         const title = event.target.value.trim();
         if (title) void updateItem(row.dataset.todoId, { title });
-        else render();
+        else {
+          event.target.value = getItems().find((item) => item.id === row.dataset.todoId)?.title || '';
+          todoListView.sizeTitle(event.target);
+        }
       } else if (event.target.matches('[data-todo-body]')) {
         void updateItem(row.dataset.todoId, { body: event.target.value });
       } else if (event.target.matches('[data-todo-project]')) {

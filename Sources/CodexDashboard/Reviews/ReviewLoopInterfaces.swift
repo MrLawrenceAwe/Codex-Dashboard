@@ -38,7 +38,7 @@ protocol ReviewLoopDriving: Sendable {
     func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String
     func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
     func interruptLatestTurn(_ threadID: String) async throws
-    func readThread(_ threadID: String) async throws -> ReviewThreadState
+    func readThread(_ threadID: String, reportTurnIDs: Set<String>) async throws -> ReviewThreadState
 }
 
 @MainActor

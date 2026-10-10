@@ -303,7 +303,6 @@ function createTodoList({ threadReferencesForProject, findThread }) {
       commitItems,
       composerActions,
       readPreset: todoPresetReader.readPreset,
-      render,
       setExpandedPresetTodoID: (id) => { expandedPresetTodoID = id; },
     });
     pageHost.append(page);

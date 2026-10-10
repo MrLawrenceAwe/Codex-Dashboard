@@ -274,7 +274,9 @@ final class ReviewLoopCoordinator {
     private func reconcile(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async throws {
         guard var updated = matchingLoop(id), var round = updated.rounds.last else { throw ReviewLoopError("Missing review round.") }
         guard let threadID = round.threadID else { throw ReviewLoopError("A previous launch was interrupted before its chat ID was saved. Inspect recent chats before starting a new loop; it will not be sent twice.") }
-        let thread = try await inspect { try await driver.readThread(threadID) }
+        let reportTurnIDs = Set([round.reviewTurnID, round.fixTurnID,
+                                 round.fixVerification?.sourceFixTurnID].compactMap { $0 })
+        let thread = try await inspect { try await driver.readThread(threadID, reportTurnIDs: reportTurnIDs) }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard let currentRound = updated.rounds.last else { return }

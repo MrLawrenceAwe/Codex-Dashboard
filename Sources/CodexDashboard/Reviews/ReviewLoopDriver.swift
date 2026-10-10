@@ -162,7 +162,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return output == "0"
     }
 
-    func readThread(_ threadID: String) async throws -> ReviewThreadState {
+    func readThread(_ threadID: String, reportTurnIDs: Set<String>) async throws -> ReviewThreadState {
         let response = try await request("thread/read", ["threadId": threadID, "includeTurns": false])
         guard var thread = response["thread"] as? [String: Any] else { throw ReviewLoopError("Codex returned no review chat.") }
         // Bounded metadata reads avoid hydrating a long tool transcript on every poll.
@@ -171,7 +171,13 @@ final class ReviewLoopDriver: ReviewLoopDriving {
               page["nextCursor"] == nil || page["nextCursor"] is NSNull else {
             throw ReviewLoopError("The review chat history exceeds the supported inspection limit.")
         }
-        for index in Set([turns.startIndex, turns.count - 1]).sorted() where turns.indices.contains(index) && turns[index]["status"] as? String == "completed" {
+        // Continuations and verification can leave a required report in the middle
+        // of the history. Load saved checkpoint turns as well as the endpoints.
+        let reportIndexes = Set([turns.startIndex, turns.count - 1]).union(
+            turns.indices.filter { index in
+                (turns[index]["id"] as? String).map(reportTurnIDs.contains) == true
+            })
+        for index in reportIndexes.sorted() where turns.indices.contains(index) && turns[index]["status"] as? String == "completed" {
             guard let turnID = turns[index]["id"] as? String else { throw ReviewLoopError("Missing review turn ID.") }
             var cursor: String?
             for _ in 0..<20 {

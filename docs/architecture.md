@@ -82,7 +82,8 @@ prompts targeting a concurrently deleted section move to General.
 To-dos live in renderer storage, with image data in IndexedDB and an inline fallback.
 Writes merge changed fields into the latest shared document, preserving other
 windows' edits and image references. Concurrent deletion beats stale edits; storage
-notifications refresh open windows. Draft protection prevents replacement of an
+notifications refresh open windows. Text saves update existing rows so click targets
+and keyboard focus survive the save. Draft protection prevents replacement of an
 actively edited field before its change is committed. View preferences and project
 highlights persist separately.
 
@@ -135,7 +136,9 @@ format correction needed before resuming. Investigation and progress messages re
 and displays snapshots without owning execution.
 
 `ReviewLoopDriver` uses the renderer's local app-server connection and reads bounded
-turn/item pages. Review and fix turns use their separate saved model selections;
+turn/item pages. It loads reports for the first and latest turns and the saved checkpoint
+turn IDs, retaining the original fix report during subsequent verification. Review and
+fix turns use their separate saved model selections;
 permission settings are not overridden. Priority filtering preserves the complete
 report but submits only qualifying findings with original numbers when necessary.
 Live testing adds instructions only when enabled; otherwise no test result is required

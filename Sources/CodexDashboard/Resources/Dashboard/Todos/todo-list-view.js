@@ -1,4 +1,5 @@
 const todoListView = (() => {
+  const renderedRows = new WeakMap();
   function projectPickerMarkup(project, projects) {
     return `<select class="todo-project-picker" data-todo-project aria-label="Project for this to-do">${projectOptions(projects, project?.id, project)}</select>`;
   }
@@ -95,7 +96,42 @@ const todoListView = (() => {
       list.innerHTML = `<div class="todo-empty"><span class="todo-empty-icon" aria-hidden="true">${dashboardIcons.render('completed')}</span><strong>${message}</strong></div>`;
       return;
     }
-    list.innerHTML = visible.map((item) => `
+    const existingRows = new Map([...list.querySelectorAll('[data-todo-id]')]
+      .map((row) => [row.dataset.todoId, row]));
+    list.querySelector('.todo-empty')?.remove();
+    visible.forEach((item, index) => {
+      const { title, body, createdAt, updatedAt, ...structure } = item;
+      // Image hydration updates the existing preview separately; its bytes do
+      // not change the row controls or invalidate a text edit's click target.
+      const image = structure.image ? { ...structure.image, dataURL: '' } : null;
+      const key = JSON.stringify({ structure: { ...structure, image }, availableTags, projects });
+      let row = existingRows.get(item.id);
+      const previous = row && renderedRows.get(row);
+      if (previous?.key === key) {
+        // A blur save must not detach the control receiving the user's click
+        // or keyboard focus. Update text and labels without replacing the row.
+        if (previous.title !== title) row.querySelector('[data-todo-title]').value = title;
+        if (previous.body !== body) row.querySelector('[data-todo-body]').value = body;
+        row.querySelector('[data-todo-completed]').setAttribute('aria-label',
+          `${item.completed ? 'Mark as open' : 'Mark as completed'}: ${title}`);
+        row.querySelector('[data-todo-delete]').setAttribute('aria-label', `Delete ${title}`);
+      } else {
+        const template = document.createElement('template');
+        template.innerHTML = itemMarkup(item, projects, availableTags).trim();
+        const replacement = template.content.firstElementChild;
+        if (row) row.replaceWith(replacement);
+        row = replacement;
+      }
+      renderedRows.set(row, { key, title, body });
+      if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
+      existingRows.delete(item.id);
+    });
+    existingRows.forEach((row) => row.remove());
+    list.querySelectorAll('[data-todo-title]').forEach(sizeTitle);
+  }
+
+  function itemMarkup(item, projects, availableTags) {
+    return `
       <article class="todo-item${item.completed ? ' is-completed' : ''}" data-todo-id="${domUtils.escapeHTML(item.id)}">
         <label class="todo-check" title="${item.completed ? 'Mark as open' : 'Mark as completed'}">
           <input type="checkbox" data-todo-completed${item.completed ? ' checked' : ''} aria-label="${item.completed ? 'Mark as open' : 'Mark as completed'}: ${domUtils.escapeHTML(item.title)}">
@@ -123,8 +159,7 @@ const todoListView = (() => {
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
         </button>
       </article>
-    `).join('');
-    list.querySelectorAll('[data-todo-title]').forEach(sizeTitle);
+    `;
   }
 
   function createPage() {

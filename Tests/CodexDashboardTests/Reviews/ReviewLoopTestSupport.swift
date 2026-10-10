@@ -119,7 +119,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
             ReviewTurnState(id: last.id, status: "interrupted", finalMessage: nil)
         ])
     }
-    func readThread(_ threadID: String) async throws -> ReviewThreadState {
+    func readThread(_ threadID: String, reportTurnIDs: Set<String>) async throws -> ReviewThreadState {
         onReadThread?()
         if failReadThread { throw ReviewLoopError("Connection timed out") }
         return thread

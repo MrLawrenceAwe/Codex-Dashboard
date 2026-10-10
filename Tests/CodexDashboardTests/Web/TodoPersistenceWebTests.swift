@@ -5,6 +5,55 @@ import XCTest
 
 @MainActor
 final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
+    func testTextSavePreservesRowControlsAndFocusUntilNextAction() async throws {
+        for field in ["title", "body"] {
+            let view = try await webView()
+            let result = try await view.evaluateAsyncJavaScript("""
+            (async () => {
+              window.__codexDashboard.openTodos();
+              const form = document.querySelector('[data-todo-form]');
+              form.querySelector('[data-todo-new-title]').value = 'Saved title';
+              form.requestSubmit();
+              await window.__waitForTodoSaves();
+              const editor = document.querySelector('[data-todo-\(field)]');
+              const nextEditor = document.querySelector('[data-todo-\(field == "title" ? "body" : "title")]');
+              const checkbox = document.querySelector('[data-todo-completed]');
+              editor.focus();
+              editor.value = 'Updated text';
+              editor.dispatchEvent(new Event('change', { bubbles: true }));
+              nextEditor.focus();
+              await window.__waitForTodoSaves();
+              const controlsPreserved = checkbox.isConnected && nextEditor.isConnected
+                && document.activeElement === nextEditor;
+              checkbox.click();
+              await window.__waitForTodoSaves();
+              const saved = window.__todoStoreForTests.load()[0];
+              return [controlsPreserved, saved['\(field)'], saved.completed];
+            })()
+            """) as? [AnyHashable]
+            XCTAssertEqual(result, [true, "Updated text", true], field)
+        }
+    }
+
+    func testEmptyTitleRestoresSavedTextWithoutReplacingControls() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Keep this title';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          const title = document.querySelector('[data-todo-title]');
+          const checkbox = document.querySelector('[data-todo-completed]');
+          title.value = '   ';
+          title.dispatchEvent(new Event('change', { bubbles: true }));
+          return [title.value, checkbox.isConnected, window.__todoStoreForTests.load()[0].title];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Keep this title", true, "Keep this title"])
+    }
+
     func testLegacyLightPresetMigratesAndSurvivesFailedRewrite() async throws {
         let view = try await webView()
         let result = try await view.evaluateJavaScript("""

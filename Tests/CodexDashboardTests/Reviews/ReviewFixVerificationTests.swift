@@ -19,6 +19,22 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         return (recovered, store, driver)
     }
 
+    func testRealDriverRetainsSourceFixReportWhileVerifyingAdvancedHEAD() async throws {
+        for completed in [false, true] {
+            let (coordinator, _, driver) = try await verifying()
+            if completed { driver.review(priorities: []) }
+            let connection = VerificationReportDevTools(thread: driver.thread)
+            let reader = ReviewLoopDriver(devTools: connection,
+                target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+            let sourceFixTurnID = try XCTUnwrap(coordinator.loops[0].rounds[0].fixVerification?.sourceFixTurnID)
+            driver.thread = try await reader.readThread("thread-1", reportTurnIDs: [sourceFixTurnID])
+            XCTAssertNotNil(driver.thread.turns[1].finalMessage)
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(coordinator.loops[0].phase, completed ? .limitReached : .running)
+            XCTAssertEqual(driver.pushedCommits, completed ? ["fixed"] : [])
+        }
+    }
+
     func testRegressionBlockedAndCorrectedVerificationNeedsExplicitResume() async throws {
         let (coordinator, _, driver) = try await verifying()
         driver.review(priorities: [.p1])
@@ -109,5 +125,33 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .limitReached)
+    }
+}
+
+private actor VerificationReportDevTools: DevToolsServing {
+    let thread: ReviewThreadState
+    init(thread: ReviewThreadState) { self.thread = thread }
+    func mainRendererTargets() async -> [DevToolsTarget] { [] }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool { false }
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) async throws -> String? {
+        let prefix = "window.__codexDashboard.reviewRequest("
+        let request = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: Data(expression.dropFirst(prefix.count).dropLast().utf8)) as? [String: Any])
+        let params = try XCTUnwrap(request["params"] as? [String: Any])
+        let result: [String: Any]
+        switch request["method"] as? String {
+        case "thread/read":
+            result = ["thread": ["cwd": thread.cwd,
+                "status": ["type": thread.turns.last?.status == "inProgress" ? "active" : "idle"]]]
+        case "thread/turns/list":
+            result = ["data": thread.turns.map { ["id": $0.id, "status": $0.status] }, "nextCursor": NSNull()]
+        case "thread/items/list":
+            let turn = try XCTUnwrap(thread.turns.first { $0.id == params["turnId"] as? String })
+            let text = try XCTUnwrap(turn.finalMessage)
+            result = ["data": [["item": ["type": "agentMessage", "phase": "final", "text": text]]],
+                "nextCursor": NSNull()]
+        default: throw ReviewLoopError("Unexpected verification request")
+        }
+        return String(data: try JSONSerialization.data(withJSONObject: ["result": result]), encoding: .utf8)
     }
 }
