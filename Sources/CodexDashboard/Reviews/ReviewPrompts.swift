@@ -16,7 +16,7 @@ enum ReviewPrompts {
         \(findings)
         """ + structureReviewInstruction(for: loop, verifyingFixes: true)
             + bugVerificationInstruction(for: loop, verifyingFixes: true)
-            + extensionReloadInstruction(for: loop, verifyingFixes: true) + mutedMediaInstruction(for: loop)
+            + extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
     }
 
     private static func bugVerificationInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
@@ -42,8 +42,8 @@ enum ReviewPrompts {
         return condition + "\n\nUse the globally configured chrome-devtools MCP server for Chrome extension reloads. Identify the installed extension ID and source folder with list_extensions and project context, then use reload_extension. Prefer these tools over Computer Use on chrome://extensions. \(timing) Verify reload success, refresh affected test pages, and reopen the popup or side panel as needed with trigger_extension_action. If the tools are unavailable or reload fails, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete." + "\n\n" + ReviewReportContract.extensionReloadInstructions
     }
 
-    private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
-        loop.liveTesting && loop.reviewType.supportsLiveTesting && loop.muteMedia
+    private static func testPlaybackInstruction(for loop: ReviewLoop) -> String {
+        loop.liveTesting && loop.reviewType.supportsLiveTesting && loop.muteTestPlayback
             ? "\n\nMute only media playback that you start or cause to start for live testing, including autoplay in test tabs you open. Mute that specific test tab or player before playback and keep it muted after navigation or extension reloads. Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture. Never mute the entire browser or system audio. Use separate test tabs when needed and verify that only your test playback is muted."
             : ""
     }
@@ -55,7 +55,7 @@ enum ReviewPrompts {
         return task + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
             + bugVerificationInstruction(for: loop, verifyingFixes: round.fixRequested)
             + extensionReloadInstruction(for: loop, verifyingFixes: round.fixRequested)
-            + mutedMediaInstruction(for: loop)
+            + testPlaybackInstruction(for: loop)
     }
 
     static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -70,7 +70,7 @@ enum ReviewPrompts {
             + " If another manual reload is needed, return the extension reload request again."
             + "\n\n" + ReviewReportContract.extensionReloadInstructions
             + bugVerificationInstruction(for: loop, verifyingFixes: round.fixRequested)
-            + mutedMediaInstruction(for: loop)
+            + testPlaybackInstruction(for: loop)
     }
 
     static func reviewPrompt(for loop: ReviewLoop) -> String {
@@ -90,10 +90,17 @@ enum ReviewPrompts {
         case .content:
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
-        let liveTesting = loop.liveTesting && loop.reviewType.supportsLiveTesting
-            ? "\n\nUse code review and live testing to find bugs and issues."
-            : ""
-        return task + "\n\nRead-only review; fixes follow after acceptance." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
+        let liveTesting: String
+        if loop.liveTesting && loop.reviewType.supportsLiveTesting {
+            liveTesting = switch loop.reviewType {
+            case .performance: "\n\nUse code review and live testing to find performance and responsiveness issues. Measure relevant behaviour to support findings."
+            case .bugsAndPerformance: "\n\nUse code review and live testing to find bugs, issues, and performance and responsiveness problems. Measure relevant behaviour to support performance findings."
+            default: "\n\nUse code review and live testing to find bugs and issues."
+            }
+        } else {
+            liveTesting = ""
+        }
+        return task + "\n\nRead-only review; fixes follow after acceptance." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + testPlaybackInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -117,7 +124,7 @@ enum ReviewPrompts {
         if loop.liveTesting && loop.reviewType == .performance {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
         }
-        prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + mutedMediaInstruction(for: loop)
+        prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
         let scope = review.findings.enumerated().compactMap { index, finding -> String? in
             guard accepted.contains(finding) else { return nil }

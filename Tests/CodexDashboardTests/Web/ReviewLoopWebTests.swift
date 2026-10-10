@@ -59,7 +59,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["Waiting for extension reload", "Reload Example in Chrome.", "Extension reloaded — continue", "resume", "reload"])
     }
 
-    func testMuteMediaSetupAndActiveCardActions() async throws {
+    func testMuteTestPlaybackSetupAndActiveCardActions() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateJavaScript("""
         (() => {
@@ -67,7 +67,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON), projects:[project],loops:[],error:null};
           api.applyReviewPageSnapshot(snapshot); api.openReviews();
-          const mute = document.querySelector('[data-review-mute-media]');
+          const mute = document.querySelector('[data-review-mute-test-playback]');
           const hiddenBefore = mute.closest('label').hidden;
           const live = document.querySelector('[data-review-live-testing]');
           live.value = 'true'; live.dispatchEvent(new Event('change'));
@@ -77,19 +77,19 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.querySelector('[data-fix-model]').value = 'model-a';
           document.querySelector('[data-review-form]').requestSubmit();
           const start = JSON.parse(api.pendingReviewAction());
-          const loop = {id:'blocked',project,phase:'blocked',liveTesting:true,muteMedia:false,completedRoundCount:0,maxRounds:3,rounds:[]};
+          const loop = {id:'blocked',project,phase:'blocked',liveTesting:true,muteTestPlayback:false,completedRoundCount:0,maxRounds:3,rounds:[]};
           api.applyReviewPageSnapshot({...snapshot,loops:[loop],acknowledgedActionID:start.id});
-          const toggle = document.querySelector('[data-review-loop-mute-media]');
+          const toggle = document.querySelector('[data-review-loop-mute-test-playback]');
           toggle.click();
           const update = JSON.parse(api.pendingReviewAction());
-          api.applyReviewPageSnapshot({...snapshot,loops:[{...loop,muteMedia:true}],acknowledgedActionID:update.id});
-          return [hiddenBefore,visible,start.muteMedia,update.kind,update.loopID,update.muteMedia,
-            document.querySelector('[data-review-loop-mute-media]').checked,
-            document.querySelector('[data-review-media-setting]').querySelector('p') === null,
+          api.applyReviewPageSnapshot({...snapshot,loops:[{...loop,muteTestPlayback:true}],acknowledgedActionID:update.id});
+          return [hiddenBefore,visible,start.muteTestPlayback,update.kind,update.loopID,update.muteTestPlayback,
+            document.querySelector('[data-review-loop-mute-test-playback]').checked,
+            document.querySelector('[data-review-test-playback-setting]').querySelector('p') === null,
             mute.type === 'checkbox'];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true,true,true,"setMuteMedia","blocked",true,true,true,true])
+        XCTAssertEqual(result, [true,true,true,"setMuteTestPlayback","blocked",true,true,true,true])
     }
 
     func testStartIncludesOptInRemotePushPreference() async throws {
@@ -849,7 +849,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
-            progress:{[loop.id]:{step:'Round limit reached',currentLabel:'Latest prompt',current:null,upcoming:null,
+            progress:{[loop.id]:{step:'Round limit reached',currentLabel:'Configured prompt preview',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
           const badge = document.querySelector('[data-review-badge]');
@@ -876,7 +876,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],error:null,
             loops:[{id:'live',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
-            progress:{live:{step:'Reviewing',currentLabel:'Current prompt',threadID:'task-1',nextMessage:'',
+            progress:{live:{step:'Reviewing',currentLabel:'Configured prompt preview',threadID:'task-1',nextMessage:'',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
           api.applyReviewPageSnapshot(snapshot);

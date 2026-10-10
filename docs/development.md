@@ -147,11 +147,17 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
+Review-loop version 11 renames `muteMedia` to `muteTestPlayback` at the storage
+boundary, preserving saved preferences and round history. Current actions, snapshots,
+and saved documents use `muteTestPlayback` and `setMuteTestPlayback`.
+
 Review-loop version 10 renames `focus` to `reviewType` when loading earlier saved
 loops, preserving their settings and round history. Current actions, snapshots,
 and saved documents use only `reviewType`.
 
-Version 9 adds `muteMedia`, defaulting existing loops to off while preserving all other version 8 fields. Review and fix prompts scope muting to playback started by the agent, including autoplay in its test tabs, and explicitly preserve existing user playback and mute/volume settings. They prohibit browser-wide or system muting. These instructions are included when live testing and this preference are enabled. Active cards save changes through `setMuteMedia` for the next prompt.
+Version 9 introduced the playback preference as `muteMedia`, defaulting existing
+loops to off while preserving other version 8 fields. See the
+[usage guide](usage.md#review-loops) for playback scope and controls.
 
 Version 8 adds the durable `stopping` phase so checkout reservations
 survive interruption failures and restarts. Version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.

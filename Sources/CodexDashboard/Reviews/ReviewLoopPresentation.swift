@@ -8,9 +8,8 @@ enum ReviewLoopPresentation {
         let (upcoming, nextMessage) = nextPrompt(for: loop, round: round, unfinished: unfinished)
         return ReviewLoopProgress(
             step: step(for: loop, round: round),
-            currentLabel: loop.phase == .running && unfinished && (round?.review == nil || round?.fixRequested == true)
-                ? "Current prompt" : "Latest prompt",
-            current: round.map { currentPrompt(for: loop, round: $0) },
+            currentLabel: "Configured prompt preview",
+            current: round.map { configuredPromptPreview(for: loop, round: $0) },
             upcoming: upcoming,
             nextMessage: nextMessage,
             threadID: round?.threadID
@@ -35,7 +34,8 @@ enum ReviewLoopPresentation {
         }
     }
 
-    private static func currentPrompt(for loop: ReviewLoop, round: ReviewRound) -> ReviewPromptPreview {
+    /// Reconstructed from current settings; this is not a record of the submitted turn.
+    private static func configuredPromptPreview(for loop: ReviewLoop, round: ReviewRound) -> ReviewPromptPreview {
         if let verification = round.fixVerification {
             return ReviewPromptPreview(
                 title: "Verify fixes · round \(round.number)",

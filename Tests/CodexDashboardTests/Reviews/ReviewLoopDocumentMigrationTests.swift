@@ -6,12 +6,13 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
     func testVersionNineRenamesFocusWithoutLosingSettingsOrHistory() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "rename", project: project,
                               promptContext: .personal, maxRounds: 3,
-                              reviewType: .organisationAndNaming, muteMedia: true)
+                              reviewType: .organisationAndNaming, muteTestPlayback: true)
         loop.phase = .paused
         loop.checkoutRoot = project.path
         loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         saved["focus"] = saved.removeValue(forKey: "reviewType")
+        saved["muteMedia"] = saved.removeValue(forKey: "muteTestPlayback")
         let data = try JSONSerialization.data(withJSONObject: ["version": 9, "loops": [saved]])
         let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
         XCTAssertEqual(migrated, loop)
@@ -22,17 +23,36 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
         XCTAssertEqual(try ReviewLoopDocumentMigration.decode(document), [loop])
     }
 
-    func testVersionEightAddsMuteMediaWithoutLosingSavedRound() throws {
+    func testVersionTenRenamesPlaybackPreferenceWithoutLosingSettingsOrHistory() throws {
+        for enabled in [false, true] {
+            var loop = ReviewLoop(id: UUID(), startActionID: "playback", project: project,
+                                  promptContext: .personal, maxRounds: 3,
+                                  liveTesting: true, muteTestPlayback: enabled)
+            loop.phase = .paused
+            loop.checkoutRoot = project.path
+            loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
+            var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+            saved["muteMedia"] = saved.removeValue(forKey: "muteTestPlayback")
+            let data = try JSONSerialization.data(withJSONObject: ["version": 10, "loops": [saved]])
+            let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+            XCTAssertEqual(migrated, loop)
+            let current = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(migrated)) as? [String: Any])
+            XCTAssertNil(current["muteMedia"])
+            XCTAssertEqual(current["muteTestPlayback"] as? Bool, enabled)
+        }
+    }
+
+    func testVersionEightAddsMuteTestPlaybackWithoutLosingSavedRound() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "mute", project: project,
                               promptContext: .personal, maxRounds: 3, liveTesting: true)
         loop.phase = .blocked
         loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved.removeValue(forKey: "muteMedia")
+        saved.removeValue(forKey: "muteTestPlayback")
         saved["focus"] = saved.removeValue(forKey: "reviewType")
         let data = try JSONSerialization.data(withJSONObject: ["version": 8, "loops": [saved]])
         XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
-        loop.muteMedia = true
+        loop.muteTestPlayback = true
         let current = try JSONEncoder().encode(ReviewLoopsDocument(version: ReviewLoopsDocument.currentVersion, loops: [loop]))
         XCTAssertEqual(try ReviewLoopDocumentMigration.decode(current), [loop])
     }

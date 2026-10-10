@@ -33,11 +33,11 @@ const reviewLoopCardView = (() => {
         <div data-review-status role="status" aria-live="polite"></div>
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
-        <div data-review-media-setting></div>
+        <div data-review-test-playback-setting></div>
         <div class="review-live" data-review-live hidden>
           <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open chat ↗</button></div>
           <div class="review-prompt" data-review-current-prompt>
-            <div class="review-prompt-heading"><span data-review-current-label>Current prompt</span><span data-review-current-title></span></div>
+            <div class="review-prompt-heading"><span data-review-current-label>Configured prompt preview</span><span data-review-current-title></span></div>
             <p data-review-current-note></p><pre data-review-current-text></pre>
           </div>
           <div class="review-prompt" data-review-upcoming-prompt>
@@ -118,13 +118,13 @@ const reviewLoopCardView = (() => {
       <button type="button" data-review-action="stop">Stop loop</button>`;
     controls.querySelectorAll('button').forEach(button => { button.dataset.reviewLoopID = loop.id; });
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
-    const mediaSetting = root.querySelector('[data-review-media-setting]');
-    mediaSetting.hidden = isFinished(loop) || loop.phase === 'stopping' || !loop.liveTesting;
-    if (!mediaSetting.hidden) {
-      if (!mediaSetting.firstElementChild) mediaSetting.innerHTML = '<label><input type="checkbox" data-review-loop-mute-media> Mute test playback</label>';
-      const input = mediaSetting.querySelector('input');
+    const playbackSetting = root.querySelector('[data-review-test-playback-setting]');
+    playbackSetting.hidden = isFinished(loop) || loop.phase === 'stopping' || !loop.liveTesting;
+    if (!playbackSetting.hidden) {
+      if (!playbackSetting.firstElementChild) playbackSetting.innerHTML = '<label><input type="checkbox" data-review-loop-mute-test-playback> Mute test playback</label>';
+      const input = playbackSetting.querySelector('input');
       input.dataset.reviewLoopId = loop.id;
-      input.checked = !!loop.muteMedia;
+      input.checked = !!loop.muteTestPlayback;
       input.disabled = !!pendingAction;
     }
     const expandedRounds = new Set(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('.review-round-details[open]')].map(details => details.dataset.round) : []);

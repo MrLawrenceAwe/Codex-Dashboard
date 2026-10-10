@@ -42,9 +42,14 @@ struct CompatibilityReport: Equatable, Sendable {
         if blockingCount > 0 {
             return "\(blockingCount) incompatible \u{00b7} \(warningCount) need attention"
         }
-        if warningCount > 0 {
-            return "Core contracts compatible \u{00b7} \(warningCount) need attention"
+        let uncheckedCount = checks.count { $0.status == .unavailable }
+        if uncheckedCount > 0 {
+            return "Compatibility checks incomplete \u{00b7} \(uncheckedCount) not checked \u{00b7} \(warningCount) need attention"
         }
+        if warningCount > 0 {
+            return "Compatibility checks need attention \u{00b7} \(warningCount) \(warningCount == 1 ? "warning" : "warnings")"
+        }
+        if checks.isEmpty { return "Compatibility not checked" }
         return "All checked contracts are compatible"
     }
 

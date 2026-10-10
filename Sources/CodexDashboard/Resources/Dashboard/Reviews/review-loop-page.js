@@ -44,8 +44,8 @@ const reviewLoopPage = (() => {
       model.addEventListener('invalid', () => { details.querySelector('.review-execution-options').open = true; });
     }
     details.addEventListener('change', event => {
-      const control = event.target.closest('[data-review-loop-mute-media]');
-      if (control) queueAction({ kind: 'setMuteMedia', loopID: control.dataset.reviewLoopId, muteMedia: control.checked });
+      const control = event.target.closest('[data-review-loop-mute-test-playback]');
+      if (control) queueAction({ kind: 'setMuteTestPlayback', loopID: control.dataset.reviewLoopId, muteTestPlayback: control.checked });
     });
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {

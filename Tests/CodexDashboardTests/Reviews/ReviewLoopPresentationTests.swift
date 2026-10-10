@@ -24,12 +24,13 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         XCTAssertNil(saved?["completedRoundCount"], "Derived counts must not be persisted")
     }
 
-    func testProgressTracksSubmittedAndConditionalPrompts() async throws {
+    func testProgressShowsConfiguredAndConditionalPromptPreviews() async throws {
         let (coordinator, _, driver) = try make()
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Reviewing")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Configured prompt preview")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
         XCTAssertTrue(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note.contains("Only if") == true)
         driver.review(priorities: [.p1, .p2])
@@ -47,7 +48,7 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
-        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Latest prompt")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.currentLabel, "Configured prompt preview")
     }
 
     func testProgressDoesNotQueuePastRoundLimitOrCleanReview() async throws {

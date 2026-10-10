@@ -168,7 +168,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var priorityLimit: ReviewFinding.Priority? = nil
     var liveTesting = false
     var reloadExtensionBeforeTesting = false
-    var muteMedia = false
+    var muteTestPlayback = false
     var pushToRemote = false
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
@@ -186,7 +186,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 10
+    static let currentVersion = 11
     let version: Int
     let loops: [ReviewLoop]
 }

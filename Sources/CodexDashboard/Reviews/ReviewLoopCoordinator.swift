@@ -68,15 +68,15 @@ final class ReviewLoopCoordinator {
             let reviewType = action.reviewType ?? .bugs
             let promptContext = reviewType.supportsProjectContext ? action.promptContext ?? .general : .general
             let liveTesting = reviewType.supportsLiveTesting && (action.liveTesting ?? false)
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, reviewType: reviewType, speed: action.speed ?? .standard, priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteMedia: liveTesting && (action.muteMedia ?? false), pushToRemote: action.pushToRemote ?? false))
-        case .setMuteMedia:
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, reviewType: reviewType, speed: action.speed ?? .standard, priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteTestPlayback: liveTesting && (action.muteTestPlayback ?? false), pushToRemote: action.pushToRemote ?? false))
+        case .setMuteTestPlayback:
             guard let id = action.loopID, var updated = matchingLoop(id),
                   !updated.phase.isFinished, updated.phase != .stopping,
                   updated.liveTesting, updated.reviewType.supportsLiveTesting,
-                  let muteMedia = action.muteMedia else {
+                  let muteTestPlayback = action.muteTestPlayback else {
                 throw ReviewLoopError("Mute test playback requires an active loop with live testing enabled.")
             }
-            updated.muteMedia = muteMedia
+            updated.muteTestPlayback = muteTestPlayback
             try persist(updated)
         case .pause, .resume, .stop:
             guard let id = action.loopID, var updated = matchingLoop(id) else {
@@ -551,20 +551,8 @@ final class ReviewLoopCoordinator {
               round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
             throw ReviewLoopError("The checkout changed during the interrupted task. Inspect its chat before continuing.")
         }
-        guard var updated = activeLoop(matching: loop.id, phase: .running) else { return }
-        // Consume this Resume before submitting. Polling must never repeat an unknown launch.
-        updated.rounds[updated.rounds.count - 1].continuationRequested = true
-        updated.message = "Continuing the interrupted \(round.fixRequested ? "fix task" : "review") in its existing chat."
-        try persist(updated)
-        let turnID = try await driver.startTurn(
-            threadID: threadID, projectPath: updated.project.path, expectedRepository: repo,
-            prompt: ReviewPrompts.interruptedContinuation(for: updated, round: round),
-            kind: round.fixRequested ? .fixContinuation : .review(updated.priorityLimit),
-            selection: round.fixRequested ? updated.fixSelection : updated.reviewSelection, speed: updated.speed)
-        guard var current = matchingLoop(loop.id) else { return }
-        if round.fixRequested { current.rounds[current.rounds.count - 1].fixTurnID = turnID }
-        else { current.rounds[current.rounds.count - 1].reviewTurnID = turnID }
-        try persist(current)
+        try await submitContinuation(loop: loop, round: round, repository: repo,
+                                     reason: .interrupted, using: driver, threadID: threadID)
     }
 
     private func continueAfterExtensionReload(
@@ -587,15 +575,33 @@ final class ReviewLoopCoordinator {
               round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
             throw ReviewLoopError("The checkout changed while waiting for extension reload. Inspect its chat before continuing.")
         }
+        try await submitContinuation(loop: loop, round: round, repository: repo,
+                                     reason: .extensionReload, using: driver, threadID: threadID)
+    }
+
+    private enum ContinuationReason { case interrupted, extensionReload }
+
+    private func submitContinuation(
+        loop: ReviewLoop, round: ReviewRound, repository: ReviewRepositoryState,
+        reason: ContinuationReason, using driver: any ReviewLoopDriving, threadID: String
+    ) async throws {
         guard var updated = activeLoop(matching: loop.id, phase: .running) else { return }
-        // Save submission intent before starting the continuation; never resend an unknown launch.
-        updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
+        let prompt: String
+        switch reason {
+        case .interrupted:
+            updated.message = "Continuing the interrupted \(round.fixRequested ? "fix task" : "review") in its existing chat."
+            prompt = ReviewPrompts.interruptedContinuation(for: updated, round: round)
+        case .extensionReload:
+            updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
+            updated.message = "Continuing after the manual extension reload."
+            prompt = ReviewPrompts.extensionReloadContinuation(for: updated, round: round)
+        }
+        // Persist intent before submission; polling must never repeat an unknown launch.
         updated.rounds[updated.rounds.count - 1].continuationRequested = true
-        updated.message = "Continuing after the manual extension reload."
         try persist(updated)
         let turnID = try await driver.startTurn(
-            threadID: threadID, projectPath: updated.project.path, expectedRepository: repo,
-            prompt: ReviewPrompts.extensionReloadContinuation(for: updated, round: round),
+            threadID: threadID, projectPath: updated.project.path, expectedRepository: repository,
+            prompt: prompt,
             kind: round.fixRequested ? .fixContinuation : .review(updated.priorityLimit),
             selection: round.fixRequested ? updated.fixSelection : updated.reviewSelection, speed: updated.speed)
         guard var current = matchingLoop(loop.id) else { return }

@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
-    func testBugReviewsKeepLiveDiscoveryAndUseConditionalVerification() {
+    func testLiveDiscoveryMatchesReviewTypeAndUsesConditionalBugVerification() {
         for reviewType in ReviewType.allCases {
             for liveTesting in [false, true] {
                 let loop = ReviewLoop(id: UUID(), startActionID: "verification", project: project,
@@ -12,7 +12,13 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 var round = ReviewRound(number: 1, baseCommit: "base")
                 let review = ReviewPrompts.reviewPrompt(for: loop)
                 XCTAssertEqual(review.contains("Use code review and live testing to find bugs and issues."),
-                               liveTesting && reviewType.supportsLiveTesting)
+                               liveTesting && reviewType == .bugs)
+                XCTAssertEqual(review.contains("Use code review and live testing to find performance and responsiveness issues."),
+                               liveTesting && reviewType == .performance)
+                XCTAssertEqual(review.contains("Use code review and live testing to find bugs, issues, and performance and responsiveness problems."),
+                               liveTesting && reviewType == .bugsAndPerformance)
+                XCTAssertEqual(review.contains("Measure relevant behaviour"),
+                               liveTesting && (reviewType == .performance || reviewType == .bugsAndPerformance))
                 XCTAssertFalse(review.contains("only when necessary"))
                 let conditional = liveTesting && (reviewType == .bugs || reviewType == .bugsAndPerformance)
                 for fixRequested in [false, true] {
@@ -82,9 +88,9 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
         }
     }
 
-    func testMuteMediaAppliesToReviewAndFixOnlyWithLiveTesting() {
+    func testMuteTestPlaybackAppliesToReviewAndFixOnlyWithLiveTesting() {
         var loop = ReviewLoop(id: UUID(), startActionID: "muted", project: project,
-                              promptContext: .general, maxRounds: 3, liveTesting: true, muteMedia: true)
+                              promptContext: .general, maxRounds: 3, liveTesting: true, muteTestPlayback: true)
         let round = ReviewRound(number: 1, baseCommit: "base")
         for reviewType in ReviewType.allCases {
             loop.reviewType = reviewType
@@ -101,7 +107,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
         XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback"))
         XCTAssertFalse(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute only media playback"))
         loop.liveTesting = true
-        loop.muteMedia = false
+        loop.muteTestPlayback = false
         XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback"))
     }
 

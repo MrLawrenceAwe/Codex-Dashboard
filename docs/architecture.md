@@ -132,7 +132,8 @@ explicit status, finding sections, addressed/withdrawn findings, and commits rat
 inferring success from prose. Review totals are derived from the parsed finding sections;
 the review response does not include a separate total. Malformed reports explain the
 format correction needed before resuming. Investigation and progress messages remain unrestricted.
-`ReviewLoopPresentation` builds progress and previews; the renderer submits actions
+`ReviewLoopPresentation` builds progress and configured prompt previews from current
+settings. These previews are not records of submitted turns. The renderer submits actions
 and displays snapshots without owning execution.
 
 `ReviewLoopDriver` uses the renderer's local app-server connection and reads bounded
@@ -158,7 +159,10 @@ reservation and retry interruption. Resume reconciles known tasks, including use
 follow-up turns, under the same validation. An explicit Resume sends one continuation
 when the latest known turn failed or was interrupted. Reviews require unchanged HEAD
 and a clean tree; fix continuations preserve unfinished changes on the original branch.
-Running turns and completed reports are reconciled without new prompts. Continuations
+Running turns and completed reports are reconciled without new prompts.
+Interrupted and extension-reload continuations share one submission sequence that
+persists intent before submission and records the acknowledged turn ID afterward;
+each path retains its own preflight checks. Continuations
 do not consume another round, and polling never retries a failed submission.
 Stop also handles turns whose submission acknowledgment arrives after cancellation.
 A stopping loop keeps its checkout reserved until submission finishes and the latest

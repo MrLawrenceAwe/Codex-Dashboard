@@ -14,9 +14,7 @@ enum ReviewLoopDocumentMigration {
             guard let saved = document["loops"] as? [[String: Any]] else { throw ReviewLoopError("Invalid review-loop document.") }
             return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map { loop in
                 if version >= 8 {
-                    var current = migrateReviewType(loop)
-                    current["muteMedia"] = current["muteMedia"] ?? false
-                    return current
+                    return migrateSettings(loop)
                 }
                 return migrate(loop)
             }))
@@ -27,16 +25,18 @@ enum ReviewLoopDocumentMigration {
         return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: migrated))
     }
 
-    private static func migrateReviewType(_ saved: [String: Any]) -> [String: Any] {
+    private static func migrateSettings(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
         if let previousType = loop.removeValue(forKey: "focus") {
             loop["reviewType"] = previousType
         }
+        let previousMutePreference = loop.removeValue(forKey: "muteMedia")
+        loop["muteTestPlayback"] = loop["muteTestPlayback"] ?? previousMutePreference ?? false
         return loop
     }
 
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
-        var loop = migrateReviewType(saved)
+        var loop = migrateSettings(saved)
         // Earlier readers marked Stop finished before interruption succeeded.
         // Preserve checkout ownership for those unfinished saved requests.
         if loop["phase"] as? String == "stopped", let message = loop["message"] as? String,
@@ -58,7 +58,6 @@ enum ReviewLoopDocumentMigration {
         if loop["reviewType"] as? String == "naming" { loop["reviewType"] = "organisationAndNaming" }
         loop["reloadExtensionBeforeTesting"] = loop.removeValue(forKey: "isExtension")
             ?? loop["reloadExtensionBeforeTesting"] ?? false
-        if loop["muteMedia"] == nil { loop["muteMedia"] = false }
         if loop["liveTesting"] == nil { loop["liveTesting"] = false }
         if loop["pushToRemote"] == nil { loop["pushToRemote"] = false }
         if loop["promptContext"] == nil {

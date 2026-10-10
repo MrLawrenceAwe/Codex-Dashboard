@@ -126,6 +126,10 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 **Reload browser extension** before testing. Review models come from Codex's live
 model list. Select **Start review & fix** to begin the loop.
 
+**Configured prompt preview** shows instructions generated from the current loop
+settings. It does not record the exact prompt submitted to a chat; setting changes
+apply to subsequent prompts.
+
 Each round starts a read-only review in a new chat on the current branch and
 checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that
 chat. Excluded priorities remain visible but are not fixed. Findings are verified
