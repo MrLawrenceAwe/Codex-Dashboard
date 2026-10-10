@@ -53,99 +53,154 @@ final class ReviewLoopCoordinator {
         guard !storageFailed else { throw ReviewLoopError(error ?? "Review loop storage is unavailable.") }
         switch action.kind {
         case .start:
-            if loops.contains(where: { $0.startActionID == action.id }) { return }
-            guard let project = projects.first(where: { $0.id == action.projectID }),
-                  let limit = action.maxRounds, (1...20).contains(limit) else {
-                throw ReviewLoopError("Choose an available local project and 1–20 rounds.")
-            }
-            guard let reviewSelection = action.reviewSelection, !reviewSelection.modelID.isEmpty,
-                  let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
-                throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
-            }
-            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(project.path)) }) else {
-                throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
-            }
-            let reviewType = action.reviewType ?? .bugs
-            let promptContext = reviewType.supportsProjectContext ? action.promptContext ?? .general : .general
-            let liveTesting = reviewType.supportsLiveTesting && (action.liveTesting ?? false)
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, reviewType: reviewType, speed: action.speed ?? .standard, priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteTestPlayback: liveTesting && (action.muteTestPlayback ?? false), pushToRemote: action.pushToRemote ?? false))
+            guard try startLoop(action, projects: projects) else { return }
         case .setMuteTestPlayback:
-            guard let id = action.loopID, var updated = matchingLoop(id),
-                  !updated.phase.isFinished, updated.phase != .stopping,
-                  updated.liveTesting, updated.reviewType.supportsLiveTesting,
-                  let muteTestPlayback = action.muteTestPlayback else {
-                throw ReviewLoopError("Mute test playback requires an active loop with live testing enabled.")
-            }
-            updated.muteTestPlayback = muteTestPlayback
-            try persist(updated)
+            try setMuteTestPlayback(action)
         case .pause, .resume, .stop:
-            guard let id = action.loopID, var updated = matchingLoop(id) else {
-                throw ReviewLoopError("This review loop has changed. Refresh its controls.")
-            }
-            guard !updated.phase.isFinished else { return }
-            if action.kind == .stop {
-                updated.phase = updated.rounds.last.map { $0.result == nil } == true ? .stopping : .stopped
-                updated.message = updated.phase == .stopping ? "Stopping its running chat." : "Stopped loop."
-            } else if updated.phase == .stopping {
-                return
-            } else if action.kind == .resume, updated.phase == .awaitingExtensionReload {
-                updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = true
-                updated.phase = .running
-                updated.message = "Extension reload confirmed. Preparing to continue the same chat."
-            } else if action.kind == .resume, updated.phase == .blocked {
-                guard !loops.contains(where: { $0.id != id && !$0.phase.isFinished &&
-                    ($0.project.id == updated.project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(updated.project.path))
-                }) else {
-                    throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
-                }
-                updated.pauseRequested = false
-                if let round = updated.rounds.last, round.result == nil || round.result?.outcome == .blocked {
-                    guard round.threadID != nil else {
-                        throw ReviewLoopError("The previous chat launch was not confirmed. Inspect recent chats before starting a new loop; it will not be sent twice.")
-                    }
-                    updated.rounds[updated.rounds.count - 1].continuationRequested = true
-                    updated.rounds[updated.rounds.count - 1].result = nil
-                    updated.phase = .running
-                    resumeRequestedIDs.insert(id)
-                    updated.message = "Checking the review chat and continuing interrupted work."
-                } else {
-                    updated.phase = .waiting
-                    updated.message = "Checking the project before continuing."
-                }
-            } else if action.kind == .pause, updated.phase != .blocked {
-                if updated.phase == .running {
-                    updated.pauseRequested = true
-                    updated.message = "Will pause after the current round finishes."
-                } else {
-                    updated.phase = .paused
-                    updated.message = "Paused."
-                }
-            } else if updated.phase == .paused {
-                updated.pauseRequested = false
-                updated.phase = updated.rounds.last.map { $0.result == nil } == true ? .running : .waiting
-                if updated.phase == .running { resumeRequestedIDs.insert(id) }
-                updated.message = "Checking the project before continuing."
-            }
-            try persist(updated)
+            guard try applyControlAction(action) else { return }
         case .openFile:
             throw ReviewLoopError("A file link must be opened from its review card.")
         case .delete, .deleteOlder, .deleteAll:
-            let next: [ReviewLoop]
-            if action.kind == .deleteAll {
-                next = loops.filter { !$0.phase.isFinished }
-            } else {
-                guard let id = action.loopID,
-                      let index = loops.firstIndex(where: { $0.id == id && $0.phase.isFinished }) else {
-                    throw ReviewLoopError("This previous review is unavailable. Refresh the list.")
-                }
-                next = loops.enumerated().compactMap { offset, loop in
-                    let shouldDelete = loop.phase.isFinished && (action.kind == .delete ? offset == index : offset < index)
-                    return shouldDelete ? nil : loop
-                }
-            }
-            try persistAll(next)
+            try deleteHistory(action)
         }
         error = nil
+    }
+
+    private func startLoop(_ action: ReviewLoopAction, projects: [ReviewProject]) throws -> Bool {
+        if loops.contains(where: { $0.startActionID == action.id }) { return false }
+        guard let project = projects.first(where: { $0.id == action.projectID }),
+              let limit = action.maxRounds, (1...20).contains(limit) else {
+            throw ReviewLoopError("Choose an available local project and 1–20 rounds.")
+        }
+        guard let reviewSelection = action.reviewSelection, !reviewSelection.modelID.isEmpty,
+              let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
+            throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
+        }
+        guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(project.path)) }) else {
+            throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
+        }
+        let reviewType = action.reviewType ?? .bugs
+        let promptContext = reviewType.supportsProjectContext ? action.promptContext ?? .general : .general
+        let liveTesting = reviewType.supportsLiveTesting && (action.liveTesting ?? false)
+        let loop = ReviewLoop(
+            id: UUID(),
+            startActionID: action.id,
+            project: project,
+            promptContext: promptContext,
+            maxRounds: limit,
+            reviewSelection: reviewSelection,
+            fixSelection: fixSelection,
+            reviewType: reviewType,
+            speed: action.speed ?? .standard,
+            priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil,
+            liveTesting: liveTesting,
+            reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false),
+            muteTestPlayback: liveTesting && (action.muteTestPlayback ?? false),
+            pushToRemote: action.pushToRemote ?? false
+        )
+        try persist(loop)
+        return true
+    }
+
+    private func setMuteTestPlayback(_ action: ReviewLoopAction) throws {
+        guard let id = action.loopID, var updated = matchingLoop(id),
+              !updated.phase.isFinished, updated.phase != .stopping,
+              updated.liveTesting, updated.reviewType.supportsLiveTesting,
+              let muteTestPlayback = action.muteTestPlayback else {
+            throw ReviewLoopError("Mute test playback requires an active loop with live testing enabled.")
+        }
+        updated.muteTestPlayback = muteTestPlayback
+        try persist(updated)
+    }
+
+    private func applyControlAction(_ action: ReviewLoopAction) throws -> Bool {
+        guard let id = action.loopID, var updated = matchingLoop(id) else {
+            throw ReviewLoopError("This review loop has changed. Refresh its controls.")
+        }
+        guard !updated.phase.isFinished else { return false }
+        switch action.kind {
+        case .stop:
+            stopLoop(&updated)
+        case .pause:
+            guard updated.phase != .stopping else { return false }
+            pauseLoop(&updated)
+        case .resume:
+            guard updated.phase != .stopping else { return false }
+            try resumeLoop(&updated)
+        default:
+            preconditionFailure("Expected a loop control action")
+        }
+        try persist(updated)
+        return true
+    }
+
+    private func stopLoop(_ loop: inout ReviewLoop) {
+        loop.phase = loop.rounds.last.map { $0.result == nil } == true ? .stopping : .stopped
+        loop.message = loop.phase == .stopping ? "Stopping its running chat." : "Stopped loop."
+    }
+
+    private func pauseLoop(_ loop: inout ReviewLoop) {
+        guard loop.phase != .blocked else { return }
+        if loop.phase == .running {
+            loop.pauseRequested = true
+            loop.message = "Will pause after the current round finishes."
+        } else {
+            loop.phase = .paused
+            loop.message = "Paused."
+        }
+    }
+
+    private func resumeLoop(_ loop: inout ReviewLoop) throws {
+        switch loop.phase {
+        case .awaitingExtensionReload:
+            loop.rounds[loop.rounds.count - 1].reloadContinuationRequested = true
+            loop.phase = .running
+            loop.message = "Extension reload confirmed. Preparing to continue the same chat."
+        case .blocked:
+            guard !loops.contains(where: { $0.id != loop.id && !$0.phase.isFinished &&
+                ($0.project.id == loop.project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(loop.project.path))
+            }) else {
+                throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
+            }
+            loop.pauseRequested = false
+            if let round = loop.rounds.last, round.result == nil || round.result?.outcome == .blocked {
+                guard round.threadID != nil else {
+                    throw ReviewLoopError("The previous chat launch was not confirmed. Inspect recent chats before starting a new loop; it will not be sent twice.")
+                }
+                loop.rounds[loop.rounds.count - 1].continuationRequested = true
+                loop.rounds[loop.rounds.count - 1].result = nil
+                loop.phase = .running
+                resumeRequestedIDs.insert(loop.id)
+                loop.message = "Checking the review chat and continuing interrupted work."
+            } else {
+                loop.phase = .waiting
+                loop.message = "Checking the project before continuing."
+            }
+        case .paused:
+            loop.pauseRequested = false
+            loop.phase = loop.rounds.last.map { $0.result == nil } == true ? .running : .waiting
+            if loop.phase == .running { resumeRequestedIDs.insert(loop.id) }
+            loop.message = "Checking the project before continuing."
+        default:
+            break
+        }
+    }
+
+    private func deleteHistory(_ action: ReviewLoopAction) throws {
+        let next: [ReviewLoop]
+        if action.kind == .deleteAll {
+            next = loops.filter { !$0.phase.isFinished }
+        } else {
+            guard let id = action.loopID,
+                  let index = loops.firstIndex(where: { $0.id == id && $0.phase.isFinished }) else {
+                throw ReviewLoopError("This previous review is unavailable. Refresh the list.")
+            }
+            next = loops.enumerated().compactMap { offset, loop in
+                let shouldDelete = loop.phase.isFinished && (action.kind == .delete ? offset == index : offset < index)
+                return shouldDelete ? nil : loop
+            }
+        }
+        try persistAll(next)
     }
 
     func stopRunningTask(for id: UUID, using driver: any ReviewLoopDriving) async throws {

@@ -35,8 +35,8 @@ extension AppCoordinator {
             guard let accountID = action.accountID else { return .unavailable }
             await switchAccount(to: accountID)
             presentationAlreadyUpdated = false
-        case .addAccount:
-            await beginAddingAccount()
+        case .restartForSignIn:
+            await prepareForSignIn()
             presentationAlreadyUpdated = false
         case .removeSavedAccount:
             guard let accountID = action.accountID else { return .unavailable }
@@ -73,8 +73,8 @@ extension AppCoordinator {
         await performAccountTransition { try await accounts.activate(accountID) }
     }
 
-    func beginAddingAccount() async {
-        await performAccountTransition { try await accounts.beginAddingAccount() }
+    func prepareForSignIn() async {
+        await performAccountTransition { try await accounts.prepareForSignIn() }
     }
 
     func dashboardSnapshotPayload() -> DashboardSnapshot {

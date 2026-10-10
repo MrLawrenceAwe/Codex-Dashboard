@@ -10,7 +10,9 @@ enum DashboardError: LocalizedError {
     case invalidDevToolsResponse
     case devToolsTimedOut
     case devToolsCommandFailed(String)
-    case enableFailed(String)
+    case mountFailed(String)
+    case synchronizationFailed(String)
+    case rendererEvaluationFailed
     case disableFailed(String)
     case invalidPromptLibrary
 
@@ -34,8 +36,12 @@ enum DashboardError: LocalizedError {
             return "The Codex renderer did not respond to the dashboard request."
         case .devToolsCommandFailed(let message):
             return "The Codex renderer rejected a dashboard command: \(message)"
-        case .enableFailed(let message):
-            return "Dashboard enablement failed: \(message)"
+        case .mountFailed(let message):
+            return "Dashboard mounting failed: \(message)"
+        case .synchronizationFailed(let message):
+            return "Dashboard synchronization failed: \(message)"
+        case .rendererEvaluationFailed:
+            return "The dashboard command raised an exception in the Codex renderer."
         case .disableFailed(let message):
             return "Dashboard disablement failed: \(message)"
         case .invalidPromptLibrary:

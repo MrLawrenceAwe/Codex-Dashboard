@@ -33,7 +33,7 @@ const accountPopover = (() => {
     queuedAction = { kind, accountID };
     queuedActionDeadline = Date.now() + 15000;
     queuedActionTimer = setTimeout(expireQueuedAction, 15000);
-    actionProgress = kind === 'addAccount'
+    actionProgress = kind === 'restartForSignIn'
       ? 'Sign-in request queued…'
       : 'Account request queued…';
     renderPanel();
@@ -68,7 +68,7 @@ const accountPopover = (() => {
       ${account.errorMessage ? `<div class="codex-accounts-error">${domUtils.escapeHTML(account.errorMessage)}</div>` : ''}
       ${account.requiresSignIn && !account.isActive ? '<div class="codex-accounts-usage-note">Codex will restart signed out. Sign in to this account, then choose Save current account.</div>' : ''}
       <div class="codex-accounts-actions">
-        ${account.isActive ? '' : `<button class="is-primary" data-account-action="${account.requiresSignIn ? 'addAccount' : 'switchAccount'}"${disabled}>${account.requiresSignIn ? 'Restart to sign in…' : 'Switch'}</button>`}
+        ${account.isActive ? '' : `<button class="is-primary" data-account-action="${account.requiresSignIn ? 'restartForSignIn' : 'switchAccount'}"${disabled}>${account.requiresSignIn ? 'Restart to sign in…' : 'Switch'}</button>`}
         <button data-account-action="refreshUsage"${disabled}>${account.isRefreshing ? 'Refreshing usage…' : 'Refresh usage'}</button>
         <button class="is-danger" data-account-action="removeSavedAccount"${disabled}>Remove saved account</button>
       </div>
@@ -86,7 +86,7 @@ const accountPopover = (() => {
   function confirmAction(kind) {
     const messages = {
       removeSavedAccount: 'Remove this saved account from this device?',
-      addAccount: 'Codex will restart signed out. Sign in, then choose Save current account. Continue?',
+      restartForSignIn: 'Codex will restart signed out. Sign in, then choose Save current account. Continue?',
     };
     return !messages[kind] || window.confirm(messages[kind]);
   }
@@ -102,7 +102,7 @@ const accountPopover = (() => {
       ${actionProgress || snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(actionProgress || snapshot.statusMessage)}</div>` : ''}
       <footer>
         <button data-account-global="saveCurrentAccount"${disabled}><span>✓</span>Save current account</button>
-        <button data-account-global="addAccount"${disabled}><span>＋</span>Add another account</button>
+        <button data-account-global="restartForSignIn"${disabled}><span>＋</span>Add another account</button>
         ${snapshot.accounts.length > 1 ? `<button data-account-global="refreshInactiveUsage"${disabled}><span>↻</span>Refresh other accounts’ usage</button>` : ''}
       </footer>`;
     panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);
@@ -115,7 +115,7 @@ const accountPopover = (() => {
         const action = button.dataset.accountAction;
         if (!confirmAction(action)) return;
         button.dataset.accountHandled = 'true';
-        queue(action, action === 'addAccount' ? null : id);
+        queue(action, action === 'restartForSignIn' ? null : id);
       };
       // Queue on pointerdown before Codex's profile-menu dismissal can cancel
       // the subsequent click. Keep click for keyboard activation.

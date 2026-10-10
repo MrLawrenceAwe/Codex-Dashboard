@@ -338,7 +338,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(coordinator.accounts.activeUsageStatus, .stale(snapshot))
     }
 
-    func testAddingAccountKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
+    func testSignInPreparationKeepsSignedOutStateWithoutTryingToMountDashboard() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AppCoordinatorAccountTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -368,7 +368,7 @@ extension AppCoordinatorTests {
             runtimeFactory: { _ in runtime }
         )
 
-        await coordinator.beginAddingAccount()
+        await coordinator.prepareForSignIn()
 
         XCTAssertEqual(runtime.restartCallCount, 1)
         XCTAssertEqual(runtime.synchronizeCallCount, 0)
@@ -400,7 +400,7 @@ extension AppCoordinatorTests {
             vault: CoordinatorMemoryCredentialVault()
         )
         let lawrence = try accountManager.saveCurrentAccount()
-        _ = try accountManager.beginAddingAccount()
+        _ = try accountManager.prepareForSignIn()
         let mumCredential = testAccountCredential(accountID: "account-mum", name: "Mum")
         try mumCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
@@ -450,7 +450,7 @@ extension AppCoordinatorTests {
             vault: CoordinatorMemoryCredentialVault()
         )
         let first = try accountManager.saveCurrentAccount()
-        _ = try accountManager.beginAddingAccount()
+        _ = try accountManager.prepareForSignIn()
         try secondCredential.write(to: authenticationURL)
         let second = try accountManager.saveCurrentAccount()
         let catalogProvider = SequencedCatalogProvider(catalogs: [
@@ -496,7 +496,7 @@ extension AppCoordinatorTests {
             vault: CoordinatorMemoryCredentialVault()
         )
         let first = try accountManager.saveCurrentAccount()
-        _ = try accountManager.beginAddingAccount()
+        _ = try accountManager.prepareForSignIn()
         try secondCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
         let usageProvider = SuspendedAccountUsageProvider()
@@ -543,7 +543,7 @@ extension AppCoordinatorTests {
             vault: CoordinatorMemoryCredentialVault()
         )
         let first = try accountManager.saveCurrentAccount()
-        _ = try accountManager.beginAddingAccount()
+        _ = try accountManager.prepareForSignIn()
         let secondCredential = testAccountCredential(accountID: "account-second", name: "Second")
         try secondCredential.write(to: authenticationURL)
         _ = try accountManager.saveCurrentAccount()
@@ -608,7 +608,7 @@ extension AppCoordinatorTests {
             vault: vault
         )
         let first = try accountManager.saveCurrentAccount()
-        _ = try accountManager.beginAddingAccount()
+        _ = try accountManager.prepareForSignIn()
         try secondCredential.write(to: authenticationURL)
         let second = try accountManager.saveCurrentAccount()
         let usage = CodexAccountUsage(
@@ -661,7 +661,7 @@ extension AppCoordinatorTests {
         )
         var accounts: [SavedAccount] = []
         for (index, credential) in credentials.enumerated() {
-            if index > 0 { _ = try accountManager.beginAddingAccount() }
+            if index > 0 { _ = try accountManager.prepareForSignIn() }
             try credential.write(to: authenticationURL)
             accounts.append(try accountManager.saveCurrentAccount())
         }

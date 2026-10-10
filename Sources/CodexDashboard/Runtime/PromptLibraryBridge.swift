@@ -127,7 +127,7 @@ final class PromptLibraryBridge {
     ) async throws {
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
-                throw DashboardError.enableFailed(failureMessage)
+                throw DashboardError.synchronizationFailed(failureMessage)
             }
         }
     }

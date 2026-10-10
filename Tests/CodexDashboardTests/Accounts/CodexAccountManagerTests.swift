@@ -78,7 +78,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try unidentified.write(to: authenticationURL)
 
         XCTAssertNil(try manager.loadDocument().activeAccountID)
-        _ = try manager.beginAddingAccount()
+        _ = try manager.prepareForSignIn()
         XCTAssertEqual(vault.credential(for: account.id), original)
     }
 
@@ -165,7 +165,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try personal.write(to: authenticationURL)
         let personalAccount = try manager.saveCurrentAccount()
 
-        _ = try manager.beginAddingAccount()
+        _ = try manager.prepareForSignIn()
         let work = credential(
             accountID: "account-work", name: "Work", accessToken: "work-original"
         )
@@ -187,12 +187,12 @@ final class CodexAccountManagerTests: XCTestCase {
         XCTAssertEqual(try manager.loadDocument().activeAccountID, workAccount.id)
     }
 
-    func testBeginAddingAccountSignsOutAndCanRollback() throws {
+    func testSignInPreparationSignsOutAndCanRollback() throws {
         let credential = credential(accountID: "account-current", name: "Current")
         try credential.write(to: authenticationURL)
         let account = try manager.saveCurrentAccount()
 
-        let transaction = try manager.beginAddingAccount()
+        let transaction = try manager.prepareForSignIn()
         XCTAssertFalse(FileManager.default.fileExists(atPath: authenticationURL.path))
         XCTAssertNil(try manager.loadDocument().activeAccountID)
 
@@ -212,7 +212,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try credential(accountID: "account-current", name: "Current")
             .write(to: authenticationURL)
 
-        XCTAssertThrowsError(try manager.beginAddingAccount()) { error in
+        XCTAssertThrowsError(try manager.prepareForSignIn()) { error in
             guard case CodexAccountError.unsupportedMetadataVersion(99) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
@@ -286,7 +286,7 @@ final class CodexAccountManagerTests: XCTestCase {
         try lawrenceCredential.write(to: authenticationURL)
         let lawrence = try manager.saveCurrentAccount()
 
-        _ = try manager.beginAddingAccount()
+        _ = try manager.prepareForSignIn()
         let oluwatoyinCredential = credential(
             accountID: "account-oluwatoyin", name: "Oluwatoyin"
         )

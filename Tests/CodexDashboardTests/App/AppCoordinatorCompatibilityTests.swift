@@ -133,14 +133,14 @@ extension AppCoordinatorTests {
         )
 
         coordinator.setFailure(
-            DashboardError.enableFailed("A background snapshot could not be delivered."),
+            DashboardError.synchronizationFailed("A background snapshot could not be delivered."),
             lastKnownState: .dashboardMounted
         )
 
         XCTAssertNil(coordinator.connectionError)
         XCTAssertEqual(
             coordinator.connectionNotice,
-            "Dashboard enablement failed: A background snapshot could not be delivered."
+            "Dashboard synchronization failed: A background snapshot could not be delivered."
         )
         XCTAssertEqual(coordinator.statusPresentation.title, "Dashboard integration is live")
     }

@@ -199,7 +199,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
                 if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
-                    summary.canUseProjectGitActions = repositoryRoot(cwd) == repository
+                    summary.sharesProjectRepository = repositoryRoot(cwd) == repository
                 }
             }
             return summary

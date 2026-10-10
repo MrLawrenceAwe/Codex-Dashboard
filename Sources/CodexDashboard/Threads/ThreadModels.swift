@@ -40,7 +40,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let latestLifecycleEvent: ThreadLifecycleEvent?
     var projectID: String? = nil
     var projectGroupPath: String? = nil
-    var canUseProjectGitActions = false
+    var sharesProjectRepository = false
     var projectGitStatus: ProjectGitStatus
 
     var originatesFromChromeExtension: Bool {
@@ -67,7 +67,7 @@ struct RendererThread: Codable, Equatable, Sendable {
     let latestLifecycleEventKind: ThreadLifecycleEventKind?
     let projectID: String?
     let projectGroupPath: String?
-    let canUseProjectGitActions: Bool
+    let sharesProjectRepository: Bool
     let projectGitStatus: ProjectGitStatus
 
     init(_ thread: ThreadSummary) {
@@ -84,7 +84,7 @@ struct RendererThread: Codable, Equatable, Sendable {
         latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
         projectID = thread.projectID
         projectGroupPath = thread.projectGroupPath
-        canUseProjectGitActions = thread.canUseProjectGitActions
+        sharesProjectRepository = thread.sharesProjectRepository
         projectGitStatus = thread.projectGitStatus
     }
 }

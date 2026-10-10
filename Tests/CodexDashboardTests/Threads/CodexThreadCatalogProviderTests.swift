@@ -37,21 +37,21 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
         let catalog = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
         XCTAssertEqual(Set(catalog.threads.compactMap(\.projectGroupPath)), [project.path])
-        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.canUseProjectGitActions, true)
-        XCTAssertEqual(catalog.threads.first { $0.id == "updated" }?.canUseProjectGitActions, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.sharesProjectRepository, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "updated" }?.sharesProjectRepository, true)
         let nestedThread = try XCTUnwrap(catalog.threads.first { $0.id == "idle" })
-        XCTAssertFalse(nestedThread.canUseProjectGitActions)
-        XCTAssertFalse(RendererThread(nestedThread).canUseProjectGitActions)
+        XCTAssertFalse(nestedThread.sharesProjectRepository)
+        XCTAssertFalse(RendererThread(nestedThread).sharesProjectRepository)
 
         // Repository boundaries can change without a Codex database write.
         try FileManager.default.removeItem(at: nested.appendingPathComponent(".git"))
         let refreshed = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
-        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.canUseProjectGitActions, true)
+        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.sharesProjectRepository, true)
 
         // Submodules and linked worktrees use a .git file and remain separate checkouts.
         try Data("gitdir: ../.git/modules/nested\n".utf8).write(to: nested.appendingPathComponent(".git"))
         let linked = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
-        XCTAssertEqual(linked.threads.first { $0.id == "idle" }?.canUseProjectGitActions, false)
+        XCTAssertEqual(linked.threads.first { $0.id == "idle" }?.sharesProjectRepository, false)
         XCTAssertNil(FileSystemPath.gitRepositoryRoot(workspace.appendingPathComponent("missing").path))
     }
 

@@ -179,7 +179,7 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             if !isHealthy {
                 guard try await devTools.evaluateBoolean(injectionBundle.mountExpression, in: target) else {
-                    throw DashboardError.enableFailed(
+                    throw DashboardError.mountFailed(
                         "The dashboard injection did not mount in the Codex renderer."
                     )
                 }
@@ -329,7 +329,7 @@ final class DashboardRenderer {
     private func deliver(_ expression: String, to targets: [DevToolsTarget], subject: String) async throws {
         for target in targets {
             guard try await devTools.evaluateBoolean(expression, in: target) else {
-                throw DashboardError.enableFailed(
+                throw DashboardError.synchronizationFailed(
                     "The dashboard was unavailable while \(subject) was being delivered."
                 )
             }

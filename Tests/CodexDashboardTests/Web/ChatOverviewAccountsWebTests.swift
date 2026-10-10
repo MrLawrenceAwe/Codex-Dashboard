@@ -368,7 +368,7 @@ extension ChatOverviewWebTests {
         });
         document.querySelector('[data-codex-accounts-trigger]').click();
         window.confirm = () => true;
-        const button = document.querySelector('[data-account-action="addAccount"]');
+        const button = document.querySelector('[data-account-action="restartForSignIn"]');
         const text = button.textContent;
         const instructions = button.closest('.codex-accounts-card').textContent;
         button.click();
@@ -384,7 +384,7 @@ extension ChatOverviewWebTests {
 
         XCTAssertEqual(recoveryCopy?.first, "Restart to sign in…")
         XCTAssertTrue(recoveryCopy?.last?.contains("Codex will restart signed out. Sign in to this account, then choose Save current account.") == true)
-        XCTAssertEqual(action["kind"] as? String, "addAccount")
+        XCTAssertEqual(action["kind"] as? String, "restartForSignIn")
         XCTAssertTrue(action["accountID"] is NSNull)
     }
 
@@ -414,7 +414,7 @@ extension ChatOverviewWebTests {
           document.querySelector('#codex-accounts-panel')?.remove();
         });
         window.confirm = () => true;
-        const button = document.querySelector('[data-account-action="addAccount"]');
+        const button = document.querySelector('[data-account-action="restartForSignIn"]');
         button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         if (button.isConnected) button.click();
         return window.__codexDashboard.takeQueuedAccountPopoverAction();
@@ -424,7 +424,7 @@ extension ChatOverviewWebTests {
             JSONSerialization.jsonObject(with: actionData) as? [String: Any]
         )
 
-        XCTAssertEqual(action["kind"] as? String, "addAccount")
+        XCTAssertEqual(action["kind"] as? String, "restartForSignIn")
     }
 
     func testIdenticalSnapshotClearsCompletedAccountProgress() async throws {

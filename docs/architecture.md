@@ -77,9 +77,11 @@ Renderer unread reconciliation runs 1.5 seconds after a native snapshot, then ev
 ## Persistence
 
 Prompt-library edits use durable pending changes in renderer storage. Each edit
-captures a base and desired document. `PromptLibraryBridge` combines these with the
-current native library, persists it, then acknowledges the queued changes. Native
-storage is `~/Library/Application Support/Codex Dashboard/prompt-library.json` with
+captures a base and desired document. `PromptLibraryBridge` supplies the current
+native library to each renderer. `prompt-store.js` merges the pending edits against
+that document; the bridge persists the merged result and acknowledges the queued
+changes. Native storage is
+`~/Library/Application Support/Codex Dashboard/prompt-library.json` with
 rolling backups. Concurrent prompt/section deletions beat stale edits; new or moved
 prompts targeting a concurrently deleted section move to General.
 

@@ -66,7 +66,7 @@ const chatOverviewListView = (() => {
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
     if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
     const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
-    const hasRepositoryThread = projectThreads.some((thread) => thread.canUseProjectGitActions);
+    const hasRepositoryThread = projectThreads.some((thread) => thread.sharesProjectRepository);
     const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>

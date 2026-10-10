@@ -145,7 +145,7 @@ final class AccountCoordinatorTests: XCTestCase {
         XCTAssertTrue(item.requiresSignIn)
         XCTAssertEqual(
             item.errorMessage,
-            "Sign-in expired. Select Sign in to authenticate this account again."
+            "Sign-in expired. Select Restart to sign in… to authenticate this account again, then choose Save current account."
         )
 
         var refreshedCredentialObject = try XCTUnwrap(

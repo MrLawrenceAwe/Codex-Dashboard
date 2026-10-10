@@ -40,7 +40,7 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
         case refreshInactiveUsage
         case saveCurrentAccount
         case switchAccount
-        case addAccount
+        case restartForSignIn
         case removeSavedAccount
     }
 

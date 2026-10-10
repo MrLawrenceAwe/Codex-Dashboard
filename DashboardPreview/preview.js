@@ -14,6 +14,7 @@ const threads = [
     model: 'gpt-6.1-sol',
     runState: 'running',
     projectGitStatus: 'uncommittedChanges',
+    sharesProjectRepository: true,
   },
   {
     id: 'thread-review',
@@ -30,6 +31,7 @@ const threads = [
     model: 'gpt-6-luna',
     runState: 'idle',
     projectGitStatus: 'clean',
+    sharesProjectRepository: true,
   },
   {
     id: 'thread-idle',
@@ -46,6 +48,7 @@ const threads = [
     model: 'gpt-5.6-terra',
     runState: 'idle',
     projectGitStatus: 'clean',
+    sharesProjectRepository: true,
   },
 ];
 window.__codexDashboard.applyThreads(threads);

@@ -159,8 +159,8 @@ final class AccountCoordinator: ObservableObject {
         return transition
     }
 
-    func beginAddingAccount() async throws -> AccountTransition {
-        let transition = try await withManager { try $0.beginAddingAccount() }
+    func prepareForSignIn() async throws -> AccountTransition {
+        let transition = try await withManager { try $0.prepareForSignIn() }
         stateRefresh = nil
         return transition
     }

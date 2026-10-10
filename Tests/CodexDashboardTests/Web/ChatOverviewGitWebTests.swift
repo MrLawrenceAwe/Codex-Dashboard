@@ -556,7 +556,7 @@ extension ChatOverviewWebTests {
     func testProjectGitActionDisabledWithoutIdleChatInMatchingRepository() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/project/nested",
-            projectGitStatus: .unpushedCommits, canUseProjectGitActions: false)
+            projectGitStatus: .unpushedCommits, sharesProjectRepository: false)
         nested.projectGroupPath = "/tmp/project"
         for includeRunningRoot in [false, true] {
             var threads = [nested]
@@ -660,7 +660,7 @@ extension ChatOverviewWebTests {
         var threads = [ThreadSummary.fixture(id: "target", checkoutPath: "/tmp/target", projectGitStatus: status)]
         if includeNestedChat {
             var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/target/nested",
-                recencyEpochMillis: 10, projectGitStatus: status, canUseProjectGitActions: false)
+                recencyEpochMillis: 10, projectGitStatus: status, sharesProjectRepository: false)
             nested.projectGroupPath = "/tmp/target"
             threads.insert(nested, at: 0)
         }

@@ -146,9 +146,7 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
             return
         }
         if result["exceptionDetails"] != nil {
-            continuation.resume(throwing: DashboardError.enableFailed(
-                "The dashboard injection raised an exception in the renderer."
-            ))
+            continuation.resume(throwing: DashboardError.rendererEvaluationFailed)
             return
         }
         guard let remoteResult = result["result"] as? [String: Any] else {

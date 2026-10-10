@@ -98,7 +98,9 @@ operations, including the renderer’s `openChatOverview` entry point, use
 `RendererThread` exposes `projectID` for saved-project identity,
 `checkoutPath` for the original directory,
 `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
-uncommitted changes and unpushed commits. Preview fixtures include the same fields.
+uncommitted changes and unpushed commits. `sharesProjectRepository` describes
+repository membership; Git action readiness also requires an idle chat.
+Preview fixtures include the same fields.
 
 Sidebar entries mount after the outer New chat action row, outside Quick chat and
 its tooltip trigger; the icon rail is excluded. Mounting and repairs share one
@@ -119,6 +121,9 @@ They also carry the active account's exhausted windows with Unix reset timestamp
 in milliseconds, independently of saved accounts. The persistent usage notice
 counts down to the latest blocking reset and retains the exhausted state until
 fresh usage confirms recovery.
+The `restartForSignIn` action uses `prepareForSignIn` to prepare a signed-out
+state for either a new account or reauthentication. Accounts are saved separately
+through `saveCurrentAccount`.
 `review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
 `review-loop-page.js` validates submissions and queues actions.
 `review-presentation.js` supplies shared labels independently of setup rendering.

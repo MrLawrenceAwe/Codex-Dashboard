@@ -166,7 +166,7 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    func beginAddingAccount() throws -> AccountTransition {
+    func prepareForSignIn() throws -> AccountTransition {
         try lock.withLock {
             let document = try documentStore.loadAndReconcile()
             let transaction = AccountTransition(
