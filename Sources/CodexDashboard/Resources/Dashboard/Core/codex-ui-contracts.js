@@ -398,12 +398,12 @@ const codexUIContracts = (() => {
     return menu?.getAttribute('role') === 'menu' && isVisible(menu) ? menu : null;
   }
 
-  function gitCommitMenuItem(menu) {
+  function gitActionMenuItem(menu, action) {
     return [...menu.querySelectorAll('[role="menuitem"]')].find((item) => (
       isVisible(item)
         && !item.disabled
         && item.getAttribute('aria-disabled') !== 'true'
-        && item.textContent.trim() === 'Commit'
+        && item.textContent.trim() === action
     )) || null;
   }
 
@@ -433,6 +433,6 @@ const codexUIContracts = (() => {
     probeModelPickerControls,
     gitActionsButton,
     gitActionsMenu,
-    gitCommitMenuItem,
+    gitActionMenuItem,
   };
 })();

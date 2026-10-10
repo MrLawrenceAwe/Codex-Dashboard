@@ -126,7 +126,7 @@ function createChatOverview({ catalog }) {
     }
     closeChatOverview();
     const result = await codexHost.openCommitDialog(thread);
-    if (result.opened) return;
+    if (result.opened || result.cancelled) return;
     commitDialogError = result.reason;
     dashboardNavigation.openPage(chatOverview);
     renderChatOverview();

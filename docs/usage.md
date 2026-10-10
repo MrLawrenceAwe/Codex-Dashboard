@@ -18,7 +18,9 @@ colours or **No highlight**. Projects remain individually collapsible.
 
 **Hide change indicators** hides a project's indicators until restored. Hidden
 projects remain under **Indicators hidden** in Local changes. **Commit or push**
-opens Codex's native Git dialog through an idle project chat. Git status uses local
+opens Codex's native Commit flow through an idle project chat when there are
+uncommitted changes, or selects its Push action when only unpushed commits remain.
+The handoff stops if you switch chats while it waits for Git controls. Git status uses local
 remote-tracking refs without fetching; repositories without a remote show only
 uncommitted changes.
 

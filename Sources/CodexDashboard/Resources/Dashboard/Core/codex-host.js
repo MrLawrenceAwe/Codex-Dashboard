@@ -88,33 +88,40 @@ const codexHost = {
 
   async openCommitDialog(thread) {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
-
-    this.navigateToThread(thread);
-    const selected = await waitFor(() => {
+    const isSelected = () => {
       const composerThreadID = codexUIContracts.activeComposerThreadID();
       return composerThreadID
         ? composerThreadID === thread.id
         : codexUIContracts.isThreadSelected(thread.id);
-    });
+    };
+    this.navigateToThread(thread);
+    const selected = await waitFor(isSelected);
     if (!selected) return { opened: false, reason: 'Codex did not select the project chat.' };
 
-    const gitActions = await waitFor(() => codexUIContracts.gitActionsButton());
+    const cancelled = { opened: false, cancelled: true, reason: 'The selected chat changed. Git handoff cancelled.' };
+    const waitForSelected = (value) => waitFor(() => !isSelected() ? cancelled : value());
+    const action = thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
+    const gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
+    if (gitActions === cancelled || !isSelected()) return cancelled;
     if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
     if (gitActions.getAttribute('aria-expanded') !== 'true') {
       gitActions.dispatchEvent(new PointerEvent('pointerdown', {
         bubbles: true, button: 0, pointerType: 'mouse',
       }));
+      if (!isSelected()) return cancelled;
       gitActions.click();
     }
 
-    const menu = await waitFor(() => codexUIContracts.gitActionsMenu(gitActions));
+    const menu = await waitForSelected(() => codexUIContracts.gitActionsMenu(gitActions));
+    if (menu === cancelled || !isSelected()) return cancelled;
     if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
-    const commit = await waitFor(() => {
+    const item = await waitForSelected(() => {
       const currentMenu = codexUIContracts.gitActionsMenu(gitActions);
-      return currentMenu && codexUIContracts.gitCommitMenuItem(currentMenu);
+      return currentMenu && codexUIContracts.gitActionMenuItem(currentMenu, action);
     });
-    if (!commit) return { opened: false, reason: 'Commit is unavailable in Codex’s Git actions menu.' };
-    commit.click();
+    if (item === cancelled || !isSelected()) return cancelled;
+    if (!item) return { opened: false, reason: `${action} is unavailable in Codex’s Git actions menu.` };
+    item.click();
     return { opened: true };
   },
 };

@@ -498,4 +498,102 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", true, true, "Chat running"])
     }
 
+    func testCommitHandoffChoosesActionForProjectGitStatus() async throws {
+        for status in [ProjectGitStatus.unpushedCommits, .uncommittedChanges, .uncommittedChangesAndUnpushedCommits] {
+            let state = try await gitHandoffState(status: status)
+            XCTAssertEqual(state[0] as? Bool, true)
+            XCTAssertEqual(state[1] as? String, status == .unpushedCommits ? "Push" : "Commit")
+            XCTAssertEqual(state[2] as? Bool, false)
+        }
+    }
+
+    func testCommitHandoffCancelsNavigationChangesAtEveryWait() async throws {
+        for stage in ["button", "menu", "item"] {
+            let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: stage)
+            XCTAssertEqual(state[0] as? Bool, false, stage)
+            XCTAssertEqual(state[1] as? String, "", stage)
+            XCTAssertEqual(state[2] as? Bool, false, "Cancellation must preserve the user's navigation")
+            XCTAssertEqual(state[3] as? Bool, true, stage)
+            XCTAssertEqual(state[4] as? String, "other-project", stage)
+        }
+    }
+
+    private func gitHandoffState(status: ProjectGitStatus, switchStage: String = "") async throws -> [Any] {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <aside role="navigation">
+            <button class="sidebar-item" data-app-action-sidebar-thread-id="local:target">Target</button>
+          </aside>
+          <main><div id="composer-host"><textarea placeholder="Do anything"></textarea></div></main>
+          <script>
+            const switchStage = '\(switchStage)';
+            const activeProps = { conversationId: 'initial' };
+            document.getElementById('composer-host').__reactFiber$test = { memoizedProps: activeProps, return: null };
+            window.__gitClicked = '';
+            const changeChat = () => { activeProps.conversationId = 'other-project'; };
+            document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', () => {
+              activeProps.conversationId = 'target';
+              if (switchStage === 'button') { setTimeout(changeChat, 100); return; }
+              const button = document.createElement('button');
+              button.setAttribute('aria-label', 'Git actions');
+              button.setAttribute('aria-controls', 'test-git-menu');
+              button.addEventListener('pointerdown', () => {
+                button.setAttribute('aria-expanded', 'true');
+                if (switchStage === 'menu') { setTimeout(changeChat, 100); return; }
+                const menu = document.createElement('div');
+                menu.id = 'test-git-menu';
+                menu.setAttribute('role', 'menu');
+                menu.innerHTML = '<div role="menuitem">Commit</div><div role="menuitem">Push</div>';
+                const commit = menu.firstElementChild;
+                // Push-only repositories must work even with Commit disabled.
+                if ('\(status.rawValue)' === 'unpushedCommits' || switchStage === 'item') {
+                  commit.setAttribute('aria-disabled', 'true');
+                }
+                menu.querySelectorAll('[role="menuitem"]').forEach(item => {
+                  item.addEventListener('click', () => { window.__gitClicked = item.textContent; });
+                });
+                document.body.append(menu);
+                if (switchStage === 'item') setTimeout(changeChat, 100);
+              });
+              document.querySelector('main').append(button);
+            });
+          </script>
+        </body></html>
+        """)
+        // Expose only the real host handoff to record when the controller's async work finishes.
+        let injection = try InjectionBundle.load()
+        let instrumented = try DashboardWebTestHarness.instrumentSource(
+            injection.mountExpression, anchor: "const codexHost = {",
+            replacement: "const codexHost = window.__gitHostForTests = {"
+        )
+        // Unmount the initial bundle before mounting the instrumented copy.
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard?.destroy?.()")
+        _ = try await webView.evaluateJavaScript(instrumented)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "target", checkoutPath: "/tmp/target", projectGitStatus: status),
+        ])
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          const host = window.__gitHostForTests;
+          const original = host.openCommitDialog;
+          host.openCommitDialog = async function(thread) {
+            const result = await original.call(this, thread);
+            window.__gitHandoffResult = result;
+            return result;
+          };
+          window.__codexDashboard.applyThreads((\(payload)).threads);
+          window.__codexDashboard.openChatOverview();
+          document.querySelector('[data-filter="changedProjects"]').click();
+          document.querySelector('[data-project-commit]').click();
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript("Boolean(window.__gitHandoffResult)", in: webView)
+        let state = try await webView.evaluateJavaScript("""
+        [window.__gitHandoffResult.opened, window.__gitClicked,
+         document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
+         window.__gitHandoffResult.cancelled || false, activeProps.conversationId]
+        """) as? [Any]
+        return try XCTUnwrap(state)
+    }
+
 }
