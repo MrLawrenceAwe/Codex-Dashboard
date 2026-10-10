@@ -74,9 +74,9 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var onStartTurnAsync: (() async -> Void)?
     var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
+    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
         if failPush { throw ReviewLoopError("Remote push failed") }
-        pushedCommits.append(expectedRepository.commit)
+        pushedCommits.append(commit)
     }
     func repository(at path: String) async throws -> ReviewRepositoryState {
         await Task.yield()

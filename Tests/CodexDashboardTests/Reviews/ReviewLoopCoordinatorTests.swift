@@ -439,7 +439,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
     }
 
     func testRejectsDirtyTreeWrongCommitAndRewrittenHistory() async throws {
-        for failure in ["dirty", "commit", "ancestry", "branch", "noCommit", "findings"] {
+        for failure in ["dirty", "commit", "ancestry", "branch", "root", "noCommit", "findings"] {
             let (coordinator, _, driver) = try make()
             await coordinator.advance(using: driver, threads: [])
             driver.review(priorities: [.p2])
@@ -447,9 +447,10 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             await coordinator.advance(using: driver, threads: [])
             driver.finish(findings: failure == "findings" ? 0 : 1, commit: failure == "noCommit" ? "base" : "fixed")
             if failure == "dirty" { driver.clean = false }
-            if failure == "commit" { driver.commit = "unexpected" }
+            if failure == "commit" { driver.commit = "unexpected"; driver.ancestor = false }
             if failure == "ancestry" { driver.ancestor = false }
             if failure == "branch" { driver.branch = "elsewhere" }
+            if failure == "root" { driver.repositoryRoot = "/tmp/other" }
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(coordinator.loops.last?.phase, .blocked, failure)
             await coordinator.advance(using: driver, threads: [])

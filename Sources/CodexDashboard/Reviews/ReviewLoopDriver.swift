@@ -62,8 +62,8 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         try await repositoryCheckpoint.repository(at: path)
     }
 
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
-        try await repositoryCheckpoint.pushCommit(at: path, expectedRepository: expectedRepository)
+    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
+        try await repositoryCheckpoint.pushCommit(commit, at: path, expectedRepository: expectedRepository)
     }
 
     func resolveCommit(_ commit: String, at path: String) async throws -> String {

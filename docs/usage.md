@@ -110,6 +110,14 @@ available even when usage alerts are suppressed.
 
 ## Review loops
 
+A completed fix is reconciled against Git history. If the clean original branch has
+advanced and still contains the reported fix commit, the loop records that fix and
+uses the current HEAD for the next round. Remote push publishes only the reported
+fix commit, excluding later commits. Rewritten history, branch or checkout changes,
+uncommitted work, and changes after an all-withdrawn report still require attention.
+Resume retries a blocked checkpoint without repeating the completed fix task.
+
+
 The sidebar shows separate counts for running or waiting loops, an amber **!** for
 blocked loops or loops awaiting an extension reload, and a green **✓** for completed
 loops or loops that reached their round limit. Counts include only current loops;

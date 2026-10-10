@@ -52,6 +52,48 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
         }
     }
 
+    func testResumeReconcilesFixBehindHEADWithoutRepeatingWork() async throws {
+        let (coordinator, store, driver) = try make(limit: 2)
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        driver.commit = "later"
+        // Reproduce a previously blocked checkpoint, including persisted recovery.
+        var blocked = store.loops[0]
+        blocked.phase = .blocked
+        blocked.message = "Commit checkpoint failed: HEAD differs from the reported fix commit."
+        blocked.pushToRemote = true
+        store.loops = [blocked]
+        let recovered = ReviewLoopCoordinator(store: store)
+        try recovered.apply(action(.resume, for: recovered), projects: [project])
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(recovered.loops[0].phase, .waiting)
+        XCTAssertEqual(recovered.loops[0].expectedCommit, "later")
+        XCTAssertEqual(recovered.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(driver.pushedCommits, ["fixed"])
+        XCTAssertEqual(driver.prompts.count, 2)
+        await recovered.advance(using: driver, threads: [])
+        XCTAssertEqual(recovered.loops[0].rounds.last?.baseCommit, "later")
+        XCTAssertEqual(driver.createdThreads.count, 2)
+    }
+
+    func testAdvancedHEADIsAcceptedAutomaticallyButWithdrawnFindingsRemainStrict() async throws {
+        for withdrawn in [false, true] {
+            let (coordinator, _, driver) = try make(limit: 1)
+            await coordinator.advance(using: driver, threads: [])
+            driver.review(priorities: [.p1])
+            await coordinator.advance(using: driver, threads: [])
+            await coordinator.advance(using: driver, threads: [])
+            driver.finish(findings: withdrawn ? 0 : 1, commit: withdrawn ? "none" : "fixed", withdrawn: withdrawn ? [1] : [])
+            driver.commit = "later"
+            await coordinator.advance(using: driver, threads: [])
+            XCTAssertEqual(coordinator.loops[0].phase, withdrawn ? .blocked : .limitReached)
+            XCTAssertEqual(driver.prompts.count, 2)
+        }
+    }
+
     func testResumeAfterRestartContinuesInterruptedTurn() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])

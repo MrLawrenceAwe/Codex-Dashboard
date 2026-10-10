@@ -268,7 +268,7 @@ private struct ReviewFixedRepositoryCheckpoint: ReviewRepositoryChecking {
     let state: ReviewRepositoryState
 
     func repository(at path: String) async throws -> ReviewRepositoryState { state }
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {}
+    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {}
     func resolveCommit(_ commit: String, at path: String) async throws -> String { commit }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { true }
 }

@@ -398,15 +398,18 @@ final class ReviewLoopCoordinator {
         let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        guard repo.commit == reportedCommit else {
-            throw ReviewLoopError("Commit checkpoint failed: HEAD (\(repo.commit)) differs from the reported fix commit (\(reportedCommit)).")
-        }
         if result.outcome == .fixed {
-            guard repo.commit != round.baseCommit else {
+            guard reportedCommit != round.baseCommit else {
                 throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
             }
-            guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: repo.commit, at: updated.project.path) }) else {
+            guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: reportedCommit, at: updated.project.path) }) else {
                 throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
+            }
+        }
+        if repo.commit != reportedCommit {
+            guard result.outcome == .fixed,
+                  try await inspectGitProcess({ try await driver.isAncestor(reportedCommit, of: repo.commit, at: updated.project.path) }) else {
+                throw ReviewLoopError("Commit checkpoint failed: the current branch no longer contains the reported fix commit. Restore its history or inspect the changes in the review chat before resuming.")
             }
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -414,7 +417,7 @@ final class ReviewLoopCoordinator {
         if result.outcome == .fixed, updated.pushToRemote {
             updated.message = "Fixes committed. Pushing the verified commit to the remote."
             try persist(updated)
-            try await driver.pushCommit(at: updated.project.path, expectedRepository: repo)
+            try await driver.pushCommit(reportedCommit, at: updated.project.path, expectedRepository: repo)
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
             updated = current
         }
@@ -432,9 +435,12 @@ final class ReviewLoopCoordinator {
             updated.message = "Fixes committed. Ready for a fresh review."
         }
         if result.outcome == .fixed, updated.pushToRemote { updated.message += " Fixes pushed to remote." }
+        if repo.commit != reportedCommit {
+            updated.message += " The branch advanced after the fix; its commit remains in the current history."
+        }
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
-            outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: repo.commit, summary: result.summary)
+            outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: reportedCommit, summary: result.summary)
         updated.expectedCommit = repo.commit
         try persist(updated)
     }
@@ -525,7 +531,8 @@ final class ReviewLoopCoordinator {
         if reviewOnly, !repo.clean {
             throw ReviewLoopError("Uncommitted changes appeared during the review. The review must leave files unchanged. Inspect the changes in its chat before resuming; no fix prompt or push was sent.")
         }
-        guard repo.clean, repo.branch == loop.branch else {
+        guard repo.clean, repo.branch == loop.branch,
+              FileSystemPath.canonicalPath(repo.root) == loop.checkoutRoot else {
             throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")
         }
         return repo

@@ -2,7 +2,7 @@ import Foundation
 
 protocol ReviewRepositoryChecking: Sendable {
     func repository(at path: String) async throws -> ReviewRepositoryState
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws
+    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws
     func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
 }
@@ -20,9 +20,13 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
         return ReviewRepositoryState(root: root, branch: branch, commit: head, clean: status.isEmpty)
     }
 
-    func pushCommit(at path: String, expectedRepository: ReviewRepositoryState) async throws {
+    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
         guard try await repository(at: path) == expectedRepository, expectedRepository.clean else {
             throw ReviewLoopError("The checkout changed before pushing. Inspect it before resuming.")
+        }
+        guard try await resolveCommit(commit, at: path) == commit,
+              try await isAncestor(commit, of: expectedRepository.commit, at: path) else {
+            throw ReviewLoopError("The reported fix commit is not in the current checkout history. Inspect it before pushing.")
         }
         let remotes = try await git(["remote"], at: path).split(separator: "\n").map(String.init)
         let branch = expectedRepository.branch
@@ -48,18 +52,33 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
         }
         // Push only the verified commit to one branch, regardless of push.default,
         // followTags, mirror, or force settings. Git rejects non-fast-forward updates.
-        let result: SubprocessOutput
         do {
-            result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            let remoteRef = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
                 arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
-                            "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
-                            "--", remote, expectedRepository.commit + ":" + destination], timeout: 60)
+                            "ls-remote", "--exit-code", "--refs", "--", remote, destination], timeout: 60)
+            let remoteCommit = String(decoding: remoteRef.standardOutput, as: UTF8.self)
+                .split(whereSeparator: { $0.isWhitespace }).first.map(String.init)
+            // A later published commit already includes the fix. Do not attempt
+            // to move the remote backwards just to publish the older checkpoint.
+            let alreadyPublished: Bool
+            if remoteRef.terminationStatus == 0, let remoteCommit {
+                if remoteCommit == commit { alreadyPublished = true }
+                else { alreadyPublished = (try? await isAncestor(commit, of: remoteCommit, at: path)) == true }
+            } else {
+                alreadyPublished = false
+            }
+            if !alreadyPublished {
+                let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+                    arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                                "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
+                                "--", remote, commit + ":" + destination], timeout: 60)
+                guard result.terminationStatus == 0 else {
+                    throw ReviewLoopError(String(decoding: result.standardError, as: UTF8.self)
+                        .trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
         } catch {
             throw ReviewLoopError("Remote push failed: \(error.localizedDescription) Inspect the remote and resume to retry.")
-        }
-        guard result.terminationStatus == 0 else {
-            throw ReviewLoopError("Remote push failed: " + String(decoding: result.standardError, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines) + " Resume after resolving the error.")
         }
         if needsUpstream {
             _ = try await git(["config", "branch.\(branch).remote", remote], at: path)
