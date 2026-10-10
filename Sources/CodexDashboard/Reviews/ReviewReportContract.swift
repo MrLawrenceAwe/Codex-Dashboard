@@ -13,31 +13,26 @@ enum ReviewReportContract {
         let format: String
         switch kind {
         case .review(let limit):
+            let findingHeading = limit == nil ? "Short title" : "[P?] Short title"
+            let findingGuidance: String
             if let limit {
-                format = """
-            # Review complete
-
-            ## Summary
-            Brief summary.
-
-            ## [P?] Short title
-            Impact and linked file location.
-
-            Report only priorities \(ReviewFinding.Priority.allCases.filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")). Omit lower-priority findings. The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
-            """
+                let allowedPriorities = ReviewFinding.Priority.allCases
+                    .filter { $0.rank <= limit.rank }.map(\.rawValue).joined(separator: ", ")
+                findingGuidance = "Report only priorities \(allowedPriorities). Omit lower-priority findings."
             } else {
-                format = """
+                findingGuidance = "Report all actionable findings without priority labels or rankings."
+            }
+            format = """
             # Review complete
 
             ## Summary
             Brief summary.
 
-            ## Short title
+            ## \(findingHeading)
             Impact and linked file location.
 
-            Report all actionable findings without priority labels or rankings. The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
+            \(findingGuidance) The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
             """
-            }
         case .fix, .fixContinuation:
             format = """
             # Fixes committed

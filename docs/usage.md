@@ -113,25 +113,6 @@ available even when usage alerts are suppressed.
 
 ## Review loops
 
-A completed fix is reconciled against Git history. If the clean original branch has
-advanced and still contains the reported fix commit, the loop runs a read-only
-verification of the original findings in the same chat. It completes the round only
-when verification reports no remaining findings and HEAD is unchanged. A new HEAD
-requires a new verification. The result records both the original fix commit and
-the verified HEAD, which becomes the starting point for the next round. Remote push publishes only the reported
-fix commit, excluding later commits. Rewritten history, branch or checkout changes,
-uncommitted work, and changes after an all-withdrawn report still require attention.
-Resume retries a blocked checkpoint without repeating the completed fix task.
-
-
-The sidebar shows separate counts for running or waiting loops, an amber **!** for
-blocked loops or loops awaiting an extension reload, and a green **✓** for completed
-loops or loops that reached their round limit. Counts include only current loops;
-moving a finished loop to history removes it from the count. Stopped loops are
-excluded. Hover over a marker for its description.
-
-Enable **Mute test playback** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
-
 Choose a local, single-folder project on **Review loops**, then a review type:
 **Bugs and issues**, **Performance**, **Bugs and performance**, **Structure**,
 **Structure and naming**, or **Content and quality**. Structure reviews cover code,
@@ -143,7 +124,15 @@ Standard/Fast speed, and a round limit of 1–20 (default five). Bugs and perfor
 reviews offer general/personal project context and a finding priority limit. P0–P2
 includes P0, P1, and P2. These types also offer **Live testing**, off by default, and
 **Reload browser extension** before testing. Review models come from Codex's live
-model list.
+model list. Select **Start review & fix** to begin the loop.
+
+Each round starts a read-only review in a new chat on the current branch and
+checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that
+chat. Excluded priorities remain visible but are not fixed. Findings are verified
+before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
+reviews finish without a commit. A clean review is an assessment, not proof that
+all defects are absent. Multiple projects can run loops, with one active loop per
+project and checkout. Avoid other edits in that checkout while a loop runs.
 
 With **Live testing** enabled, bug reviews use both code review and live testing
 to find bugs and issues. For findings discovered through code review, live testing
@@ -151,6 +140,8 @@ is used to verify the bug and its fix only when necessary. Fixes for findings di
 are verified with live testing. These rules also apply to resumed fix tasks and
 later verification. Extension reloads during verification are needed only when
 live verification is needed.
+
+Enable **Mute test playback** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
 
 Structure, naming, and content reviews do not request extension reloads.
 Structure and naming loops explicitly use static review in both review and fix
@@ -170,13 +161,11 @@ shows the reason and steps. The chat reports `# Extension reload required` with 
 reloading to resume the same chat and round, preserving unfinished fixes. Final
 review and commit checks still run before the round can complete.
 
-Each round starts a read-only review in a new chat on the current branch and
-checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that
-chat. Excluded priorities remain visible but are not fixed. Findings are verified
-before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
-reviews finish without a commit. A clean review is an assessment, not proof that
-all defects are absent. Multiple projects can run loops, with one active loop per
-project and checkout. Avoid other edits in that checkout while a loop runs.
+The sidebar shows separate counts for running or waiting loops, an amber **!** for
+blocked loops or loops awaiting an extension reload, and a green **✓** for completed
+loops or loops that reached their round limit. Counts include only current loops;
+moving a finished loop to history removes it from the count. Stopped loops are
+excluded. Hover over a marker for its description.
 
 The dashboard counts the finding sections in a review automatically. Review responses
 use a completion or blocked heading, a summary, and one section per finding, without
@@ -189,6 +178,16 @@ commits are pushed after each round to the upstream branch, or the current branc
 on `origin` or the sole remote. New branch pushes record an upstream. Pushes are
 never forced. A push failure blocks the loop; Resume retries that verified commit
 without another fix prompt.
+
+A completed fix is reconciled against Git history. If the clean original branch has
+advanced and still contains the reported fix commit, the loop runs a read-only
+verification of the original findings in the same chat. It completes the round only
+when verification reports no remaining findings and HEAD is unchanged. A new HEAD
+requires a new verification. The result records both the original fix commit and
+the verified HEAD, which becomes the starting point for the next round. Remote push publishes only the reported
+fix commit, excluding later commits. Rewritten history, branch or checkout changes,
+uncommitted work, and changes after an all-withdrawn report still require attention.
+Resume retries a blocked checkpoint without repeating the completed fix task.
 
 **Pause after round** finishes the current round. **Stop loop** prevents new work
 and interrupts its running turn. While **Stopping**, its checkout stays reserved;

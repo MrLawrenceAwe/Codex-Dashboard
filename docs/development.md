@@ -107,8 +107,10 @@ submenus; previews exercise the DOM menu path.
 
 Composer transfers wait for the destination composer's identity, recheck project
 membership, and cancel when navigation changes. Prompt placeholders preserve
-literal selection and clipboard text, including dollar signs. Current presets
-use `low` for reasoning effort, displayed as **Low** in all three features.
+literal selection and clipboard text, including dollar signs. The former `light`
+reasoning-effort identifier migrates to `low`, displayed as **Low** in prompts,
+to-dos, and reviews. New prompt and to-do presets default to `medium` (**Medium**);
+review selections default to the model’s reasoning effort.
 To-do views receive project choices from their controller; removed assigned
 projects remain visible as unavailable.
 Account popover snapshots carry labelled usage rows and separate status notes;
