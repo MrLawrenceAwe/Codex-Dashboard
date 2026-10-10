@@ -142,6 +142,13 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 **Reload browser extension** before testing. Review models come from Codex's live
 model list.
 
+With **Live testing** enabled, bug reviews use both code review and live testing
+to find bugs and issues. For findings discovered through code review, live testing
+is used to verify the bug and its fix only when necessary. Fixes for findings discovered through live testing
+are verified with live testing. These rules also apply to resumed fix tasks and
+later verification. Extension reloads during verification are needed only when
+live verification is needed.
+
 Structure, naming, and content reviews do not request extension reloads.
 Structure and naming loops explicitly use static review in both review and fix
 turns. Fix verification can use relevant builds, type checks, and automated checks

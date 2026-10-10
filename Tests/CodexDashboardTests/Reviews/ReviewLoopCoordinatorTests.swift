@@ -829,9 +829,8 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             var withoutLiveTesting = saved
             withoutLiveTesting.liveTesting = false
             let baseFix = ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last))
-            let liveVerification = reviewType.supportsLiveTesting
-                ? "\n\nVerify fixes for findings discovered through live testing using live testing." : ""
-            XCTAssertTrue(driver.prompts[1].hasPrefix(baseFix + liveVerification))
+            XCTAssertTrue(driver.prompts[1].hasPrefix(baseFix))
+            XCTAssertEqual(driver.prompts[1].contains("Verify fixes for findings discovered through live testing using live testing."), reviewType.supportsLiveTesting)
             XCTAssertEqual(driver.prompts[1].contains("After changes, run any required build and reload the same extension before live verification."), reviewType.supportsLiveTesting)
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])

@@ -3,6 +3,37 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testBugReviewsKeepLiveDiscoveryAndUseConditionalVerification() {
+        for reviewType in ReviewType.allCases {
+            for liveTesting in [false, true] {
+                let loop = ReviewLoop(id: UUID(), startActionID: "verification", project: project,
+                                      promptContext: .general, maxRounds: 3, reviewType: reviewType,
+                                      liveTesting: liveTesting, reloadExtensionBeforeTesting: true)
+                var round = ReviewRound(number: 1, baseCommit: "base")
+                let review = ReviewPrompts.reviewPrompt(for: loop)
+                XCTAssertEqual(review.contains("Use code review and live testing to find bugs and issues."),
+                               liveTesting && reviewType.supportsLiveTesting)
+                XCTAssertFalse(review.contains("only when necessary"))
+                let conditional = liveTesting && (reviewType == .bugs || reviewType == .bugsAndPerformance)
+                for fixRequested in [false, true] {
+                    round.fixRequested = fixRequested
+                    for prompt in [ReviewPrompts.interruptedContinuation(for: loop, round: round),
+                                   ReviewPrompts.extensionReloadContinuation(for: loop, round: round)] {
+                        XCTAssertEqual(prompt.contains("only when necessary"), conditional && fixRequested)
+                    }
+                }
+                for prompt in [ReviewPrompts.fixPrompt(for: loop, round: round),
+                               ReviewPrompts.verifyFix(for: loop, round: round, commit: "head")] {
+                    XCTAssertEqual(prompt.contains("only when necessary"), conditional)
+                    XCTAssertEqual(prompt.contains("Follow these extension reload instructions only when live verification is needed."), conditional)
+                    if conditional {
+                        XCTAssertTrue(prompt.contains("Verify fixes for findings discovered through live testing using live testing."))
+                    }
+                }
+            }
+        }
+    }
+
     func testStructureScopePersistsThroughReviewFixAndReloadContinuation() {
         for reviewType in [ReviewType.organisation, .organisationAndNaming] {
             for liveTesting in [false, true] {
