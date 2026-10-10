@@ -1,5 +1,6 @@
 const chatOverviewQuery = (() => {
   const hasLocalChanges = thread => !!thread.projectGroupPath && ['uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
+  const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.canUseProjectGitActions;
 
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
@@ -59,5 +60,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasLocalChanges };
+  return { summarizeActivity, selectThreads, hasLocalChanges, canOpenProjectGitActions };
 })();

@@ -117,10 +117,10 @@ function createChatOverview({ catalog }) {
   async function openCommitDialogForProject(projectPath) {
     commitDialogError = '';
     const thread = currentThreads().find(
-      (item) => item.runState !== 'running' && String(item.projectGroupPath || '').trim() === projectPath,
+      (item) => chatOverviewQuery.canOpenProjectGitActions(item) && String(item.projectGroupPath || '').trim() === projectPath,
     );
     if (!thread) {
-      commitDialogError = 'No idle chat is available for this project.';
+      commitDialogError = 'No idle chat is available in this project’s repository.';
       renderChatOverview();
       return;
     }

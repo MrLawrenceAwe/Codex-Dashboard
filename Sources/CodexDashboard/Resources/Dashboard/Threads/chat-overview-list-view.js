@@ -65,10 +65,12 @@ const chatOverviewListView = (() => {
 
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
     if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
-    const hasIdleThread = projectThreads.some((thread) => thread.runState !== 'running');
+    const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
+    const hasRepositoryThread = projectThreads.some((thread) => thread.canUseProjectGitActions);
+    const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
-      <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push is available when this project has an idle chat'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : 'Chat running'}</span></button>`;
+      <button type="button" class="dashboard-project-commit" data-project-commit="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push requires an idle chat in this project’s repository'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : unavailableLabel}</span></button>`;
   }
 
   function renderProjectIdentity(projectName, projectPath) {

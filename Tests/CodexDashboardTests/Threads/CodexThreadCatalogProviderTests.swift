@@ -3,6 +3,58 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testGitActionEligibilityUsesRepositoryIdentityWithinProjectGroups() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let project = workspace.appendingPathComponent("project")
+        let subfolder = project.appendingPathComponent("src")
+        let nested = project.appendingPathComponent("nested")
+        let alias = workspace.appendingPathComponent("alias")
+        for directory in [subfolder, nested] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        for repository in [project, nested] {
+            let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                arguments: ["init", repository.path], timeout: 3)
+            XCTAssertEqual(result.terminationStatus, 0)
+        }
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
+        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
+        let setup = """
+        DELETE FROM project_roots;
+        DELETE FROM projects;
+        INSERT INTO projects (id, name) VALUES ('project', 'Project');
+        INSERT INTO project_roots (project_id, path) VALUES ('project', \(sql(project.path)));
+        UPDATE threads SET project_id = 'project';
+        UPDATE threads SET cwd = \(sql(alias.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sql(subfolder.path)) WHERE id = 'updated';
+        UPDATE threads SET cwd = \(sql(nested.path)) WHERE id = 'idle';
+        """
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, setup], timeout: 3)
+        XCTAssertEqual(result.terminationStatus, 0)
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
+        let catalog = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        XCTAssertEqual(Set(catalog.threads.compactMap(\.projectGroupPath)), [project.path])
+        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.canUseProjectGitActions, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "updated" }?.canUseProjectGitActions, true)
+        let nestedThread = try XCTUnwrap(catalog.threads.first { $0.id == "idle" })
+        XCTAssertFalse(nestedThread.canUseProjectGitActions)
+        XCTAssertFalse(RendererThread(nestedThread).canUseProjectGitActions)
+
+        // Repository boundaries can change without a Codex database write.
+        try FileManager.default.removeItem(at: nested.appendingPathComponent(".git"))
+        let refreshed = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.canUseProjectGitActions, true)
+
+        // Submodules and linked worktrees use a .git file and remain separate checkouts.
+        try Data("gitdir: ../.git/modules/nested\n".utf8).write(to: nested.appendingPathComponent(".git"))
+        let linked = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        XCTAssertEqual(linked.threads.first { $0.id == "idle" }?.canUseProjectGitActions, false)
+        XCTAssertNil(FileSystemPath.gitRepositoryRoot(workspace.appendingPathComponent("missing").path))
+    }
+
     func testSavedProjectsGroupAliasesAndRemovalDoesNotHideChats() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)

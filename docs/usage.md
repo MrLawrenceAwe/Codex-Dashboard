@@ -18,11 +18,12 @@ colours or **No highlight**. Projects remain individually collapsible.
 
 **Hide change indicators** hides a project's indicators until restored. Hidden
 projects remain under **Indicators hidden** in Local changes. **Commit or push**
-opens Codex's native Commit flow through an idle project chat when there are
-uncommitted changes, or selects its Push action when only unpushed commits remain.
-The handoff stops if you switch chats while it waits for Git controls. Git status uses local
-remote-tracking refs without fetching; repositories without a remote show only
-uncommitted changes.
+opens Codex's native Commit flow through an idle chat in the same repository when
+there are uncommitted changes, or selects its Push action when only unpushed commits
+remain. Chats in separate nested repositories cannot handle their parent project's
+Git actions. The handoff stops if you switch chats, including while the initial chat
+selection is pending. Git status uses local remote-tracking refs without fetching;
+repositories without a remote show only uncommitted changes.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
 finishes. Disable this from the menu bar if unwanted. Review-loop chats and chats

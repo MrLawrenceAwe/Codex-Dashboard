@@ -16,7 +16,8 @@ extension ThreadSummary {
         model: String? = nil,
         runState: ThreadRunState = .idle,
         latestLifecycleEvent: ThreadLifecycleEvent? = nil,
-        projectGitStatus: ProjectGitStatus = .clean
+        projectGitStatus: ProjectGitStatus = .clean,
+        canUseProjectGitActions: Bool = true
     ) -> ThreadSummary {
         var thread = ThreadSummary(
             id: id,
@@ -33,6 +34,7 @@ extension ThreadSummary {
         )
         thread.projectID = projectID ?? checkoutPath
         thread.projectGroupPath = checkoutPath
+        thread.canUseProjectGitActions = canUseProjectGitActions
         thread.isUnread = isUnread
         return thread
     }

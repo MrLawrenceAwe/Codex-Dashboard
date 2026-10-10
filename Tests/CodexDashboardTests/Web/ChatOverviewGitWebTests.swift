@@ -508,7 +508,7 @@ extension ChatOverviewWebTests {
     }
 
     func testCommitHandoffCancelsNavigationChangesAtEveryWait() async throws {
-        for stage in ["button", "menu", "item"] {
+        for stage in ["selection", "button", "menu", "item"] {
             let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: stage)
             XCTAssertEqual(state[0] as? Bool, false, stage)
             XCTAssertEqual(state[1] as? String, "", stage)
@@ -518,11 +518,64 @@ extension ChatOverviewWebTests {
         }
     }
 
-    private func gitHandoffState(status: ProjectGitStatus, switchStage: String = "") async throws -> [Any] {
+    func testCommitHandoffCancelsExplicitNavigationBeforeSelectionChanges() async throws {
+        for stage in ["selection-click", "selection-route"] {
+            let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: stage)
+            XCTAssertEqual(state[0] as? Bool, false, stage)
+            XCTAssertEqual(state[1] as? String, "", stage)
+            XCTAssertEqual(state[2] as? Bool, false, "Do not reopen Overview over the user's navigation")
+            XCTAssertEqual(state[3] as? Bool, true, stage)
+            XCTAssertEqual(state[4] as? String, "initial", stage)
+        }
+    }
+
+    func testCommitHandoffAllowsDelayedInitialSelection() async throws {
+        let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: "delayed-selection")
+        XCTAssertEqual(state[0] as? Bool, true)
+        XCTAssertEqual(state[1] as? String, "Commit")
+        XCTAssertEqual(state[3] as? Bool, false)
+    }
+
+    func testProjectCommitSkipsNewerIdleChatInDifferentRepository() async throws {
+        let state = try await gitHandoffState(status: .unpushedCommits, includeNestedChat: true)
+        XCTAssertEqual(state[0] as? Bool, true)
+        XCTAssertEqual(state[1] as? String, "Push")
+        XCTAssertEqual(state[4] as? String, "target")
+        XCTAssertEqual(state[5] as? String, "target")
+    }
+
+    func testProjectCommitDisabledWithoutIdleChatInMatchingRepository() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/project/nested",
+            projectGitStatus: .unpushedCommits, canUseProjectGitActions: false)
+        nested.projectGroupPath = "/tmp/project"
+        for includeRunningRoot in [false, true] {
+            var threads = [nested]
+            if includeRunningRoot {
+                threads.append(.fixture(id: "root", checkoutPath: "/tmp/project", runState: .running,
+                    projectGitStatus: .unpushedCommits))
+            }
+            let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
+            let state = try await webView.evaluateJavaScript("""
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openChatOverview();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              const button = document.querySelector('[data-project-commit]');
+              return [button.disabled, button.textContent.trim()];
+            })()
+            """) as? [Any]
+            XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable],
+                [true, includeRunningRoot ? "Chat running" : "No repository chat"])
+        }
+    }
+
+    private func gitHandoffState(status: ProjectGitStatus, switchStage: String = "", includeNestedChat: Bool = false) async throws -> [Any] {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
           <aside role="navigation">
             <button class="sidebar-item" data-app-action-sidebar-thread-id="local:target">Target</button>
+            <button class="sidebar-item" data-app-action-sidebar-thread-id="local:initial">Initial</button>
           </aside>
           <main><div id="composer-host"><textarea placeholder="Do anything"></textarea></div></main>
           <script>
@@ -531,7 +584,7 @@ extension ChatOverviewWebTests {
             document.getElementById('composer-host').__reactFiber$test = { memoizedProps: activeProps, return: null };
             window.__gitClicked = '';
             const changeChat = () => { activeProps.conversationId = 'other-project'; };
-            document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', () => {
+            const selectTarget = () => {
               activeProps.conversationId = 'target';
               if (switchStage === 'button') { setTimeout(changeChat, 100); return; }
               const button = document.createElement('button');
@@ -556,6 +609,21 @@ extension ChatOverviewWebTests {
                 if (switchStage === 'item') setTimeout(changeChat, 100);
               });
               document.querySelector('main').append(button);
+            };
+            document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', () => {
+              if (switchStage === 'selection') { setTimeout(changeChat, 100); return; }
+              if (switchStage === 'selection-click') {
+                setTimeout(() => document.querySelector('[data-app-action-sidebar-thread-id="local:initial"]').click(), 100);
+                return;
+              }
+              if (switchStage === 'selection-route') {
+                setTimeout(() => window.dispatchEvent(new MessageEvent('message', {
+                  data: { type: 'navigate-to-route', path: '/local/initial' }, source: null,
+                })), 100);
+                return;
+              }
+              if (switchStage === 'delayed-selection') { setTimeout(selectTarget, 150); return; }
+              selectTarget();
             });
           </script>
         </body></html>
@@ -569,14 +637,20 @@ extension ChatOverviewWebTests {
         // Unmount the initial bundle before mounting the instrumented copy.
         _ = try await webView.evaluateJavaScript("window.__codexDashboard?.destroy?.()")
         _ = try await webView.evaluateJavaScript(instrumented)
-        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(id: "target", checkoutPath: "/tmp/target", projectGitStatus: status),
-        ])
+        var threads = [ThreadSummary.fixture(id: "target", checkoutPath: "/tmp/target", projectGitStatus: status)]
+        if includeNestedChat {
+            var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/target/nested",
+                recencyEpochMillis: 10, projectGitStatus: status, canUseProjectGitActions: false)
+            nested.projectGroupPath = "/tmp/target"
+            threads.insert(nested, at: 0)
+        }
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: threads)
         _ = try await webView.evaluateJavaScript("""
         (() => {
           const host = window.__gitHostForTests;
           const original = host.openCommitDialog;
           host.openCommitDialog = async function(thread) {
+            window.__gitHandoffThreadID = thread.id;
             const result = await original.call(this, thread);
             window.__gitHandoffResult = result;
             return result;
@@ -591,7 +665,7 @@ extension ChatOverviewWebTests {
         let state = try await webView.evaluateJavaScript("""
         [window.__gitHandoffResult.opened, window.__gitClicked,
          document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
-         window.__gitHandoffResult.cancelled || false, activeProps.conversationId]
+         window.__gitHandoffResult.cancelled || false, activeProps.conversationId, window.__gitHandoffThreadID]
         """) as? [Any]
         return try XCTUnwrap(state)
     }

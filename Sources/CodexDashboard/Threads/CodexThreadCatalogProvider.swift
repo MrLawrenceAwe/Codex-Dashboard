@@ -152,6 +152,14 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         }
         let activityPaths = Set(threads.map(\.rolloutPath))
         rolloutActivityReader.retainCache(for: activityPaths)
+        var repositoryRoots: [String: String] = [:]
+        var resolvedRepositoryPaths = Set<String>()
+        func repositoryRoot(_ path: String) -> String? {
+            if resolvedRepositoryPaths.insert(path).inserted {
+                repositoryRoots[path] = FileSystemPath.gitRepositoryRoot(path)
+            }
+            return repositoryRoots[path]
+        }
         // Any loaded task can be resumed or hit a usage limit without a database
         // write. The reader checks file signatures and only parses changed rollouts.
         let candidates: [ThreadSummary] = threads.map { thread in
@@ -190,6 +198,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
+                if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
+                    summary.canUseProjectGitActions = repositoryRoot(cwd) == repository
+                }
             }
             return summary
         }

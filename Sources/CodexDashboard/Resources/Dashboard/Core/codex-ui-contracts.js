@@ -154,6 +154,14 @@ const codexUIContracts = (() => {
     return null;
   }
 
+  function selectedThreadID() {
+    const composerID = activeComposerThreadID();
+    if (composerID) return composerID;
+    const rowID = threadRows().find((row) => isVisible(row) && row.getAttribute('aria-current') === 'page')
+      ?.getAttribute('data-app-action-sidebar-thread-id');
+    return rowID?.startsWith('local:') ? rowID.slice('local:'.length) : null;
+  }
+
   function activeComposerHasNoProject() {
     const activeComposer = composer();
     let host = activeComposer?.parentElement;
@@ -420,6 +428,7 @@ const codexUIContracts = (() => {
     threadRow,
     isThreadSelected,
     activeComposerThreadID,
+    selectedThreadID,
     activeComposerHasNoProject,
     activeComposerProjectID,
     activeComposerProject,

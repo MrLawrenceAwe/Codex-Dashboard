@@ -88,40 +88,66 @@ const codexHost = {
 
   async openCommitDialog(thread) {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
-    const isSelected = () => {
-      const composerThreadID = codexUIContracts.activeComposerThreadID();
-      return composerThreadID
-        ? composerThreadID === thread.id
-        : codexUIContracts.isThreadSelected(thread.id);
-    };
-    this.navigateToThread(thread);
-    const selected = await waitFor(isSelected);
-    if (!selected) return { opened: false, reason: 'Codex did not select the project chat.' };
-
+    const initialThreadID = codexUIContracts.selectedThreadID();
+    const isSelected = () => codexUIContracts.selectedThreadID() === thread.id;
     const cancelled = { opened: false, cancelled: true, reason: 'The selected chat changed. Git handoff cancelled.' };
-    const waitForSelected = (value) => waitFor(() => !isSelected() ? cancelled : value());
-    const action = thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
-    const gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
-    if (gitActions === cancelled || !isSelected()) return cancelled;
-    if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
-    if (gitActions.getAttribute('aria-expanded') !== 'true') {
-      gitActions.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, button: 0, pointerType: 'mouse',
-      }));
-      if (!isSelected()) return cancelled;
-      gitActions.click();
-    }
+    let navigationCancelled = false;
+    const route = `/local/${encodeURIComponent(thread.id)}`;
+    const handleNavigation = (event) => {
+      if (event.type === 'message') {
+        const data = event.data;
+        if ((data?.type === 'navigate-to-route' && data.path !== route)
+          || data?.type === 'new-projectless-task') navigationCancelled = true;
+      } else if (event.type === 'click') {
+        const target = event.target instanceof Element ? event.target : null;
+        const row = target?.closest('[data-app-action-sidebar-thread-id]');
+        if (target?.closest('aside') && row?.getAttribute('data-app-action-sidebar-thread-id') !== `local:${thread.id}`) {
+          navigationCancelled = true;
+        }
+      } else if (event.type === 'keydown') {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n') navigationCancelled = true;
+      } else {
+        navigationCancelled = true;
+      }
+    };
+    const navigationEvents = ['click', 'message', 'popstate', 'hashchange', 'keydown'];
+    navigationEvents.forEach((type) => window.addEventListener(type, handleNavigation, true));
+    try {
+      this.navigateToThread(thread);
+      const selected = await waitFor(() => {
+        const currentID = codexUIContracts.selectedThreadID();
+        if (navigationCancelled || (currentID && currentID !== thread.id && currentID !== initialThreadID)) return cancelled;
+        return isSelected();
+      });
+      if (selected === cancelled || navigationCancelled) return cancelled;
+      if (!selected) return { opened: false, reason: 'Codex did not select the project chat.' };
 
-    const menu = await waitForSelected(() => codexUIContracts.gitActionsMenu(gitActions));
-    if (menu === cancelled || !isSelected()) return cancelled;
-    if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
-    const item = await waitForSelected(() => {
-      const currentMenu = codexUIContracts.gitActionsMenu(gitActions);
-      return currentMenu && codexUIContracts.gitActionMenuItem(currentMenu, action);
-    });
-    if (item === cancelled || !isSelected()) return cancelled;
-    if (!item) return { opened: false, reason: `${action} is unavailable in Codex’s Git actions menu.` };
-    item.click();
-    return { opened: true };
+      const waitForSelected = (value) => waitFor(() => navigationCancelled || !isSelected() ? cancelled : value());
+      const action = thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
+      const gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
+      if (gitActions === cancelled || navigationCancelled || !isSelected()) return cancelled;
+      if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
+      if (gitActions.getAttribute('aria-expanded') !== 'true') {
+        gitActions.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, button: 0, pointerType: 'mouse',
+        }));
+        if (navigationCancelled || !isSelected()) return cancelled;
+        gitActions.click();
+      }
+
+      const menu = await waitForSelected(() => codexUIContracts.gitActionsMenu(gitActions));
+      if (menu === cancelled || navigationCancelled || !isSelected()) return cancelled;
+      if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
+      const item = await waitForSelected(() => {
+        const currentMenu = codexUIContracts.gitActionsMenu(gitActions);
+        return currentMenu && codexUIContracts.gitActionMenuItem(currentMenu, action);
+      });
+      if (item === cancelled || navigationCancelled || !isSelected()) return cancelled;
+      if (!item) return { opened: false, reason: `${action} is unavailable in Codex’s Git actions menu.` };
+      item.click();
+      return { opened: true };
+    } finally {
+      navigationEvents.forEach((type) => window.removeEventListener(type, handleNavigation, true));
+    }
   },
 };
