@@ -111,8 +111,15 @@ struct ReviewRound: Codable, Equatable, Sendable {
     var fixRequested = false
     var continuationRequested: Bool? = nil
     var reloadContinuationRequested: Bool? = nil
+    var fixVerification: ReviewFixVerification?
     var review: ReviewReport?
     var result: ReviewRoundResult?
+}
+
+struct ReviewFixVerification: Codable, Equatable, Sendable {
+    let sourceFixTurnID: String
+    let commit: String
+    var turnID: String?
 }
 
 struct ReviewFinding: Codable, Equatable, Sendable {
@@ -145,6 +152,7 @@ struct ReviewRoundResult: Codable, Equatable, Sendable {
     let addressedFindingCount: Int
     let commit: String
     let summary: String
+    var verifiedCommit: String? = nil
 }
 
 struct ReviewLoop: Codable, Equatable, Sendable {

@@ -111,8 +111,11 @@ available even when usage alerts are suppressed.
 ## Review loops
 
 A completed fix is reconciled against Git history. If the clean original branch has
-advanced and still contains the reported fix commit, the loop records that fix and
-uses the current HEAD for the next round. Remote push publishes only the reported
+advanced and still contains the reported fix commit, the loop runs a read-only
+verification of the original findings in the same chat. It completes the round only
+when verification reports no remaining findings and HEAD is unchanged. A new HEAD
+requires a new verification. The result records both the original fix commit and
+the verified HEAD, which becomes the starting point for the next round. Remote push publishes only the reported
 fix commit, excluding later commits. Rewritten history, branch or checkout changes,
 uncommitted work, and changes after an all-withdrawn report still require attention.
 Resume retries a blocked checkpoint without repeating the completed fix task.

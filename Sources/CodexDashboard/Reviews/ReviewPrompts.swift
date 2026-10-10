@@ -1,6 +1,23 @@
 import Foundation
 
 enum ReviewPrompts {
+    static func verifyFix(for loop: ReviewLoop, round: ReviewRound, commit: String) -> String {
+        let findings = round.review?.findings(upTo: loop.priorityLimit).enumerated().map { index, finding in
+            "Finding \(index + 1): \(finding.title)\n\(finding.body)"
+        }.joined(separator: "\n\n") ?? ""
+        return """
+        Reverify the original findings at current HEAD `\(commit)`. The branch advanced after the fix report; Git ancestry alone does not establish that the fixes still work.
+
+        This is a read-only verification. Inspect the actual current code and changes since the reported fix, and run focused checks that exercise each original failure. Check that later commits have not reverted or broken the fixes. Recheck the reasoning for withdrawn findings. Do not edit files, create commits, or push. If HEAD changes during verification, report the verification as blocked.
+
+        Return a review report. Report any original finding still present or any fix regression as a finding. A report with no findings must explain the evidence and checks confirming the fixes at this HEAD. If verification cannot be completed, return a blocked review report.
+
+        Original findings:
+        \(findings)
+        """ + structureReviewInstruction(for: loop, verifyingFixes: true)
+            + extensionReloadInstruction(for: loop, verifyingFixes: true) + mutedMediaInstruction(for: loop)
+    }
+
     private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
         guard loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming else { return "" }
         let verification = verifyingFixes

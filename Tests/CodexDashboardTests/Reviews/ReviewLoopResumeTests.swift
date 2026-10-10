@@ -69,17 +69,32 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
         let recovered = ReviewLoopCoordinator(store: store)
         try recovered.apply(action(.resume, for: recovered), projects: [project])
         await recovered.advance(using: driver, threads: [])
-        XCTAssertEqual(recovered.loops[0].phase, .waiting)
-        XCTAssertEqual(recovered.loops[0].expectedCommit, "later")
-        XCTAssertEqual(recovered.loops[0].rounds[0].result?.commit, "fixed")
-        XCTAssertEqual(driver.pushedCommits, ["fixed"])
-        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertEqual(recovered.loops[0].phase, .running)
+        XCTAssertNil(recovered.loops[0].rounds[0].result)
+        XCTAssertTrue(driver.pushedCommits.isEmpty)
+        XCTAssertEqual(driver.prompts.count, 3)
+        XCTAssertEqual(driver.selections.last!, recovered.loops[0].reviewSelection)
+        XCTAssertTrue(driver.prompts.last!.contains("Reverify the original findings"))
         await recovered.advance(using: driver, threads: [])
-        XCTAssertEqual(recovered.loops[0].rounds.last?.baseCommit, "later")
+        XCTAssertEqual(driver.prompts.count, 3, "Do not duplicate running verification")
+        let restarted = ReviewLoopCoordinator(store: store)
+        try restarted.apply(action(.resume, for: restarted), projects: [project])
+        await restarted.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 3, "Restart must not repeat verification")
+        driver.review(priorities: [])
+        await restarted.advance(using: driver, threads: [])
+        XCTAssertEqual(restarted.loops[0].phase, .waiting)
+        XCTAssertEqual(restarted.loops[0].rounds[0].result?.verifiedCommit, "later")
+        XCTAssertEqual(restarted.loops[0].expectedCommit, "later")
+        XCTAssertEqual(restarted.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(driver.pushedCommits, ["fixed"])
+        XCTAssertEqual(driver.prompts.count, 3)
+        await restarted.advance(using: driver, threads: [])
+        XCTAssertEqual(restarted.loops[0].rounds.last?.baseCommit, "later")
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
 
-    func testAdvancedHEADIsAcceptedAutomaticallyButWithdrawnFindingsRemainStrict() async throws {
+    func testAdvancedHEADRequiresVerificationButWithdrawnFindingsRemainStrict() async throws {
         for withdrawn in [false, true] {
             let (coordinator, _, driver) = try make(limit: 1)
             await coordinator.advance(using: driver, threads: [])
@@ -89,8 +104,13 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
             driver.finish(findings: withdrawn ? 0 : 1, commit: withdrawn ? "none" : "fixed", withdrawn: withdrawn ? [1] : [])
             driver.commit = "later"
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(coordinator.loops[0].phase, withdrawn ? .blocked : .limitReached)
-            XCTAssertEqual(driver.prompts.count, 2)
+            XCTAssertEqual(coordinator.loops[0].phase, withdrawn ? .blocked : .running)
+            XCTAssertEqual(driver.prompts.count, withdrawn ? 2 : 3)
+            if !withdrawn {
+                driver.review(priorities: [])
+                await coordinator.advance(using: driver, threads: [])
+                XCTAssertEqual(coordinator.loops[0].phase, .limitReached)
+            }
         }
     }
 
