@@ -5,6 +5,8 @@ enum DashboardError: LocalizedError {
     case codexQuitTimedOut
     case rendererTimedOut
     case missingResources
+    case unreadableResourceManifest(path: String, reason: String)
+    case invalidResourceManifest(path: String, reason: String)
     case invalidDevToolsResponse
     case devToolsTimedOut
     case devToolsCommandFailed(String)
@@ -22,6 +24,10 @@ enum DashboardError: LocalizedError {
             return "Codex reopened, but its local renderer did not become available."
         case .missingResources:
             return "The dashboard resources are missing from the application bundle."
+        case .unreadableResourceManifest(let path, let reason):
+            return "The dashboard resource manifest could not be read at \(path): \(reason)"
+        case .invalidResourceManifest(let path, let reason):
+            return "The dashboard resource manifest is invalid at \(path): \(reason)"
         case .invalidDevToolsResponse:
             return "The Codex renderer returned an invalid debugging response."
         case .devToolsTimedOut:

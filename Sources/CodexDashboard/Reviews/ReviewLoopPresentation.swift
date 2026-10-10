@@ -81,7 +81,7 @@ enum ReviewLoopPresentation {
         let note: String
         if loop.phase == .paused { note = "After resume and checkout verification." }
         else if loop.pauseRequested { note = "After this round pauses and you resume." }
-        else if unfinished { note = "After fixes commit and verification passes. HEAD will use that commit." }
+        else if unfinished { note = "After fixes commit and verification passes. The next review uses the verified HEAD." }
         else { note = "After the project is idle and the checkout passes verification." }
         return (ReviewPromptPreview(
             title: "Review · round \(loop.rounds.count + 1)",

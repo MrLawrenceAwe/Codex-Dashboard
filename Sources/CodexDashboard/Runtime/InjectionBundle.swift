@@ -91,10 +91,16 @@ struct InjectionBundle: Sendable {
         ) else {
             throw DashboardError.missingResources
         }
+        let data: Data
         do {
-            return try JSONDecoder().decode(ResourceManifest.self, from: Data(contentsOf: url))
+            data = try Data(contentsOf: url)
         } catch {
-            throw DashboardError.missingResources
+            throw DashboardError.unreadableResourceManifest(path: url.path, reason: error.localizedDescription)
+        }
+        do {
+            return try JSONDecoder().decode(ResourceManifest.self, from: data)
+        } catch {
+            throw DashboardError.invalidResourceManifest(path: url.path, reason: String(describing: error))
         }
     }
 

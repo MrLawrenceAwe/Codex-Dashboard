@@ -53,7 +53,7 @@ const reviewLoopPage = (() => {
       if (historyAction) {
         const kind = historyAction.dataset.reviewHistoryAction;
         const loopID = details.querySelector('[data-review-history-select]').value;
-        const message = { delete: 'Delete this saved loop?', deleteOlder: 'Delete all saved loops older than this one?', deleteAll: 'Delete all saved previous loops?' }[kind];
+        const message = { delete: 'Delete this saved loop?', deleteOlder: 'Delete all saved loops created before this one, regardless of their last updated date?', deleteAll: 'Delete all saved previous loops?' }[kind];
         if (message && window.confirm(`${message} Review chats will remain available.`)) queueAction({ kind, loopID: kind === 'deleteAll' ? null : loopID });
         return;
       }

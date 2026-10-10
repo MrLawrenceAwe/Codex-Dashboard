@@ -159,7 +159,8 @@ that do not launch or drive a browser or application UI. Live browser testing,
 Computer Use, and extension reloads require an explicit request for that task.
 
 With **Reload browser extension** enabled, Codex uses Chrome DevTools to reload
-Chrome extensions before live testing and again after building fixes. It checks
+Chrome extensions before live testing and, when live verification is needed,
+again after building fixes. It checks
 that the reload succeeded, refreshes affected test pages, and reopens extension
 UI as needed. The `chrome-devtools` MCP server must be configured in Codex with
 extension tools enabled; Chrome may ask you to approve the connection. If the
@@ -218,7 +219,8 @@ turns, and approval requests stop progression with an explanation. Review edits
 block before any fix or push. Reaching the configured limit ends with **Round limit
 reached**, which means the configured rounds finished, not that findings are absent.
 Finished loops move to history. History controls delete saved loops and their
-round records; the review chats remain available.
+round records; the review chats remain available. **Delete loops created earlier**
+uses creation order, regardless of the displayed last updated dates.
 
 ## Compatibility and diagnostics
 
