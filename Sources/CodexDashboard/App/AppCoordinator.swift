@@ -4,7 +4,8 @@ import Foundation
 
 @MainActor
 final class AppCoordinator: ObservableObject {
-    static let foregroundOnTaskCompletionKey = "foregroundOnTaskCompletion"
+    // Keep the persisted key so a rename does not reset the saved preference.
+    static let automaticallyOpenCompletedChatsKey = "foregroundOnTaskCompletion"
     private static let maximumLiveMonitoredProjectCount = 60
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
@@ -22,8 +23,8 @@ final class AppCoordinator: ObservableObject {
     @Published var compatibilityWasTriggeredByUpdate = false
     @Published var promptLibraryStatusMessage: String?
     @Published var phoneNotificationStatusMessage: String?
-    @Published var foregroundOnTaskCompletion: Bool {
-        didSet { userDefaults.set(foregroundOnTaskCompletion, forKey: Self.foregroundOnTaskCompletionKey) }
+    @Published var automaticallyOpenCompletedChats: Bool {
+        didSet { userDefaults.set(automaticallyOpenCompletedChats, forKey: Self.automaticallyOpenCompletedChatsKey) }
     }
 
     let threadSnapshotService: ThreadSnapshotService
@@ -104,7 +105,7 @@ final class AppCoordinator: ObservableObject {
             usageCacheStore: accountUsageCacheStore
         )
         notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
-        foregroundOnTaskCompletion = userDefaults.object(forKey: Self.foregroundOnTaskCompletionKey) as? Bool ?? true
+        automaticallyOpenCompletedChats = userDefaults.object(forKey: Self.automaticallyOpenCompletedChatsKey) as? Bool ?? true
         refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
         compatibilityMonitor = CompatibilityMonitor(
             localChecker: compatibilityChecker,
@@ -205,7 +206,7 @@ final class AppCoordinator: ObservableObject {
         await cancelSynchronization()
         connectionNotice = nil
         do {
-            try await loadThreadSnapshot()
+            _ = try await refreshThreadState()
         } catch {
             connectionError =
                 "Codex was not restarted because active chats could not be checked. "
@@ -229,7 +230,7 @@ final class AppCoordinator: ObservableObject {
         do {
             let targets = try await dashboardRuntime.restartCodex()
             rendererAvailable = true
-            try await loadThreadSnapshot()
+            _ = try await refreshThreadState()
             try await dashboardRuntime.synchronizeDashboard(
                 with: dashboardSnapshotPayload(),
                 on: targets,

@@ -5,6 +5,67 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testPreflightRefreshConsumesCompletionWithoutOpeningChatOrRefreshingUsage() async throws {
+        let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
+        let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
+        let provider = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", runState: .running, latestLifecycleEvent: started)],
+                totalThreadCount: 1
+            ),
+            ThreadCatalog(
+                threads: [.fixture(id: "thread-1", latestLifecycleEvent: completed)],
+                totalThreadCount: 1
+            ),
+        ])
+        let foregrounder = RecordingCodexForegrounder()
+        let usageProvider = RecordingAccountUsageProvider()
+        let runtime = StubDashboardRuntime(codexIsRunning: true)
+        let coordinator = makeAppCoordinator(
+            catalogProvider: provider,
+            projectGitStatusProvider: StubProjectGitStatusProvider(),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            observeFileChanges: false,
+            codexForegrounder: foregrounder,
+            accountUsageProvider: usageProvider,
+            runtimeFactory: { _ in runtime }
+        )
+
+        _ = try await coordinator.refreshThreadState()
+        let observed = try await coordinator.refreshThreadState()
+        let completion = try XCTUnwrap(observed)
+        XCTAssertTrue(completion.hasCompletion)
+        XCTAssertEqual(completion.threadIDToOpen, "thread-1")
+        XCTAssertEqual(coordinator.threads.first?.runState, .idle)
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+        let initialUsageRequests = await usageProvider.count()
+        XCTAssertEqual(initialUsageRequests, 0)
+
+        // Normal polling must not replay a completion consumed by preflight.
+        await coordinator.synchronizeDashboard()
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+        let subsequentUsageRequests = await usageProvider.count()
+        XCTAssertEqual(subsequentUsageRequests, 0)
+    }
+
+    func testAutomaticChatOpeningReadsExistingSavedPreference() throws {
+        let suiteName = "AppCoordinatorCompletionOpeningTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(false, forKey: "foregroundOnTaskCompletion")
+        let coordinator = makeAppCoordinator(
+            userDefaults: defaults,
+            observeFileChanges: false,
+            runtimeFactory: { _ in StubDashboardRuntime() }
+        )
+
+        XCTAssertFalse(coordinator.automaticallyOpenCompletedChats)
+        coordinator.automaticallyOpenCompletedChats = true
+        XCTAssertTrue(defaults.bool(forKey: "foregroundOnTaskCompletion"))
+    }
+
     func testNewTaskCompletionForegroundsCodexAfterInitialSnapshot() async {
         let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
         let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))
@@ -296,8 +357,8 @@ extension AppCoordinatorTests {
         XCTAssertEqual(foregrounder.callCount, 0)
     }
 
-    func testForegroundPreferencePersistsAndSuppressesCompletionActivation() async throws {
-        let suiteName = "AppCoordinatorForegroundTests-\(UUID().uuidString)"
+    func testAutomaticChatOpeningPreferencePersistsAndSuppressesCompletionActivation() async throws {
+        let suiteName = "AppCoordinatorCompletionOpeningTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
@@ -325,10 +386,10 @@ extension AppCoordinatorTests {
         )
         await coordinator.synchronizeDashboard()
 
-        coordinator.foregroundOnTaskCompletion = false
+        coordinator.automaticallyOpenCompletedChats = false
         await coordinator.synchronizeDashboard()
 
-        XCTAssertFalse(defaults.bool(forKey: AppCoordinator.foregroundOnTaskCompletionKey))
+        XCTAssertFalse(defaults.bool(forKey: AppCoordinator.automaticallyOpenCompletedChatsKey))
         XCTAssertEqual(foregrounder.callCount, 0)
     }
 

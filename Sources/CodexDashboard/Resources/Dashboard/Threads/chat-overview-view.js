@@ -91,7 +91,7 @@ const chatOverviewView = (() => {
     visibleItemLimit,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
-    commitDialogError,
+    projectGitActionError,
     markAllReadPending,
     markAllReadError,
     isThreadUnread,
@@ -103,8 +103,8 @@ const chatOverviewView = (() => {
     if (!page) return false;
     const notice = page.querySelector('[data-chat-overview-notice]');
     if (notice) {
-      notice.textContent = markAllReadError || commitDialogError;
-      notice.hidden = !markAllReadError && !commitDialogError;
+      notice.textContent = markAllReadError || projectGitActionError;
+      notice.hidden = !markAllReadError && !projectGitActionError;
     }
     const markAllRead = page.querySelector('[data-mark-all-read]');
     if (markAllRead) {

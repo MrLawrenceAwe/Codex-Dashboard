@@ -333,7 +333,7 @@ final class DashboardRendererTests: XCTestCase {
         )
         let devTools = AccountPopoverRendererDevTools(
             target: target,
-            action: "{\"kind\":\"updateUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
+            action: "{\"kind\":\"refreshUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
         )
         let renderer = try DashboardRenderer(
             devTools: devTools,
@@ -344,7 +344,7 @@ final class DashboardRendererTests: XCTestCase {
 
         XCTAssertEqual(
             result,
-            .action(AccountPopoverAction(kind: .updateUsage, accountID: accountID))
+            .action(AccountPopoverAction(kind: .refreshUsage, accountID: accountID))
         )
     }
 

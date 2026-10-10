@@ -118,7 +118,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[2] as? Bool, true)
         XCTAssertEqual(values[3] as? Bool, true)
         _ = try await webView.evaluateJavaScript(
-            "document.querySelector('[data-account-action=\"update\"]').click()"
+            "document.querySelector('[data-account-action=\"refreshUsage\"]').click()"
         )
         let serializedAction = try await webView.evaluateJavaScript(
             "window.__codexDashboard.takeQueuedAccountPopoverAction()"
@@ -127,7 +127,7 @@ extension ChatOverviewWebTests {
         let action = try XCTUnwrap(
             JSONSerialization.jsonObject(with: actionData) as? [String: Any]
         )
-        XCTAssertEqual(action["kind"] as? String, "updateUsage")
+        XCTAssertEqual(action["kind"] as? String, "refreshUsage")
         XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
     }
 
@@ -285,7 +285,7 @@ extension ChatOverviewWebTests {
             activeAccountID: null, statusMessage: null, isBusy: false,
           });
           document.querySelector('[data-codex-accounts-trigger]').click();
-          document.querySelector('[data-account-action="update"]').click();
+          document.querySelector('[data-account-action="refreshUsage"]').click();
           document.querySelector('#profile-menu').remove();
         })()
         """)
@@ -320,7 +320,7 @@ extension ChatOverviewWebTests {
           activeAccountID: null, statusMessage: null, isBusy: false,
         });
         document.querySelector('[data-codex-accounts-trigger]').click();
-        document.querySelector('[data-account-action="switch"]').click();
+        document.querySelector('[data-account-action="switchAccount"]').click();
         document.querySelector('#profile-portal').remove();
         await new Promise(resolve => setTimeout(resolve, 0));
         const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
@@ -345,7 +345,7 @@ extension ChatOverviewWebTests {
         XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex chats") == true)
     }
 
-    func testExpiredAccountUsesSignInFlowInsteadOfSwitchingDeadCredential() async throws {
+    func testExpiredAccountExplainsSignedOutRestartAndCredentialRecovery() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
           <main>Conversation surface</main>
@@ -356,7 +356,7 @@ extension ChatOverviewWebTests {
         </body></html>
         """)
 
-        let label = try await webView.callAsyncJavaScript("""
+        let recoveryCopy = try await webView.callAsyncJavaScript("""
         window.__codexDashboard.applyAccountPopoverSnapshot({
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
@@ -367,11 +367,13 @@ extension ChatOverviewWebTests {
           activeAccountID: null, statusMessage: null, isBusy: false,
         });
         document.querySelector('[data-codex-accounts-trigger]').click();
-        const button = document.querySelector('[data-account-action="sign-in"]');
+        window.confirm = () => true;
+        const button = document.querySelector('[data-account-action="addAccount"]');
         const text = button.textContent;
+        const instructions = button.closest('.codex-accounts-card').textContent;
         button.click();
-        return text;
-        """, contentWorld: .page) as? String
+        return [text, instructions];
+        """, contentWorld: .page) as? [String]
         let serializedAction = try await webView.evaluateJavaScript(
             "window.__codexDashboard.takeQueuedAccountPopoverAction()"
         ) as? String
@@ -380,8 +382,10 @@ extension ChatOverviewWebTests {
             JSONSerialization.jsonObject(with: actionData) as? [String: Any]
         )
 
-        XCTAssertEqual(label, "Sign in")
+        XCTAssertEqual(recoveryCopy?.first, "Restart to sign in…")
+        XCTAssertTrue(recoveryCopy?.last?.contains("Codex will restart signed out. Sign in to this account, then choose Save current account.") == true)
         XCTAssertEqual(action["kind"] as? String, "addAccount")
+        XCTAssertTrue(action["accountID"] is NSNull)
     }
 
     func testAccountActionSurvivesHostProfileMenuPointerDismissal() async throws {
@@ -409,7 +413,8 @@ extension ChatOverviewWebTests {
         document.addEventListener('pointerdown', () => {
           document.querySelector('#codex-accounts-panel')?.remove();
         });
-        const button = document.querySelector('[data-account-action="sign-in"]');
+        window.confirm = () => true;
+        const button = document.querySelector('[data-account-action="addAccount"]');
         button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         if (button.isConnected) button.click();
         return window.__codexDashboard.takeQueuedAccountPopoverAction();
@@ -433,11 +438,11 @@ extension ChatOverviewWebTests {
           const snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           document.querySelector('[data-codex-accounts-trigger]').click();
-          document.querySelector('[data-account-global="save"]').click();
+          document.querySelector('[data-account-global="saveCurrentAccount"]').click();
           window.__codexDashboard.takeQueuedAccountPopoverAction();
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           return [document.querySelector('.codex-accounts-status') === null,
-                  document.querySelector('[data-account-global="save"]').disabled];
+                  document.querySelector('[data-account-global="saveCurrentAccount"]').disabled];
         })()
         """) as? [Bool]
         XCTAssertEqual(result, [true, false])
@@ -458,14 +463,14 @@ extension ChatOverviewWebTests {
           let now = originalNow();
           Date.now = () => now;
           try {
-            document.querySelector('[data-account-global="save"]').click();
+            document.querySelector('[data-account-global="saveCurrentAccount"]').click();
             window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
-            const stillQueued = document.querySelector('[data-account-global="save"]').disabled;
+            const stillQueued = document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
             now += 15001;
             const expiredAction = window.__codexDashboard.takeQueuedAccountPopoverAction();
-            const enabled = !document.querySelector('[data-account-global="save"]').disabled;
+            const enabled = !document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
             const message = document.querySelector('.codex-accounts-status').textContent;
-            document.querySelector('[data-account-global="save"]').click();
+            document.querySelector('[data-account-global="saveCurrentAccount"]').click();
             const retried = JSON.parse(window.__codexDashboard.takeQueuedAccountPopoverAction()).kind;
             return [stillQueued, expiredAction, enabled, message, retried];
           } finally { Date.now = originalNow; }

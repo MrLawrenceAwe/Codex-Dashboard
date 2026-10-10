@@ -3,19 +3,15 @@ import XCTest
 @testable import CodexDashboard
 
 final class InjectionBundleTests: XCTestCase {
-    func testPromptSchemaIsIncludedInInjectionAndPromptContract() throws {
+    func testPromptSchemaAndContractAreIncludedInInjection() throws {
         let injection = try InjectionBundle.load()
-        let contract = try InjectionBundle.loadPromptLibraryContractSource()
         let expectedVersion = #""version":\#(PromptLibrarySchema.currentVersion)"#
 
         XCTAssertTrue(injection.mountExpression.contains("const COMPOSER_PRESET_SCHEMA"))
         XCTAssertTrue(injection.mountExpression.contains("const PROMPT_LIBRARY_SCHEMA"))
         XCTAssertTrue(injection.mountExpression.contains(expectedVersion))
-        XCTAssertTrue(contract.contains("const COMPOSER_PRESET_SCHEMA"))
-        XCTAssertTrue(contract.contains("const composerPresets"))
-        XCTAssertTrue(contract.contains("const PROMPT_LIBRARY_SCHEMA"))
-        XCTAssertTrue(contract.contains(expectedVersion))
-        XCTAssertTrue(contract.contains("const promptLibraryContract"))
+        XCTAssertTrue(injection.mountExpression.contains("const composerPresets"))
+        XCTAssertTrue(injection.mountExpression.contains("const promptLibraryContract"))
     }
 
     func testSchemaOnlyChangeInvalidatesInjectionVersion() throws {

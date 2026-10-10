@@ -12,8 +12,8 @@ through a loopback-only Chromium DevTools connection. Single-instance arbitratio
 prevents older controllers from overwriting the active dashboard. Codex's signed
 application bundle is not modified.
 
-The injection manifest defines runtime resources and compatibility contract bundles.
-Swift supplies the prompt-library contract and shared composer-preset schema;
+The injection manifest defines runtime resources and the renderer compatibility
+contract bundle. Swift supplies the prompt-library and shared composer-preset schemas;
 the injection version hashes the assembled payload. The renderer bridge connects
 snapshots to feature controllers and restores pages after host reloads. Feature
 controllers own mounting and teardown.
@@ -55,6 +55,10 @@ mark it read: Codex remains the source of truth.
 project events from `RecursiveProjectChangeMonitor`. Debounce policies remain
 separate. Git metadata watches follow linked-worktree pointers. Codex activation
 forces a Git refresh; filesystem events and user actions accelerate polling.
+`refreshThreadState` applies the latest snapshot and observes completions; normal
+synchronization explicitly calls `handleThreadCompletions` for usage refresh and
+automatic chat opening. Restart and account-switch preflights consume the snapshot
+without those completion actions.
 
 `RefreshScheduler.Schedule` defines waits after each operation completes:
 

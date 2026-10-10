@@ -14,7 +14,7 @@ function createChatOverview({ catalog }) {
     rootClass: 'codex-dashboard-open',
   });
   let viewNeedsRender = true;
-  let commitDialogError = '';
+  let projectGitActionError = '';
   let markAllReadPending = false;
   let markAllReadError = '';
   let destroyed = false;
@@ -89,7 +89,7 @@ function createChatOverview({ catalog }) {
     if (!unreadIDs.length) return;
     markAllReadPending = true;
     markAllReadError = '';
-    commitDialogError = '';
+    projectGitActionError = '';
     renderChatOverview();
     try {
       const { available, failedIDs } = codexHost.markThreadsRead(unreadIDs);
@@ -114,20 +114,20 @@ function createChatOverview({ catalog }) {
     }
   }
 
-  async function openCommitDialogForProject(projectPath) {
-    commitDialogError = '';
+  async function openGitActionsForProject(projectPath) {
+    projectGitActionError = '';
     const thread = currentThreads().find(
       (item) => chatOverviewQuery.canOpenProjectGitActions(item) && String(item.projectGroupPath || '').trim() === projectPath,
     );
     if (!thread) {
-      commitDialogError = 'No idle chat is available in this project’s repository.';
+      projectGitActionError = 'No idle chat is available in this project’s repository.';
       renderChatOverview();
       return;
     }
     closeChatOverview();
-    const result = await codexHost.openCommitDialog(thread);
+    const result = await codexHost.openProjectGitAction(thread);
     if (result.opened || result.cancelled) return;
-    commitDialogError = result.reason;
+    projectGitActionError = result.reason;
     dashboardNavigation.openPage(chatOverview);
     renderChatOverview();
   }
@@ -142,7 +142,7 @@ function createChatOverview({ catalog }) {
       visibleItemLimit: visibleLimit,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
-      commitDialogError,
+      projectGitActionError,
       markAllReadPending,
       markAllReadError,
       isThreadUnread,
@@ -230,15 +230,15 @@ function createChatOverview({ catalog }) {
           const projectPath = projectIndicators.dataset.projectIndicators;
           if (hiddenChangeIndicatorPaths.has(projectPath)) hiddenChangeIndicatorPaths.delete(projectPath);
           else hiddenChangeIndicatorPaths.add(projectPath);
-          commitDialogError = '';
+          projectGitActionError = '';
           savePreferences();
           renderChatOverview();
           return;
         }
-        const projectCommit = event.target.closest('[data-project-commit]');
-        if (projectCommit) {
+        const projectGitAction = event.target.closest('[data-project-git-action]');
+        if (projectGitAction) {
           event.preventDefault();
-          void openCommitDialogForProject(projectCommit.dataset.projectCommit);
+          void openGitActionsForProject(projectGitAction.dataset.projectGitAction);
           return;
         }
         const projectToggle = event.target.closest('[data-project-toggle]');

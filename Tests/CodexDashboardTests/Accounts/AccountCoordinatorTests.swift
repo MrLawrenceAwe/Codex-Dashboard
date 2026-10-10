@@ -268,7 +268,7 @@ final class AccountCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.activeUsageStatus.snapshot?.usage, usageA)
     }
 
-    func testForgettingActiveAccountDoesNotAutomaticallySaveItAgain() async throws {
+    func testRemovingSavedActiveAccountDoesNotAutomaticallySaveItAgain() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -282,7 +282,7 @@ final class AccountCoordinatorTests: XCTestCase {
         let account = try manager.saveCurrentAccount()
         let coordinator = AccountCoordinator(manager: manager, usageProvider: StubAccountUsageProvider())
 
-        await coordinator.forgetSavedAccount(account.id)
+        await coordinator.removeSavedAccount(account.id)
         let synchronized = await coordinator.synchronizeActiveCredentialAfterFileChange()
         XCTAssertFalse(synchronized)
         XCTAssertTrue(try manager.loadDocument().accounts.isEmpty)

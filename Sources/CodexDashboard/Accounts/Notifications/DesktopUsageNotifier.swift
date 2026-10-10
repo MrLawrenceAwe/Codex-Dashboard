@@ -1,8 +1,6 @@
 import Foundation
 import UserNotifications
 
-typealias DeadlineUsageRefreshHandler = @MainActor @Sendable (UUID) async -> CodexAccountUsageSnapshot?
-
 struct DeliveredDesktopNotification {
     let identifier: String
     let title: String

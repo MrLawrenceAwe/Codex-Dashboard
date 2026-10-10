@@ -70,14 +70,6 @@ struct InjectionBundle: Sendable {
         try loadContract(named: "renderer", bundle: bundle)
     }
 
-    static func loadPromptLibraryContractSource(bundle: Bundle? = nil) throws -> String {
-        ComposerPresetSchema.javascriptDeclaration + "\n"
-            + PromptLibrarySchema.javascriptDeclaration + "\n" + (try loadContract(
-            named: "promptLibrary",
-            bundle: bundle
-        ))
-    }
-
     private static func loadContract(named name: String, bundle: Bundle?) throws -> String {
         let resourceBundle = bundle ?? defaultResourceBundle
         let manifest = try loadManifest(from: resourceBundle)

@@ -103,12 +103,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         let launchItem = actionItem("Launch at Login", action: #selector(toggleLaunchAtLogin))
         launchItem.state = launchAtLogin.isEnabled ? .on : .off
         menu.addItem(launchItem)
-        let foregroundItem = actionItem(
-            "Bring Codex to Front on Chat Completion",
-            action: #selector(toggleForegroundOnTaskCompletion)
+        let completionOpeningItem = actionItem(
+            "Open completed chats automatically",
+            action: #selector(toggleAutomaticallyOpenCompletedChats)
         )
-        foregroundItem.state = coordinator.foregroundOnTaskCompletion ? .on : .off
-        menu.addItem(foregroundItem)
+        completionOpeningItem.state = coordinator.automaticallyOpenCompletedChats ? .on : .off
+        menu.addItem(completionOpeningItem)
         menu.addItem(actionItem("Copy Diagnostics", action: #selector(copyDiagnostics)))
         menu.addItem(actionItem("Export Prompt Library…", action: #selector(exportPromptLibrary)))
         menu.addItem(.separator())
@@ -178,8 +178,8 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         launchAtLogin.setEnabled(!launchAtLogin.isEnabled)
     }
 
-    @objc private func toggleForegroundOnTaskCompletion() {
-        coordinator.foregroundOnTaskCompletion.toggle()
+    @objc private func toggleAutomaticallyOpenCompletedChats() {
+        coordinator.automaticallyOpenCompletedChats.toggle()
     }
 
     @objc private func copyDiagnostics() {

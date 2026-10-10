@@ -18,7 +18,7 @@ extension AppCoordinator {
         }
         let presentationAlreadyUpdated: Bool
         switch action.kind {
-        case .updateUsage:
+        case .refreshUsage:
             if let accountID = action.accountID {
                 _ = await refreshSavedAccountUsage(accountID, interactionAllowed: true)
             } else {
@@ -38,9 +38,9 @@ extension AppCoordinator {
         case .addAccount:
             await beginAddingAccount()
             presentationAlreadyUpdated = false
-        case .forgetAccount:
+        case .removeSavedAccount:
             guard let accountID = action.accountID else { return .unavailable }
-            await accounts.forgetSavedAccount(accountID)
+            await accounts.removeSavedAccount(accountID)
             presentationAlreadyUpdated = false
         }
         if !presentationAlreadyUpdated {
@@ -100,7 +100,7 @@ extension AppCoordinator {
         await synchronizationCoalescer.cancelAndWait()
         accounts.invalidateUsage()
         do {
-            try await loadThreadSnapshot()
+            _ = try await refreshThreadState()
         } catch {
             accounts.setStatusMessage(
                 "Account change cancelled because active chats could not be checked. "

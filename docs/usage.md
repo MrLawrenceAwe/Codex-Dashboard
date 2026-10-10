@@ -26,7 +26,8 @@ selection is pending. Git status uses local remote-tracking refs without fetchin
 repositories without a remote show only uncommitted changes.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
-finishes. Disable this from the menu bar if unwanted. Review-loop chats and chats
+finishes. Turn off **Open completed chats automatically** in the menu bar if
+unwanted. Review-loop chats and chats
 started in the ChatGPT Chrome extension are excluded. Typing, voice chat, and
 dictation suppress automatic focus changes; suppressed completions are not opened
 later.
@@ -67,6 +68,10 @@ Finish or cancel running chats before switching. Codex uses one active account;
 Dashboard does not merge accounts or rotate them automatically. Removing a saved
 active account leaves Codex signed in. Save it again explicitly to restore it to
 the list. Do not commit, export, or manually copy `~/.codex/auth.json`.
+
+**Restart to sign in…** restarts Codex signed out when a saved account needs
+reauthentication. Sign in to that account, then choose **Save current account**
+to update its saved credentials.
 
 The panel shows five-hour and weekly allowance remaining, reset countdowns, and
 available banked resets with their nearest known expiry.

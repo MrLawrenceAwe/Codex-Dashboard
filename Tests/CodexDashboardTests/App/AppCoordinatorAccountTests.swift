@@ -15,7 +15,7 @@ extension AppCoordinatorTests {
         )
         let runtime = StubDashboardRuntime(
             codexIsRunning: true, maintainsDashboard: true,
-            accountPopoverActionWaitResult: .action(AccountPopoverAction(kind: .updateUsage, accountID: nil))
+            accountPopoverActionWaitResult: .action(AccountPopoverAction(kind: .refreshUsage, accountID: nil))
         )
         let coordinator = makeAppCoordinator(
             accountManager: CodexAccountManager(
@@ -151,7 +151,7 @@ extension AppCoordinatorTests {
             codexIsRunning: true,
             maintainsDashboard: true,
             accountPopoverActionWaitResult: .action(AccountPopoverAction(
-                kind: .updateUsage,
+                kind: .refreshUsage,
                 accountID: account.id
             ))
         )

@@ -70,11 +70,6 @@
       "Core/dashboard-elements",
       "Core/dom-utils",
       "Core/codex-ui-contracts"
-    ],
-    "promptLibrary": [
-      "Core/dom-utils",
-      "Composer/composer-presets",
-      "Prompts/prompt-library-contract"
     ]
   }
 }

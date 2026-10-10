@@ -209,7 +209,7 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    func forgetSavedAccount(_ accountID: UUID) throws {
+    func removeSavedAccount(_ accountID: UUID) throws {
         try lock.withLock {
             var document = try documentStore.loadAndReconcile()
             let previousDocument = document

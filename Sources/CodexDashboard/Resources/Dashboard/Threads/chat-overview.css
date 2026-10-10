@@ -148,11 +148,11 @@ aside [data-codex-sidebar-interrupted] {
 #codex-dashboard-chat-overview-page .dashboard-project-icon svg { width: 13px; height: 13px; }
 #codex-dashboard-chat-overview-page .dashboard-project-summary { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
 #codex-dashboard-chat-overview-page .dashboard-project-count { flex: 0 0 auto; color: var(--dashboard-dim); font-size: 10px; }
-#codex-dashboard-chat-overview-page .dashboard-project-commit, #codex-dashboard-chat-overview-page .dashboard-project-indicators { display: inline-flex; min-height: 26px; flex: 0 0 auto; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: transparent; color: var(--dashboard-muted); font-size: 10px; font-weight: 550; cursor: pointer; }
-#codex-dashboard-chat-overview-page .dashboard-project-commit:hover, #codex-dashboard-chat-overview-page .dashboard-project-indicators:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
-#codex-dashboard-chat-overview-page .dashboard-project-commit:disabled { cursor: not-allowed; opacity: .52; }
-#codex-dashboard-chat-overview-page .dashboard-project-commit:disabled:hover { border-color: var(--dashboard-line); background: var(--dashboard-control); color: var(--dashboard-muted); }
-#codex-dashboard-chat-overview-page .dashboard-project-commit svg, #codex-dashboard-chat-overview-page .dashboard-project-indicators svg { width: 11px; height: 11px; }
+#codex-dashboard-chat-overview-page .dashboard-project-git-action, #codex-dashboard-chat-overview-page .dashboard-project-indicators { display: inline-flex; min-height: 26px; flex: 0 0 auto; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--dashboard-line); border-radius: 5px; background: transparent; color: var(--dashboard-muted); font-size: 10px; font-weight: 550; cursor: pointer; }
+#codex-dashboard-chat-overview-page .dashboard-project-git-action:hover, #codex-dashboard-chat-overview-page .dashboard-project-indicators:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
+#codex-dashboard-chat-overview-page .dashboard-project-git-action:disabled { cursor: not-allowed; opacity: .52; }
+#codex-dashboard-chat-overview-page .dashboard-project-git-action:disabled:hover { border-color: var(--dashboard-line); background: var(--dashboard-control); color: var(--dashboard-muted); }
+#codex-dashboard-chat-overview-page .dashboard-project-git-action svg, #codex-dashboard-chat-overview-page .dashboard-project-indicators svg { width: 11px; height: 11px; }
 #codex-dashboard-chat-overview-page .dashboard-git-changes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--dashboard-amber) 25%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--dashboard-amber) 8%, transparent); color: var(--dashboard-amber); font-size: 10px; font-weight: 550; }
 #codex-dashboard-chat-overview-page .dashboard-git-changes svg { width: 11px; height: 11px; }
 #codex-dashboard-chat-overview-page .dashboard-project-indicators-hidden { display: inline-flex; flex: 0 0 auto; padding: 2px 5px; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-dim); font-size: 10px; font-weight: 550; }
@@ -163,7 +163,7 @@ aside [data-codex-sidebar-interrupted] {
 #codex-dashboard-chat-overview-page .dashboard-git-project-copy { display: flex; min-width: 0; align-items: center; gap: 9px; }
 #codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-project-copy { gap: 2px; }
 #codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-git-changes { margin-left: 5px; }
-#codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-project-commit { margin-left: auto; }
+#codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-project-git-action { margin-left: auto; }
 #codex-dashboard-chat-overview-page .dashboard-hidden-indicators { margin-top: 4px; }
 #codex-dashboard-chat-overview-page .dashboard-hidden-indicators > summary { display: flex; min-height: 32px; align-items: center; gap: 7px; padding: 6px 4px; color: var(--dashboard-dim); cursor: pointer; list-style: none; }
 #codex-dashboard-chat-overview-page .dashboard-hidden-indicators > summary::-webkit-details-marker { display: none; }
@@ -228,12 +228,12 @@ aside [data-codex-sidebar-interrupted] {
   #codex-dashboard-chat-overview-page .dashboard-thread-actions { justify-content: flex-end; }
   #codex-dashboard-chat-overview-page .dashboard-thread[data-run-state="running"] .dashboard-thread-actions { justify-content: space-between; }
   #codex-dashboard-chat-overview-page .dashboard-git-project { align-items: stretch; flex-direction: column; }
-  #codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-project-commit { justify-content: center; margin-left: 0; }
+  #codex-dashboard-chat-overview-page .dashboard-git-project .dashboard-project-git-action { justify-content: center; margin-left: 0; }
   #codex-dashboard-chat-overview-page .dashboard-thread-details { align-items: flex-start; flex-direction: column; gap: 2px; }
   #codex-dashboard-chat-overview-page .dashboard-thread-preview { white-space: normal; }
   #codex-dashboard-chat-overview-page .dashboard-open-affordance { opacity: .72; }
   #codex-dashboard-chat-overview-page .dashboard-git-changes span { display: none; }
-  #codex-dashboard-chat-overview-page .dashboard-project-commit span, #codex-dashboard-chat-overview-page .dashboard-project-indicators span { display: none; }
+  #codex-dashboard-chat-overview-page .dashboard-project-git-action span, #codex-dashboard-chat-overview-page .dashboard-project-indicators span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

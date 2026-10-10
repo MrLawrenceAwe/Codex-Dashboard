@@ -1,5 +1,7 @@
 import Foundation
 
+typealias DeadlineUsageRefreshHandler = @MainActor @Sendable (UUID) async -> CodexAccountUsageSnapshot?
+
 enum UsageDeadlineStyle: Equatable, Sendable {
     case fullDate
     case todayOrTomorrow

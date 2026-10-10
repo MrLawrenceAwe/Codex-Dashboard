@@ -86,7 +86,7 @@ const codexHost = {
     }));
   },
 
-  async openCommitDialog(thread) {
+  async openProjectGitAction(thread) {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
     const initialThreadID = codexUIContracts.selectedThreadID();
     const isSelected = () => codexUIContracts.selectedThreadID() === thread.id;

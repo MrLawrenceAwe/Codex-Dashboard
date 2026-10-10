@@ -36,12 +36,12 @@ struct AccountPopoverItem: Codable, Equatable, Sendable {
 
 struct AccountPopoverAction: Codable, Equatable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case updateUsage
+        case refreshUsage
         case refreshInactiveUsage
         case saveCurrentAccount
         case switchAccount
         case addAccount
-        case forgetAccount
+        case removeSavedAccount
     }
 
     let kind: Kind

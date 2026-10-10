@@ -132,6 +132,8 @@ Review display snapshots add the computed `completedRoundCount`; saved documents
 retain round data without duplicating that count. Required runtime and DevTools
 operations have explicit implementations; test doubles supply their own stubs.
 The DevTools convenience overload uses a four-second timeout.
+The **Open completed chats automatically** preference retains its original
+`foregroundOnTaskCompletion` storage key to preserve saved choices.
 
 ## Storage migrations
 

@@ -136,9 +136,9 @@ final class AccountCoordinator: ObservableObject {
         }
     }
 
-    func forgetSavedAccount(_ accountID: UUID) async {
+    func removeSavedAccount(_ accountID: UUID) async {
         do {
-            try await withManager { try $0.forgetSavedAccount(accountID) }
+            try await withManager { try $0.removeSavedAccount(accountID) }
             stateRefresh = nil
             statusMessage = "Removed the saved account from Keychain."
             usageByAccountID[accountID] = nil

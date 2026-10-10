@@ -3,7 +3,9 @@ import Foundation
 extension AppCoordinator {
     func synchronizeRuntime() async {
         do {
-            try await loadThreadSnapshot()
+            if let completion = try await refreshThreadState() {
+                await handleThreadCompletions(completion)
+            }
         } catch {
             catalogWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
             refreshThreadDataWarning()
@@ -105,9 +107,9 @@ extension AppCoordinator {
         await publishSnapshotIfMaintained()
     }
 
-    func loadThreadSnapshot() async throws {
+    func refreshThreadState() async throws -> ThreadCompletionTracker.Result? {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return nil }
         let completion = observeCompletions(in: snapshot.catalog.threads)
         applyThreadSnapshot(
             snapshot.catalog.threads,
@@ -117,12 +119,16 @@ extension AppCoordinator {
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
+        return completion
+    }
+
+    func handleThreadCompletions(_ completion: ThreadCompletionTracker.Result) async {
         if completion.hasCompletion {
             Task { await self.refreshAccountUsage() }
         }
         if let completedThreadID = completion.threadIDToOpen {
-            let completedThread = snapshot.catalog.threads.first { $0.id == completedThreadID }
-            if foregroundOnTaskCompletion,
+            let completedThread = threads.first { $0.id == completedThreadID }
+            if automaticallyOpenCompletedChats,
                completedThread?.originatesFromChromeExtension != true,
                !keyboardActivityDetector.hasRecentKeyboardActivity {
                 guard await dashboardRuntime?.hasActiveSpeechInput() != true,

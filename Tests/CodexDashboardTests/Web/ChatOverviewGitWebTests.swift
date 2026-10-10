@@ -46,7 +46,7 @@ extension ChatOverviewWebTests {
           document.querySelector('[data-filter="changedProjects"]').click();
           return [document.querySelector('[data-filter-count="changedProjects"]').textContent,
             [...document.querySelectorAll('[data-thread-list] .dashboard-git-changes')].map(item => item.textContent.trim()),
-            document.querySelectorAll('[data-thread-list] [data-project-commit]').length];
+            document.querySelectorAll('[data-thread-list] [data-project-git-action]').length];
         })()
         """) as? [Any]
         let values = try XCTUnwrap(result)
@@ -55,7 +55,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[2] as? Int, 2)
     }
 
-    func testChangedProjectsFilterShowsOneCommitActionPerChangedProject() async throws {
+    func testChangedProjectsFilterShowsOneGitActionPerChangedProject() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -103,7 +103,7 @@ extension ChatOverviewWebTests {
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
                 document.querySelectorAll('[data-thread-list] .dashboard-git-project').length,
-                document.querySelectorAll('[data-thread-list] [data-project-commit]').length,
+                document.querySelectorAll('[data-thread-list] [data-project-git-action]').length,
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-filter="changedProjects"]').textContent.trim(),
               ];
@@ -171,14 +171,14 @@ extension ChatOverviewWebTests {
               document.querySelector('[data-filter="changedProjects"]').click();
               const before = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
-                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelectorAll('[data-project-git-action]').length,
                 document.querySelector('[data-project-indicators]').textContent.trim(),
               ];
               document.querySelector('[data-project-indicators]').click();
               const muted = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
-                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelectorAll('[data-project-git-action]').length,
                 document.querySelector('[data-project-indicators]').textContent.trim(),
                 document.querySelector('.dashboard-hidden-indicators')?.open,
                 document.querySelector('.dashboard-hidden-indicators summary')?.textContent.trim(),
@@ -188,7 +188,7 @@ extension ChatOverviewWebTests {
               const restored = [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 document.querySelector('[data-navigation-changes]').hidden,
-                document.querySelectorAll('[data-project-commit]').length,
+                document.querySelectorAll('[data-project-git-action]').length,
                 document.querySelector('[data-project-indicators]').textContent.trim(),
                 document.querySelectorAll('.dashboard-git-project .dashboard-git-changes').length,
               ];
@@ -235,7 +235,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
-              document.querySelector('[data-project-commit]').click();
+              document.querySelector('[data-project-git-action]').click();
             })()
             """
         )
@@ -260,7 +260,7 @@ extension ChatOverviewWebTests {
         )
     }
 
-    func testProjectCommitRoutesPastHiddenSidebarCopyAndUsesCodexGitActionsMenu() async throws {
+    func testProjectGitActionRoutesPastHiddenSidebarCopyAndUsesCodexGitActionsMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -358,7 +358,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
-              const buttons = [...document.querySelectorAll('[data-project-commit]')];
+              const buttons = [...document.querySelectorAll('[data-project-git-action]')];
               const result = [buttons.length, buttons[0]?.textContent.trim()];
               buttons[0].click();
               return result;
@@ -389,7 +389,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[4] as? String, "false")
     }
 
-    func testProjectCommitWaitsForGitActionsMenu() async throws {
+    func testProjectGitActionWaitsForGitActionsMenu() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -446,7 +446,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
-              document.querySelector('[data-project-commit]').click();
+              document.querySelector('[data-project-git-action]').click();
             })()
             """
         )
@@ -467,7 +467,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(try XCTUnwrap(state) as? [AnyHashable], ["true", false])
     }
 
-    func testRunningChangedProjectUsesConsistentCountAndDefersCommitAction() async throws {
+    func testRunningChangedProjectUsesConsistentCountAndDefersGitAction() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
@@ -484,12 +484,12 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
-              const commit = document.querySelector('[data-project-commit]');
+              const gitAction = document.querySelector('[data-project-git-action]');
               return [
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,
                 Boolean(document.querySelector('.dashboard-git-project')),
-                commit.disabled,
-                commit.textContent.trim(),
+                gitAction.disabled,
+                gitAction.textContent.trim(),
               ];
             })()
             """
@@ -498,7 +498,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], ["1", true, true, "Chat running"])
     }
 
-    func testCommitHandoffChoosesActionForProjectGitStatus() async throws {
+    func testGitHandoffChoosesActionForProjectGitStatus() async throws {
         for status in [ProjectGitStatus.unpushedCommits, .uncommittedChanges, .uncommittedChangesAndUnpushedCommits] {
             let state = try await gitHandoffState(status: status)
             XCTAssertEqual(state[0] as? Bool, true)
@@ -507,7 +507,7 @@ extension ChatOverviewWebTests {
         }
     }
 
-    func testCommitHandoffCancelsNavigationChangesAtEveryWait() async throws {
+    func testGitHandoffCancelsNavigationChangesAtEveryWait() async throws {
         for stage in ["selection", "button", "menu", "item"] {
             let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: stage)
             XCTAssertEqual(state[0] as? Bool, false, stage)
@@ -518,7 +518,7 @@ extension ChatOverviewWebTests {
         }
     }
 
-    func testCommitHandoffCancelsExplicitNavigationBeforeSelectionChanges() async throws {
+    func testGitHandoffCancelsExplicitNavigationBeforeSelectionChanges() async throws {
         for stage in ["selection-click", "selection-route"] {
             let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: stage)
             XCTAssertEqual(state[0] as? Bool, false, stage)
@@ -529,14 +529,14 @@ extension ChatOverviewWebTests {
         }
     }
 
-    func testCommitHandoffAllowsDelayedInitialSelection() async throws {
+    func testGitHandoffAllowsDelayedInitialSelection() async throws {
         let state = try await gitHandoffState(status: .uncommittedChanges, switchStage: "delayed-selection")
         XCTAssertEqual(state[0] as? Bool, true)
         XCTAssertEqual(state[1] as? String, "Commit")
         XCTAssertEqual(state[3] as? Bool, false)
     }
 
-    func testCommitHandoffReacquiresTriggerWhenCodexRetainsHiddenChatSurface() async throws {
+    func testGitHandoffReacquiresTriggerWhenCodexRetainsHiddenChatSurface() async throws {
         for status in [ProjectGitStatus.uncommittedChanges, .unpushedCommits] {
             let state = try await gitHandoffState(status: status, switchStage: "replace-trigger")
             XCTAssertEqual(state[0] as? Bool, true)
@@ -545,7 +545,7 @@ extension ChatOverviewWebTests {
         }
     }
 
-    func testProjectCommitSkipsNewerIdleChatInDifferentRepository() async throws {
+    func testProjectGitActionSkipsNewerIdleChatInDifferentRepository() async throws {
         let state = try await gitHandoffState(status: .unpushedCommits, includeNestedChat: true)
         XCTAssertEqual(state[0] as? Bool, true)
         XCTAssertEqual(state[1] as? String, "Push")
@@ -553,7 +553,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(state[5] as? String, "target")
     }
 
-    func testProjectCommitDisabledWithoutIdleChatInMatchingRepository() async throws {
+    func testProjectGitActionDisabledWithoutIdleChatInMatchingRepository() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/project/nested",
             projectGitStatus: .unpushedCommits, canUseProjectGitActions: false)
@@ -570,7 +570,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="changedProjects"]').click();
-              const button = document.querySelector('[data-project-commit]');
+              const button = document.querySelector('[data-project-git-action]');
               return [button.disabled, button.textContent.trim()];
             })()
             """) as? [Any]
@@ -668,8 +668,8 @@ extension ChatOverviewWebTests {
         _ = try await webView.evaluateJavaScript("""
         (() => {
           const host = window.__gitHostForTests;
-          const original = host.openCommitDialog;
-          host.openCommitDialog = async function(thread) {
+          const original = host.openProjectGitAction;
+          host.openProjectGitAction = async function(thread) {
             window.__gitHandoffThreadID = thread.id;
             const result = await original.call(this, thread);
             window.__gitHandoffResult = result;
@@ -678,7 +678,7 @@ extension ChatOverviewWebTests {
           window.__codexDashboard.applyThreads((\(payload)).threads);
           window.__codexDashboard.openChatOverview();
           document.querySelector('[data-filter="changedProjects"]').click();
-          document.querySelector('[data-project-commit]').click();
+          document.querySelector('[data-project-git-action]').click();
         })()
         """)
         try await DashboardWebTestHarness.waitForJavaScript("Boolean(window.__gitHandoffResult)", in: webView)
