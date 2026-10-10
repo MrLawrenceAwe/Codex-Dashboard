@@ -64,16 +64,16 @@ final class ReviewLoopCoordinator {
             guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
-            let focus = action.focus ?? .bugs
-            let promptContext = focus.supportsProjectContext ? action.promptContext ?? .general : .general
-            let liveTesting = focus.supportsLiveTesting && (action.liveTesting ?? false)
-            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, focus: focus, speed: action.speed ?? .standard, priorityLimit: focus.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteMedia: liveTesting && (action.muteMedia ?? false), pushToRemote: action.pushToRemote ?? false))
+            let reviewType = action.reviewType ?? .bugs
+            let promptContext = reviewType.supportsProjectContext ? action.promptContext ?? .general : .general
+            let liveTesting = reviewType.supportsLiveTesting && (action.liveTesting ?? false)
+            try persist(ReviewLoop(id: UUID(), startActionID: action.id, project: project, promptContext: promptContext, maxRounds: limit, reviewSelection: reviewSelection, fixSelection: fixSelection, reviewType: reviewType, speed: action.speed ?? .standard, priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil, liveTesting: liveTesting, reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false), muteMedia: liveTesting && (action.muteMedia ?? false), pushToRemote: action.pushToRemote ?? false))
         case .setMuteMedia:
             guard let id = action.loopID, var updated = matchingLoop(id),
                   !updated.phase.isFinished, updated.phase != .stopping,
-                  updated.liveTesting, updated.focus.supportsLiveTesting,
+                  updated.liveTesting, updated.reviewType.supportsLiveTesting,
                   let muteMedia = action.muteMedia else {
-                throw ReviewLoopError("Mute media requires an active loop with live testing enabled.")
+                throw ReviewLoopError("Mute test playback requires an active loop with live testing enabled.")
             }
             updated.muteMedia = muteMedia
             try persist(updated)

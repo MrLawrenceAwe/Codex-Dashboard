@@ -2,7 +2,7 @@ const threadInterruptionIndicators = (() => {
   function applyThreads(threads) {
     const nextInterruptedThreadIDs = new Set(
       threads
-        .filter((thread) => thread.latestLifecycleEventKind === 'forcedHalt')
+        .filter((thread) => thread.latestLifecycleEventKind === 'usageLimitReached')
         .map((thread) => thread.id),
     );
     document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {

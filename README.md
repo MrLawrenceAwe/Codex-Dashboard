@@ -12,27 +12,13 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 *Screenshot from the automated visual test fixture; all chats and projects are synthetic.*
 
-## Engineering highlights
-
-- Coordinates native filesystem monitoring with a modular web interface.
-- Saves prompts, to-dos and review-loop progress with recovery after failed writes.
-- Includes state, persistence, cancellation and visual regression tests.
-
-## Project overview
+## Features
 
 - **Chat monitoring:** recent activity, unread status, completion tracking, uncommitted files and unpushed Git commits.
-- **Review loops:** concurrent project reviews with automatic fixes and commits, separate model choices, pause/resume/stop controls, and optional remote pushing. See [review-loop behaviour](docs/usage.md#review-loops).
+- **Review loops:** project reviews with automatic fixes and commits, separate model choices, pause/resume/stop controls, and optional remote pushing.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
-- **Implementation:** Swift 6, AppKit and JavaScript, with a native coordinator and a modular renderer interface.
-- **Automated testing:** XCTest and WebKit tests cover state changes, persistence, migration failures, UI behaviour and screenshot-based visual regression.
 
-Chat overview groups chats using Codex’s current saved projects, combining symlink aliases. Chats from removed projects remain under **Other chats**, without project change indicators.
-
-Chat overview’s **Local changes** filter includes uncommitted files and unpushed commits, with separate status labels. Unpushed status uses local remote-tracking refs without fetching; a branch without an upstream is compared with all known remote refs. Repositories without a remote show only uncommitted changes.
-
-The project explores reliable desktop workflow automation, including file-change
-monitoring, scheduled refresh, asynchronous persistence and recovery after failed
-writes. Test fixtures use synthetic data.
+See [Using Codex Dashboard](docs/usage.md) for feature behaviour and controls.
 
 The DevTools connection is limited to the local machine. New Codex launches use a new
 high port; Dashboard reuses that port when reconnecting to the running Codex process.
@@ -91,4 +77,5 @@ See [architecture and behaviour](docs/architecture.md) for runtime, storage, ref
 and notification details. See [development and testing](docs/development.md) for
 renderer previews, resource organisation, migrations, and visual baselines.
 
-Extension reload applies only to bugs and performance reviews with live testing enabled; structure, naming, and content reviews do not request it. With **Reload browser extension** enabled, Review Loop instructs Codex to use the globally configured `chrome-devtools` MCP server to reload Chrome extensions before live testing and after building fixes. Codex verifies the reload and refreshes affected test pages. If the tools are unavailable or reload fails, it returns `# Extension reload required` with a `## Summary` containing the browser, extension, steps, and reason. The loop displays those instructions as **Waiting for extension reload**. After reloading, select **Extension reloaded — continue** to resume the same chat and round, preserving unfinished fixes. Final review and commit checks still run before the round can complete.
+See [review-loop extension testing](docs/usage.md#review-loops) for automatic reloads,
+manual recovery, and static-review rules.

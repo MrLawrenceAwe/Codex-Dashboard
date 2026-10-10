@@ -12,7 +12,7 @@ const dashboardIcons = (() => {
       restore: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
       addTodo: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
       completed: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/>',
-      forcedHalt: '<path d="M8.5 3.5h7l5 5v7l-5 5h-7l-5-5v-7z"/><path d="M9.5 9v6M14.5 9v6"/>',
+      usageLimitReached: '<path d="M8.5 3.5h7l5 5v7l-5 5h-7l-5-5v-7z"/><path d="M9.5 9v6M14.5 9v6"/>',
     };
     return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
   }

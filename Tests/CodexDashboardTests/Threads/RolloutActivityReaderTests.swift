@@ -93,7 +93,7 @@ final class RolloutActivityReaderTests: XCTestCase {
         XCTAssertEqual(reader.latestRecordedEvent(at: rolloutURL.path)?.kind, .aborted)
     }
 
-    func testUsageLimitCompletionIsAForcedHalt() throws {
+    func testUsageLimitCompletionRecordsLimitReachedEvent() throws {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let rolloutURL = try makeRollout(lines: [
             #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"task_started"}}"#,
@@ -103,7 +103,7 @@ final class RolloutActivityReaderTests: XCTestCase {
 
         XCTAssertEqual(
             reader.latestRecordedEvent(at: rolloutURL.path)?.kind,
-            .forcedHalt
+            .usageLimitReached
         )
     }
 

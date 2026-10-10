@@ -149,7 +149,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(catalog.threads[1].recencyEpochMillis, (now - 600) * 1_000)
     }
 
-    func testForcedHaltMarkerSurvivesApplicationRestart() async throws {
+    func testUsageLimitReachedMarkerSurvivesApplicationRestart() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,
@@ -172,10 +172,10 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
 
         let haltedThread = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
         XCTAssertEqual(haltedThread.runState, .idle)
-        XCTAssertEqual(haltedThread.latestLifecycleEvent?.kind, .forcedHalt)
+        XCTAssertEqual(haltedThread.latestLifecycleEvent?.kind, .usageLimitReached)
     }
 
-    func testForcedHaltMarkerClearsAfterThreadIsContinued() async throws {
+    func testUsageLimitReachedMarkerClearsAfterThreadIsContinued() async throws {
         let now = Int64(Date().timeIntervalSince1970)
         let stateDatabaseURL = try CodexTestFixtures.makeStateDatabase(
             now: now,
@@ -239,7 +239,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             codexLaunchDate: launchDate,
             requiredThreadIDs: []
         )
-        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.latestLifecycleEvent?.kind, .forcedHalt)
+        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.latestLifecycleEvent?.kind, .usageLimitReached)
     }
 
     func testOrdersThreadsByIndexedDatabaseRecencyWithoutScanningHistoricalResponses() async throws {

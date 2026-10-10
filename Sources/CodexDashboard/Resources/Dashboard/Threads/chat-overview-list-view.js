@@ -17,11 +17,11 @@ const chatOverviewListView = (() => {
   } = {}) {
     const openLabel = `${isUnread ? 'Unread. ' : ''}Open chat: ${thread.title}`;
     const isCompleted = isCompletionTickVisible(thread);
-    const isForcedHalt = thread.latestLifecycleEventKind === 'forcedHalt';
+    const isUsageLimitReached = thread.latestLifecycleEventKind === 'usageLimitReached';
     const statusMarkup = thread.runState === 'running'
       ? `<span class="dashboard-run-spinner" role="status" aria-label="Running" title="Running"></span><span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`
-      : isForcedHalt
-        ? `<span class="dashboard-forced-halt-status" role="status" aria-label="Interrupted because the usage limit was reached" title="This chat was interrupted because the usage limit was reached">${dashboardIcons.render('forcedHalt')}<span>Interrupted</span></span>`
+      : isUsageLimitReached
+        ? `<span class="dashboard-usage-limit-status" role="status" aria-label="Interrupted because the usage limit was reached" title="This chat was interrupted because the usage limit was reached">${dashboardIcons.render('usageLimitReached')}<span>Interrupted</span></span>`
         : isCompleted
           ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
           : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;

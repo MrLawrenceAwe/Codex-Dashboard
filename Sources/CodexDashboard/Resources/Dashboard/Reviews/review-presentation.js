@@ -1,6 +1,6 @@
 const reviewPresentation = (() => {
-  function focusLabel(focus, reviewTypes) {
-    return reviewTypes.find(type => type.id === focus)?.label || focus || '';
+  function reviewTypeLabel(reviewType, reviewTypes) {
+    return reviewTypes.find(type => type.id === reviewType)?.label || reviewType || '';
   }
 
   function updatedAtLabel(timestamp) {
@@ -10,5 +10,5 @@ const reviewPresentation = (() => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   }
 
-  return { focusLabel, updatedAtLabel };
+  return { reviewTypeLabel, updatedAtLabel };
 })();

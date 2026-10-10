@@ -15,12 +15,12 @@ final class ReviewLoopFileStoreTests: ReviewLoopTestCase {
         XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
         var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
         olderLoop.removeValue(forKey: "speed")
-        olderLoop.removeValue(forKey: "focus")
+        olderLoop.removeValue(forKey: "reviewType")
         olderLoop.removeValue(forKey: "promptContext")
         olderLoop["instructions"] = "(this is a project for personal use)"
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
         XCTAssertEqual(try store.load().first?.speed, .standard)
-        XCTAssertEqual(try store.load().first?.focus, .bugs)
+        XCTAssertEqual(try store.load().first?.reviewType, .bugs)
         XCTAssertEqual(try store.load().first?.promptContext, .personal)
         olderLoop["instructions"] = "(saved custom context)"
         try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)

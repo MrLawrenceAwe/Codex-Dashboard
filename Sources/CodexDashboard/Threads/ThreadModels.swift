@@ -9,7 +9,7 @@ enum ThreadLifecycleEventKind: String, Codable, Equatable, Sendable {
     case started
     case completed
     case aborted
-    case forcedHalt
+    case usageLimitReached
 }
 
 struct ThreadLifecycleEvent: Codable, Equatable, Sendable {

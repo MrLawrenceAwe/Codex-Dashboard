@@ -193,7 +193,7 @@ struct RolloutActivityReader {
         case Self.startedEventType: kind = .started
         case "task_complete":
             kind = envelope.payload?.error?.codexErrorInfo == "usage_limit_exceeded"
-                ? .forcedHalt
+                ? .usageLimitReached
                 : .completed
         case "turn_aborted": kind = .aborted
         default: return nil

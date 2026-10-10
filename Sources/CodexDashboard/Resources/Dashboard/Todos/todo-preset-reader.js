@@ -1,4 +1,4 @@
-const todoFormValues = (() => {
+const todoPresetReader = (() => {
   function readPreset(toggle, fields) {
     if (!toggle.checked) return null;
     return composerPresets.normalize({

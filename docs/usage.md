@@ -116,7 +116,7 @@ loops or loops that reached their round limit. Counts include only current loops
 moving a finished loop to history removes it from the count. Stopped loops are
 excluded. Hover over a marker for its description.
 
-Enable **Mute media** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
+Enable **Mute test playback** to mute playback the agent starts for live testing, including autoplay in test tabs it opens. Your existing playback and mute/volume settings, including TikTok picture-in-picture, stay untouched. The agent mutes individual test tabs or players, never the whole browser or system audio.
 
 Choose a local, single-folder project on **Review loops**, then a review type:
 **Bugs and issues**, **Performance**, **Bugs and performance**, **Structure**,
@@ -143,8 +143,11 @@ that the reload succeeded, refreshes affected test pages, and reopens extension
 UI as needed. The `chrome-devtools` MCP server must be configured in Codex with
 extension tools enabled; Chrome may ask you to approve the connection. If the
 tools are unavailable or a reload fails, the loop waits for a manual reload and
-shows the reason and steps. Select **Extension reloaded — continue** after
-reloading to resume the unfinished task.
+shows the reason and steps. The chat reports `# Extension reload required` with a
+`## Summary` containing the browser, extension, steps, and reason; Dashboard shows
+**Waiting for extension reload**. Select **Extension reloaded — continue** after
+reloading to resume the same chat and round, preserving unfinished fixes. Final
+review and commit checks still run before the round can complete.
 
 Each round starts a read-only review in a new chat on the current branch and
 checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that

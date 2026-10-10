@@ -39,20 +39,20 @@ const reviewLoopPage = (() => {
         const effort = details.querySelector(`[data-${kind}-effort]`).value;
         return model ? { modelID: model, reasoningEffort: effort || null } : null;
       };
-      const focus = details.querySelector('[data-review-focus]').value;
-      queue({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
-        focus,
-        liveTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true',
-        reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
-        muteMedia: reviewLoopSetupView.supportsLiveTesting(focus) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').checked,
+      const reviewType = details.querySelector('[data-review-type]').value;
+      queueAction({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
+        reviewType,
+        liveTesting: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true',
+        reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
+        muteMedia: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').checked,
         pushToRemote: details.querySelector('[data-review-push]').value === 'true',
         speed: details.querySelector('[data-review-speed]').value,
-        promptContext: { kind: reviewLoopSetupView.supportsProjectContext(focus) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
-        priorityLimit: reviewLoopSetupView.usesPriorities(focus) ? details.querySelector('[data-review-priority]').value : null,
+        promptContext: { kind: reviewLoopSetupView.supportsProjectContext(reviewType) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
+        priorityLimit: reviewLoopSetupView.usesPriorities(reviewType) ? details.querySelector('[data-review-priority]').value : null,
         maxRounds: Number(details.querySelector('[data-review-limit]').value) });
     });
     details.querySelector('[data-review-live-testing]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
-    details.querySelector('[data-review-focus]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
+    details.querySelector('[data-review-type]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     for (const kind of ['review', 'fix']) {
       const model = details.querySelector(`[data-${kind}-model]`);
       model.addEventListener('change', () => reviewLoopSetupView.renderReasoningOptions(snapshot, pendingAction, kind));
@@ -60,7 +60,7 @@ const reviewLoopPage = (() => {
     }
     details.addEventListener('change', event => {
       const control = event.target.closest('[data-review-loop-mute-media]');
-      if (control) queue({ kind: 'setMuteMedia', loopID: control.dataset.reviewLoopId, muteMedia: control.checked });
+      if (control) queueAction({ kind: 'setMuteMedia', loopID: control.dataset.reviewLoopId, muteMedia: control.checked });
     });
     details.querySelector('[data-review-history-select]').addEventListener('change', render);
     details.addEventListener('click', event => {
@@ -69,16 +69,16 @@ const reviewLoopPage = (() => {
         const kind = historyAction.dataset.reviewHistoryAction;
         const loopID = details.querySelector('[data-review-history-select]').value;
         const message = { delete: 'Delete this saved loop?', deleteOlder: 'Delete all saved loops older than this one?', deleteAll: 'Delete all saved previous loops?' }[kind];
-        if (message && window.confirm(`${message} Review chats will remain available.`)) queue({ kind, loopID: kind === 'deleteAll' ? null : loopID });
+        if (message && window.confirm(`${message} Review chats will remain available.`)) queueAction({ kind, loopID: kind === 'deleteAll' ? null : loopID });
         return;
       }
       const file = event.target.closest('[data-review-file]');
       if (file) {
-        queue({ kind: 'openFile', loopID: file.dataset.reviewLoopId, filePath: file.dataset.reviewFile });
+        queueAction({ kind: 'openFile', loopID: file.dataset.reviewLoopId, filePath: file.dataset.reviewFile });
         return;
       }
       const control = event.target.closest('[data-review-action]');
-      if (control) queue({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
+      if (control) queueAction({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
       const clear = event.target.closest('[data-review-clear]');
       if (clear) {
         retainedLoopIDs.delete(clear.dataset.reviewClear);
@@ -97,7 +97,7 @@ const reviewLoopPage = (() => {
     return true;
   }
 
-  function queue(action) {
+  function queueAction(action) {
     if (pendingAction) return;
     pendingAction = { ...action, id: crypto.randomUUID() };
     render();
@@ -107,16 +107,16 @@ const reviewLoopPage = (() => {
     reviewLoopView.render(snapshot, pendingAction, retainedLoopIDs);
   }
 
-  function apply(next) {
-    snapshot = next;
+  function applySnapshot(nextSnapshot) {
+    snapshot = nextSnapshot;
     if (pageState.isOpen()) {
-      for (const loop of next.loops) {
-        if (!next.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
+      for (const loop of nextSnapshot.loops) {
+        if (!nextSnapshot.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
       }
     }
-    const knownIDs = new Set(next.loops.map(loop => loop.id));
+    const knownIDs = new Set(nextSnapshot.loops.map(loop => loop.id));
     for (const id of retainedLoopIDs) if (!knownIDs.has(id)) retainedLoopIDs.delete(id);
-    if (next.acknowledgedActionID === pendingAction?.id) pendingAction = null;
+    if (nextSnapshot.acknowledgedActionID === pendingAction?.id) pendingAction = null;
     render();
     return true;
   }
@@ -139,5 +139,5 @@ const reviewLoopPage = (() => {
     pendingAction = null;
   }
 
-  return { mountPage, mountNavigation, open, close, destroy, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, apply, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
+  return { mountPage, mountNavigation, open, close, destroy, isOpen: pageState.isOpen, applyVisibility: pageState.applyVisibility, applySnapshot, pendingAction: () => pendingAction ? JSON.stringify(pendingAction) : null };
 })();

@@ -384,14 +384,14 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(try XCTUnwrap(result) as? [AnyHashable], [true, false, "Completed"])
     }
 
-    func testUsageLimitedThreadShowsPersistentForcedHaltMarker() async throws {
+    func testUsageLimitedThreadShowsPersistentUsageLimitReachedMarker() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "usage-halted",
                 title: "Interrupted work",
                 isUnread: false,
-                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .usageLimitReached, timestamp: .now)
             ),
         ])
 
@@ -401,7 +401,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               const row = document.querySelector('[data-thread-id="usage-halted"]');
-              const marker = row.querySelector('.dashboard-forced-halt-status');
+              const marker = row.querySelector('.dashboard-usage-limit-status');
               return [
                 marker?.textContent.trim(),
                 marker?.getAttribute('aria-label'),
@@ -437,7 +437,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         let haltedPayload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "usage-halted",
-                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .usageLimitReached, timestamp: .now)
             ),
         ])
         let runningPayload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -513,7 +513,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(
                 id: "usage-halted",
-                latestLifecycleEvent: ThreadLifecycleEvent(kind: .forcedHalt, timestamp: .now)
+                latestLifecycleEvent: ThreadLifecycleEvent(kind: .usageLimitReached, timestamp: .now)
             ),
         ])
         _ = try await webView.evaluateJavaScript(

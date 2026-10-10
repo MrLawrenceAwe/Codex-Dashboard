@@ -302,7 +302,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
       updateItem,
       commitItems,
       composerActions,
-      readPreset: todoFormValues.readPreset,
+      readPreset: todoPresetReader.readPreset,
       render,
       setExpandedPresetTodoID: (id) => { expandedPresetTodoID = id; },
     });

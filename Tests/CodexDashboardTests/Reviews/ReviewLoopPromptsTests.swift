@@ -4,10 +4,10 @@ import XCTest
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
     func testStructureScopePersistsThroughReviewFixAndReloadContinuation() {
-        for focus in [ReviewFocus.organisation, .organisationAndNaming] {
+        for reviewType in [ReviewType.organisation, .organisationAndNaming] {
             for liveTesting in [false, true] {
                 let loop = ReviewLoop(id: UUID(), startActionID: "structure", project: project,
-                                      promptContext: .general, maxRounds: 3, focus: focus,
+                                      promptContext: .general, maxRounds: 3, reviewType: reviewType,
                                       liveTesting: liveTesting, reloadExtensionBeforeTesting: true)
                 var round = ReviewRound(number: 1, baseCommit: "base")
                 let review = ReviewPrompts.reviewPrompt(for: loop)
@@ -16,7 +16,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                     round.fixRequested = fixRequested
                     let continuation = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
                     for prompt in [review, fix, continuation] {
-                        XCTAssertTrue(prompt.contains(focus.scopeDescription))
+                        XCTAssertTrue(prompt.contains(reviewType.scopeDescription))
                         XCTAssertTrue(prompt.contains("No live or UI testing, Computer Use, or extension reloads"))
                         XCTAssertFalse(prompt.contains("# Extension reload required"))
                         XCTAssertFalse(prompt.contains("chrome-devtools MCP server"))
@@ -34,15 +34,15 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
         var loop = ReviewLoop(id: UUID(), startActionID: "extension", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true)
         let round = ReviewRound(number: 1, baseCommit: "base")
-        for focus in ReviewFocus.allCases {
-            loop.focus = focus
+        for reviewType in ReviewType.allCases {
+            loop.reviewType = reviewType
             for (liveTesting, reload) in [(true, true), (true, false), (false, true), (false, false)] {
                 loop.liveTesting = liveTesting
                 loop.reloadExtensionBeforeTesting = reload
                 for prompt in [ReviewPrompts.reviewPrompt(for: loop), ReviewPrompts.fixPrompt(for: loop, round: round)] {
-                    XCTAssertEqual(prompt.contains("chrome-devtools MCP server"), liveTesting && reload && focus.supportsLiveTesting)
-                    XCTAssertEqual(prompt.contains("# Extension reload required"), liveTesting && reload && focus.supportsLiveTesting)
-                    if liveTesting && reload && focus.supportsLiveTesting {
+                    XCTAssertEqual(prompt.contains("chrome-devtools MCP server"), liveTesting && reload && reviewType.supportsLiveTesting)
+                    XCTAssertEqual(prompt.contains("# Extension reload required"), liveTesting && reload && reviewType.supportsLiveTesting)
+                    if liveTesting && reload && reviewType.supportsLiveTesting {
                         XCTAssertTrue(prompt.contains("Verify reload success"))
                         XCTAssertTrue(prompt.contains("return # Extension reload required"))
                     }
@@ -55,12 +55,12 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
         var loop = ReviewLoop(id: UUID(), startActionID: "muted", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true, muteMedia: true)
         let round = ReviewRound(number: 1, baseCommit: "base")
-        for focus in ReviewFocus.allCases {
-            loop.focus = focus
-            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback that you start"), focus.supportsLiveTesting)
-            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute only media playback that you start"), focus.supportsLiveTesting)
+        for reviewType in ReviewType.allCases {
+            loop.reviewType = reviewType
+            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback that you start"), reviewType.supportsLiveTesting)
+            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).contains("Mute only media playback that you start"), reviewType.supportsLiveTesting)
         }
-        loop.focus = .bugs
+        loop.reviewType = .bugs
         for prompt in [ReviewPrompts.reviewPrompt(for: loop), ReviewPrompts.fixPrompt(for: loop, round: round)] {
             XCTAssertTrue(prompt.contains("including autoplay in test tabs you open"))
             XCTAssertTrue(prompt.contains("Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture"))
@@ -90,32 +90,32 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
     func testPerformanceReviewIncludesOptionalProjectContext() {
         var loop = ReviewLoop(id: UUID(), startActionID: "performance", project: project,
                               promptContext: .personal, maxRounds: 3)
-        loop.focus = .performance
+        loop.reviewType = .performance
         XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
                        "Review project for performance and responsiveness (this is a project for personal use)." + reviewBoundary)
     }
 
     func testCombinedReviewIncludesOptionalProjectContext() {
         let loop = ReviewLoop(id: UUID(), startActionID: "combined", project: project,
-                              promptContext: .personal, maxRounds: 3, focus: .bugsAndPerformance)
+                              promptContext: .personal, maxRounds: 3, reviewType: .bugsAndPerformance)
         XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop),
                        "Review project for bugs, issues, performance and responsiveness (this is a project for personal use)." + reviewBoundary)
     }
 
     func testReviewsWithoutProjectContextIgnoreSavedContext() throws {
-        for focus in [ReviewFocus.organisation, .organisationAndNaming, .content] {
+        for reviewType in [ReviewType.organisation, .organisationAndNaming, .content] {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var action = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
+            var action = startAction(id: reviewType.rawValue, kind: .start, projectID: project.id,
                                      promptContext: .personal, maxRounds: 3, loopID: nil)
-            action.focus = focus
+            action.reviewType = reviewType
             try coordinator.apply(action, projects: [project])
             XCTAssertEqual(store.loops.first?.promptContext, .general)
             XCTAssertFalse(ReviewPrompts.reviewPrompt(for: store.loops[0]).contains("personal use"))
 
             let savedLoop = ReviewLoop(id: store.loops[0].id, startActionID: action.id,
                                        project: project, promptContext: .personal,
-                                       maxRounds: 3, focus: focus)
+                                       maxRounds: 3, reviewType: reviewType)
             XCTAssertFalse(ReviewPrompts.reviewPrompt(for: savedLoop).contains("personal use"))
         }
     }

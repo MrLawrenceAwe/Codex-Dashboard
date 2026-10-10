@@ -88,7 +88,7 @@ const reviewLoopView = (() => {
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
     const selectedID = historySelect.value;
-    const typeLabel = loop => reviewPresentation.focusLabel(loop.focus, snapshot.reviewTypes || []) || 'Not recorded';
+    const typeLabel = loop => reviewPresentation.reviewTypeLabel(loop.reviewType, snapshot.reviewTypes || []) || 'Not recorded';
     const options = history.map(loop => `<option value="${escape(loop.id)}">${escape(loop.project.name)} · ${escape(typeLabel(loop))} · ${escape(reviewPresentation.updatedAtLabel(loop.updatedAt))}</option>`).join('');
     if (historySelect.dataset.options !== options) {
       historySelect.innerHTML = options;

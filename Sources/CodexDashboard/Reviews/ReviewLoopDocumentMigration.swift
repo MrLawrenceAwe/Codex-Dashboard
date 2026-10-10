@@ -13,8 +13,8 @@ enum ReviewLoopDocumentMigration {
             }
             guard let saved = document["loops"] as? [[String: Any]] else { throw ReviewLoopError("Invalid review-loop document.") }
             return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: saved.map { loop in
-                if version == 8 {
-                    var current = loop
+                if version >= 8 {
+                    var current = migrateReviewType(loop)
                     current["muteMedia"] = current["muteMedia"] ?? false
                     return current
                 }
@@ -27,8 +27,16 @@ enum ReviewLoopDocumentMigration {
         return try JSONDecoder().decode([ReviewLoop].self, from: JSONSerialization.data(withJSONObject: migrated))
     }
 
-    private static func migrate(_ saved: [String: Any]) -> [String: Any] {
+    private static func migrateReviewType(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
+        if let previousType = loop.removeValue(forKey: "focus") {
+            loop["reviewType"] = previousType
+        }
+        return loop
+    }
+
+    private static func migrate(_ saved: [String: Any]) -> [String: Any] {
+        var loop = migrateReviewType(saved)
         // Earlier readers marked Stop finished before interruption succeeded.
         // Preserve checkout ownership for those unfinished saved requests.
         if loop["phase"] as? String == "stopped", let message = loop["message"] as? String,
@@ -47,7 +55,7 @@ enum ReviewLoopDocumentMigration {
                 return round
             }
         }
-        if loop["focus"] as? String == "naming" { loop["focus"] = "organisationAndNaming" }
+        if loop["reviewType"] as? String == "naming" { loop["reviewType"] = "organisationAndNaming" }
         loop["reloadExtensionBeforeTesting"] = loop.removeValue(forKey: "isExtension")
             ?? loop["reloadExtensionBeforeTesting"] ?? false
         if loop["muteMedia"] == nil { loop["muteMedia"] = false }
@@ -82,9 +90,9 @@ enum ReviewLoopDocumentMigration {
             }
         }
         loop.removeValue(forKey: "selection")
-        if loop["focus"] == nil { loop["focus"] = "bugs" }
+        if loop["reviewType"] == nil { loop["reviewType"] = "bugs" }
         if loop["speed"] == nil { loop["speed"] = "standard" }
-        if loop["priorityLimit"] == nil && ["bugs", "performance"].contains(loop["focus"] as? String ?? "") {
+        if loop["priorityLimit"] == nil && ["bugs", "performance"].contains(loop["reviewType"] as? String ?? "") {
             loop["priorityLimit"] = "P2"
         }
         return loop

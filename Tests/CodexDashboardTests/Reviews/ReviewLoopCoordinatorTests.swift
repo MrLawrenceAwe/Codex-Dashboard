@@ -208,7 +208,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         let coordinator = ReviewLoopCoordinator(store: store)
         var start = startAction(id: "count-sections", kind: .start, projectID: project.id,
                                 promptContext: .general, maxRounds: 1, loopID: nil)
-        start.focus = .organisationAndNaming
+        start.reviewType = .organisationAndNaming
         try coordinator.apply(start, projects: [project])
         let driver = ReviewTestDriver()
         await coordinator.advance(using: driver, threads: [])
@@ -805,38 +805,38 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
     }
 
     func testLiveTestingPersistsAndReachesReviewsAndFixVerification() async throws {
-        for focus in ReviewFocus.allCases {
+        for reviewType in ReviewType.allCases {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = startAction(id: focus.rawValue, kind: .start, projectID: project.id,
+            var start = startAction(id: reviewType.rawValue, kind: .start, projectID: project.id,
                                     promptContext: .general, maxRounds: 3, loopID: nil)
-            start.focus = focus
+            start.reviewType = reviewType
             start.liveTesting = true
             start.reloadExtensionBeforeTesting = true
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
-            XCTAssertEqual(saved.liveTesting, focus.supportsLiveTesting)
-            XCTAssertEqual(saved.reloadExtensionBeforeTesting, focus.supportsLiveTesting)
+            XCTAssertEqual(saved.liveTesting, reviewType.supportsLiveTesting)
+            XCTAssertEqual(saved.reloadExtensionBeforeTesting, reviewType.supportsLiveTesting)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[0].contains("Use the globally configured chrome-devtools MCP server"), focus.supportsLiveTesting)
-            if focus.usesPriorities { driver.review(priorities: [.p1]) }
+            XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find bugs and issues."), reviewType.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[0].contains("Use the globally configured chrome-devtools MCP server"), reviewType.supportsLiveTesting)
+            if reviewType.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             var withoutLiveTesting = saved
             withoutLiveTesting.liveTesting = false
             let baseFix = ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last))
-            let liveVerification = focus.supportsLiveTesting
+            let liveVerification = reviewType.supportsLiveTesting
                 ? "\n\nVerify fixes for findings discovered through live testing using live testing." : ""
             XCTAssertTrue(driver.prompts[1].hasPrefix(baseFix + liveVerification))
-            XCTAssertEqual(driver.prompts[1].contains("After changes, run any required build and reload the same extension before live verification."), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[1].contains("After changes, run any required build and reload the same extension before live verification."), reviewType.supportsLiveTesting)
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[2].contains("Use code review and live testing to find bugs and issues."), focus.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[2].contains("Use the globally configured chrome-devtools MCP server"), focus.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Use code review and live testing to find bugs and issues."), reviewType.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts[2].contains("Use the globally configured chrome-devtools MCP server"), reviewType.supportsLiveTesting)
         }
     }
 
@@ -894,20 +894,20 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Computer Use"))
     }
 
-    func testReviewFocusPersistsAndDrivesBothTurnsAndNextRound() async throws {
-        for focus in ReviewFocus.allCases {
+    func testReviewTypePersistsAndDrivesBothTurnsAndNextRound() async throws {
+        for reviewType in ReviewType.allCases {
             let store = ReviewTestStore()
             let coordinator = ReviewLoopCoordinator(store: store)
-            var start = startAction(id: "focus", kind: .start, projectID: project.id,
+            var start = startAction(id: "reviewType", kind: .start, projectID: project.id,
                                          promptContext: .general, maxRounds: 3, loopID: nil)
-            start.focus = focus
+            start.reviewType = reviewType
             try coordinator.apply(start, projects: [project])
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
-            XCTAssertEqual(saved.focus, focus)
-            XCTAssertEqual(saved.priorityLimit, focus.usesPriorities ? .p2 : nil)
+            XCTAssertEqual(saved.reviewType, reviewType)
+            XCTAssertEqual(saved.priorityLimit, reviewType.usesPriorities ? .p2 : nil)
             let expectedReview: String
             let expectedFix: String
-            switch focus {
+            switch reviewType {
             case .bugs:
                 expectedReview = "Review project for bugs and issues."
                 expectedFix = "Fix the finding and commit"
@@ -929,7 +929,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             }
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            if focus.usesPriorities { driver.review(priorities: [.p1]) }
+            if reviewType.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])

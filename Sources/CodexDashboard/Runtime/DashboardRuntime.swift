@@ -31,7 +31,7 @@ protocol DashboardRuntime: AnyObject {
 }
 
 @MainActor
-final class LocalCodexDashboardRuntime: DashboardRuntime {
+final class CodexDashboardRuntime: DashboardRuntime {
     private let codex: CodexProcessController
     private let renderer: DashboardRenderer
     private var lastObservedCodexLaunchDate: Date?

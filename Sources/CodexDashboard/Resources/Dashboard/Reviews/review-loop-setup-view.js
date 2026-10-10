@@ -5,9 +5,9 @@ const reviewLoopSetupView = (() => {
   let reviewTypes = [];
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
-  const usesPriorities = focus => reviewTypes.find(type => type.id === focus)?.usesPriorities === true;
-  const supportsLiveTesting = focus => reviewTypes.find(type => type.id === focus)?.supportsLiveTesting === true;
-  const supportsProjectContext = focus => reviewTypes.find(type => type.id === focus)?.supportsProjectContext === true;
+  const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
+  const supportsLiveTesting = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsLiveTesting === true;
+  const supportsProjectContext = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsProjectContext === true;
 
   function formMarkup() {
     return `
@@ -20,7 +20,7 @@ const reviewLoopSetupView = (() => {
         </select></label>
         </fieldset>
         <fieldset class="review-limits"><legend>Review settings</legend>
-        <label>Review type<select data-review-focus aria-label="Review type" aria-describedby="review-type-help"></select></label>
+        <label>Review type<select data-review-type aria-label="Review type" aria-describedby="review-type-help"></select></label>
         <p id="review-type-help" class="review-field-help" data-review-type-help></p>
         <label class="review-priority">Finding priority<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
@@ -30,11 +30,11 @@ const reviewLoopSetupView = (() => {
         <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
         <label class="review-extension">Reload browser extension<select data-review-extension aria-label="Reload browser extension before testing" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
         <p id="review-extension-help" class="review-field-help review-extension-help">Reload with Chrome DevTools before testing and after fixes. If automatic reload fails, the loop waits for a manual reload.</p>
-        <label class="review-mute-media"><input type="checkbox" data-review-mute-media> Mute media</label>
+        <label class="review-mute-media"><input type="checkbox" data-review-mute-media> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits fixes when findings are found. Stops when no findings remain or the limit is reached.</p>
+        <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits verified fixes for qualifying findings. Stops when no qualifying findings remain or the round limit is reached.</p>
         </fieldset>
         <details class="review-execution-options" open><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -57,11 +57,11 @@ const reviewLoopSetupView = (() => {
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
-    const focus = root.querySelector('[data-review-focus]').value;
-    root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === focus)?.scopeDescription || '';
-    root.querySelector('.review-priority').hidden = !usesPriorities(focus);
+    const reviewType = root.querySelector('[data-review-type]').value;
+    root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === reviewType)?.scopeDescription || '';
+    root.querySelector('.review-priority').hidden = !usesPriorities(reviewType);
     const liveTesting = root.querySelector('.review-live-testing');
-    liveTesting.hidden = !supportsLiveTesting(focus);
+    liveTesting.hidden = !supportsLiveTesting(reviewType);
     root.querySelector('.review-live-testing-help').hidden = liveTesting.hidden;
     if (liveTesting.hidden) liveTesting.querySelector('select').value = 'false';
     const extension = root.querySelector('.review-extension');
@@ -72,7 +72,7 @@ const reviewLoopSetupView = (() => {
     muteMedia.hidden = extension.hidden;
     if (muteMedia.hidden) muteMedia.querySelector('input').checked = false;
     const context = root.querySelector('.review-project-context');
-    context.hidden = !supportsProjectContext(focus);
+    context.hidden = !supportsProjectContext(reviewType);
     if (context.hidden) context.querySelector('select').value = '';
   }
 
@@ -95,10 +95,10 @@ const reviewLoopSetupView = (() => {
     reviewTypes = snapshot.reviewTypes || [];
     const nextReviewTypesSignature = JSON.stringify(reviewTypes);
     if (nextReviewTypesSignature !== reviewTypesSignature) {
-      const focusSelect = root.querySelector('[data-review-focus]');
-      const selected = focusSelect.value;
-      focusSelect.innerHTML = reviewTypes.map(type => `<option value="${escape(type.id)}">${escape(type.label)}</option>`).join('');
-      if (reviewTypes.some(type => type.id === selected)) focusSelect.value = selected;
+      const reviewTypeSelect = root.querySelector('[data-review-type]');
+      const selected = reviewTypeSelect.value;
+      reviewTypeSelect.innerHTML = reviewTypes.map(type => `<option value="${escape(type.id)}">${escape(type.label)}</option>`).join('');
+      if (reviewTypes.some(type => type.id === selected)) reviewTypeSelect.value = selected;
       reviewTypesSignature = nextReviewTypesSignature;
     }
     const nextModelsSignature = JSON.stringify(models);

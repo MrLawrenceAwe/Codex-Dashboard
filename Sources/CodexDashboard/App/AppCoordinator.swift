@@ -82,7 +82,7 @@ final class AppCoordinator: ObservableObject {
         desktopUsageNotifier: any DesktopUsageNotifying = NoopDesktopUsageNotifier(),
         phoneUsageNotifier: any PhoneUsageNotifying = NoopPhoneUsageNotifier(),
         runtimeFactory: (PromptLibraryFileStore) throws -> any DashboardRuntime = {
-            try LocalCodexDashboardRuntime(promptLibraryStore: $0)
+            try CodexDashboardRuntime(promptLibraryStore: $0)
         }
     ) {
         threadSnapshotService = ThreadSnapshotService(

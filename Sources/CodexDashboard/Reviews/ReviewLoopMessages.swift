@@ -18,7 +18,7 @@ struct ReviewLoopAction: Codable, Sendable {
     var filePath: String? = nil
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
-    var focus: ReviewFocus? = nil
+    var reviewType: ReviewType? = nil
     var speed: ReviewSpeed? = nil
     var priorityLimit: ReviewFinding.Priority? = nil
 }
@@ -35,20 +35,20 @@ struct ReviewPageSnapshot: Encodable, Sendable {
 }
 
 struct ReviewTypeOption: Codable, Sendable {
-    let id: ReviewFocus
+    let id: ReviewType
     let label: String
     let scopeDescription: String
     let usesPriorities: Bool
     let supportsProjectContext: Bool
     let supportsLiveTesting: Bool
 
-    init(_ focus: ReviewFocus) {
-        id = focus
-        label = focus.label
-        scopeDescription = focus.scopeDescription
-        usesPriorities = focus.usesPriorities
-        supportsProjectContext = focus.supportsProjectContext
-        supportsLiveTesting = focus.supportsLiveTesting
+    init(_ reviewType: ReviewType) {
+        id = reviewType
+        label = reviewType.label
+        scopeDescription = reviewType.scopeDescription
+        usesPriorities = reviewType.usesPriorities
+        supportsProjectContext = reviewType.supportsProjectContext
+        supportsLiveTesting = reviewType.supportsLiveTesting
     }
 }
 

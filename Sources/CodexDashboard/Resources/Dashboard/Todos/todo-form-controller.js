@@ -26,7 +26,7 @@ function createTodoFormController({ imageController, tagController, threadRefere
       tags: tagController.draft(),
       project: selectedProject,
       thread: selectedThread,
-      preset: todoFormValues.readPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]')),
+      preset: todoPresetReader.readPreset(page.querySelector('[data-todo-new-preset-enabled]'), page.querySelector('[data-todo-new-preset-fields]')),
     };
   }
 

@@ -11,7 +11,7 @@ struct ReviewModelSelection: Codable, Equatable, Sendable {
     let reasoningEffort: String?
 }
 
-enum ReviewFocus: String, Codable, CaseIterable, Sendable {
+enum ReviewType: String, Codable, CaseIterable, Sendable {
     case bugs, bugsAndPerformance, organisation, organisationAndNaming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
@@ -155,7 +155,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     let maxRounds: Int
     var reviewSelection: ReviewModelSelection? = nil
     var fixSelection: ReviewModelSelection? = nil
-    var focus: ReviewFocus = .bugs
+    var reviewType: ReviewType = .bugs
     var speed: ReviewSpeed = .standard
     var priorityLimit: ReviewFinding.Priority? = nil
     var liveTesting = false
@@ -178,7 +178,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 9
+    static let currentVersion = 10
     let version: Int
     let loops: [ReviewLoop]
 }

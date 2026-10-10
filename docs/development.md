@@ -60,7 +60,7 @@ Renderer resources are listed in `injection-manifest.json`:
 | Folder | Responsibility |
 | --- | --- |
 | `Core` | Injection, host contracts, lifecycle, navigation, visibility, and shared DOM helpers |
-| `Accounts` | Account popover presentation and actions |
+| `Accounts` | Account popover presentation, actions, and usage-reset notice |
 | `Composer` | Text/image insertion, model selection, and shared preset validation, labels, and form fields |
 | `Threads` | Chat overview, thread indexing, unread reconciliation, and completion indicators |
 | `Todos` | To-do storage, list rendering, creation drafts, tags, images, and composer transfer |
@@ -74,7 +74,9 @@ cards and actions.
 catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
 their mounting and teardown. `todo-list-view.js` owns filter markup; `todo-query.js` selects matching items,
 `todo-form-controller.js` binds creation events and maintains draft project/chat selection.
-`todo-form-values.js` reads model settings for new and existing to-dos.
+`todo-preset-reader.js` reads model settings for new and existing to-dos.
+`usage-reset-notice.js` owns the usage notice, countdown, dragging, collapse state,
+and timer/resize cleanup; `account-popover.js` supplies usage snapshots.
 Image and tag presentation live in `todo-image-view.js` and `todo-tag-view.js`;
 `todo-dialog-host.js` mounts their shared overlay host.
 The to-do composer layout lives in CSS with a `has-image` class for the image draft.
@@ -138,13 +140,17 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
-Review-loop version 9 adds `muteMedia`, defaulting existing loops to off while preserving all other version 8 fields. Review and fix prompts scope muting to playback started by the agent, including autoplay in its test tabs, and explicitly preserve existing user playback and mute/volume settings. They prohibit browser-wide or system muting. These instructions are included when live testing and this preference are enabled. Active cards save changes through `setMuteMedia` for the next prompt.
+Review-loop version 10 renames `focus` to `reviewType` when loading earlier saved
+loops, preserving their settings and round history. Current actions, snapshots,
+and saved documents use only `reviewType`.
+
+Version 9 adds `muteMedia`, defaulting existing loops to off while preserving all other version 8 fields. Review and fix prompts scope muting to playback started by the agent, including autoplay in its test tabs, and explicitly preserve existing user playback and mute/volume settings. They prohibit browser-wide or system muting. These instructions are included when live testing and this preference are enabled. Active cards save changes through `setMuteMedia` for the next prompt.
 
 Version 8 adds the durable `stopping` phase so checkout reservations
 survive interruption failures and restarts. Version 7 renames `isExtension` to `reloadExtensionBeforeTesting`, preserving the saved reload preference.
 Version 6 renames saved round-result `findings` to
 `addressedFindingCount`, preserving existing history at the migration boundary.
-Version 3 renames the `naming` focus to `organisationAndNaming`.
+Version 3 renames the `naming` review type to `organisationAndNaming`.
 Version 1 and older unversioned single-loop/array documents also migrate remote
 push, prompt context, and model selection fields at the file-store boundary.
 The coordinator writes the current version after a successful load.

@@ -2,15 +2,15 @@ import Foundation
 
 enum ReviewPrompts {
     private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
-        guard loop.focus == .organisation || loop.focus == .organisationAndNaming else { return "" }
+        guard loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming else { return "" }
         let verification = verifyingFixes
             ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
             : "Statically inspect source, call sites, tests, docs, and manifests."
-        return "\n\nScope: \(loop.focus.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task, even under general extension-development instructions."
+        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task, even under general extension-development instructions."
     }
 
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
-        guard loop.liveTesting && loop.focus.supportsLiveTesting && loop.reloadExtensionBeforeTesting else { return "" }
+        guard loop.liveTesting && loop.reviewType.supportsLiveTesting && loop.reloadExtensionBeforeTesting else { return "" }
         let timing = verifyingFixes
             ? "After changes, run any required build and reload the same extension before live verification."
             : "Reload the browser extension before live testing to establish the current behaviour."
@@ -18,13 +18,13 @@ enum ReviewPrompts {
     }
 
     private static func mutedMediaInstruction(for loop: ReviewLoop) -> String {
-        loop.liveTesting && loop.focus.supportsLiveTesting && loop.muteMedia
+        loop.liveTesting && loop.reviewType.supportsLiveTesting && loop.muteMedia
             ? "\n\nMute only media playback that you start or cause to start for live testing, including autoplay in test tabs you open. Mute that specific test tab or player before playback and keep it muted after navigation or extension reloads. Leave the user’s existing playback and mute/volume settings untouched, including TikTok picture-in-picture. Never mute the entire browser or system audio. Use separate test tabs when needed and verify that only your test playback is muted."
             : ""
     }
 
     static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
-        if loop.focus == .organisation || loop.focus == .organisationAndNaming {
+        if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
             return (round.fixRequested
                 ? "Continue the unfinished fix task. Preserve existing changes and return the final fix report."
                 : "Continue the unfinished read-only review and return the final review report.")
@@ -38,9 +38,9 @@ enum ReviewPrompts {
     }
 
     static func reviewPrompt(for loop: ReviewLoop) -> String {
-        let context = loop.focus.supportsProjectContext ? loop.promptContext.promptSuffix : ""
+        let context = loop.reviewType.supportsProjectContext ? loop.promptContext.promptSuffix : ""
         let task: String
-        switch loop.focus {
+        switch loop.reviewType {
         case .bugs:
             task = "Review project for bugs and issues\(context)."
         case .bugsAndPerformance:
@@ -54,7 +54,7 @@ enum ReviewPrompts {
         case .content:
             task = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose\(context)."
         }
-        let liveTesting = loop.liveTesting && loop.focus.supportsLiveTesting
+        let liveTesting = loop.liveTesting && loop.reviewType.supportsLiveTesting
             ? "\n\nUse code review and live testing to find bugs and issues."
             : ""
         return task + "\n\nRead-only review; fixes follow after acceptance." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + mutedMediaInstruction(for: loop)
@@ -69,7 +69,7 @@ enum ReviewPrompts {
         default: findings = "all findings"
         }
         let task: String
-        switch loop.focus {
+        switch loop.reviewType {
         case .bugs, .bugsAndPerformance:
             task = "Fix \(findings) and commit"
         case .organisation, .organisationAndNaming, .content, .performance:
@@ -77,7 +77,7 @@ enum ReviewPrompts {
         }
         var prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
         prompt += structureReviewInstruction(for: loop, verifyingFixes: true)
-        if loop.liveTesting && loop.focus.supportsLiveTesting {
+        if loop.liveTesting && loop.reviewType.supportsLiveTesting {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
         }
         prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + mutedMediaInstruction(for: loop)

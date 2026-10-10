@@ -249,9 +249,9 @@ final class ReviewLoopDriverTests: XCTestCase {
     }
 
     func testOrganisationFixPromptNamesFindingsAndCommitForEachCount() {
-        for focus in [ReviewFocus.organisation, .organisationAndNaming] {
+        for reviewType in [ReviewType.organisation, .organisationAndNaming] {
             var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
-            loop.focus = focus
+            loop.reviewType = reviewType
             for (count, expected) in [(1, "Address the finding and commit"), (2, "Address both findings and commit"), (3, "Address all findings and commit")] {
                 var round = ReviewRound(number: 1, baseCommit: "abc")
                 round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in

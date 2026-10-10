@@ -6,7 +6,7 @@ For source ownership, build instructions, and migrations, see [Development](deve
 ## Runtime and integration
 
 The native Swift menu-bar application coordinates local thread data, accounts,
-compatibility checks, and renderer synchronization. `LocalCodexDashboardRuntime`
+compatibility checks, and renderer synchronization. `CodexDashboardRuntime`
 manages Codex's process and `DashboardRenderer` maintains the injected resources
 through a loopback-only Chromium DevTools connection. Single-instance arbitration
 prevents older controllers from overwriting the active dashboard. Codex's signed

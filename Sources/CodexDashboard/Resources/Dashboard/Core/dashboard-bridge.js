@@ -50,7 +50,7 @@ window.__codexDashboard = {
   version: DASHBOARD_VERSION,
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
-  applyReviewPageSnapshot: reviewLoopPage.apply,
+  applyReviewPageSnapshot: reviewLoopPage.applySnapshot,
   ensureMounted: ensureDashboardMounted,
   destroy() {
     dashboardLifecycle.destroy();

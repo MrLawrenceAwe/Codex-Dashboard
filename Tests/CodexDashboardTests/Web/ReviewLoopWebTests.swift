@@ -6,7 +6,7 @@ import XCTest
 final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
     private static let modelsJSON = "[{modelID:'model-a',displayName:'Model A',supportedReasoningEfforts:['low']}]"
     private static let reviewTypesJSON = String(
-        decoding: try! JSONEncoder().encode(ReviewFocus.allCases.map(ReviewTypeOption.init)),
+        decoding: try! JSONEncoder().encode(ReviewType.allCases.map(ReviewTypeOption.init)),
         as: UTF8.self
     )
 
@@ -25,7 +25,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'saved',project,phase:'paused',focus:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
+          const loop = {id:'saved',project,phase:'paused',reviewType:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
             reviewSelection:{modelID:'model-a',reasoningEffort:'low'},
             fixSelection:{modelID:'retired-model',reasoningEffort:'xhigh'}};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),
@@ -284,7 +284,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loops = ['old','new'].map((id,index) => ({id,project,focus:index ? 'performance' : 'organisationAndNaming',phase:'completed',completedRoundCount:1,maxRounds:5,rounds:[]}));
+          const loops = ['old','new'].map((id,index) => ({id,project,reviewType:index ? 'performance' : 'organisationAndNaming',phase:'completed',completedRoundCount:1,maxRounds:5,rounds:[]}));
           loops[1].updatedAt = Date.UTC(2026,9,3,14,35) / 1000;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['old','new'],error:null};
           const dateText = timestamp => new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
@@ -405,21 +405,21 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
-          const focus = document.querySelector('[data-review-focus]');
+          const reviewType = document.querySelector('[data-review-type]');
           const live = document.querySelector('[data-review-live-testing]');
           const results = [live.value, live.querySelector('option[value="true"]').textContent];
           for (const kind of ['bugs', 'bugsAndPerformance', 'organisation', 'organisationAndNaming', 'performance', 'content']) {
             live.value = 'true';
-            focus.value = kind;
-            focus.dispatchEvent(new Event('change'));
+            reviewType.value = kind;
+            reviewType.dispatchEvent(new Event('change'));
             results.push(document.querySelector('.review-live-testing').hidden, live.value);
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
             results.push(action.liveTesting, live.disabled);
             api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           }
-          focus.value = 'bugs';
-          focus.dispatchEvent(new Event('change'));
+          reviewType.value = 'bugs';
+          reviewType.dispatchEvent(new Event('change'));
           results.push(live.value, live.disabled);
           return results;
         })()
@@ -471,7 +471,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
-          const select = document.querySelector('[data-review-focus]');
+          const select = document.querySelector('[data-review-type]');
           const results = [];
           for (const option of select.options) {
             select.value = option.value;
@@ -479,7 +479,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             const hidden = document.querySelector('.review-priority').hidden;
             document.querySelector('[data-review-start]').click();
             const action = JSON.parse(api.pendingReviewAction());
-            results.push(action.focus, hidden, action.priorityLimit);
+            results.push(action.reviewType, hidden, action.priorityLimit);
             api.applyReviewPageSnapshot({...snapshot, acknowledgedActionID:action.id});
           }
           return results;
@@ -498,12 +498,12 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           document.querySelector('[data-review-model]').value = 'model-a';
           document.querySelector('[data-fix-model]').value = 'model-a';
-          const focus = document.querySelector('[data-review-focus]');
+          const reviewType = document.querySelector('[data-review-type]');
           const context = document.querySelector('[data-review-prompt-context]');
           const states = [];
           for (const kind of ['bugs', 'bugsAndPerformance', 'organisation', 'organisationAndNaming', 'performance', 'content']) {
-            focus.value = kind;
-            focus.dispatchEvent(new Event('change'));
+            reviewType.value = kind;
+            reviewType.dispatchEvent(new Event('change'));
             states.push(kind,context.parentElement.hidden,context.value);
             if (!context.parentElement.hidden) context.value = 'personal';
             document.querySelector('[data-review-start]').click();
@@ -532,8 +532,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes,projects:[project],models:[],
-            loops:[{id:'loop',project,focus:'organisationAndNaming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
-          const select = document.querySelector('[data-review-focus]');
+            loops:[{id:'loop',project,reviewType:'organisationAndNaming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
+          const select = document.querySelector('[data-review-type]');
           const labels = [...select.options].map(option => option.textContent);
           const namingHidesPriorities = document.querySelector('.review-priority').hidden;
           select.value = 'bugs';
