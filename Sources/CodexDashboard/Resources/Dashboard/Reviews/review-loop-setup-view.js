@@ -54,6 +54,31 @@ const reviewLoopSetupView = (() => {
     `;
   }
 
+  function readSettings() {
+    const root = panel();
+    const value = selector => root.querySelector(selector).value;
+    const selection = kind => {
+      const modelID = value(`[data-${kind}-model]`);
+      return modelID ? { modelID, reasoningEffort: value(`[data-${kind}-effort]`) || null } : null;
+    };
+    const reviewType = value('[data-review-type]');
+    const liveTesting = supportsLiveTesting(reviewType) && value('[data-review-live-testing]') === 'true';
+    return {
+      projectID: value('[data-review-project]'),
+      reviewSelection: selection('review'),
+      fixSelection: selection('fix'),
+      reviewType,
+      liveTesting,
+      reloadExtensionBeforeTesting: liveTesting && value('[data-review-extension]') === 'true',
+      muteMedia: liveTesting && root.querySelector('[data-review-mute-media]').checked,
+      pushToRemote: value('[data-review-push]') === 'true',
+      speed: value('[data-review-speed]'),
+      promptContext: { kind: supportsProjectContext(reviewType) ? value('[data-review-prompt-context]') || 'general' : 'general' },
+      priorityLimit: usesPriorities(reviewType) ? value('[data-review-priority]') : null,
+      maxRounds: Number(value('[data-review-limit]')),
+    };
+  }
+
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
@@ -140,5 +165,5 @@ const reviewLoopSetupView = (() => {
     reviewTypesSignature = '';
   }
 
-  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, usesPriorities, supportsProjectContext, supportsLiveTesting };
+  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, readSettings };
 })();

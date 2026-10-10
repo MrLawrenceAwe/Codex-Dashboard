@@ -54,6 +54,9 @@ Generation exits before starting the menu-bar application.
 Swift source and tests mirror the application, account, compatibility, composer,
 prompt, review, runtime, and thread boundaries. Filesystem watchers and activity
 monitors live in `App/Monitoring`; diagnostics views live in `App/Diagnostics`.
+`Support/FileSystemPath.swift` defines canonical path identity for catalog grouping,
+review checkout checks, file links, and monitoring. Project event matching separately
+retains lexical standardisation so it does not resolve symlinks for each event.
 
 Renderer resources are listed in `injection-manifest.json`:
 
@@ -114,6 +117,8 @@ They also carry the active account's exhausted windows with Unix reset timestamp
 in milliseconds, independently of saved accounts. The persistent usage notice
 counts down to the latest blocking reset and retains the exhausted state until
 fresh usage confirms recovery.
+`review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
+`review-loop-page.js` validates submissions and queues actions.
 `review-presentation.js` supplies shared labels independently of setup rendering.
 Reasoning order and labels come from the shared composer preset schema and
 presentation helpers. Chat rows and review model cards resolve display names and

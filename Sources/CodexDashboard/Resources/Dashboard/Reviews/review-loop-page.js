@@ -34,22 +34,7 @@ const reviewLoopPage = (() => {
     details.querySelector('form').addEventListener('submit', event => {
       event.preventDefault();
       if (!event.target.reportValidity()) return;
-      const selection = kind => {
-        const model = details.querySelector(`[data-${kind}-model]`).value;
-        const effort = details.querySelector(`[data-${kind}-effort]`).value;
-        return model ? { modelID: model, reasoningEffort: effort || null } : null;
-      };
-      const reviewType = details.querySelector('[data-review-type]').value;
-      queueAction({ reviewSelection: selection('review'), fixSelection: selection('fix'), kind: 'start', projectID: details.querySelector('[data-review-project]').value,
-        reviewType,
-        liveTesting: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true',
-        reloadExtensionBeforeTesting: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-extension]').value === 'true',
-        muteMedia: reviewLoopSetupView.supportsLiveTesting(reviewType) && details.querySelector('[data-review-live-testing]').value === 'true' && details.querySelector('[data-review-mute-media]').checked,
-        pushToRemote: details.querySelector('[data-review-push]').value === 'true',
-        speed: details.querySelector('[data-review-speed]').value,
-        promptContext: { kind: reviewLoopSetupView.supportsProjectContext(reviewType) ? details.querySelector('[data-review-prompt-context]').value || 'general' : 'general' },
-        priorityLimit: reviewLoopSetupView.usesPriorities(reviewType) ? details.querySelector('[data-review-priority]').value : null,
-        maxRounds: Number(details.querySelector('[data-review-limit]').value) });
+      queueAction({ kind: 'start', ...reviewLoopSetupView.readSettings() });
     });
     details.querySelector('[data-review-live-testing]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     details.querySelector('[data-review-type]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());

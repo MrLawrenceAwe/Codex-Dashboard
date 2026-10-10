@@ -39,7 +39,7 @@ final class ReviewLoopCoordinator {
                 }
             }
             for loop in loops where !loop.phase.isFinished {
-                if let root = loop.checkoutRoot { checkoutOwners[Self.canonicalPath(root)] = loop.id }
+                if let root = loop.checkoutRoot { checkoutOwners[FileSystemPath.canonicalPath(root)] = loop.id }
             }
             try store.save(loops)
         } catch {
@@ -61,7 +61,7 @@ final class ReviewLoopCoordinator {
                   let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
                 throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
             }
-            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(project.path)) }) else {
+            guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(project.path)) }) else {
                 throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
             }
             let reviewType = action.reviewType ?? .bugs
@@ -93,7 +93,7 @@ final class ReviewLoopCoordinator {
                 updated.message = "Extension reload confirmed. Preparing to continue the same chat."
             } else if action.kind == .resume, updated.phase == .blocked {
                 guard !loops.contains(where: { $0.id != id && !$0.phase.isFinished &&
-                    ($0.project.id == updated.project.id || Self.canonicalPath($0.project.path) == Self.canonicalPath(updated.project.path))
+                    ($0.project.id == updated.project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(updated.project.path))
                 }) else {
                     throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
                 }
@@ -219,7 +219,7 @@ final class ReviewLoopCoordinator {
         let repo = try await inspect { try await driver.repository(at: updated.project.path) }
         guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
         updated = current
-        let root = Self.canonicalPath(repo.root)
+        let root = FileSystemPath.canonicalPath(repo.root)
         if let owner = checkoutOwners[root], owner != id,
            let other = matchingLoop(owner), !other.phase.isFinished {
             throw ReviewLoopError("This Git checkout already has an active review loop for \(other.project.name). Stop that loop before starting another.")
@@ -276,7 +276,7 @@ final class ReviewLoopCoordinator {
         updated = current
         guard let currentRound = updated.rounds.last else { return }
         round = currentRound
-        guard Self.canonicalPath(thread.cwd) == Self.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
+        guard FileSystemPath.canonicalPath(thread.cwd) == FileSystemPath.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
         guard let reviewTurn = round.reviewTurnID.flatMap({ id in thread.turns.first { $0.id == id } }) ?? thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
               round.continuationRequested == true || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
@@ -550,14 +550,10 @@ final class ReviewLoopCoordinator {
 
     private func hasOtherRunningTask(_ threads: [RendererThread], root: String, excluding: String?) -> Bool {
         threads.contains { thread in
-            let cwd = Self.canonicalPath(thread.checkoutPath)
-            let root = Self.canonicalPath(root)
+            let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
+            let root = FileSystemPath.canonicalPath(root)
             return thread.id != excluding && thread.runState == .running && (cwd == root || cwd.hasPrefix(root + "/"))
         }
-    }
-
-    private static func canonicalPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     var progress: [String: ReviewLoopProgress] {

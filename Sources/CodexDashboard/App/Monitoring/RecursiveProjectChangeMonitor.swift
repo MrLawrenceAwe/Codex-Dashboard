@@ -23,7 +23,7 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         var pathsByObservedRoot: [String: Set<String>] = [:]
         for projectPath in projectPaths {
             pathsByObservedRoot[Self.standardizedPath(projectPath), default: []].insert(projectPath)
-            pathsByObservedRoot[Self.canonicalPath(projectPath), default: []].insert(projectPath)
+            pathsByObservedRoot[FileSystemPath.canonicalPath(projectPath), default: []].insert(projectPath)
         }
         observedRoots = pathsByObservedRoot.map { (path: $0.key, projectPaths: $0.value) }
         self.action = action
@@ -108,10 +108,6 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
         guard !affectedProjectPaths.isEmpty else { return }
         let action = action
         Task { @MainActor in await action(affectedProjectPaths) }
-    }
-
-    private static func canonicalPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private static func standardizedPath(_ path: String) -> String {

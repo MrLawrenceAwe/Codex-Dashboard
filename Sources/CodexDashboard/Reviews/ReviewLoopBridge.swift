@@ -90,10 +90,10 @@ final class ReviewLoopBridge {
         if let line = path.range(of: #":\d+(?::\d+)?$"#, options: .regularExpression) {
             path.removeSubrange(line)
         }
-        let root = URL(fileURLWithPath: projectPath, isDirectory: true)
-            .standardizedFileURL.resolvingSymlinksInPath()
-        let candidate = (path.hasPrefix("/") ? URL(fileURLWithPath: path) : root.appendingPathComponent(path))
-            .standardizedFileURL.resolvingSymlinksInPath()
+        let root = FileSystemPath.canonicalURL(projectPath)
+        let candidate = FileSystemPath.canonicalURL(
+            path.hasPrefix("/") ? path : root.appendingPathComponent(path).path
+        )
         guard candidate.path.hasPrefix(root.path + "/") else { return nil }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),

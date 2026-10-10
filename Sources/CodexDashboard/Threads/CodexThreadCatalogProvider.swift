@@ -50,12 +50,8 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let path: String
     }
 
-    private static func canonicalPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
-    }
-
     private func registeredRoot(for thread: StoredThread, in roots: [ProjectRoot]) -> ProjectRoot? {
-        let cwd = Self.canonicalPath(thread.checkoutPath)
+        let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
         let assigned = roots.filter { $0.id == thread.projectID }
         let candidates = thread.projectID == nil ? roots : assigned
         return candidates.filter { cwd == $0.path || cwd.hasPrefix($0.path + "/") }
@@ -148,7 +144,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 FROM projects JOIN project_roots ON project_roots.project_id = projects.id
                 ORDER BY projects.position, project_roots.position
                 """)
-            cachedProjectRoots = roots.map { ProjectRoot(id: $0.id, name: $0.name, path: Self.canonicalPath($0.path)) }
+            cachedProjectRoots = roots.map { ProjectRoot(id: $0.id, name: $0.name, path: FileSystemPath.canonicalPath($0.path)) }
             cachedDatabaseSignature = databaseSignature
             cachedRequiredThreadIDs = requiredThreadIDs
             cachedLaunchMilliseconds = launchMilliseconds
@@ -191,7 +187,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             )
             summary.projectID = root?.id
             if let root {
-                let cwd = Self.canonicalPath(thread.checkoutPath)
+                let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
             }
