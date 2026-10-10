@@ -137,7 +137,7 @@ struct ReviewReport: Codable, Equatable, Sendable {
     }
 }
 
-enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix, fixAfterReload }
+enum ReviewTurnKind { case review(ReviewFinding.Priority?), fix, fixContinuation }
 
 struct ReviewRoundResult: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Sendable { case clean, fixed, withdrawn, blocked }

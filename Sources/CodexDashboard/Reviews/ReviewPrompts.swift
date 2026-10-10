@@ -23,6 +23,15 @@ enum ReviewPrompts {
             : ""
     }
 
+    static func interruptedContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
+        let task = round.fixRequested
+            ? "Continue the unfinished fix and verification task from where you stopped. Inspect and preserve existing changes and any commit already made; do not repeat completed work. Finish addressing the accepted findings, then return the final fix report with the resulting commit."
+            : "Continue the unfinished read-only review from where you stopped, then return the final review report. Leave the checkout unchanged; fixes follow after acceptance."
+        return task + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
+            + extensionReloadInstruction(for: loop, verifyingFixes: round.fixRequested)
+            + mutedMediaInstruction(for: loop)
+    }
+
     static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
         if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
             return (round.fixRequested

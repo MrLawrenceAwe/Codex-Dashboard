@@ -13,6 +13,7 @@ final class ReviewLoopCoordinator {
     private var storageFailed = false
     private var advancingIDs: Set<UUID> = []
     private var stoppingIDs: Set<UUID> = []
+    private var resumeRequestedIDs: Set<UUID> = []
     private var checkoutOwners: [String: UUID] = [:]
 
     var threadIDs: Set<String> {
@@ -105,7 +106,8 @@ final class ReviewLoopCoordinator {
                     updated.rounds[updated.rounds.count - 1].continuationRequested = true
                     updated.rounds[updated.rounds.count - 1].result = nil
                     updated.phase = .running
-                    updated.message = "Checking the review chat after your follow-up."
+                    resumeRequestedIDs.insert(id)
+                    updated.message = "Checking the review chat and continuing interrupted work."
                 } else {
                     updated.phase = .waiting
                     updated.message = "Checking the project before continuing."
@@ -121,6 +123,7 @@ final class ReviewLoopCoordinator {
             } else if updated.phase == .paused {
                 updated.pauseRequested = false
                 updated.phase = updated.rounds.last.map { $0.result == nil } == true ? .running : .waiting
+                if updated.phase == .running { resumeRequestedIDs.insert(id) }
                 updated.message = "Checking the project before continuing."
             }
             try persist(updated)
@@ -281,6 +284,11 @@ final class ReviewLoopCoordinator {
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
               round.continuationRequested == true || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
             throw ReviewLoopError("The review chat has an unexpected turn. Inspect it before starting a new loop.")
+        }
+        if resumeRequestedIDs.remove(id) != nil,
+           let latest = thread.turns.last, ["interrupted", "failed"].contains(latest.status) {
+            try await continueInterruptedTurn(loop: updated, round: round, using: driver, threads: threads, threadID: threadID)
+            return
         }
         if round.reloadContinuationRequested == true {
             try await continueAfterExtensionReload(loop: updated, round: round, thread: thread, using: driver, threads: threads, threadID: threadID)
@@ -450,6 +458,33 @@ final class ReviewLoopCoordinator {
         return true
     }
 
+    private func continueInterruptedTurn(
+        loop: ReviewLoop, round: ReviewRound,
+        using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
+    ) async throws {
+        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
+        guard repo.branch == loop.branch,
+              FileSystemPath.canonicalPath(repo.root) == loop.checkoutRoot,
+              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
+              round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
+            throw ReviewLoopError("The checkout changed during the interrupted task. Inspect its chat before continuing.")
+        }
+        guard var updated = activeLoop(matching: loop.id, phase: .running) else { return }
+        // Consume this Resume before submitting. Polling must never repeat an unknown launch.
+        updated.rounds[updated.rounds.count - 1].continuationRequested = true
+        updated.message = "Continuing the interrupted \(round.fixRequested ? "fix task" : "review") in its existing chat."
+        try persist(updated)
+        let turnID = try await driver.startTurn(
+            threadID: threadID, projectPath: updated.project.path, expectedRepository: repo,
+            prompt: ReviewPrompts.interruptedContinuation(for: updated, round: round),
+            kind: round.fixRequested ? .fixContinuation : .review(updated.priorityLimit),
+            selection: round.fixRequested ? updated.fixSelection : updated.reviewSelection, speed: updated.speed)
+        guard var current = matchingLoop(loop.id) else { return }
+        if round.fixRequested { current.rounds[current.rounds.count - 1].fixTurnID = turnID }
+        else { current.rounds[current.rounds.count - 1].reviewTurnID = turnID }
+        try persist(current)
+    }
+
     private func continueAfterExtensionReload(
         loop: ReviewLoop, round: ReviewRound, thread: ReviewThreadState,
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
@@ -473,7 +508,7 @@ final class ReviewLoopCoordinator {
         let turnID = try await driver.startTurn(
             threadID: threadID, projectPath: updated.project.path, expectedRepository: repo,
             prompt: ReviewPrompts.extensionReloadContinuation(for: updated, round: round),
-            kind: round.fixRequested ? .fixAfterReload : .review(updated.priorityLimit),
+            kind: round.fixRequested ? .fixContinuation : .review(updated.priorityLimit),
             selection: round.fixRequested ? updated.fixSelection : updated.reviewSelection, speed: updated.speed)
         guard var current = matchingLoop(loop.id) else { return }
         if round.fixRequested { current.rounds[current.rounds.count - 1].fixTurnID = turnID }
@@ -498,7 +533,7 @@ final class ReviewLoopCoordinator {
 
     private func requireCompleted(_ turn: ReviewTurnState) throws {
         guard turn.status == "completed" else {
-            throw ReviewLoopError("The chat was interrupted, failed, or did not start. Open its chat to resolve the issue.")
+            throw ReviewLoopError("The chat was interrupted or failed. Select Resume to continue in the same chat once the issue is resolved.")
         }
     }
 

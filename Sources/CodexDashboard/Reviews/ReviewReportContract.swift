@@ -38,7 +38,7 @@ enum ReviewReportContract {
             Report all actionable findings without priority labels or rankings. The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
             """
             }
-        case .fix, .fixAfterReload:
+        case .fix, .fixContinuation:
             format = """
             # Fixes committed
             Findings addressed: N

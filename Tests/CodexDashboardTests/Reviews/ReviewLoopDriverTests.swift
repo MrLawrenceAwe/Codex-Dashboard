@@ -85,7 +85,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         }
     }
 
-    func testOnlyFixReloadContinuationCanStartWithUnfinishedChanges() async throws {
+    func testOnlyFixContinuationCanStartWithUnfinishedChanges() async throws {
         let connection = ReviewReportDevTools()
         let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", commit: "base", clean: false)
         let driver = ReviewLoopDriver(devTools: connection,
@@ -99,12 +99,12 @@ final class ReviewLoopDriverTests: XCTestCase {
             } catch {}
         }
         let id = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedRepository: repository,
-                                             prompt: "Continue", kind: .fixAfterReload, selection: nil, speed: .standard)
+                                             prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
         XCTAssertEqual(id, "turn")
         let changed = ReviewRepositoryState(root: repository.root, branch: "other", commit: repository.commit, clean: false)
         do {
             _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedRepository: changed,
-                                           prompt: "Continue", kind: .fixAfterReload, selection: nil, speed: .standard)
+                                           prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
             XCTFail("Continuation must still verify the expected repository")
         } catch {}
     }

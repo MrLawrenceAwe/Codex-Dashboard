@@ -154,7 +154,7 @@ final class ReviewReportContractTests: XCTestCase {
         for invalid in ["# Extension reload required", request + "\n## Extra\nOther", request.replacingOccurrences(of: "Reload Example in Chrome.", with: "")] {
             XCTAssertThrowsError(try ReviewReportContract.extensionReloadRequest(invalid))
         }
-        for kind in [ReviewTurnKind.review(.p2), .review(nil), .fix, .fixAfterReload] {
+        for kind in [ReviewTurnKind.review(.p2), .review(nil), .fix, .fixContinuation] {
             XCTAssertFalse(ReviewReportContract.instructions(for: kind).contains("# Extension reload required"))
         }
     }

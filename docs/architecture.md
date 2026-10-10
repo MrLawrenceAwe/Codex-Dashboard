@@ -152,7 +152,11 @@ Retries and restart reconciliation reuse the same fix rather than requesting ano
 saved before each task/follow-up; unknown launches are never automatically resent.
 Restart pauses running and waiting loops; stopping loops retain their checkout
 reservation and retry interruption. Resume reconciles known tasks, including user
-follow-up turns, under the same validation. Follow-ups do not consume another round.
+follow-up turns, under the same validation. An explicit Resume sends one continuation
+when the latest known turn failed or was interrupted. Reviews require unchanged HEAD
+and a clean tree; fix continuations preserve unfinished changes on the original branch.
+Running turns and completed reports are reconciled without new prompts. Continuations
+do not consume another round, and polling never retries a failed submission.
 Stop also handles turns whose submission acknowledgment arrives after cancellation.
 A stopping loop keeps its checkout reserved until submission finishes and the latest
 turn is confirmed inactive. Failed interruptions stay visible and are retried; only

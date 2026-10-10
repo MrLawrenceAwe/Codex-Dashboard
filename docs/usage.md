@@ -176,9 +176,12 @@ If its chat was deleted, Stop confirms its absence in the local chat catalog
 and releases the checkout. Catalog failures retain the checkout for another retry.
 After a Dashboard restart, running and waiting loops pause while stopping loops
 continue stopping. **Resume** reconciles known work first
-and never duplicates an unconfirmed launch. For a blocked loop, open its chat,
-answer its question or resolve the blocker, then Resume. Follow-ups stay in the
-same round. An unconfirmed launch requires inspection before starting another loop;
+and never duplicates an unconfirmed launch. If a turn failed or was interrupted
+(for example, after running out of usage), restore access and select **Resume**.
+Dashboard sends a continuation in the existing chat, preserving unfinished fixes
+and the same round. A running turn or completed report is checked without sending
+another prompt. For a completed report that needs attention, open its chat,
+answer its question or resolve the blocker, then Resume. An unconfirmed launch requires inspection before starting another loop;
 an unfinished old JSON-format report requires a new loop.
 
 Dirty checkouts, unexpected branch/commit changes, malformed reports, interrupted

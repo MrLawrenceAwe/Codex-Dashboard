@@ -102,7 +102,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         // It also covers the time spent creating and naming a new review thread.
         let current = try await repositoryCheckpoint.repository(at: projectPath)
         let permitsUnfinishedFixes: Bool
-        if case .fixAfterReload = kind { permitsUnfinishedFixes = true } else { permitsUnfinishedFixes = false }
+        if case .fixContinuation = kind { permitsUnfinishedFixes = true } else { permitsUnfinishedFixes = false }
         guard (current.clean || permitsUnfinishedFixes), current == expectedRepository else {
             throw ReviewLoopError("The checkout changed before the review chat started. Inspect its changes before continuing.")
         }

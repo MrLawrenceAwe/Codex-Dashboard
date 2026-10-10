@@ -56,7 +56,7 @@ enum ReviewLoopPresentation {
                                         note: "Reload the extension manually, then select Extension reloaded — continue."), "")
         }
         if loop.phase == .blocked {
-            return (nil, "Open the review chat and provide the missing information or resolve its blocker, then Resume. The loop checks that chat's latest report and commit.")
+            return (nil, "Resume continues failed or interrupted work in the same chat. For a completed report that needs attention, resolve its blocker in the chat, then Resume to check the latest report and commit.")
         }
         if let round, unfinished, !round.fixRequested {
             return (ReviewPromptPreview(
