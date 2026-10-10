@@ -536,6 +536,15 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(state[3] as? Bool, false)
     }
 
+    func testCommitHandoffReacquiresTriggerWhenCodexRetainsHiddenChatSurface() async throws {
+        for status in [ProjectGitStatus.uncommittedChanges, .unpushedCommits] {
+            let state = try await gitHandoffState(status: status, switchStage: "replace-trigger")
+            XCTAssertEqual(state[0] as? Bool, true)
+            XCTAssertEqual(state[1] as? String, status == .unpushedCommits ? "Push" : "Commit")
+            XCTAssertEqual(state[2] as? Bool, false)
+        }
+    }
+
     func testProjectCommitSkipsNewerIdleChatInDifferentRepository() async throws {
         let state = try await gitHandoffState(status: .unpushedCommits, includeNestedChat: true)
         XCTAssertEqual(state[0] as? Bool, true)
@@ -590,11 +599,21 @@ extension ChatOverviewWebTests {
               const button = document.createElement('button');
               button.setAttribute('aria-label', 'Git actions');
               button.setAttribute('aria-controls', 'test-git-menu');
-              button.addEventListener('pointerdown', () => {
-                button.setAttribute('aria-expanded', 'true');
+              const openGitMenu = (event) => {
+                const trigger = event.currentTarget;
+                if (switchStage === 'replace-trigger' && trigger === button) {
+                  button.hidden = true;
+                  const replacement = button.cloneNode(true);
+                  replacement.hidden = false;
+                  replacement.setAttribute('aria-controls', 'replacement-git-menu');
+                  replacement.addEventListener('pointerdown', openGitMenu);
+                  document.querySelector('main').append(replacement);
+                  return;
+                }
+                trigger.setAttribute('aria-expanded', 'true');
                 if (switchStage === 'menu') { setTimeout(changeChat, 100); return; }
                 const menu = document.createElement('div');
-                menu.id = 'test-git-menu';
+                menu.id = trigger.getAttribute('aria-controls');
                 menu.setAttribute('role', 'menu');
                 menu.innerHTML = '<div role="menuitem">Commit</div><div role="menuitem">Push</div>';
                 const commit = menu.firstElementChild;
@@ -607,7 +626,8 @@ extension ChatOverviewWebTests {
                 });
                 document.body.append(menu);
                 if (switchStage === 'item') setTimeout(changeChat, 100);
-              });
+              };
+              button.addEventListener('pointerdown', openGitMenu);
               document.querySelector('main').append(button);
             };
             document.querySelector('[data-app-action-sidebar-thread-id]').addEventListener('click', () => {

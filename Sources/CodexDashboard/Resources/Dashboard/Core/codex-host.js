@@ -124,22 +124,34 @@ const codexHost = {
 
       const waitForSelected = (value) => waitFor(() => navigationCancelled || !isSelected() ? cancelled : value());
       const action = thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
-      const gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
+      let gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
       if (gitActions === cancelled || navigationCancelled || !isSelected()) return cancelled;
       if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
-      if (gitActions.getAttribute('aria-expanded') !== 'true') {
-        gitActions.dispatchEvent(new PointerEvent('pointerdown', {
+      const attemptedTriggers = new WeakSet();
+      const openMenu = (trigger) => {
+        if (attemptedTriggers.has(trigger) || trigger.getAttribute('aria-expanded') === 'true') return;
+        attemptedTriggers.add(trigger);
+        trigger.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true, button: 0, pointerType: 'mouse',
         }));
-        if (navigationCancelled || !isSelected()) return cancelled;
-        gitActions.click();
-      }
+        if (navigationCancelled || !isSelected()) return;
+        trigger.click();
+      };
+      openMenu(gitActions);
 
-      const menu = await waitForSelected(() => codexUIContracts.gitActionsMenu(gitActions));
+      const menu = await waitForSelected(() => {
+        // Codex can retain the old chat's trigger in a hidden surface while
+        // mounting the selected chat. Its aria-controls never updates again.
+        gitActions = codexUIContracts.gitActionsButton();
+        if (!gitActions) return null;
+        openMenu(gitActions);
+        return codexUIContracts.gitActionsMenu(gitActions);
+      });
       if (menu === cancelled || navigationCancelled || !isSelected()) return cancelled;
       if (!menu) return { opened: false, reason: 'Codex did not open the Git actions menu.' };
       const item = await waitForSelected(() => {
-        const currentMenu = codexUIContracts.gitActionsMenu(gitActions);
+        const currentTrigger = codexUIContracts.gitActionsButton();
+        const currentMenu = currentTrigger && codexUIContracts.gitActionsMenu(currentTrigger);
         return currentMenu && codexUIContracts.gitActionMenuItem(currentMenu, action);
       });
       if (item === cancelled || navigationCancelled || !isSelected()) return cancelled;
