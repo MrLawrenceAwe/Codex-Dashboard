@@ -5,6 +5,91 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testRestartLocksActionsDuringPreflightAndRejectsOverlappingRequest() async throws {
+        let catalog = RestartPreflightCatalogProvider()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: catalog, observeFileChanges: false,
+            runtimeFactory: { _ in runtime }
+        )
+        let restart = Task { await coordinator.restartCodexAndEnableDashboard() }
+        try await waitUntil { await catalog.requestCount == 1 }
+
+        XCTAssertTrue(coordinator.isPerformingAction)
+        XCTAssertFalse(coordinator.dashboardActions.canRestart)
+        await coordinator.restartCodexAndEnableDashboard()
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        let preflightRequests = await catalog.requestCount
+        XCTAssertEqual(preflightRequests, 1)
+
+        await catalog.release()
+        await restart.value
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertFalse(coordinator.isPerformingAction)
+    }
+
+    func testRestartDrainsSynchronizationBeforeCheckingActiveChats() async throws {
+        let catalog = RestartPreflightCatalogProvider()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: catalog, observeFileChanges: false,
+            runtimeFactory: { _ in runtime }
+        )
+        let gate = RestartSynchronizationGate()
+        let synchronization = Task {
+            await coordinator.synchronizationCoalescer.perform { await gate.suspend() }
+        }
+        try await waitUntil { gate.started }
+        let restart = Task { await coordinator.restartCodexAndEnableDashboard() }
+        try await waitUntil { coordinator.isPerformingAction }
+
+        let requestsBeforeDrain = await catalog.requestCount
+        XCTAssertEqual(requestsBeforeDrain, 0)
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        gate.release()
+        await synchronization.value
+        try await waitUntil { await catalog.requestCount == 1 }
+        await catalog.release()
+        await restart.value
+        XCTAssertEqual(runtime.restartCallCount, 1)
+    }
+
+    func testRestartWaitsForInProgressBlockingCompatibilityCheck() async throws {
+        let checker = RestartCompatibilityChecker()
+        let catalog = RestartPreflightCatalogProvider()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(
+            catalogProvider: catalog, compatibilityChecker: checker,
+            observeFileChanges: false, runtimeFactory: { _ in runtime }
+        )
+        let check = Task { await coordinator.checkCompatibility() }
+        try await waitUntil { await checker.requestCount == 1 }
+        let restart = Task { await coordinator.restartCodexAndEnableDashboard() }
+        try await waitUntil { await catalog.requestCount == 1 }
+        await catalog.release()
+        var joinedCheckStarted = false
+        var joinedCheckFinished = false
+        let joinedCheck = Task {
+            joinedCheckStarted = true
+            await coordinator.checkCompatibility()
+            joinedCheckFinished = true
+        }
+        try await waitUntil { joinedCheckStarted }
+        XCTAssertFalse(joinedCheckFinished)
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        await checker.release()
+        await check.value
+        await joinedCheck.value
+        await restart.value
+
+        let checkRequests = await checker.requestCount
+        XCTAssertEqual(checkRequests, 1)
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertEqual(coordinator.compatibilityReport?.blockingCount, 1)
+        XCTAssertFalse(coordinator.isPerformingAction)
+        XCTAssertFalse(coordinator.isCheckingCompatibility)
+    }
+
     func testRestartRefusesToInterruptRunningTask() async {
         let runningThread = ThreadSummary(
             id: "running-thread",
@@ -35,6 +120,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(runtime.restartCallCount, 0)
         XCTAssertNil(coordinator.connectionError)
         XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex chats before restarting.")
+        XCTAssertFalse(coordinator.isPerformingAction)
     }
 
     func testMountedDashboardFailureIsReportedAsANotice() {
@@ -253,4 +339,57 @@ extension AppCoordinatorTests {
         XCTAssertEqual(defaults.string(forKey: "lastCheckedCodexVersion"), "2.0")
     }
 
+}
+
+private actor RestartPreflightCatalogProvider: ThreadCatalogProviding {
+    private(set) var requestCount = 0
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func loadCatalog(codexLaunchDate: Date?, requiredThreadIDs: Set<String>) async -> ThreadCatalog {
+        requestCount += 1
+        if requestCount == 1 {
+            await withCheckedContinuation { continuation = $0 }
+        }
+        return ThreadCatalog(threads: [], totalThreadCount: 0)
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+@MainActor
+private final class RestartSynchronizationGate {
+    private(set) var started = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func suspend() async {
+        started = true
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor RestartCompatibilityChecker: LocalCompatibilityChecking {
+    private(set) var requestCount = 0
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func checkLocalContracts() async -> [CompatibilityCheck] {
+        requestCount += 1
+        if requestCount == 1 {
+            await withCheckedContinuation { continuation = $0 }
+        }
+        return [CompatibilityCheck(id: "storage", title: "Storage", status: .incompatible,
+                                   detail: "Blocking preflight result.")]
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
 }

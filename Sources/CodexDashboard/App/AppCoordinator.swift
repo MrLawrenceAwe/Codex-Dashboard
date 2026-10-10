@@ -40,6 +40,7 @@ final class AppCoordinator: ObservableObject {
     let desktopUsageNotifier: any DesktopUsageNotifying
     let phoneUsageNotifier: any PhoneUsageNotifying
     let synchronizationCoalescer = SynchronizationCoalescer()
+    var compatibilityCheckTask: Task<Void, Never>?
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
     var catalogWarning: String?
@@ -196,6 +197,12 @@ final class AppCoordinator: ObservableObject {
 
     func restartCodexAndEnableDashboard() async {
         guard !isPerformingAction, let dashboardRuntime else { return }
+        // Reserve the action before preflight can suspend. Drain synchronization
+        // before checking chats so it cannot launch work after the idle check.
+        isPerformingAction = true
+        refreshGeneration += 1
+        defer { isPerformingAction = false }
+        await cancelSynchronization()
         connectionNotice = nil
         do {
             try await loadThreadSnapshot()
@@ -214,13 +221,9 @@ final class AppCoordinator: ObservableObject {
             connectionError = Self.incompatibleContractMessage
             return
         }
-        isPerformingAction = true
-        refreshGeneration += 1
         dashboardRuntime.prepareForRestart()
         connectionState = .checking
         connectionError = nil
-        defer { isPerformingAction = false }
-        await cancelSynchronization()
         var rendererAvailable = false
 
         do {

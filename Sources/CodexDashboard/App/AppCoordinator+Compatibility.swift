@@ -2,10 +2,21 @@ import Foundation
 
 extension AppCoordinator {
     func checkCompatibility() async {
-        guard !isCheckingCompatibility else { return }
+        if let compatibilityCheckTask {
+            await compatibilityCheckTask.value
+            return
+        }
         isCheckingCompatibility = true
-        defer { isCheckingCompatibility = false }
+        let task = Task { await performCompatibilityCheck() }
+        compatibilityCheckTask = task
+        defer {
+            compatibilityCheckTask = nil
+            isCheckingCompatibility = false
+        }
+        await task.value
+    }
 
+    private func performCompatibilityCheck() async {
         let report = await compatibilityMonitor.check(runtime: dashboardRuntime)
         compatibilityReport = report
         lastCompatibilityCheck = .now
