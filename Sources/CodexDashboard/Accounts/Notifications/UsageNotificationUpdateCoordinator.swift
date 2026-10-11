@@ -37,6 +37,11 @@ final class UsageNotificationUpdateCoordinator {
             sentUpdates: history.deadlines(for: .updates),
             now: currentDate
         )
+        history.prune(
+            for: accounts, usageByAccountID: usageByAccountID,
+            retainingImmediateIdentifiers: Set(plan.immediate.map(\.identifier)),
+            now: currentDate
+        )
         history.saveDeadlines(plan.deadlinesWithoutUpdateAlerts, for: .known)
         await apply(plan, currentDate)
     }

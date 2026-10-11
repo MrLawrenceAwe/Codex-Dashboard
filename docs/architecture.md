@@ -128,6 +128,10 @@ other. Durable keys remain stable to avoid duplicate alerts or lost phone settin
 `NotificationUsageRefresher` coalesces deadline refresh requests with short reuse.
 The desktop channel schedules a labelled stale-data fallback; phone delivery retries
 failed refreshes. Alert schedules and suppression rules are in the [usage guide](usage.md#usage-alerts).
+Immediate delivery history retains 30 days plus current observed windows and alerts
+still eligible for retry. Planning precedes pruning so stale retries remain deduplicated.
+Removed-account observations and deadline histories are pruned; a missing usage
+snapshot for a saved account retains its last observation.
 
 ## Review execution
 

@@ -71,24 +71,9 @@ Renderer resources are listed in `injection-manifest.json`:
 | `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
 | `Reviews` | Review page controls, setup, cards, history, and app-server requests |
 
-`chat-overview-list-view.js` renders chat rows and project groups, including Git
-cards and actions.
-`dashboard-bridge.js` wires feature controllers to `createDashboardLifecycle` and
-catalog lookups. `dashboard-navigation.js` switches pages; feature controllers own
-their mounting and teardown. `todo-list-view.js` owns filter markup; `todo-query.js` selects matching items,
-`todo-form-controller.js` binds creation events and maintains draft project/chat selection.
-`todo-preset-reader.js` reads model settings for new and existing to-dos.
-`usage-reset-notice.js` owns the usage notice, countdown, dragging, collapse state,
-and timer/resize cleanup; `account-popover.js` supplies usage snapshots.
-Image and tag presentation live in `todo-image-view.js` and `todo-tag-view.js`;
-`todo-dialog-host.js` mounts their shared overlay host.
-The to-do composer layout lives in CSS with a `has-image` class for the image draft.
-`codex-ui-contracts.js` owns speech detection and shares React fiber lookup and
-ancestor traversal while keeping committed-fiber resolution explicit for read-state inspection.
-
-See [architecture](architecture.md) for refresh, persistence,
-account transactions, notifications, and review execution. Keep implementation explanations there rather than duplicating them in the module
-map. User-facing instructions belong in [Using Codex Dashboard](usage.md).
+Feature controllers own mounting and teardown; views own markup and presentation.
+See [architecture](architecture.md) for refresh, persistence, account transactions,
+notifications and review execution, and [usage](usage.md) for user controls.
 
 ## Renderer contracts
 
@@ -107,20 +92,11 @@ its tooltip trigger; the icon rail is excluded. Mounting and repairs share one
 operation. Native macOS context-menu integration preserves Codex callbacks and
 submenus; previews exercise the DOM menu path.
 
-Composer transfers wait for the destination composer's identity, recheck project
-membership, and cancel when navigation changes. Prompt placeholders preserve
-literal selection and clipboard text, including dollar signs. The former `light`
-reasoning-effort identifier migrates to `low`, displayed as **Low** in prompts,
-to-dos, and reviews. New prompt and to-do presets default to `medium` (**Medium**);
-review selections default to the model’s reasoning effort.
-To-do views receive project choices from their controller; removed assigned
-projects remain visible as unavailable.
-Account popover snapshots carry labelled usage rows and separate status notes;
-the renderer does not parse formatted strings.
-They also carry the active account's exhausted windows with Unix reset timestamps
-in milliseconds, independently of saved accounts. The persistent usage notice
-counts down to the latest blocking reset and retains the exhausted state until
-fresh usage confirms recovery.
+Composer transfer, prompt placeholders and preset defaults are described in
+[architecture](architecture.md#persistence) and [usage](usage.md). Renderer popovers
+receive structured usage rows and Unix reset timestamps in milliseconds; no
+formatted text is parsed. To-do controllers supply project choices, retaining
+removed assignments as unavailable.
 The `restartForSignIn` action uses `prepareForSignIn` to prepare a signed-out
 state for either a new account or reauthentication. Accounts are saved separately
 through `saveCurrentAccount`.
