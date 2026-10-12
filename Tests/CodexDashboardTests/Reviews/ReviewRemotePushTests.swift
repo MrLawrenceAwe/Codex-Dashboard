@@ -81,7 +81,7 @@ final class ReviewRemotePushTests: XCTestCase {
         XCTAssertEqual(pushed, current.commit)
     }
 
-    func testPushUsesConfiguredUpstreamBranchAndRejectsDivergence() async throws {
+    func testPushUsesConfiguredUpstreamBranchAndReverifiesDivergence() async throws {
         let (checkout, remote) = try await fixture()
         _ = try await git(["push", "-u", "origin", "main:published"], at: checkout)
         let base = try await git(["rev-parse", "HEAD"], at: checkout)
@@ -91,18 +91,127 @@ final class ReviewRemotePushTests: XCTestCase {
         try await checkpoint.pushCommit(fixed.commit, at: checkout, expectedRepository: fixed)
         let pushed = try await git(["rev-parse", "refs/heads/published"], at: remote)
         XCTAssertEqual(pushed, fixed.commit)
-        // A remote change on a different lineage must never be overwritten.
+        // Preserve both histories and require verification before publishing the merge.
         _ = try await git(["reset", "--hard", base], at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Divergent fix"], at: checkout)
         let divergent = try await checkpoint.repository(at: checkout)
         do {
             try await checkpoint.pushCommit(divergent.commit, at: checkout, expectedRepository: divergent)
-            XCTFail("A non-fast-forward push must fail")
-        } catch {
-            XCTAssertTrue(error.localizedDescription.contains("Remote push failed"))
+            XCTFail("A merged checkout must be reverified before pushing")
+        } catch let integration as ReviewRemoteIntegrationRequired {
+            XCTAssertTrue(integration.repository.clean)
+            let containsFix = try await checkpoint.isAncestor(divergent.commit, of: integration.repository.commit, at: checkout)
+            let containsRemote = try await checkpoint.isAncestor(fixed.commit, of: integration.repository.commit, at: checkout)
+            XCTAssertTrue(containsFix)
+            XCTAssertTrue(containsRemote)
         }
         let unchanged = try await git(["rev-parse", "refs/heads/published"], at: remote)
         XCTAssertEqual(unchanged, fixed.commit)
+    }
+
+    private func otherCheckout(_ remote: String) async throws -> String {
+        let other = URL(fileURLWithPath: remote).deletingLastPathComponent().appendingPathComponent("other").path
+        _ = try await git(["clone", remote, other], at: URL(fileURLWithPath: remote).deletingLastPathComponent().path)
+        _ = try await git(["checkout", "main"], at: other)
+        _ = try await git(["config", "user.name", "Other"], at: other)
+        _ = try await git(["config", "user.email", "other@example.test"], at: other)
+        return other
+    }
+
+    func testFetchRecognizesFixInUnknownRemoteDescendantWithoutChangingCheckout() async throws {
+        let (checkout, remote) = try await fixture()
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        let checkpoint = ReviewRepositoryCheckpoint()
+        let fix = try await checkpoint.repository(at: checkout)
+        let other = try await otherCheckout(remote)
+        _ = try await git(["commit", "--allow-empty", "-m", "Remote work"], at: other)
+        _ = try await git(["push", "origin", "main"], at: other)
+        let remoteHead = try await git(["rev-parse", "HEAD"], at: other)
+        try await checkpoint.pushCommit(fix.commit, at: checkout, expectedRepository: fix)
+        let unchanged = try await checkpoint.repository(at: checkout)
+        XCTAssertEqual(unchanged, fix)
+        let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(published, remoteHead)
+    }
+
+    func testFetchMergeThenVerifiedRetryPreservesRemoteAndOriginalFix() async throws {
+        let (checkout, remote) = try await fixture()
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        let other = try await otherCheckout(remote)
+        _ = try await git(["commit", "--allow-empty", "-m", "Remote work"], at: other)
+        _ = try await git(["push", "origin", "main"], at: other)
+        let remoteHead = try await git(["rev-parse", "HEAD"], at: other)
+        _ = try await git(["commit", "--allow-empty", "-m", "Local fix"], at: checkout)
+        let checkpoint = ReviewRepositoryCheckpoint()
+        let fix = try await checkpoint.repository(at: checkout)
+        do {
+            try await checkpoint.pushCommit(fix.commit, at: checkout, expectedRepository: fix)
+            XCTFail("Requires verification")
+        } catch is ReviewRemoteIntegrationRequired { }
+        let merged = try await checkpoint.repository(at: checkout)
+        let beforeVerification = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(beforeVerification, remoteHead)
+        XCTAssertNotEqual(merged.commit, fix.commit)
+        // The coordinator supplies this checkpoint only after read-only verification.
+        try await checkpoint.pushCommit(fix.commit, at: checkout, expectedRepository: merged)
+        let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(published, merged.commit)
+        let hasFix = try await checkpoint.isAncestor(fix.commit, of: published, at: checkout)
+        let hasRemote = try await checkpoint.isAncestor(remoteHead, of: published, at: checkout)
+        XCTAssertTrue(hasFix)
+        XCTAssertTrue(hasRemote)
+    }
+
+    func testConflictingRemoteMergeAbortsAndLeavesBothBranchesUntouched() async throws {
+        let (checkout, remote) = try await fixture()
+        let file = URL(fileURLWithPath: checkout).appendingPathComponent("shared.txt")
+        try Data("base\n".utf8).write(to: file)
+        _ = try await git(["add", "."], at: checkout)
+        _ = try await git(["commit", "-m", "Base"], at: checkout)
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        let other = try await otherCheckout(remote)
+        try Data("remote\n".utf8).write(to: URL(fileURLWithPath: other).appendingPathComponent("shared.txt"))
+        _ = try await git(["commit", "-am", "Remote change"], at: other)
+        _ = try await git(["push", "origin", "main"], at: other)
+        let remoteHead = try await git(["rev-parse", "HEAD"], at: other)
+        try Data("local\n".utf8).write(to: file)
+        _ = try await git(["commit", "-am", "Local fix"], at: checkout)
+        let checkpoint = ReviewRepositoryCheckpoint()
+        let fix = try await checkpoint.repository(at: checkout)
+        do {
+            try await checkpoint.pushCommit(fix.commit, at: checkout, expectedRepository: fix)
+            XCTFail("Conflicts require attention")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("could not be merged automatically"))
+        }
+        let unchanged = try await checkpoint.repository(at: checkout)
+        XCTAssertEqual(unchanged, fix)
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "local\n")
+        let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(published, remoteHead)
+    }
+
+    func testRemoteRecoveryDoesNotAbortAnExistingCleanPendingMerge() async throws {
+        let (checkout, remote) = try await fixture()
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        let other = try await otherCheckout(remote)
+        _ = try await git(["commit", "--allow-empty", "-m", "Remote work"], at: other)
+        _ = try await git(["push", "origin", "main"], at: other)
+        _ = try await git(["commit", "--allow-empty", "-m", "Local fix"], at: checkout)
+        _ = try await git(["fetch", "origin", "main"], at: checkout)
+        _ = try await git(["merge", "--no-commit", "--no-ff", "origin/main"], at: checkout)
+        let pending = try await git(["rev-parse", "MERGE_HEAD"], at: checkout)
+        let checkpoint = ReviewRepositoryCheckpoint()
+        let fix = try await checkpoint.repository(at: checkout)
+        XCTAssertTrue(fix.clean, "An empty pending merge is invisible to porcelain status")
+        do {
+            try await checkpoint.pushCommit(fix.commit, at: checkout, expectedRepository: fix)
+            XCTFail("An existing Git operation must be left alone")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("existing Git operation"))
+        }
+        let preserved = try await git(["rev-parse", "MERGE_HEAD"], at: checkout)
+        XCTAssertEqual(preserved, pending)
     }
 
     func testPushRejectsChangedCheckoutAndMissingRemote() async throws {

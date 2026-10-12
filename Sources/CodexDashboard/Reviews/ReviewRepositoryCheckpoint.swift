@@ -7,6 +7,10 @@ protocol ReviewRepositoryChecking: Sendable {
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
 }
 
+struct ReviewRemoteIntegrationRequired: Error {
+    let repository: ReviewRepositoryState
+}
+
 struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
     func repository(at path: String) async throws -> ReviewRepositoryState {
         let root = try await git(["rev-parse", "--show-toplevel"], at: path)
@@ -56,33 +60,86 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
             let remoteRef = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
                 arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
                             "ls-remote", "--exit-code", "--refs", "--", remote, destination], timeout: 60)
-            let remoteCommit = String(decoding: remoteRef.standardOutput, as: UTF8.self)
-                .split(whereSeparator: { $0.isWhitespace }).first.map(String.init)
-            // A later published commit already includes the fix. Do not attempt
-            // to move the remote backwards just to publish the older checkpoint.
-            let alreadyPublished: Bool
-            if remoteRef.terminationStatus == 0, let remoteCommit {
-                if remoteCommit == commit { alreadyPublished = true }
-                else { alreadyPublished = (try? await isAncestor(commit, of: remoteCommit, at: path)) == true }
-            } else {
-                alreadyPublished = false
+            guard remoteRef.terminationStatus == 0 || remoteRef.terminationStatus == 2 else {
+                throw ReviewLoopError(String(decoding: remoteRef.standardError, as: UTF8.self))
+            }
+            var remoteCommit: String?
+            if remoteRef.terminationStatus == 0 {
+                // Fetch the actual destination, including commits absent from this checkout.
+                // Never fetch into or rewrite the local branch.
+                let fetched = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+                    arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                                "fetch", "--no-tags", "--no-recurse-submodules", "--", remote, destination], timeout: 60)
+                guard fetched.terminationStatus == 0 else {
+                    throw ReviewLoopError(String(decoding: fetched.standardError, as: UTF8.self))
+                }
+                remoteCommit = try await git(["rev-parse", "FETCH_HEAD^{commit}"], at: path)
+            }
+            var alreadyPublished = false
+            var pushCommit = commit
+            if let remoteCommit {
+                alreadyPublished = try await isAncestor(commit, of: remoteCommit, at: path)
+                if !alreadyPublished, !(try await isAncestor(remoteCommit, of: commit, at: path)) {
+                    if try await isAncestor(remoteCommit, of: expectedRepository.commit, at: path) {
+                        // The current HEAD has been reverified by the coordinator and includes
+                        // both histories. Publish it rather than retrying the pre-merge fix.
+                        pushCommit = expectedRepository.commit
+                    } else {
+                        guard try await repository(at: path) == expectedRepository else {
+                            throw ReviewLoopError("The checkout changed during remote synchronization.")
+                        }
+                        try await mergeRemote(remoteCommit, at: path)
+                        throw ReviewRemoteIntegrationRequired(repository: try await repository(at: path))
+                    }
+                }
             }
             if !alreadyPublished {
+                guard try await repository(at: path) == expectedRepository else {
+                    throw ReviewLoopError("The checkout changed during remote synchronization.")
+                }
                 let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
                     arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
                                 "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
-                                "--", remote, commit + ":" + destination], timeout: 60)
+                                "--", remote, pushCommit + ":" + destination], timeout: 60)
                 guard result.terminationStatus == 0 else {
                     throw ReviewLoopError(String(decoding: result.standardError, as: UTF8.self)
                         .trimmingCharacters(in: .whitespacesAndNewlines))
                 }
             }
+        } catch let integration as ReviewRemoteIntegrationRequired {
+            throw integration
         } catch {
             throw ReviewLoopError("Remote push failed: \(error.localizedDescription) Inspect the remote and resume to retry.")
         }
         if needsUpstream {
             _ = try await git(["config", "branch.\(branch).remote", remote], at: path)
             _ = try await git(["config", "branch.\(branch).merge", destination], at: path)
+        }
+    }
+
+    private func mergeRemote(_ commit: String, at path: String) async throws {
+        // A clean index can still belong to an unfinished merge or rebase.
+        // Never abort or continue an operation initiated by somebody else.
+        let operationNames = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply"]
+        for name in operationNames {
+            let operationPath = try await git(["rev-parse", "--path-format=absolute", "--git-path", name], at: path)
+            guard !FileManager.default.fileExists(atPath: operationPath) else {
+                throw ReviewLoopError("Finish the existing Git operation before synchronizing remote changes, then resume.")
+            }
+        }
+        do {
+            let merge = try await runGit(["merge", "--no-edit", "--no-ff", "--no-autostash", commit], at: path, timeout: 60)
+            guard merge.terminationStatus == 0 else {
+                throw ReviewLoopError("Remote changes could not be merged automatically. Resolve the histories in the review chat, then resume. "
+                    + String(decoding: merge.standardOutput + merge.standardError, as: UTF8.self))
+            }
+        } catch {
+            // Abort only our own failed merge, including one interrupted by a timeout.
+            let mergePath = try await git(["rev-parse", "--path-format=absolute", "--git-path", "MERGE_HEAD"], at: path)
+            if FileManager.default.fileExists(atPath: mergePath) {
+                _ = try await git(["merge", "--abort"], at: path)
+            }
+            throw error
         }
     }
 
@@ -119,8 +176,8 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
         return String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func runGit(_ arguments: [String], at path: String) async throws -> SubprocessOutput {
-        try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["--no-optional-locks", "-C", path] + arguments, timeout: 5)
+    private func runGit(_ arguments: [String], at path: String, timeout: TimeInterval = 5) async throws -> SubprocessOutput {
+        try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["--no-optional-locks", "-C", path] + arguments, timeout: timeout)
     }
 
 }

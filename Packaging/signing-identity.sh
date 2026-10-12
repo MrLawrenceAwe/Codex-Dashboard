@@ -13,7 +13,9 @@ if [[ -n "${SIGNING_IDENTITY:-}" ]]; then
 fi
 
 CERTIFICATE_NAME='Codex Dashboard Local Development'
-KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+# Select a separate build keychain when the login keychain cannot be unlocked.
+# Keep the default identity location so existing saved-account approvals survive.
+KEYCHAIN="${SIGNING_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}"
 find_identity() {
   security find-identity -v -p codesigning "$KEYCHAIN" \
     | awk -v name="$CERTIFICATE_NAME" '$0 ~ "\"" name "\"$" && $0 !~ /\(/ { print $2; exit }'
@@ -35,7 +37,7 @@ fi
 umask 077
 SIGNING_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/codex-dashboard-signing.XXXXXX")"
 trap 'rm -rf "$SIGNING_TEMP"' EXIT
-printf 'Creating %s in the login Keychain…\n' "$CERTIFICATE_NAME" >&2
+printf 'Creating %s in %s…\n' "$CERTIFICATE_NAME" "$KEYCHAIN" >&2
 openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \
   -subj "/CN=$CERTIFICATE_NAME/" \
   -addext 'basicConstraints=critical,CA:FALSE' \

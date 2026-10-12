@@ -48,6 +48,7 @@ final class ReviewTestStore: ReviewLoopStoring {
 final class ReviewTestDriver: ReviewLoopDriving {
     var pushedCommits: [String] = []
     var failPush = false
+    var integrateRemoteOnPush = false
     var clean = true
     var commit = "base"
     var branch = "main"
@@ -76,6 +77,11 @@ final class ReviewTestDriver: ReviewLoopDriving {
     func projects() async throws -> [ReviewProject] { [] }
     func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
         if failPush { throw ReviewLoopError("Remote push failed") }
+        if integrateRemoteOnPush {
+            integrateRemoteOnPush = false
+            self.commit = "merged"
+            throw ReviewRemoteIntegrationRequired(repository: try await repository(at: path))
+        }
         pushedCommits.append(commit)
     }
     func repository(at path: String) async throws -> ReviewRepositoryState {

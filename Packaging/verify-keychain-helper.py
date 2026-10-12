@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the helper with a disposable item, never saved-account credentials."""
 import json
+import os
 import plistlib
 import shutil
 import subprocess
@@ -9,8 +10,14 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SIGNING_ENV = os.environ.copy()
+if not SIGNING_ENV.get("SIGNING_KEYCHAIN"):
+    SIGNING_ENV["SIGNING_KEYCHAIN"] = subprocess.check_output(
+        ["python3", str(ROOT / "Packaging/signing-keychain.py")], text=True).strip()
+if SIGNING_ENV["SIGNING_KEYCHAIN"] == str(Path.home() / "Library/Keychains/codex-dashboard-build.keychain-db"):
+    subprocess.run(["python3", str(ROOT / "Packaging/signing-keychain.py"), "--authorize-signing"], check=True)
 IDENTITY = subprocess.check_output(
-    ["/bin/zsh", str(ROOT / "Packaging/signing-identity.sh")], text=True
+    ["/bin/zsh", str(ROOT / "Packaging/signing-identity.sh")], text=True, env=SIGNING_ENV
 ).strip()
 
 RUNNER = r'''
@@ -42,9 +49,12 @@ def run(*args):
 
 def sign(path, identifier=None):
     args = ["codesign", "--force", "--sign", IDENTITY]
+    if SIGNING_ENV["SIGNING_KEYCHAIN"]:
+        args = ["python3", str(ROOT / "Packaging/signing-keychain.py"), "--run", *args,
+                "--keychain", SIGNING_ENV["SIGNING_KEYCHAIN"]]
     if identifier:
         args += ["--identifier", identifier]
-    run(*args, str(path))
+    subprocess.run([*args, str(path)], check=True, capture_output=True, timeout=60, env=SIGNING_ENV)
 
 
 def cdhash(path):

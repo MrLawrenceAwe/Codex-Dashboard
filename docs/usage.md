@@ -186,8 +186,12 @@ Malformed reports show the specific format problem and how to correct it.
 **Remote push** defaults to keeping commits local. When enabled, verified fix
 commits are pushed after each round to the upstream branch, or the current branch
 on `origin` or the sole remote. New branch pushes record an upstream. Pushes are
-never forced. A push failure blocks the loop; Resume retries that verified commit
-without another fix prompt.
+never forced. Before pushing, Dashboard fetches the destination branch. If it has
+advanced separately, Dashboard merges its changes into the clean checkout and
+runs read-only verification of the original findings before publishing the merged
+HEAD. The original fix commit is preserved. Merge conflicts are aborted and block
+the loop with instructions to resolve the histories in the review chat. Other push
+failures block the loop; Resume retries without another fix prompt.
 
 A completed fix is reconciled against Git history. If the clean original branch has
 advanced and still contains the reported fix commit, the loop runs a read-only
@@ -195,7 +199,8 @@ verification of the original findings in the same chat. It completes the round o
 when verification reports no remaining findings and HEAD is unchanged. A new HEAD
 requires a new verification. The result records both the original fix commit and
 the verified HEAD, which becomes the starting point for the next round. Remote push publishes only the reported
-fix commit, excluding later commits. Rewritten history, branch or checkout changes,
+fix commit, excluding later commits unless publishing the reverified HEAD is needed
+to preserve the remote history. Rewritten history, branch or checkout changes,
 uncommitted work, and changes after an all-withdrawn report still require attention.
 Resume retries a blocked checkpoint without repeating the completed fix task.
 

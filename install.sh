@@ -31,7 +31,19 @@ if (( RUN_TESTS )); then
 fi
 swift build -c release
 
+if [[ -z "${SIGNING_KEYCHAIN:-}" ]]; then
+  export SIGNING_KEYCHAIN="$(python3 "$PROJECT_ROOT/Packaging/signing-keychain.py")"
+fi
 RESOLVED_SIGNING_IDENTITY="$(/bin/zsh "$PROJECT_ROOT/Packaging/signing-identity.sh")"
+if [[ "$SIGNING_KEYCHAIN" == "$HOME/Library/Keychains/codex-dashboard-build.keychain-db" ]]; then
+  python3 "$PROJECT_ROOT/Packaging/signing-keychain.py" --authorize-signing
+fi
+SIGNING_KEYCHAIN_ARGUMENTS=()
+SIGNING_RUNNER=()
+if [[ -n "${SIGNING_KEYCHAIN:-}" ]]; then
+  SIGNING_KEYCHAIN_ARGUMENTS=(--keychain "$SIGNING_KEYCHAIN")
+  SIGNING_RUNNER=(python3 "$PROJECT_ROOT/Packaging/signing-keychain.py" --run)
+fi
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources/Dashboard" "$APP_BUNDLE/Contents/Helpers"
@@ -42,11 +54,11 @@ cp "$PROJECT_ROOT/Packaging/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIco
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD" "$APP_BUNDLE/Contents/Info.plist"
 ditto "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard" "$APP_BUNDLE/Contents/Resources/Dashboard"
 cp "$BUILD_ROOT/release/CodexDashboardKeychainHelper" "$APP_BUNDLE/Contents/Helpers/CodexDashboardKeychainHelper"
-codesign --force --sign "$RESOLVED_SIGNING_IDENTITY" \
+"${SIGNING_RUNNER[@]}" codesign --force "${SIGNING_KEYCHAIN_ARGUMENTS[@]}" --sign "$RESOLVED_SIGNING_IDENTITY" \
   --identifier local.lawrenceawe.codex-dashboard.keychain-helper \
   "$APP_BUNDLE/Contents/Helpers/CodexDashboardKeychainHelper"
 # Sign the containing bundle without re-signing the already signed helper.
-codesign --force --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE"
+"${SIGNING_RUNNER[@]}" codesign --force "${SIGNING_KEYCHAIN_ARGUMENTS[@]}" --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 
 mkdir -p "$INSTALL_ROOT"

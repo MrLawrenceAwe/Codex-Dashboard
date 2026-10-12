@@ -19,6 +19,32 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         return (recovered, store, driver)
     }
 
+    func testRemoteMergeRequiresVerificationBeforeRetryAndKeepsOriginalReport() async throws {
+        let (_, store, driver) = try make(limit: 1)
+        store.loops[0].pushToRemote = true
+        // Recreate to read the updated persistent configuration.
+        let enabled = ReviewLoopCoordinator(store: store)
+        try enabled.apply(action(.resume, for: enabled), projects: [project])
+        await enabled.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await enabled.advance(using: driver, threads: [])
+        await enabled.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        driver.integrateRemoteOnPush = true
+        await enabled.advance(using: driver, threads: [])
+        XCTAssertEqual(enabled.loops[0].phase, .running)
+        XCTAssertEqual(enabled.loops[0].rounds[0].fixVerification?.commit, "merged")
+        XCTAssertEqual(enabled.loops[0].completedRoundCount, 0)
+        XCTAssertTrue(driver.pushedCommits.isEmpty)
+        XCTAssertTrue(driver.prompts.last!.contains("read-only verification"))
+        driver.review(priorities: [])
+        await enabled.advance(using: driver, threads: [])
+        XCTAssertEqual(enabled.loops[0].phase, .limitReached)
+        XCTAssertEqual(enabled.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(enabled.loops[0].rounds[0].result?.verifiedCommit, "merged")
+        XCTAssertEqual(driver.pushedCommits, ["fixed"])
+    }
+
     func testRealDriverRetainsSourceFixReportWhileVerifyingAdvancedHEAD() async throws {
         for completed in [false, true] {
             let (coordinator, _, driver) = try await verifying()

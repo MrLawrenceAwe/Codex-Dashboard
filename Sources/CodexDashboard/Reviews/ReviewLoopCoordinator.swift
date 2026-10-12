@@ -498,7 +498,13 @@ final class ReviewLoopCoordinator {
         if result.outcome == .fixed, updated.pushToRemote {
             updated.message = "Fixes committed. Pushing the verified commit to the remote."
             try persist(updated)
-            try await driver.pushCommit(reportedCommit, at: updated.project.path, expectedRepository: repo)
+            do {
+                try await driver.pushCommit(reportedCommit, at: updated.project.path, expectedRepository: repo)
+            } catch let integration as ReviewRemoteIntegrationRequired {
+                try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: fixTurn.id,
+                                                repository: integration.repository, using: driver, threadID: threadID)
+                return
+            }
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
             updated = current
         }

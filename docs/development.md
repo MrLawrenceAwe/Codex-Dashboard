@@ -13,6 +13,21 @@ Use Xcode 26.6 for development; the application's deployment target remains macO
 The first local install creates a dedicated self-signed certificate in the login
 Keychain, trusted for code signing. Later installs reuse that certificate; they do
 not fall back to ad-hoc signing. Set `SIGNING_IDENTITY` to use an existing certificate.
+When the login keychain password is unavailable, run
+`python3 Packaging/signing-keychain.py --create` once. This creates an isolated
+`codex-dashboard-build.keychain-db` with a generated password kept under
+`~/Library/Application Support/Codex Dashboard/build-signing/` with private file
+permissions. Later installs unlock and reuse it automatically. The password is
+passed to `security` on stdin and never included in process arguments or build logs.
+Only Apple signing tools are authorized to use its non-extractable signing key.
+The user's default keychain is retained. The signing keychain is added to the
+search list only for each signing command; the previous list is restored afterward.
+
+Set `SIGNING_KEYCHAIN` to select another build-signing keychain. It must already
+be unlocked; the installer searches and signs explicitly with that keychain.
+This supports builds when the login keychain password is unavailable, without
+resetting the login keychain. A new signing certificate can require saved-account
+access to be approved again; existing credentials remain in their original keychain.
 An invalid existing local identity fails installation so an unexpected certificate
 replacement cannot silently change the app’s designated signing requirement. The certificate
 and non-extractable private key stay in Keychain; temporary key files are removed.

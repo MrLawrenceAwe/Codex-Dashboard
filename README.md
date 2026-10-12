@@ -48,6 +48,12 @@ Choose **Always Allow** when macOS first asks the helper to access a saved accou
 each account is a separate Keychain item. Changes to the helper or signing
 certificate may require approval again.
 
+If the login keychain password is unavailable, run
+`python3 Packaging/signing-keychain.py --create` once, then rerun the installer.
+This prepares a separate keychain for build signing; later installs reuse it without
+asking for the login keychain password. Changing certificates can require approval
+again for saved-account access. See [local signing](docs/development.md#local-signing).
+
 To use an existing signing certificate, set `SIGNING_IDENTITY` to its name or SHA-1
 fingerprint when running the installer. The installer stops if signing fails.
 See [local signing](docs/development.md#local-signing) for certificate trust,
