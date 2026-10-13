@@ -341,6 +341,21 @@ final class DashboardRenderer {
         lastPromptLibrarySynchronization = nil
     }
 
+    func flushPromptLibrary() async throws {
+        await waitForSynchronizationsToFinish()
+        guard let promptLibraryBridge else {
+            throw DashboardError.synchronizationFailed("Prompt library storage is unavailable.")
+        }
+        let targets = await targets(forceRefresh: true)
+        try await promptLibraryBridge.synchronize(
+            targets: targets,
+            healthyTargets: targets.filter { mountedTargetIDs.contains($0.id) },
+            mountedDashboard: false,
+            requiresRendererRead: true
+        )
+        lastPromptLibrarySynchronization = now()
+    }
+
     func compatibilityChecks() async -> [CompatibilityCheck] {
         await compatibilityChecker.check()
     }

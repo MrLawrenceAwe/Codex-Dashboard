@@ -45,6 +45,9 @@ Unavailable or locked settings stop prompt insertion. Saved model identifiers
 remain editable when Codex's model list changes. New prompt and to-do presets
 default to **GPT-6.1 Sol**. Use Diagnostics to import, export, or reveal the native
 prompt-library file; rolling backups are kept beside it.
+Export saves queued prompt edits first. If the running Codex dashboard cannot be
+read, export reports an error and leaves any existing destination file intact.
+With Codex closed or integration disabled, export uses the saved native library.
 
 **To-dos** stores tasks with details, tags, projects, linked chats, images, and model
 settings. Right-click a sidebar chat and choose **Add to To-dos**; a chat already

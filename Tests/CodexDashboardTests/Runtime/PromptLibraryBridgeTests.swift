@@ -5,6 +5,75 @@ import XCTest
 
 @MainActor
 extension DashboardRendererTests {
+    func testPromptExportIncludesPendingEditsBeforeSynchronizationDeadline() async throws {
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html",
+                                    webSocketURL: "ws://127.0.0.1/main")
+        let initial = #"{"version":4,"prompts":[],"sections":[]}"#
+        let pending = #"{"version":4,"prompts":[{"id":"new","name":"New","content":"Latest edit","scope":{"type":"global"}}],"sections":[]}"#
+        let devTools = PromptLibraryRendererDevTools(target: target, exportedLibrary: initial)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        let renderer = try DashboardRenderer(
+            devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "mount"),
+            promptLibraryStore: store,
+            now: { Date(timeIntervalSince1970: 1_000) }
+        )
+        let snapshot = DashboardSnapshot(threads: [])
+        try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
+        await devTools.setPendingLibrary(pending)
+        // A normal poll inside the ten-second interval leaves this edit queued.
+        try await renderer.synchronize(snapshot, on: [target])
+        let destination = directory.appendingPathComponent("export.json")
+        let runtime = StubDashboardRuntime()
+        runtime.onPromptLibraryFlush = { try await renderer.flushPromptLibrary() }
+        let coordinator = makeAppCoordinator(promptLibraryStore: store, runtimeFactory: { _ in runtime })
+        await coordinator.exportPromptLibrary(to: destination)
+        let exported = try JSONDecoder().decode(PromptLibraryDocument.self, from: Data(contentsOf: destination))
+        XCTAssertEqual(exported.prompts.first?.content, "Latest edit")
+        XCTAssertEqual(coordinator.promptLibraryStatusMessage, "Exported prompt library.")
+    }
+
+    func testPromptExportBeforeFirstSynchronizationIncludesPendingLibrary() async throws {
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html",
+                                    webSocketURL: "ws://127.0.0.1/main")
+        let library = #"{"version":4,"prompts":[{"id":"new","name":"New","content":"First prompt","scope":{"type":"global"}}],"sections":[]}"#
+        let devTools = PromptLibraryRendererDevTools(target: target, exportedLibrary: library, pendingLibrary: library)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+        let renderer = try DashboardRenderer(devTools: devTools, promptLibraryStore: store)
+        let runtime = StubDashboardRuntime()
+        runtime.onPromptLibraryFlush = { try await renderer.flushPromptLibrary() }
+        let coordinator = makeAppCoordinator(promptLibraryStore: store, runtimeFactory: { _ in runtime })
+        let destination = directory.appendingPathComponent("export.json")
+        await coordinator.exportPromptLibrary(to: destination)
+        let exported = try JSONDecoder().decode(PromptLibraryDocument.self, from: Data(contentsOf: destination))
+        XCTAssertEqual(exported.prompts.first?.content, "First prompt")
+    }
+
+    func testPromptExportPreservesDestinationWhenRendererReadFails() async throws {
+        for response in [nil, "invalid JSON", #"{"version":99,"prompts":[],"sections":[]}"#] as [String?] {
+            let devTools = UnavailablePromptExportDevTools(response: response)
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = PromptLibraryFileStore(documentURL: directory.appendingPathComponent("prompts.json"))
+            try store.save(.empty)
+            let renderer = try DashboardRenderer(devTools: devTools, promptLibraryStore: store)
+            let runtime = StubDashboardRuntime()
+            runtime.onPromptLibraryFlush = { try await renderer.flushPromptLibrary() }
+            let coordinator = makeAppCoordinator(promptLibraryStore: store, runtimeFactory: { _ in runtime })
+            let destination = directory.appendingPathComponent("export.json")
+            let original = Data("Existing backup".utf8)
+            try original.write(to: destination)
+            await coordinator.exportPromptLibrary(to: destination)
+            XCTAssertEqual(try Data(contentsOf: destination), original)
+            XCTAssertNotEqual(coordinator.promptLibraryStatusMessage, "Exported prompt library.")
+            XCTAssertFalse(coordinator.isPerformingAction)
+        }
+    }
+
     func testPromptLibraryMigratesToNativeStoreAndExternalImportWins() async throws {
         let target = DevToolsTarget(
             id: "main",
@@ -220,4 +289,14 @@ extension DashboardRendererTests {
         XCTAssertTrue(expressions.contains { $0.contains("Imported content") })
     }
 
+}
+
+private actor UnavailablePromptExportDevTools: DevToolsServing {
+    let response: String?
+    init(response: String?) { self.response = response }
+    func mainRendererTargets() -> [DevToolsTarget] {
+        [DevToolsTarget(id: "main", type: "page", url: "app://-/index.html", webSocketURL: "ws://127.0.0.1/main")]
+    }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
+    func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? { response }
 }

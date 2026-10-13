@@ -23,9 +23,22 @@ final class PromptLibraryBridge {
     func synchronize(
         targets: [DevToolsTarget],
         healthyTargets: [DevToolsTarget],
-        mountedDashboard: Bool
+        mountedDashboard: Bool,
+        requiresRendererRead: Bool = false
     ) async throws {
-        guard let firstTarget = targets.first else { return }
+        guard let firstTarget = targets.first else {
+            if requiresRendererRead { throw DashboardError.synchronizationFailed("Connect Codex before exporting the latest prompt library.") }
+            return
+        }
+        if requiresRendererRead {
+            // A missing dashboard and an empty pending queue both return null.
+            // Verify the full library so an unavailable renderer cannot produce
+            // a successful export of an older native document.
+            guard try await exportedLibrary(using: RendererScript.exportPromptLibrary,
+                                            from: firstTarget, requiresRendererRead: true) != nil else {
+                throw DashboardError.synchronizationFailed("The prompt library is unavailable in Codex. Reconnect before exporting.")
+            }
+        }
         var seededNativeLibrary = false
         // Seed every renderer with the current native document before reading
         // pending edits. Each queued edit can then merge against this version,
@@ -42,9 +55,10 @@ final class PromptLibraryBridge {
             seededNativeLibrary = true
         }
         if !nativeLibraryIsAuthoritative,
-           let pendingLibrary = await exportedLibrary(
+           let pendingLibrary = try await exportedLibrary(
             using: RendererScript.exportPendingPromptLibrary,
-            from: firstTarget
+            from: firstTarget,
+            requiresRendererRead: requiresRendererRead
         ) {
             if !nativeLibraryIsAuthoritative {
                 _ = try store.save(pendingLibrary)
@@ -62,9 +76,10 @@ final class PromptLibraryBridge {
            !seededNativeLibrary,
            !nativeLibraryChanged,
            let sourceTarget,
-           let rendererLibrary = await exportedLibrary(
+           let rendererLibrary = try await exportedLibrary(
                using: RendererScript.exportPromptLibrary,
-               from: sourceTarget
+               from: sourceTarget,
+               requiresRendererRead: requiresRendererRead
            ) {
             if !nativeLibraryIsAuthoritative {
                 _ = try store.save(rendererLibrary)
@@ -90,15 +105,24 @@ final class PromptLibraryBridge {
 
     private func exportedLibrary(
         using expression: String,
-        from target: DevToolsTarget
-    ) async -> PromptLibraryDocument? {
-        guard
-            let serialized = try? await devTools.evaluateString(expression, in: target),
-            let data = serialized.data(using: .utf8),
-            let storedLibrary = try? JSONDecoder().decode(PromptLibraryDocument.self, from: data)
-        else { return nil }
-        let library = PromptLibraryMigration.migrate(storedLibrary)
-        return library.isValid ? library : nil
+        from target: DevToolsTarget,
+        requiresRendererRead: Bool
+    ) async throws -> PromptLibraryDocument? {
+        do {
+            guard let serialized = try await devTools.evaluateString(expression, in: target) else {
+                if requiresRendererRead && expression == RendererScript.exportPromptLibrary {
+                    throw DashboardError.synchronizationFailed("The prompt library is unavailable in Codex. Reconnect before exporting.")
+                }
+                return nil
+            }
+            let storedLibrary = try JSONDecoder().decode(PromptLibraryDocument.self, from: Data(serialized.utf8))
+            let library = PromptLibraryMigration.migrate(storedLibrary)
+            guard library.isValid else { throw DashboardError.invalidPromptLibrary }
+            return library
+        } catch {
+            if requiresRendererRead { throw error }
+            return nil
+        }
     }
 
     private func discardPendingLibrary(on targets: [DevToolsTarget]) async throws {

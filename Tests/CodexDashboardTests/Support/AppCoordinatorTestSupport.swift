@@ -338,6 +338,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     private(set) var lastAccountPopoverSnapshot: AccountPopoverSnapshot?
     private(set) var openedThreadIDs: [String] = []
     var speechInputIsActive = false
+    var onPromptLibraryFlush: (() async throws -> Void)?
 
     init(
         codexIsRunning: Bool = false,
@@ -369,6 +370,10 @@ final class StubDashboardRuntime: DashboardRuntime {
         )]
     }
     func useStoredPromptLibraryOnNextSync() {}
+    func flushPromptLibrary() async throws {
+        if let synchronizationError { throw synchronizationError }
+        try await onPromptLibraryFlush?()
+    }
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1

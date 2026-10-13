@@ -37,6 +37,10 @@ final class SynchronizationCoalescer {
         await current?.value
     }
 
+    func waitForCurrentSynchronization() async {
+        await task?.value
+    }
+
     func cancel() {
         task?.cancel()
         task = nil

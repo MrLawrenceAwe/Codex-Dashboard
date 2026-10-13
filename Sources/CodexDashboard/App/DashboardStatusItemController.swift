@@ -187,7 +187,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func exportPromptLibrary() {
-        coordinator.exportPromptLibrary()
+        Task { await coordinator.exportPromptLibrary() }
     }
 
     @objc private func quit() {

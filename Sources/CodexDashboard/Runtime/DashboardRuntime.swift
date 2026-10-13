@@ -28,6 +28,7 @@ protocol DashboardRuntime: AnyObject {
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
     func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async
     func useStoredPromptLibraryOnNextSync()
+    func flushPromptLibrary() async throws
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
 
@@ -122,6 +123,11 @@ final class CodexDashboardRuntime: DashboardRuntime {
 
     func useStoredPromptLibraryOnNextSync() {
         renderer.useStoredPromptLibraryOnNextSync()
+    }
+
+    func flushPromptLibrary() async throws {
+        guard codexIsRunning, maintainsDashboard else { return }
+        try await renderer.flushPromptLibrary()
     }
 
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] {

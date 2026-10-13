@@ -213,7 +213,7 @@ struct DiagnosticsWindowView: View {
                     .font(.system(size: 12, weight: .medium))
                 HStack(spacing: 8) {
                     Button("Import…") { Task { await coordinator.importPromptLibrary() } }
-                    Button("Export…") { coordinator.exportPromptLibrary() }
+                    Button("Export…") { Task { await coordinator.exportPromptLibrary() } }
                     Button("Show File") { coordinator.revealPromptLibrary() }
                 }
                 if let message = coordinator.promptLibraryStatusMessage {
