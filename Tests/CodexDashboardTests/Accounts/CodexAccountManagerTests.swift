@@ -70,6 +70,53 @@ private final class MemoryAccountCredentialVault: AccountCredentialVault, @unche
 }
 
 final class CodexAccountManagerTests: XCTestCase {
+    func testSavingSecondAccountSurvivesRelaunchWithoutReplacingFirstAccount() throws {
+        let firstCredential = credential(accountID: "account-lawrence", name: "Lawrence")
+        try firstCredential.write(to: authenticationURL)
+        let first = try manager.saveCurrentAccount()
+        let secondCredential = credential(accountID: "account-mum", name: "Mum")
+        try secondCredential.write(to: authenticationURL)
+        let second = try manager.saveCurrentAccount()
+
+        let reloaded = CodexAccountManager(
+            metadataURL: metadataURL, authenticationURL: authenticationURL, vault: vault
+        )
+        XCTAssertEqual(try reloaded.loadDocument().accounts, [first, second])
+        XCTAssertEqual(try reloaded.loadDocument().activeAccountID, second.id)
+        XCTAssertEqual(try reloaded.savedCredential(for: first.id, interactionAllowed: false), firstCredential)
+        XCTAssertEqual(try reloaded.savedCredential(for: second.id, interactionAllowed: false), secondCredential)
+        XCTAssertEqual(try Data(contentsOf: authenticationURL), secondCredential)
+    }
+
+    func testRepeatedSaveUpdatesCredentialWithoutDuplicatingAccount() throws {
+        try credential(accountID: "account-mum", name: "Mum", accessToken: "original")
+            .write(to: authenticationURL)
+        let first = try manager.saveCurrentAccount()
+        let rotated = credential(accountID: "account-mum", name: "Mum", accessToken: "rotated")
+        try rotated.write(to: authenticationURL)
+
+        let second = try manager.saveCurrentAccount()
+
+        XCTAssertEqual(second.id, first.id)
+        XCTAssertEqual(try manager.loadDocument().accounts.count, 1)
+        XCTAssertEqual(vault.credential(for: first.id), rotated)
+    }
+
+    func testSavingWithoutSignedInAccountLeavesSavedAccountsIntact() throws {
+        let original = credential(accountID: "account-lawrence", name: "Lawrence")
+        try original.write(to: authenticationURL)
+        let first = try manager.saveCurrentAccount()
+        try FileManager.default.removeItem(at: authenticationURL)
+
+        XCTAssertThrowsError(try manager.saveCurrentAccount()) { error in
+            guard case CodexAccountError.noActiveCredential = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertEqual(try manager.loadDocument().accounts, [first])
+        XCTAssertEqual(vault.credential(for: first.id), original)
+    }
+
     func testUnidentifiedActiveCredentialDoesNotOverwriteSavedLogin() throws {
         let original = credential(accountID: "saved-account")
         try original.write(to: authenticationURL)

@@ -69,7 +69,9 @@ window.__codexDashboard = {
     return true;
   },
   applyAccountPopoverSnapshot: accountPopover.applySnapshot,
-  takeQueuedAccountPopoverAction: accountPopover.takeQueuedAction,
+  readQueuedAccountPopoverAction: accountPopover.readQueuedAction,
+  acknowledgeAccountPopoverAction: accountPopover.acknowledgeAction,
+  completeAccountPopoverAction: accountPopover.completeAction,
   exportPromptLibrary: () => JSON.stringify(promptStore.exportLibrary()),
   exportPendingPromptLibrary: () => {
     const library = promptStore.pendingLibrary();

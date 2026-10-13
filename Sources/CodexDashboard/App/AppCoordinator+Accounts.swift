@@ -13,7 +13,7 @@ extension AppCoordinator {
         }
         guard !isPerformingAction else {
             accounts.setStatusMessage("Another dashboard action is in progress. Try again when it finishes.")
-            await publishAccountPopoverSnapshot()
+            await dashboardRuntime.completeAccountPopoverAction(action, snapshot: accounts.popoverSnapshot(isBusy: true))
             return .handled
         }
         let presentationAlreadyUpdated: Bool
@@ -43,6 +43,9 @@ extension AppCoordinator {
             await accounts.removeSavedAccount(accountID)
             presentationAlreadyUpdated = false
         }
+        await dashboardRuntime.completeAccountPopoverAction(
+            action, snapshot: accounts.popoverSnapshot(isBusy: isPerformingAction)
+        )
         if !presentationAlreadyUpdated {
             await updateAccountPresentation()
         }

@@ -17,6 +17,9 @@ final class DashboardRenderer {
     private let promptLibraryBridge: PromptLibraryBridge?
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshot?
+    private var receivedAccountRequestIDs: Set<String> = []
+    private var completedAccountRequests: [String: AccountPopoverSnapshot] = [:]
+    private var completedAccountRequestOrder: [String] = []
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var pendingSynchronization: PendingSynchronization?
@@ -275,7 +278,7 @@ final class DashboardRenderer {
         for target in await targets() {
             do {
                 guard let serialized = try await devTools.evaluateString(
-                    RendererScript.takeQueuedAccountPopoverAction,
+                    RendererScript.readQueuedAccountPopoverAction,
                     in: target,
                     timeout: .seconds(1)
                 ), serialized != RendererScript.accountPopoverUnavailable else { continue }
@@ -284,6 +287,21 @@ final class DashboardRenderer {
                 guard let data = serialized.data(using: .utf8),
                       let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
                 else { continue }
+                if (action.kind == .switchAccount || action.kind == .removeSavedAccount), action.accountID == nil {
+                    continue
+                }
+                if let snapshot = completedAccountRequests[action.requestID] {
+                    _ = try? await devTools.evaluateBoolean(
+                        RendererScript.completeAccountPopoverAction(action, snapshot: snapshot), in: target
+                    )
+                    continue
+                }
+                guard receivedAccountRequestIDs.insert(action.requestID).inserted else { continue }
+                // Receipt is recorded locally before the UI acknowledgement. A lost
+                // acknowledgement must never repeat a sign-out or account switch.
+                _ = try? await devTools.evaluateBoolean(
+                    RendererScript.acknowledgeAccountPopoverAction(action), in: target
+                )
                 return .action(action)
             } catch {
                 // A closed or unavailable window must not starve the other windows.
@@ -301,6 +319,21 @@ final class DashboardRenderer {
         let targets = await targets()
         guard !targets.isEmpty else { return }
         try? await deliverAccountPopover(snapshot, to: targets)
+    }
+
+    func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async {
+        completedAccountRequests[action.requestID] = snapshot
+        completedAccountRequestOrder.append(action.requestID)
+        if completedAccountRequestOrder.count > 64 {
+            let expired = completedAccountRequestOrder.removeFirst()
+            completedAccountRequests[expired] = nil
+            receivedAccountRequestIDs.remove(expired)
+        }
+        for target in await targets() {
+            _ = try? await devTools.evaluateBoolean(
+                RendererScript.completeAccountPopoverAction(action, snapshot: snapshot), in: target
+            )
+        }
     }
 
     func useStoredPromptLibraryOnNextSync() {

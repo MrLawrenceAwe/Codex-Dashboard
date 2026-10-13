@@ -256,7 +256,13 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
     private let targets: [DevToolsTarget]
     private let actions: [String: String]
 
-    init(target: DevToolsTarget, action: String?) {
+    private var losesAcknowledgement = false
+    private var losesCompletion = false
+    private(set) var completionAttempts = 0
+
+    init(target: DevToolsTarget, action: String?, losesAcknowledgement: Bool = false, losesCompletion: Bool = false) {
+        self.losesAcknowledgement = losesAcknowledgement
+        self.losesCompletion = losesCompletion
         self.targets = [target]
         self.actions = action.map { [target.id: $0] } ?? [:]
     }
@@ -268,7 +274,20 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
 
     func mainRendererTargets() -> [DevToolsTarget] { targets }
 
-    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) -> Bool { true }
+    func evaluateBoolean(_ expression: String, in target: DevToolsTarget) throws -> Bool {
+        if expression.contains("acknowledgeAccountPopoverAction"), losesAcknowledgement {
+            losesAcknowledgement = false
+            throw DashboardError.devToolsTimedOut
+        }
+        if expression.contains("completeAccountPopoverAction") {
+            completionAttempts += 1
+            if losesCompletion {
+                losesCompletion = false
+                throw DashboardError.devToolsTimedOut
+            }
+        }
+        return true
+    }
 
     func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
         actions[target.id]
@@ -277,6 +296,30 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
 
 @MainActor
 final class DashboardRendererTests: XCTestCase {
+    func testRepeatedAccountPollDoesNotRepeatActionAndRetriesCompletionDelivery() async throws {
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html",
+                                   webSocketURL: "ws://127.0.0.1/main")
+        let action = AccountPopoverAction(requestID: "lost-response", kind: .restartForSignIn, accountID: nil)
+        let devTools = AccountPopoverRendererDevTools(
+            target: target, action: String(data: try JSONEncoder().encode(action), encoding: .utf8),
+            losesAcknowledgement: true, losesCompletion: true
+        )
+        let renderer = try DashboardRenderer(devTools: devTools,
+            injectionBundle: InjectionBundle(version: "test", mountExpression: "true"))
+        let first = await renderer.pollAccountPopoverAction()
+        let repeated = await renderer.pollAccountPopoverAction()
+        XCTAssertEqual(first, .action(action))
+        XCTAssertEqual(repeated, .empty)
+        await renderer.completeAccountPopoverAction(action, snapshot: AccountPopoverSnapshot(
+            accounts: [], activeAccountID: nil, statusMessage: "Wait for active chats to finish.",
+            isBusy: false, usageBlockage: nil
+        ))
+        let afterLostCompletion = await renderer.pollAccountPopoverAction()
+        XCTAssertEqual(afterLostCompletion, .empty)
+        let completionAttempts = await devTools.completionAttempts
+        XCTAssertEqual(completionAttempts, 2)
+    }
+
     func testUnavailableAccountPollRediscoversTargetsWithoutWaitingForHealthDeadline() async throws {
         let devTools = EmptyRendererPollingDevTools()
         let renderer = try DashboardRenderer(devTools: devTools,
@@ -333,7 +376,7 @@ final class DashboardRendererTests: XCTestCase {
         )
         let devTools = AccountPopoverRendererDevTools(
             target: target,
-            action: "{\"kind\":\"refreshUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
+            action: "{\"requestID\":\"request-1\",\"kind\":\"refreshUsage\",\"accountID\":\"\(accountID.uuidString)\"}"
         )
         let renderer = try DashboardRenderer(
             devTools: devTools,
@@ -344,7 +387,7 @@ final class DashboardRendererTests: XCTestCase {
 
         XCTAssertEqual(
             result,
-            .action(AccountPopoverAction(kind: .refreshUsage, accountID: accountID))
+            .action(AccountPopoverAction(requestID: "request-1", kind: .refreshUsage, accountID: accountID))
         )
     }
 
@@ -357,12 +400,12 @@ final class DashboardRendererTests: XCTestCase {
             let renderer = try DashboardRenderer(
                 devTools: AccountPopoverRendererDevTools(targets: targets, actions: [
                     "first": firstResult,
-                    "second": "{\"kind\":\"saveCurrentAccount\"}",
+                    "second": "{\"requestID\":\"request-2\",\"kind\":\"saveCurrentAccount\"}",
                 ]),
                 injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
             )
             let result = await renderer.pollAccountPopoverAction()
-            XCTAssertEqual(result, .action(AccountPopoverAction(kind: .saveCurrentAccount, accountID: nil)))
+            XCTAssertEqual(result, .action(AccountPopoverAction(requestID: "request-2", kind: .saveCurrentAccount, accountID: nil)))
         }
     }
 

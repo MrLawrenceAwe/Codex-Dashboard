@@ -103,6 +103,12 @@ and accesses them over pipes. `DashboardKeychainProtocol` shares typed messages;
 `DashboardKeychain` contains the native vault independently of Dashboard UI builds.
 See [local signing](development.md#local-signing) for approval persistence.
 
+Account-menu requests have unique IDs and remain in the renderer until native
+handling explicitly completes them. Polling reads without consuming; native receipt
+is recorded before acknowledging the UI. Completed results are retained for the
+latest 64 requests so a lost completion response can be redelivered without repeating
+an account change. Unacknowledged requests expire after 15 seconds and allow retry.
+
 Metadata loading, reconciliation, migrations, and Keychain transactions run on a
 serial worker. Menus use the last published account snapshot. Unidentified active
 credentials clear the saved-account association and cannot overwrite a saved login.

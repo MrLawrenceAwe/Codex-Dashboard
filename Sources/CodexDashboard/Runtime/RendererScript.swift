@@ -51,8 +51,16 @@ enum RendererScript {
     }
 
     static let accountPopoverUnavailable = "__codexDashboardUnavailable__"
-    static let takeQueuedAccountPopoverAction =
-        "window.__codexDashboard?.takeQueuedAccountPopoverAction?.() ?? '\(accountPopoverUnavailable)'"
+    static let readQueuedAccountPopoverAction =
+        "window.__codexDashboard?.readQueuedAccountPopoverAction?.() ?? '\(accountPopoverUnavailable)'"
+
+    static func acknowledgeAccountPopoverAction(_ action: AccountPopoverAction) throws -> String {
+        "window.__codexDashboard?.acknowledgeAccountPopoverAction?.(\(try encodeJSON(action.requestID))) === true"
+    }
+
+    static func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) throws -> String {
+        "window.__codexDashboard?.completeAccountPopoverAction?.(\(try encodeJSON(action.requestID)), \(try encodeJSON(snapshot))) === true"
+    }
 
     static let exportPromptLibrary = "window.__codexDashboard?.exportPromptLibrary?.() ?? null"
 

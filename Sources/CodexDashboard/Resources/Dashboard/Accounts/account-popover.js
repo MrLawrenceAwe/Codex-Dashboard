@@ -1,6 +1,8 @@
 const accountPopover = (() => {
   const triggerAttribute = 'data-codex-accounts-trigger';
   const panelID = 'codex-accounts-panel';
+  const requestPrefix = [...crypto.getRandomValues(new Uint32Array(4))].join('-');
+  let requestSequence = 0;
   let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
   let snapshotFingerprint = '';
   let observer;
@@ -12,8 +14,9 @@ const accountPopover = (() => {
   let queuedActionTimer;
   let queuedActionDeadline = 0;
   let queuedAction = null;
+  let actionAcknowledged = false;
   function expireQueuedAction() {
-    if (!queuedAction) return;
+    if (!queuedAction || actionAcknowledged) return;
     queuedAction = null;
     queuedActionDeadline = 0;
     retainPanelUntilActionCompletes = false;
@@ -30,7 +33,8 @@ const accountPopover = (() => {
     // native code publishes the action's resulting snapshot so failures (for
     // example, an account switch blocked by an active task) remain visible.
     retainPanelUntilActionCompletes = true;
-    queuedAction = { kind, accountID };
+    actionAcknowledged = false;
+    queuedAction = { requestID: `${requestPrefix}-${++requestSequence}`, kind, accountID };
     queuedActionDeadline = Date.now() + 15000;
     queuedActionTimer = setTimeout(expireQueuedAction, 15000);
     actionProgress = kind === 'restartForSignIn'
@@ -40,18 +44,32 @@ const accountPopover = (() => {
     usageResetNotice.applySnapshot(snapshot.usageBlockage);
   }
 
-  function takeQueuedAction() {
-    if (queuedAction && Date.now() >= queuedActionDeadline) expireQueuedAction();
+  function readQueuedAction() {
+    if (queuedAction && !actionAcknowledged && Date.now() >= queuedActionDeadline) expireQueuedAction();
+    return JSON.stringify(queuedAction);
+  }
+
+  function acknowledgeAction(requestID) {
+    if (queuedAction?.requestID !== requestID) return false;
     if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
     queuedActionTimer = undefined;
-    const action = queuedAction;
+    actionAcknowledged = true;
+    actionProgress = 'Request received. Checking Codex state…';
+    renderPanel();
+    return true;
+  }
+
+  function completeAction(requestID, next) {
+    if (queuedAction?.requestID !== requestID) return false;
+    if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
+    queuedActionTimer = undefined;
     queuedAction = null;
-    if (action) {
-      actionProgress = 'Request received. Checking Codex state…';
-      renderPanel();
-      usageResetNotice.applySnapshot(snapshot.usageBlockage);
-    }
-    return JSON.stringify(action);
+    actionAcknowledged = false;
+    retainPanelUntilActionCompletes = false;
+    actionProgress = null;
+    applySnapshot(next);
+    renderPanel();
+    return true;
   }
 
   function accountMarkup(account) {
@@ -106,26 +124,23 @@ const accountPopover = (() => {
         ${snapshot.accounts.length > 1 ? `<button data-account-global="refreshInactiveUsage"${disabled}><span>↻</span>Refresh other accounts’ usage</button>` : ''}
       </footer>`;
     panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);
-    panel.querySelectorAll('[data-account-action]').forEach((button) => {
+    panel.querySelectorAll('[data-account-action], [data-account-global]').forEach((button) => {
       const handleAction = (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (button.disabled || (event.type === 'pointerdown' && event.button !== 0)) return;
         if (button.dataset.accountHandled === 'true') return;
         const id = button.closest('[data-account-id]')?.dataset.accountId;
-        const action = button.dataset.accountAction;
+        const action = button.dataset.accountAction || button.dataset.accountGlobal;
         if (!confirmAction(action)) return;
         button.dataset.accountHandled = 'true';
-        queue(action, action === 'restartForSignIn' ? null : id);
+        queue(action, action === 'restartForSignIn' ? null : (id ?? null));
       };
       // Queue on pointerdown before Codex's profile-menu dismissal can cancel
       // the subsequent click. Keep click for keyboard activation.
       button.addEventListener('pointerdown', handleAction);
       button.addEventListener('click', handleAction);
     });
-    panel.querySelectorAll('[data-account-global]').forEach((button) => button.addEventListener('click', () => {
-      const action = button.dataset.accountGlobal;
-      if (confirmAction(action)) queue(action);
-    }));
   }
 
   function openPanel(trigger) {
@@ -263,7 +278,8 @@ const accountPopover = (() => {
     const hadActionProgress = actionProgress !== null;
     snapshot = candidate;
     snapshotFingerprint = candidateFingerprint;
-    // The native action has completed once its resulting snapshot arrives.
+    // Background snapshots must not complete a request. Only completeAction
+    // releases it after native handling, including a blocked restart or failure.
     if (!queuedAction && !snapshot.isBusy) {
       retainPanelUntilActionCompletes = false;
       actionProgress = null;
@@ -308,5 +324,5 @@ const accountPopover = (() => {
     closePanel();
   }
 
-  return { applySnapshot, takeQueuedAction, mount, unmount };
+  return { applySnapshot, readQueuedAction, acknowledgeAction, completeAction, mount, unmount };
 })();

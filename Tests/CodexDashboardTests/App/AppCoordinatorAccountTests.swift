@@ -5,6 +5,35 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testAddAccountReportsBlockedRestartAndCompletesRequest() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let auth = directory.appendingPathComponent("auth.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let credential = testAccountCredential(accountID: "current", name: "Current")
+        try credential.write(to: auth)
+        let action = AccountPopoverAction(kind: .restartForSignIn, accountID: nil)
+        let runtime = StubDashboardRuntime(codexIsRunning: true, accountPopoverActionWaitResult: .action(action))
+        let coordinator = makeAppCoordinator(
+            catalogProvider: StubCatalogProvider(catalog: ThreadCatalog(
+                threads: [.fixture(runState: .running)], totalThreadCount: 1
+            )),
+            unreadThreadIDProvider: StubUnreadIDProvider(unreadThreadIDs: []),
+            accountManager: CodexAccountManager(
+                metadataURL: directory.appendingPathComponent("accounts.json"),
+                authenticationURL: auth, vault: CoordinatorMemoryCredentialVault()
+            ),
+            runtimeFactory: { _ in runtime }
+        )
+        let outcome = await coordinator.handleAccountPopoverAction()
+        XCTAssertEqual(outcome, .handled)
+        XCTAssertEqual(runtime.completedAccountRequestIDs, [action.requestID])
+        XCTAssertEqual(runtime.lastAccountPopoverSnapshot?.statusMessage, CodexAccountError.activeTasks.localizedDescription)
+        XCTAssertEqual(runtime.lastAccountPopoverSnapshot?.isBusy, false)
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertEqual(try Data(contentsOf: auth), credential)
+    }
+
     func testResetNoticeRefreshesUnsavedActiveAccountAndPublishesBlockage() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("ResetNoticeRefreshTests-\(UUID().uuidString)")

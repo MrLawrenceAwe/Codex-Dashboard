@@ -44,8 +44,15 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
         case removeSavedAccount
     }
 
+    let requestID: String
     let kind: Kind
     let accountID: UUID?
+
+    init(requestID: String = UUID().uuidString, kind: Kind, accountID: UUID?) {
+        self.requestID = requestID
+        self.kind = kind
+        self.accountID = accountID
+    }
 }
 
 enum AccountPopoverActionPollResult: Equatable, Sendable {

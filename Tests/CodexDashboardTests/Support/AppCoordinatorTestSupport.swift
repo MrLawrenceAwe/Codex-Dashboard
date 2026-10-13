@@ -334,6 +334,7 @@ final class StubDashboardRuntime: DashboardRuntime {
     private(set) var synchronizeCallCount = 0
     private(set) var lastSynchronizedSnapshot: DashboardSnapshot?
     private(set) var accountPopoverSynchronizationCount = 0
+    private(set) var completedAccountRequestIDs: [String] = []
     private(set) var lastAccountPopoverSnapshot: AccountPopoverSnapshot?
     private(set) var openedThreadIDs: [String] = []
     var speechInputIsActive = false
@@ -396,6 +397,12 @@ final class StubDashboardRuntime: DashboardRuntime {
         accountPopoverSynchronizationCount += 1
         lastAccountPopoverSnapshot = snapshot
     }
+
+    func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async {
+        completedAccountRequestIDs.append(action.requestID)
+        lastAccountPopoverSnapshot = snapshot
+    }
+
     func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
 }
 

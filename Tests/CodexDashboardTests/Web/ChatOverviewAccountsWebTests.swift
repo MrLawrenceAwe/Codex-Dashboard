@@ -5,6 +5,80 @@ import XCTest
 
 @MainActor
 extension ChatOverviewWebTests {
+    func testLostPollResponseKeepsRequestUntilExplicitCompletion() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          window.confirm = () => true;
+          document.querySelector('[data-account-global="restartForSignIn"]').click();
+          const lostResponse = api.readQueuedAccountPopoverAction();
+          const retry = api.readQueuedAccountPopoverAction();
+          const action = JSON.parse(retry);
+          const beforeAcknowledgement = document.querySelector('.codex-accounts-status').textContent;
+          api.acknowledgeAccountPopoverAction(action.requestID);
+          api.applyAccountPopoverSnapshot({accounts: [], activeAccountID: null, statusMessage: null, isBusy: false});
+          const retainedAfterUnrelatedSnapshot = api.readQueuedAccountPopoverAction() === retry;
+          api.completeAccountPopoverAction(action.requestID, {
+            accounts: [], activeAccountID: null, statusMessage: 'Wait for active chats to finish.', isBusy: false,
+          });
+          return [lostResponse === retry, !beforeAcknowledgement.includes('Request received'),
+            retainedAfterUnrelatedSnapshot, api.readQueuedAccountPopoverAction(),
+            document.querySelector('.codex-accounts-status').textContent,
+            document.querySelector('[data-account-global="restartForSignIn"]').disabled];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? String, "null")
+        XCTAssertEqual(values[4] as? String, "Wait for active chats to finish.")
+        XCTAssertEqual(values[5] as? Bool, false)
+    }
+
+    func testSaveQueuesBeforeHostDismissesProfileMenuOnPointerPress() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div id="profile-menu" role="menu">
+            <button><span>Settings</span></button><button>Log out</button>
+          </div>
+        </body></html>
+        """)
+        let result = try await webView.callAsyncJavaScript("""
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        // Host capture handlers run before the overlay can stop propagation.
+        document.addEventListener('pointerdown', () => {
+          document.querySelector('#profile-menu')?.remove();
+        }, { capture: true, once: true });
+        const button = document.querySelector('[data-account-global="saveCurrentAccount"]');
+        button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const retained = Boolean(document.querySelector('#codex-accounts-panel'));
+        if (button.isConnected) button.click();
+        const first = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        button.click();
+        const second = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        window.__codexDashboard.completeAccountPopoverAction(first.requestID, {
+          accounts: [], activeAccountID: null, isBusy: false,
+          statusMessage: 'Saved Mum securely in Keychain.',
+        });
+        return [retained, first?.kind ?? null, second,
+          document.querySelector('.codex-accounts-status')?.textContent ?? null];
+        """, contentWorld: .page) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? String, "saveCurrentAccount")
+        XCTAssertEqual((values[2] as? [String: Any])?["kind"] as? String, "saveCurrentAccount")
+        XCTAssertEqual(values[3] as? String, "Saved Mum securely in Keychain.")
+    }
+
     func testDashboardInsetAccountsForScaledCodexShell() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
@@ -50,7 +124,7 @@ extension ChatOverviewWebTests {
               document.querySelector('[data-account-save]') === null,
               document.querySelector('[data-account-add]') === null,
               document.querySelector('[data-account-notice]') === null,
-              typeof window.__codexDashboard.takeQueuedAccountPopoverAction,
+              typeof window.__codexDashboard.readQueuedAccountPopoverAction,
             ]
             """
         ) as? [Any]
@@ -121,7 +195,7 @@ extension ChatOverviewWebTests {
             "document.querySelector('[data-account-action=\"refreshUsage\"]').click()"
         )
         let serializedAction = try await webView.evaluateJavaScript(
-            "window.__codexDashboard.takeQueuedAccountPopoverAction()"
+            "window.__codexDashboard.readQueuedAccountPopoverAction()"
         ) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: String.Encoding.utf8))
         let action = try XCTUnwrap(
@@ -324,8 +398,8 @@ extension ChatOverviewWebTests {
         document.querySelector('#profile-portal').remove();
         await new Promise(resolve => setTimeout(resolve, 0));
         const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
-        window.__codexDashboard.takeQueuedAccountPopoverAction();
-        window.__codexDashboard.applyAccountPopoverSnapshot({
+        const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        window.__codexDashboard.completeAccountPopoverAction(action.requestID, {
           accounts: [{
             id: '00000000-0000-0000-0000-000000000001',
             name: 'Personal', isActive: false, usageRows: [],
@@ -375,7 +449,7 @@ extension ChatOverviewWebTests {
         return [text, instructions];
         """, contentWorld: .page) as? [String]
         let serializedAction = try await webView.evaluateJavaScript(
-            "window.__codexDashboard.takeQueuedAccountPopoverAction()"
+            "window.__codexDashboard.readQueuedAccountPopoverAction()"
         ) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
         let action = try XCTUnwrap(
@@ -417,7 +491,7 @@ extension ChatOverviewWebTests {
         const button = document.querySelector('[data-account-action="restartForSignIn"]');
         button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         if (button.isConnected) button.click();
-        return window.__codexDashboard.takeQueuedAccountPopoverAction();
+        return window.__codexDashboard.readQueuedAccountPopoverAction();
         """, contentWorld: .page) as? String
         let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
         let action = try XCTUnwrap(
@@ -439,8 +513,8 @@ extension ChatOverviewWebTests {
           window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           document.querySelector('[data-codex-accounts-trigger]').click();
           document.querySelector('[data-account-global="saveCurrentAccount"]').click();
-          window.__codexDashboard.takeQueuedAccountPopoverAction();
-          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+          window.__codexDashboard.completeAccountPopoverAction(action.requestID, snapshot);
           return [document.querySelector('.codex-accounts-status') === null,
                   document.querySelector('[data-account-global="saveCurrentAccount"]').disabled];
         })()
@@ -467,11 +541,11 @@ extension ChatOverviewWebTests {
             window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
             const stillQueued = document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
             now += 15001;
-            const expiredAction = window.__codexDashboard.takeQueuedAccountPopoverAction();
+            const expiredAction = window.__codexDashboard.readQueuedAccountPopoverAction();
             const enabled = !document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
             const message = document.querySelector('.codex-accounts-status').textContent;
             document.querySelector('[data-account-global="saveCurrentAccount"]').click();
-            const retried = JSON.parse(window.__codexDashboard.takeQueuedAccountPopoverAction()).kind;
+            const retried = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction()).kind;
             return [stillQueued, expiredAction, enabled, message, retried];
           } finally { Date.now = originalNow; }
         })()

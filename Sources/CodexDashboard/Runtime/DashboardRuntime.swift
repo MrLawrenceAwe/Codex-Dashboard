@@ -26,6 +26,7 @@ protocol DashboardRuntime: AnyObject {
     func hasActiveSpeechInput() async -> Bool
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async
+    func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async
     func useStoredPromptLibraryOnNextSync()
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
 }
@@ -113,6 +114,10 @@ final class CodexDashboardRuntime: DashboardRuntime {
 
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
         await renderer.synchronizeAccountPopover(snapshot)
+    }
+
+    func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async {
+        await renderer.completeAccountPopoverAction(action, snapshot: snapshot)
     }
 
     func useStoredPromptLibraryOnNextSync() {
