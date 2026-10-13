@@ -10,7 +10,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
-    func testVisualFeedbackTracksWorkAndOnlyMarksRecordedVerificationDone() async throws {
+    func testVisualFeedbackShowsTwoStagesAndConditionalReverification() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         webView.frame = CGRect(x: 0, y: 0, width: 360, height: 900)
         let result = try await webView.evaluateAsyncJavaScript("""
@@ -36,7 +36,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           round.fixRequested = true;
           results.push(states());
           round.fixVerification = {commit:'abc123'};
-          results.push(states());
+          results.push(states(), document.querySelector('[aria-current="step"] strong').textContent,
+            document.querySelector('[aria-current="step"] .review-stage-description').textContent);
           loop.phase = 'blocked';
           results.push(states(),document.querySelector('[data-stage="blocked"] .review-stage-description').textContent,
             document.querySelector('[data-stage="blocked"]').hasAttribute('aria-current'));
@@ -55,10 +56,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return results;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["waiting,pending,pending", "active,pending,pending", "Review", "—", true,
-            "done,active,pending", "done,done,active", "done,done,blocked", "Needs attention", false,
-            "done,done,paused", "done,done,stopped", "done,done,unrecorded", "done,done,done", "1,1,1",
-            "done,skipped,skipped", true, true])
+        XCTAssertEqual(result, ["waiting,pending", "active,pending", "Review", "—", true,
+            "done,active", "done,active", "Fix & commit", "Reverifying fixes", "done,blocked", "Needs attention", false,
+            "done,paused", "done,stopped", "done,done", "done,done", "1,1,1",
+            "done,skipped", true, true])
     }
 
     func testCardsResolveLabelsWithoutRenderingSetupAndPreserveUnavailableIdentifiers() async throws {

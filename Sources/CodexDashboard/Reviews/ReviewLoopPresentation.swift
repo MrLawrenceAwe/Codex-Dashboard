@@ -27,7 +27,7 @@ enum ReviewLoopPresentation {
         case .paused: "Paused"
         case .waiting: "Waiting to review"
         case .running:
-            if round?.fixVerification != nil { "Verifying fixes at current HEAD" }
+            if round?.fixVerification != nil { "Reverifying fixes at current HEAD" }
             else if round?.fixRequested == true { "Fixing & committing" }
             else if round?.review != nil { "Preparing fixes" }
             else { "Reviewing" }
@@ -38,7 +38,7 @@ enum ReviewLoopPresentation {
     private static func configuredPromptPreview(for loop: ReviewLoop, round: ReviewRound) -> ReviewPromptPreview {
         if let verification = round.fixVerification {
             return ReviewPromptPreview(
-                title: "Verify fixes · round \(round.number)",
+                title: "Reverify fixes · round \(round.number)",
                 text: ReviewPrompts.verifyFix(for: loop, round: round, commit: verification.commit),
                 note: verification.turnID == nil ? "Submission not yet confirmed." : ""
             )

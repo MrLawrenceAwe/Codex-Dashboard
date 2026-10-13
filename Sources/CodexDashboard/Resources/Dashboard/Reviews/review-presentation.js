@@ -29,22 +29,26 @@ const reviewPresentation = (() => {
   function roundStages(loop) {
     const round = loop.rounds.at(-1);
     const outcome = round?.result?.outcome;
-    const current = round?.fixVerification ? 2 : round?.fixRequested || round?.review?.outcome === 'reviewed' ? 1 : 0;
-    const labels = ['Review', 'Fix & commit', 'Verify'];
-    const states = ['pending', 'pending', 'pending'];
+    const current = round?.fixVerification || round?.fixRequested || round?.review?.outcome === 'reviewed' ? 1 : 0;
+    const labels = ['Review', 'Fix & commit'];
+    const states = ['pending', 'pending'];
     if (outcome && outcome !== 'blocked') {
       states[0] = 'done';
       states[1] = outcome === 'clean' ? 'skipped' : 'done';
-      states[2] = round.result.verifiedCommit ? 'done' : outcome === 'fixed' ? 'unrecorded' : 'skipped';
     } else {
       for (let index = 0; index < current; index++) states[index] = 'done';
       states[current] = ({ running: 'active', blocked: 'blocked', awaitingExtensionReload: 'blocked',
         paused: 'paused', stopping: 'stopping', stopped: 'stopped', waiting: 'waiting' })[loop.phase] || 'incomplete';
     }
-    const descriptions = { pending: 'Up next', done: 'Done', skipped: 'Not needed', unrecorded: 'Not recorded',
+    const descriptions = { pending: 'Up next', done: 'Done', skipped: 'Not needed',
       active: 'In progress', blocked: 'Needs attention', paused: 'Paused', stopping: 'Stopping',
       stopped: 'Stopped', waiting: 'Waiting', incomplete: 'Incomplete' };
-    return labels.map((label, index) => ({ label, state: states[index], description: descriptions[states[index]] }));
+    return labels.map((label, index) => ({
+      label,
+      state: states[index],
+      description: index === 1 && states[index] === 'active' && round?.fixVerification
+        ? 'Reverifying fixes' : descriptions[states[index]],
+    }));
   }
 
   function updatedAtLabel(timestamp) {
