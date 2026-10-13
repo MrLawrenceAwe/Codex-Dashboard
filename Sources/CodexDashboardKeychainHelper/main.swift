@@ -36,6 +36,12 @@ do {
     let input = try FileHandle.standardInput.readToEnd() ?? Data()
     guard input.count <= 1_048_576 else { exit(64) }
     let request = try JSONDecoder().decode(KeychainRequest.self, from: input)
+    // Each helper handles one request. Disable traditional login-keychain UI as
+    // well as LAContext interaction for unattended reads and writes.
+    if !request.interactionAllowed {
+        let status = SecKeychainSetUserInteractionAllowed(false)
+        guard status == errSecSuccess else { throw KeychainVaultError.status(status) }
+    }
     let vault = NativeAccountCredentialVault(probe: request.probe == true)
     switch request.operation {
     case .read:

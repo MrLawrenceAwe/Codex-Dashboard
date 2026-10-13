@@ -82,14 +82,18 @@ with tempfile.TemporaryDirectory(prefix="codex-keychain-helper-test-") as tempor
     run("codesign", "--verify", "--deep", "--strict", str(app))
     account = str(uuid.uuid4())
 
-    def request(operation, interaction=False):
-        data = {"operation": operation, "accountID": account, "probe": True,
+    def request(operation, interaction=False, account_id=None, requires_authorization=False):
+        data = {"operation": operation, "accountID": account_id or account, "probe": True,
                 "interactionAllowed": interaction}
         if operation == "store":
             data["credential"] = "ZGlzcG9zYWJsZS1oZWxwZXItdGVzdA=="
         result = subprocess.run([str(executable), str(helper)], input=json.dumps(data).encode(),
                                 capture_output=True, check=True, timeout=20)
         response = json.loads(result.stdout)
+        if requires_authorization:
+            assert response["authorizationRequired"] or response["status"] in (-25308, -25293, -128), f"Protected access did not fail closed: status={response['status']}, authorizationRequired={response['authorizationRequired']}, hasCredential={response.get('credential') is not None}"
+            assert response.get("credential") is None, "Protected credential was returned"
+            return
         assert response["status"] == 0 and not response["authorizationRequired"], "Keychain access failed"
         return response.get("credential")
 
@@ -108,6 +112,20 @@ with tempfile.TemporaryDirectory(prefix="codex-keychain-helper-test-") as tempor
         assert request("read") == "ZGlzcG9zYWJsZS1oZWxwZXItdGVzdA=="
         unauthorized = subprocess.run([str(helper)], input=b"{}", capture_output=True, timeout=10)
         assert unauthorized.returncode == 77 and not unauthorized.stdout, "Unsigned caller was accepted"
-        print("PASS: changed caller build; unchanged helper; silent read/write; unsigned caller rejected.")
+        # A disposable item trusted only by security must not open an approval
+        # dialog when the helper reads it in the background. The default ACL
+        # permits updates; those must remain silent without granting read access.
+        restricted_account = str(uuid.uuid4()).upper()
+        run("security", "add-generic-password", "-a", restricted_account,
+            "-s", "com.lawrenceawe.CodexDashboard.helper-probe",
+            "-w", "disposable-restricted-test", "-T", "/usr/bin/security")
+        try:
+            request("read", account_id=restricted_account, requires_authorization=True)
+            request("store", account_id=restricted_account)
+            request("read", account_id=restricted_account, requires_authorization=True)
+        finally:
+            run("security", "delete-generic-password", "-a", restricted_account,
+                "-s", "com.lawrenceawe.CodexDashboard.helper-probe")
+        print("PASS: changed caller build; unchanged helper; silent read/write; protected reads rejected before and after silent update; unsigned caller rejected.")
     finally:
         request("delete", interaction=True)

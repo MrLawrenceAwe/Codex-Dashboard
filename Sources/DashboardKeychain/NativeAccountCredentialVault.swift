@@ -144,8 +144,7 @@ public struct NativeAccountCredentialVault {
         }
         configureAuthentication(
             in: &query,
-            interactionAllowed: interactionAllowed,
-            skipsProtectedItems: true
+            interactionAllowed: interactionAllowed
         )
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -165,16 +164,13 @@ public struct NativeAccountCredentialVault {
 
     private func configureAuthentication(
         in query: inout [String: Any],
-        interactionAllowed: Bool,
-        skipsProtectedItems: Bool = false
+        interactionAllowed: Bool
     ) {
         guard !interactionAllowed else { return }
         query[kSecUseAuthenticationContext as String] = authenticationContext(
             interactionAllowed: false
         )
-        if skipsProtectedItems {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
-        }
+        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
     }
 
     private func authenticationContext(interactionAllowed: Bool = true) -> LAContext {

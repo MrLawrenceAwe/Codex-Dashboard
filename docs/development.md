@@ -46,7 +46,9 @@ individually, then signs the containing app without recursively re-signing it.
 The helper checks the calling process's Dashboard identifier and certificate against
 its own certificate before accepting a single JSON request on stdin. Credential
 bytes travel over pipes, never argv or environment variables. Background calls
-retain their no-interaction policy. Existing Keychain items and their UUIDs stay
+retain their no-interaction policy: the single-request helper disables traditional
+Keychain Services UI, and queries fail instead of prompting or skipping protected
+items. Existing Keychain items and their UUIDs stay
 in place; previous protected items retain their recovery path to avoid data loss.
 Helper or toolchain changes can change its code hash and require reauthorization.
 
