@@ -27,12 +27,14 @@ const reviewLoopView = (() => {
         <label>Previous loops<select data-review-history-select aria-label="Previous review loop"></select></label>
         <p class="review-field-help" data-review-history-type></p>
         <p class="review-field-help" data-review-history-updated></p>
+        <details class="review-history-manage"><summary>Manage history</summary>
         <div class="review-history-actions">
           <button type="button" data-review-history-action="delete">Delete selected</button>
           <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete loops created earlier</button>
           <button type="button" data-review-history-action="deleteAll">Delete all history</button>
         </div>
         <p id="review-history-delete-help" class="review-field-help">Deletes saved loops created before the selected loop, regardless of their last updated date. Review chats remain available.</p>
+        </details>
         <details class="review-history-details" data-review-history-details>
           <summary>Loop details</summary>
           <div data-review-history-card></div>

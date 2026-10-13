@@ -128,8 +128,13 @@ Choose separate review and fix models, optional supported reasoning efforts,
 Standard/Fast speed, and a round limit of 1–20 (default five). Bugs and performance
 reviews offer general/personal project context and a finding priority limit. P0–P2
 includes P0, P1, and P2. These types also offer **Live testing**, off by default, and
-**Reload browser extension** before testing. Review models come from Codex's live
+**Reload browser extension** before testing under **Testing & publishing**, alongside
+remote push settings. Review models come from Codex's live
 model list. Select **Start review & fix** to begin the loop.
+
+Expand **Configured prompt preview** or **Up next** to inspect instructions without
+leaving the loop. **Loop settings** shows the saved configuration. Prompt sections
+keep their expanded state during refresh.
 
 **Configured prompt preview** shows instructions generated from the current loop
 settings. It does not record the exact prompt submitted to a chat; setting changes
@@ -231,7 +236,7 @@ addressed across successful fix rounds, and distinct fix commits. These counts
 summarise recorded rounds and do not represent unique issues across reviews.
 Motion follows the system’s reduced-motion preference.
 
-Finished loops move to history. History controls delete saved loops and their
+Finished loops move to history. Expand **Manage history** to delete saved loops and their
 round records; the review chats remain available. **Delete loops created earlier**
 uses creation order, regardless of the displayed last updated dates.
 

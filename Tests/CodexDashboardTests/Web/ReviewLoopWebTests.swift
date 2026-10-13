@@ -919,7 +919,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["Round limit reached", "Round limit reached", 0, false, "All configured review rounds completed.", true])
     }
 
-    func testLivePromptsStayVisibleAfterRefreshAndRenderAsText() async throws {
+    func testLivePromptDisclosuresRetainExpansionAfterRefreshAndRenderAsText() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -933,9 +933,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           const current = document.querySelector('[data-review-current-prompt]');
           const upcoming = document.querySelector('[data-review-upcoming-prompt]');
+          const collapsedInitially = !current.open && !upcoming.open;
+          current.open = true;
           api.applyReviewPageSnapshot(snapshot);
           const active = [!document.querySelector('[data-review-live]').hidden,
-            current.tagName,upcoming.tagName,!current.hidden,!upcoming.hidden,
+            collapsedInitially,current.open,upcoming.open,!current.hidden,!upcoming.hidden,
             document.querySelector('[data-review-current-text]').textContent,
             document.querySelector('[data-review-upcoming-text]').textContent,
             document.querySelector('[data-review-current-text]').children.length,
@@ -949,7 +951,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-next-message]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, "DIV", "DIV", true, true, "Review <code> & files", "Address all and commit", 0, "task-1", true, "No further prompts scheduled."])
+        XCTAssertEqual(result, [true, true, true, false, true, true, "Review <code> & files", "Address all and commit", 0, "task-1", true, "No further prompts scheduled."])
     }
 
     func testRequestUsesLocalDesktopConnectionAndCorrelatesResponses() async throws {

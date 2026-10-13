@@ -26,6 +26,20 @@ const reviewLoopSetupView = (() => {
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
+        <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
+        <p id="review-limit-help" class="review-field-help">Stops when no qualifying findings remain or this limit is reached.</p>
+        </fieldset>
+        <details class="review-execution-options" open><summary>Model &amp; speed</summary>
+        <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
+        <label>Review model<select data-review-model required aria-label="Review model"><option value="">Choose a model</option></select></label>
+        <label>Reasoning effort<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
+        <label>Fix model<select data-fix-model required aria-label="Fix model"><option value="">Choose a model</option></select></label>
+        <label>Reasoning effort<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
+        <label>Response speed<select data-review-speed aria-label="Response speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
+        </fieldset>
+        </details>
+        <details class="review-testing-options"><summary>Testing &amp; publishing</summary>
+        <fieldset class="review-limits"><legend class="review-visually-hidden">Testing and publishing settings</legend>
         <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
         <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
         <label class="review-extension">Reload browser extension<select data-review-extension aria-label="Reload browser extension before testing" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
@@ -33,16 +47,6 @@ const reviewLoopSetupView = (() => {
         <label class="review-mute-test-playback"><input type="checkbox" data-review-mute-test-playback> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
-        <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Each round reviews the project and commits verified fixes for qualifying findings. Stops when no qualifying findings remain or the round limit is reached.</p>
-        </fieldset>
-        <details class="review-execution-options" open><summary>Model &amp; speed</summary>
-        <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
-        <label>Review model<select data-review-model required aria-label="Review model"><option value="">Choose a model</option></select></label>
-        <label>Review reasoning effort<select data-review-effort aria-label="Review reasoning effort"><option value="">Model default</option></select></label>
-        <label>Fix model<select data-fix-model required aria-label="Fix model"><option value="">Choose a model</option></select></label>
-        <label>Fix reasoning effort<select data-fix-effort aria-label="Fix reasoning effort"><option value="">Model default</option></select></label>
-        <label>Response speed<select data-review-speed aria-label="Response speed"><option value="standard" selected>Standard</option><option value="fast">Fast</option></select></label>
         </fieldset>
         </details>
         <p class="review-availability" data-review-availability role="status" hidden></p>

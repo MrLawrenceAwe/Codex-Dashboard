@@ -29,25 +29,26 @@ const reviewLoopCardView = (() => {
     card.dataset.loopId = loop.id;
     card.innerHTML = `
       <div class="review-section-heading"><h2 data-review-project-name></h2><span data-review-badge></span></div>
-      <div data-review-context class="review-context"></div>
+      <div class="review-scope-label" data-review-scope-label></div>
+        <div class="review-live-heading" data-review-live-heading hidden><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open chat ↗</button></div>
         <div class="review-feedback" data-review-feedback></div>
         <div data-review-status role="status" aria-live="polite"></div>
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
         <div data-review-test-playback-setting></div>
         <div class="review-live" data-review-live hidden>
-          <div class="review-live-heading"><strong data-review-step></strong><button type="button" data-review-current-task hidden>Open chat ↗</button></div>
-          <div class="review-prompt" data-review-current-prompt>
-            <div class="review-prompt-heading"><span data-review-current-label>Configured prompt preview</span><span data-review-current-title></span></div>
+          <details class="review-prompt" data-review-current-prompt>
+            <summary class="review-prompt-heading"><span data-review-current-label>Configured prompt preview</span><span data-review-current-title></span></summary>
             <p data-review-current-note></p><pre data-review-current-text></pre>
-          </div>
-          <div class="review-prompt" data-review-upcoming-prompt>
-            <div class="review-prompt-heading"><span>Up next</span><span data-review-upcoming-title></span></div>
+          </details>
+          <details class="review-prompt" data-review-upcoming-prompt>
+            <summary class="review-prompt-heading"><span>Up next</span><span data-review-upcoming-title></span></summary>
             <p data-review-upcoming-note></p><pre data-review-upcoming-text></pre>
-          </div>
+          </details>
           <p class="review-next-message" data-review-next-message></p>
         </div>
-        <ol data-review-rounds aria-label="Review rounds"></ol>`;
+        <ol data-review-rounds aria-label="Review rounds"></ol>
+        <details class="review-configuration"><summary>Loop settings</summary><div data-review-context class="review-context"></div></details>`;
     return card;
   }
 
@@ -99,6 +100,7 @@ const reviewLoopCardView = (() => {
     badge.dataset.phase = loop.phase;
     const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID)}${selection.reasoningEffort ? ` · ${escape(composerPresets.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const reviewTypeLabel = reviewPresentation.reviewTypeLabel(loop.reviewType, reviewTypes);
+    root.querySelector('[data-review-scope-label]').textContent = [reviewTypeLabel, loop.priorityLimit ? `P0${loop.priorityLimit === 'P0' ? '' : `–${loop.priorityLimit}`}` : ''].filter(Boolean).join(' · ');
     root.querySelector('[data-review-context]').innerHTML = `<span>${escape(reviewTypeLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.liveTesting ? '<span>Live testing enabled</span>' : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
@@ -144,7 +146,7 @@ const reviewLoopCardView = (() => {
     const commits = new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.commit).map(round => round.result.commit)).size;
     const feedback = root.querySelector('[data-review-feedback]');
     const markup = `
-      <div class="review-feedback-heading"><strong>${latest ? `Round ${latest.number}` : 'First round'}</strong><span>${escape(phaseLabel(loop))}</span></div>
+      <div class="review-feedback-heading"><strong>${latest ? `Round ${latest.number}` : 'First round'}</strong></div>
       <ol class="review-stage-track" aria-label="${latest ? `Round ${latest.number}` : 'First round'} progress">${stages.map((stage, index) => `
         <li data-stage="${stage.state}" ${stage.state === 'active' ? 'aria-current="step"' : ''}>
           <span class="review-stage-icon" aria-hidden="true">${icons[stage.state] || index + 1}</span>
@@ -163,6 +165,7 @@ const reviewLoopCardView = (() => {
   function renderProgress(root, loop, progress) {
     const live = root.querySelector('[data-review-live]');
     live.hidden = !loop || !progress;
+    root.querySelector('[data-review-live-heading]').hidden = live.hidden;
     if (live.hidden) return;
     root.querySelector('[data-review-step]').textContent = progress.step;
     root.querySelector('[data-review-current-label]').textContent = progress.currentLabel;
