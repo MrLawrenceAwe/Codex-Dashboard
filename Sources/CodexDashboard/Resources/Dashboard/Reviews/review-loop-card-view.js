@@ -153,7 +153,7 @@ const reviewLoopCardView = (() => {
           <strong>${stage.label}</strong><span class="review-stage-description">${stage.description}</span>
         </li>`).join('')}</ol>
       <dl class="review-metrics">
-        <div><dt>Latest findings</dt><dd>${latest?.review ? latest.review.findings.length : '—'}</dd></div>
+        <div><dt>Findings this round</dt><dd>${latest?.review ? latest.review.findings.length : '—'}</dd></div>
         <div><dt>Findings addressed</dt><dd>${addressed}</dd></div>
         <div><dt>Fix commits</dt><dd>${commits}</dd></div>
       </dl>`;
