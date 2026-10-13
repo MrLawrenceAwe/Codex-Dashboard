@@ -223,6 +223,14 @@ Dirty checkouts, unexpected branch/commit changes, malformed reports, interrupte
 turns, and approval requests stop progression with an explanation. Review edits
 block before any fix or push. Reaching the configured limit ends with **Round limit
 reached**, which means the configured rounds finished, not that findings are absent.
+Each loop card shows the latest round’s **Review → Fix & commit → Verify** stages,
+with an active spinner, completed checks, and explicit paused or attention states.
+Stages that are not needed are labelled accordingly; verification is marked done
+only when recorded. The summary shows findings in the latest review, findings
+addressed across successful fix rounds, and distinct fix commits. These counts
+summarise recorded rounds and do not represent unique issues across reviews.
+Motion follows the system’s reduced-motion preference.
+
 Finished loops move to history. History controls delete saved loops and their
 round records; the review chats remain available. **Delete loops created earlier**
 uses creation order, regardless of the displayed last updated dates.

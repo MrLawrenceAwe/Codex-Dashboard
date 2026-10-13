@@ -10,6 +10,57 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testVisualFeedbackTracksWorkAndOnlyMarksRecordedVerificationDone() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        webView.frame = CGRect(x: 0, y: 0, width: 360, height: 900)
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const round = {number:1,fixRequested:false};
+          const loop = {id:'feedback',project,phase:'waiting',completedRoundCount:0,maxRounds:3,rounds:[]};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[]};
+          const states = () => {
+            api.applyReviewPageSnapshot(snapshot);
+            return [...document.querySelectorAll('.review-stage-track > li')].map(item => item.dataset.stage).join(',');
+          };
+          const results = [states()];
+          api.openReviews();
+          loop.phase = 'running'; loop.rounds = [round];
+          results.push(states(),document.querySelector('[aria-current="step"] strong').textContent,
+            document.querySelector('.review-metrics dd').textContent);
+          const activeStage = document.querySelector('[aria-current="step"]');
+          api.applyReviewPageSnapshot(snapshot);
+          results.push(activeStage === document.querySelector('[aria-current="step"]'));
+          round.review = {outcome:'reviewed',findings:[{title:'Issue',body:'Details'}]};
+          round.fixRequested = true;
+          results.push(states());
+          round.fixVerification = {commit:'abc123'};
+          results.push(states());
+          loop.phase = 'blocked';
+          results.push(states(),document.querySelector('[data-stage="blocked"] .review-stage-description').textContent,
+            document.querySelector('[data-stage="blocked"]').hasAttribute('aria-current'));
+          loop.phase = 'paused'; results.push(states());
+          loop.phase = 'stopped'; results.push(states());
+          loop.phase = 'limitReached'; snapshot.finishedLoopIDs = [loop.id];
+          round.result = {outcome:'fixed',commit:'abc123',addressedFindingCount:1};
+          results.push(states());
+          round.result.verifiedCommit = 'abc123';
+          results.push(states(),[...document.querySelectorAll('.review-metrics dd')].map(item => item.textContent).join(','));
+          round.result = {outcome:'clean',addressedFindingCount:0};
+          results.push(states());
+          const track = document.querySelector('.review-stage-track');
+          results.push(track.getBoundingClientRect().right <= document.documentElement.clientWidth,
+            [...track.children].every(item => item.scrollWidth <= item.clientWidth));
+          return results;
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["waiting,pending,pending", "active,pending,pending", "Review", "—", true,
+            "done,active,pending", "done,done,active", "done,done,blocked", "Needs attention", false,
+            "done,done,paused", "done,done,stopped", "done,done,unrecorded", "done,done,done", "1,1,1",
+            "done,skipped,skipped", true, true])
+    }
+
     func testCardsResolveLabelsWithoutRenderingSetupAndPreserveUnavailableIdentifiers() async throws {
         let webView = DashboardWebTestHarness.makeWebView()
         webView.loadHTMLString(DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))

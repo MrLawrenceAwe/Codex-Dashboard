@@ -165,3 +165,29 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop [data-review-test-playback-setting] { margin-top:16px; }
 .dashboard-review-loop [data-review-test-playback-setting] label, .dashboard-review-loop .review-mute-test-playback { display:flex; align-items:center; gap:8px; width:fit-content; font-size:13px; }
 .dashboard-review-loop [data-review-test-playback-setting] input, .dashboard-review-loop [data-review-mute-test-playback] { appearance:auto; width:16px; min-height:16px; height:16px; margin:0; padding:0; }
+
+.dashboard-review-loop .review-feedback { margin-top:18px; padding:14px; border:1px solid var(--review-border); border-radius:10px; background:var(--review-tint); }
+.dashboard-review-loop .review-feedback-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 12px; font-size:11px; }
+.dashboard-review-loop .review-feedback-heading > span { color:var(--review-muted); }
+.dashboard-review-loop .review-stage-track { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin:14px 0; }
+.dashboard-review-loop .review-stage-track > li { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0; color:var(--review-muted); font-size:11px; }
+.dashboard-review-loop .review-stage-track > li:not(:last-child)::after { content:''; position:absolute; top:13px; left:34px; right:0; height:1px; background:var(--review-border); }
+.dashboard-review-loop .review-stage-icon { display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--review-border); border-radius:50%; font-size:12px; font-variant-numeric:tabular-nums; }
+.dashboard-review-loop .review-stage-track strong { font-weight:600; }
+.dashboard-review-loop .review-stage-description { font-size:10px; overflow-wrap:anywhere; }
+.dashboard-review-loop .review-stage-track [data-stage="done"] { color:var(--review-accent); }
+.dashboard-review-loop .review-stage-track [data-stage="done"] .review-stage-icon { background:color-mix(in srgb, var(--review-accent) 12%, transparent); border-color:currentColor; }
+.dashboard-review-loop .review-stage-track [data-stage="active"] { color:var(--app-color-text-foreground, #ececec); }
+.dashboard-review-loop .review-stage-track [data-stage="active"] .review-stage-icon { border-color:var(--review-accent); border-top-color:transparent; animation:review-nav-spin 1.2s linear infinite; font-size:0; }
+.dashboard-review-loop .review-stage-track :is([data-stage="blocked"], [data-stage="paused"]) { color:var(--app-color-text-warning, #c99b54); }
+.dashboard-review-loop .review-stage-track :is([data-stage="blocked"], [data-stage="paused"]) .review-stage-icon { border-color:currentColor; background:color-mix(in srgb, currentColor 8%, transparent); }
+.dashboard-review-loop .review-metrics { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:0; padding-top:12px; border-top:1px solid var(--review-border); }
+.dashboard-review-loop .review-metrics dt { font-size:10px; color:var(--review-muted); }
+.dashboard-review-loop .review-metrics dd { margin:3px 0 0; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; }
+.dashboard-review-loop .review-activity:is([data-phase="blocked"], [data-phase="awaitingExtensionReload"]) { border-color:color-mix(in srgb, var(--app-color-text-warning, #c99b54) 55%, transparent); }
+.dashboard-review-loop [data-review-rounds] > li:is([data-outcome="fixed"], [data-outcome="clean"], [data-outcome="withdrawn"]) .review-round-number { color:var(--review-accent); border-color:color-mix(in srgb, var(--review-accent) 45%, transparent); }
+.dashboard-review-loop [data-review-rounds] > li[data-outcome="blocked"] .review-round-number { color:var(--app-color-text-warning, #c99b54); border-color:currentColor; }
+.dashboard-review-loop [data-review-rounds] > li[data-outcome="active"] .review-round-number { color:var(--review-accent); border-color:currentColor; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-review-loop .review-stage-track [data-stage="active"] .review-stage-icon { animation:none; border-top-color:var(--review-accent); border-style:dashed; }
+}

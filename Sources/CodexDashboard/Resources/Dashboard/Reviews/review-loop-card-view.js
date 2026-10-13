@@ -30,6 +30,7 @@ const reviewLoopCardView = (() => {
     card.innerHTML = `
       <div class="review-section-heading"><h2 data-review-project-name></h2><span data-review-badge></span></div>
       <div data-review-context class="review-context"></div>
+        <div class="review-feedback" data-review-feedback></div>
         <div data-review-status role="status" aria-live="polite"></div>
         <div class="review-round-progress" data-review-round-progress hidden><div><span>Rounds completed</span><span data-review-round-count></span></div><progress data-review-meter aria-label="Completed review rounds" value="0" max="5"></progress></div>
         <div class="review-controls" data-review-controls></div>
@@ -65,7 +66,7 @@ const reviewLoopCardView = (() => {
   }
 
   function roundMarkup(round, loop, expandedRounds, findingsState, loopFinished) {
-    return `<li>
+    return `<li data-outcome="${escape(round.result?.outcome || (loop.phase === 'running' && round === loop.rounds.at(-1) ? 'active' : 'pending'))}">
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
       <span>${escape(reviewPresentation.roundStatus(round, loop.pushToRemote))}</span></div>
@@ -108,6 +109,8 @@ const reviewLoopCardView = (() => {
     const meter = root.querySelector('[data-review-meter]');
     meter.max = loop.maxRounds;
     meter.value = completedRounds;
+    root.dataset.phase = loop.phase;
+    renderFeedback(root, loop);
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
     controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
@@ -132,6 +135,30 @@ const reviewLoopCardView = (() => {
     root.dataset.renderedLoop = loop?.id || '';
     root.querySelector('[data-review-rounds]').innerHTML = loop.rounds.map(round =>
       roundMarkup(round, loop, expandedRounds, findingsState, isFinished(loop))).join('');
+  }
+  function renderFeedback(root, loop) {
+    const stages = reviewPresentation.roundStages(loop);
+    const icons = { done: '✓', skipped: '–', blocked: '!', paused: 'Ⅱ', stopped: '■', stopping: '■' };
+    const latest = loop.rounds.at(-1);
+    const addressed = loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0);
+    const commits = new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.commit).map(round => round.result.commit)).size;
+    const feedback = root.querySelector('[data-review-feedback]');
+    const markup = `
+      <div class="review-feedback-heading"><strong>${latest ? `Round ${latest.number}` : 'First round'}</strong><span>${escape(phaseLabel(loop))}</span></div>
+      <ol class="review-stage-track" aria-label="${latest ? `Round ${latest.number}` : 'First round'} progress">${stages.map((stage, index) => `
+        <li data-stage="${stage.state}" ${stage.state === 'active' ? 'aria-current="step"' : ''}>
+          <span class="review-stage-icon" aria-hidden="true">${icons[stage.state] || index + 1}</span>
+          <strong>${stage.label}</strong><span class="review-stage-description">${stage.description}</span>
+        </li>`).join('')}</ol>
+      <dl class="review-metrics">
+        <div><dt>Latest findings</dt><dd>${latest?.review ? latest.review.findings.length : '—'}</dd></div>
+        <div><dt>Findings addressed</dt><dd>${addressed}</dd></div>
+        <div><dt>Fix commits</dt><dd>${commits}</dd></div>
+      </dl>`;
+    if (feedback.dataset.markup !== markup) {
+      feedback.innerHTML = markup;
+      feedback.dataset.markup = markup;
+    }
   }
   function renderProgress(root, loop, progress) {
     const live = root.querySelector('[data-review-live]');

@@ -26,6 +26,27 @@ const reviewPresentation = (() => {
     return round.result?.commit ? `${label} · ${round.result.commit.slice(0, 8)}` : label;
   }
 
+  function roundStages(loop) {
+    const round = loop.rounds.at(-1);
+    const outcome = round?.result?.outcome;
+    const current = round?.fixVerification ? 2 : round?.fixRequested || round?.review?.outcome === 'reviewed' ? 1 : 0;
+    const labels = ['Review', 'Fix & commit', 'Verify'];
+    const states = ['pending', 'pending', 'pending'];
+    if (outcome && outcome !== 'blocked') {
+      states[0] = 'done';
+      states[1] = outcome === 'clean' ? 'skipped' : 'done';
+      states[2] = round.result.verifiedCommit ? 'done' : outcome === 'fixed' ? 'unrecorded' : 'skipped';
+    } else {
+      for (let index = 0; index < current; index++) states[index] = 'done';
+      states[current] = ({ running: 'active', blocked: 'blocked', awaitingExtensionReload: 'blocked',
+        paused: 'paused', stopping: 'stopping', stopped: 'stopped', waiting: 'waiting' })[loop.phase] || 'incomplete';
+    }
+    const descriptions = { pending: 'Up next', done: 'Done', skipped: 'Not needed', unrecorded: 'Not recorded',
+      active: 'In progress', blocked: 'Needs attention', paused: 'Paused', stopping: 'Stopping',
+      stopped: 'Stopped', waiting: 'Waiting', incomplete: 'Incomplete' };
+    return labels.map((label, index) => ({ label, state: states[index], description: descriptions[states[index]] }));
+  }
+
   function updatedAtLabel(timestamp) {
     if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return 'Not recorded';
     const date = new Date(timestamp * 1000);
@@ -33,5 +54,5 @@ const reviewPresentation = (() => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   }
 
-  return { reviewTypeLabel, roundStatus, updatedAtLabel };
+  return { reviewTypeLabel, roundStatus, roundStages, updatedAtLabel };
 })();
