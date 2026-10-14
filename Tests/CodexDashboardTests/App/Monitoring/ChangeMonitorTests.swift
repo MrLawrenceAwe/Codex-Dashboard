@@ -17,11 +17,11 @@ final class ChangeMonitorTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
         let dataMonitor = CodexDataChangeMonitor()
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var catalogRefreshes = 0
         var unreadRefreshes = 0
         var accountRefreshes = 0
-        var workingTreeRefreshes = 0
+        var projectGitRefreshes = 0
         var refreshedProjectPaths: Set<String> = []
         dataMonitor.start(
             catalogURL: catalogDirectory.appendingPathComponent("state.sqlite"),
@@ -32,13 +32,13 @@ final class ChangeMonitorTests: XCTestCase {
             refreshUnread: { unreadRefreshes += 1 },
             refreshAccounts: { accountRefreshes += 1 }
         )
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in
-                workingTreeRefreshes += 1
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in
+                projectGitRefreshes += 1
                 refreshedProjectPaths.formUnion(paths ?? [])
             }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { dataMonitor.stop(); workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { dataMonitor.stop(); projectGitMonitor.stop() }
 
         try Data("catalog".utf8).write(to: catalogDirectory.appendingPathComponent("state.sqlite"))
         try Data("unread".utf8).write(to: unreadDirectory.appendingPathComponent("state.json"))
@@ -47,7 +47,7 @@ final class ChangeMonitorTests: XCTestCase {
 
         try await waitUntil {
             catalogRefreshes > 0 && unreadRefreshes > 0
-                && accountRefreshes > 0 && workingTreeRefreshes > 0
+                && accountRefreshes > 0 && projectGitRefreshes > 0
         }
         XCTAssertEqual(refreshedProjectPaths, [projectDirectory.path])
     }
@@ -134,7 +134,7 @@ final class ChangeMonitorTests: XCTestCase {
         XCTAssertEqual(maximumActiveRefreshCount, 1)
     }
 
-    func testNestedProjectFileChangeTriggersWorkingTreeRefresh() async throws {
+    func testNestedProjectFileChangeTriggersProjectGitRefresh() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-nested-monitor-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
@@ -149,12 +149,12 @@ final class ChangeMonitorTests: XCTestCase {
         try Data("initial".utf8).write(to: nestedFile)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var refreshedProjectPaths: Set<String> = []
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in refreshedProjectPaths.formUnion(paths ?? []) }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("updated".utf8).write(to: nestedFile)
@@ -162,7 +162,7 @@ final class ChangeMonitorTests: XCTestCase {
         try await waitUntil { refreshedProjectPaths.contains(projectDirectory.path) }
     }
 
-    func testNonRepositoryNestedFileChangeDoesNotTriggerWorkingTreeRefresh() async throws {
+    func testNonRepositoryNestedFileChangeDoesNotTriggerProjectGitRefresh() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-non-repository-monitor-\(UUID().uuidString)", isDirectory: true)
         let projectDirectory = root.appendingPathComponent("project", isDirectory: true)
@@ -170,18 +170,18 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
-        var workingTreeRefreshes = 0
-        workingTreeMonitor.start(refreshWorkingTrees: { _ in workingTreeRefreshes += 1 }
+        let projectGitMonitor = ProjectGitChangeMonitor()
+        var projectGitRefreshes = 0
+        projectGitMonitor.start(refreshProjectGitStatuses: { _ in projectGitRefreshes += 1 }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("generated".utf8).write(to: nestedDirectory.appendingPathComponent("asset.json"))
         try await Task.sleep(for: .seconds(1))
 
-        XCTAssertEqual(workingTreeRefreshes, 0)
+        XCTAssertEqual(projectGitRefreshes, 0)
     }
 
     func testNonRepositoryWatchPromotesNewGitRepositoryToRecursiveMonitoring() async throws {
@@ -192,12 +192,12 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var refreshes: [Set<String>] = []
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in refreshes.append(paths ?? []) }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         _ = try await Subprocess.run(
@@ -221,12 +221,12 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: secondProject, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var refreshes: [Set<String>] = []
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in refreshes.append(paths ?? []) }
         )
-        workingTreeMonitor.updateProjectPaths([firstProject.path, secondProject.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([firstProject.path, secondProject.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("change".utf8).write(to: firstProject.appendingPathComponent("changed.txt"))
@@ -242,12 +242,12 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var refreshes: [Set<String>] = []
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in refreshes.append(paths ?? []) }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         for index in 0..<5 {
@@ -301,15 +301,15 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor(
+        let projectGitMonitor = ProjectGitChangeMonitor(
             projectRefreshQuietPeriod: .milliseconds(200),
             projectRefreshMaximumDelay: .milliseconds(500)
         )
         var refreshes: [Set<String>] = []
-        workingTreeMonitor.start(refreshWorkingTrees: { paths in refreshes.append(paths ?? []) }
+        projectGitMonitor.start(refreshProjectGitStatuses: { paths in refreshes.append(paths ?? []) }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         for index in 0..<8 {
             try Data("\(index)".utf8).write(
@@ -329,12 +329,12 @@ final class ChangeMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
-        let workingTreeMonitor = WorkingTreeChangeMonitor()
+        let projectGitMonitor = ProjectGitChangeMonitor()
         var refreshCount = 0
         var activeRefreshCount = 0
         var maximumActiveRefreshCount = 0
         var firstRefreshContinuation: CheckedContinuation<Void, Never>?
-        workingTreeMonitor.start(refreshWorkingTrees: { _ in
+        projectGitMonitor.start(refreshProjectGitStatuses: { _ in
                 refreshCount += 1
                 activeRefreshCount += 1
                 maximumActiveRefreshCount = max(maximumActiveRefreshCount, activeRefreshCount)
@@ -344,8 +344,8 @@ final class ChangeMonitorTests: XCTestCase {
                 activeRefreshCount -= 1
             }
         )
-        workingTreeMonitor.updateProjectPaths([projectDirectory.path])
-        defer { workingTreeMonitor.stop() }
+        projectGitMonitor.updateProjectPaths([projectDirectory.path])
+        defer { projectGitMonitor.stop() }
 
         try await Task.sleep(for: .milliseconds(150))
         try Data("first".utf8).write(to: projectDirectory.appendingPathComponent("first.txt"))

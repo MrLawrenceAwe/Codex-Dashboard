@@ -233,9 +233,9 @@ extension AppCoordinatorTests {
         )
     }
 
-    func testWorkingTreePollingBoundsDelayEvenWhenFileEventsFail() {
-        XCTAssertEqual(RefreshScheduler.Schedule.workingTree(active: true), .seconds(15))
-        XCTAssertEqual(RefreshScheduler.Schedule.workingTree(active: false), .seconds(60))
+    func testProjectGitPollingBoundsDelayEvenWhenFileEventsFail() {
+        XCTAssertEqual(RefreshScheduler.Schedule.projectGitStatus(active: true), .seconds(15))
+        XCTAssertEqual(RefreshScheduler.Schedule.projectGitStatus(active: false), .seconds(60))
     }
 
     func testUnreadFailureShowsWarningWithoutHidingCatalog() async {

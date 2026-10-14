@@ -71,6 +71,8 @@ Generation exits before starting the menu-bar application.
 Swift source and tests mirror the application, account, compatibility, composer,
 prompt, review, runtime, and thread boundaries. Filesystem watchers and activity
 monitors live in `App/Monitoring`; diagnostics views live in `App/Diagnostics`.
+`DesktopNotificationCenter.swift` owns the macOS notification adapter and its
+protocol; `DesktopUsageNotifier.swift` owns usage-alert scheduling and delivery.
 `Support/FileSystemPath.swift` defines canonical path identity for catalog grouping,
 review checkout checks, file links, and monitoring. Project event matching separately
 retains lexical standardisation so it does not resolve symlinks for each event.

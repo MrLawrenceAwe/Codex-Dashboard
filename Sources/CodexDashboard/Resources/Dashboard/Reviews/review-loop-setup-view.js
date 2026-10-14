@@ -46,7 +46,7 @@ const reviewLoopSetupView = (() => {
         <p id="review-extension-help" class="review-field-help review-extension-help">Reload with Chrome DevTools before live testing and, when live verification is needed, after building fixes. If a required reload fails, the loop waits for a manual reload.</p>
         <label class="review-mute-test-playback"><input type="checkbox" data-review-mute-test-playback> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
-        <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures stop the loop.</p>
+        <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. Push failures block the loop. Resolve the issue, then Resume to retry.</p>
         </fieldset>
         </details>
         <p class="review-availability" data-review-availability role="status" hidden></p>

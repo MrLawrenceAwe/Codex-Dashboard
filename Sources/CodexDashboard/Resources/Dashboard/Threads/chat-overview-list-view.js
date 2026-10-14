@@ -64,7 +64,7 @@ const chatOverviewListView = (() => {
   }
 
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
-    if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
+    if (!projectThreads.some(chatOverviewQuery.hasPendingGitChanges)) return '';
     const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
     const hasRepositoryThread = projectThreads.some((thread) => thread.sharesProjectRepository);
     const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
@@ -82,7 +82,7 @@ const chatOverviewListView = (() => {
   }
 
   function renderChangeStatus(projectThreads, indicatorsHidden, showHiddenStatus) {
-    if (!projectThreads.some(chatOverviewQuery.hasLocalChanges)) return '';
+    if (!projectThreads.some(chatOverviewQuery.hasPendingGitChanges)) return '';
     if (indicatorsHidden) {
       return showHiddenStatus
         ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'

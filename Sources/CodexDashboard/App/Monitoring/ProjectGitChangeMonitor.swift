@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class WorkingTreeChangeMonitor {
+final class ProjectGitChangeMonitor {
     static let projectRefreshQuietPeriod: Duration = .milliseconds(500)
     static let projectRefreshMaximumDelay: Duration = .seconds(2)
 
@@ -10,11 +10,11 @@ final class WorkingTreeChangeMonitor {
     private var watchedProjectPaths: Set<String> = []
     private let refreshDebouncer: RefreshDebouncer
     private var pendingProjectPaths: Set<String> = []
-    private var refreshWorkingTrees: (@MainActor (Set<String>?) async -> Void)?
+    private var refreshProjectGitStatuses: (@MainActor (Set<String>?) async -> Void)?
 
     init(
-        projectRefreshQuietPeriod: Duration = WorkingTreeChangeMonitor.projectRefreshQuietPeriod,
-        projectRefreshMaximumDelay: Duration = WorkingTreeChangeMonitor.projectRefreshMaximumDelay
+        projectRefreshQuietPeriod: Duration = ProjectGitChangeMonitor.projectRefreshQuietPeriod,
+        projectRefreshMaximumDelay: Duration = ProjectGitChangeMonitor.projectRefreshMaximumDelay
     ) {
         refreshDebouncer = RefreshDebouncer(
             quietPeriod: projectRefreshQuietPeriod,
@@ -22,9 +22,9 @@ final class WorkingTreeChangeMonitor {
         )
     }
 
-    func start(refreshWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void) {
+    func start(refreshProjectGitStatuses: @escaping @MainActor (Set<String>?) async -> Void) {
         stop()
-        self.refreshWorkingTrees = refreshWorkingTrees
+        self.refreshProjectGitStatuses = refreshProjectGitStatuses
     }
 
     func updateProjectPaths(_ paths: Set<String>) {
@@ -90,7 +90,7 @@ final class WorkingTreeChangeMonitor {
         projectChangeMonitor?.stop()
         projectChangeMonitor = nil
         watchedProjectPaths = []
-        refreshWorkingTrees = nil
+        refreshProjectGitStatuses = nil
     }
 
     private func scheduleProjectRefresh(for paths: Set<String>) {
@@ -99,7 +99,7 @@ final class WorkingTreeChangeMonitor {
             guard let self else { return }
             let paths = self.pendingProjectPaths
             self.pendingProjectPaths = []
-            if !paths.isEmpty { await self.refreshWorkingTrees?(paths) }
+            if !paths.isEmpty { await self.refreshProjectGitStatuses?(paths) }
         }
     }
 }

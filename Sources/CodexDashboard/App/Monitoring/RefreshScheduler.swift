@@ -7,7 +7,7 @@ final class RefreshScheduler {
         static func catalog(active: Bool) -> Duration {
             active ? .seconds(2) : .seconds(8)
         }
-        static func workingTree(active: Bool) -> Duration {
+        static func projectGitStatus(active: Bool) -> Duration {
             return active ? .seconds(15) : .seconds(60)
         }
         static func unread(active: Bool, fileEventsAvailable: Bool) -> Duration {
@@ -21,23 +21,23 @@ final class RefreshScheduler {
     }
 
     private var catalogPollingTask: Task<Void, Never>?
-    private var workingTreePollingTask: Task<Void, Never>?
+    private var projectGitPollingTask: Task<Void, Never>?
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
     private let dataChanges: CodexDataChangeMonitor?
-    private let workingTreeChanges: WorkingTreeChangeMonitor?
+    private let projectGitChanges: ProjectGitChangeMonitor?
 
     var hasFileChangeMonitoring: Bool { dataChanges != nil }
 
     init(observeFileChanges: Bool = true) {
         dataChanges = observeFileChanges ? CodexDataChangeMonitor() : nil
-        workingTreeChanges = observeFileChanges ? WorkingTreeChangeMonitor() : nil
+        projectGitChanges = observeFileChanges ? ProjectGitChangeMonitor() : nil
     }
 
     deinit {
         catalogPollingTask?.cancel()
-        workingTreePollingTask?.cancel()
+        projectGitPollingTask?.cancel()
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
@@ -45,14 +45,14 @@ final class RefreshScheduler {
 
     func start(
         synchronizeDashboard: @escaping @MainActor () async -> Void,
-        updateWorkingTrees: @escaping @MainActor (Set<String>?) async -> Void,
+        updateProjectGitStatuses: @escaping @MainActor (Set<String>?) async -> Void,
         updateUnreadState: @escaping @MainActor () async -> Void,
         refreshAccountUsage: @escaping @MainActor () async -> Void,
         refreshInactiveAccountUsage: @escaping @MainActor () async -> Void,
         refreshAccountState: @escaping @MainActor () async -> Void
     ) {
         guard catalogPollingTask == nil,
-              workingTreePollingTask == nil,
+              projectGitPollingTask == nil,
               unreadPollingTask == nil,
               accountUsagePollingTask == nil,
               inactiveAccountUsagePollingTask == nil
@@ -64,9 +64,9 @@ final class RefreshScheduler {
             },
             action: synchronizeDashboard
         )
-        workingTreePollingTask = recurringTask(
-            interval: { Schedule.workingTree(active: Self.isUserActive) },
-            action: { await updateWorkingTrees(nil) }
+        projectGitPollingTask = recurringTask(
+            interval: { Schedule.projectGitStatus(active: Self.isUserActive) },
+            action: { await updateProjectGitStatuses(nil) }
         )
         unreadPollingTask = recurringTask(
             interval: { [self] in
@@ -88,7 +88,7 @@ final class RefreshScheduler {
             interval: { Schedule.inactiveAccountUsage },
             action: refreshInactiveAccountUsage
         )
-        workingTreeChanges?.start(refreshWorkingTrees: updateWorkingTrees)
+        projectGitChanges?.start(refreshProjectGitStatuses: updateProjectGitStatuses)
         dataChanges?.start(
             catalogURL: CodexConfiguration.stateDatabaseURL,
             unreadStateURL: CodexConfiguration.globalStateURL,
@@ -101,7 +101,7 @@ final class RefreshScheduler {
     }
 
     func updateProjectPaths(_ paths: Set<String>) {
-        workingTreeChanges?.updateProjectPaths(paths)
+        projectGitChanges?.updateProjectPaths(paths)
     }
 
     static var isUserActive: Bool {
@@ -123,16 +123,16 @@ final class RefreshScheduler {
 
     func stop() {
         catalogPollingTask?.cancel()
-        workingTreePollingTask?.cancel()
+        projectGitPollingTask?.cancel()
         unreadPollingTask?.cancel()
         accountUsagePollingTask?.cancel()
         inactiveAccountUsagePollingTask?.cancel()
         catalogPollingTask = nil
-        workingTreePollingTask = nil
+        projectGitPollingTask = nil
         unreadPollingTask = nil
         accountUsagePollingTask = nil
         inactiveAccountUsagePollingTask = nil
         dataChanges?.stop()
-        workingTreeChanges?.stop()
+        projectGitChanges?.stop()
     }
 }

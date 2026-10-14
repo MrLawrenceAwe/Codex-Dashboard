@@ -19,7 +19,7 @@ actor ThreadSnapshotService {
     private var unreadStateWarning: String?
     private var hasLoadedSnapshot = false
     private var unreadRefreshGeneration: UInt64 = 0
-    private var workingTreeGenerationByPath: [String: UInt64] = [:]
+    private var projectGitGenerationByPath: [String: UInt64] = [:]
 
     init(
         catalogProvider: any ThreadCatalogProviding,
@@ -98,15 +98,15 @@ actor ThreadSnapshotService {
         projectPaths requestedPaths: Set<String>? = nil
     ) async -> [String: ProjectGitStatus]? {
         let allProjectPaths = Set(threads.compactMap(\.projectGroupPath))
-        // WorkingTreeChangeMonitor already coalesces bursts. Do not discard the final event:
+        // ProjectGitChangeMonitor already coalesces bursts. Do not discard the final event:
         // it may be the commit that clears the project's change indicator.
         let projectPaths = requestedPaths.map { $0.intersection(allProjectPaths) } ?? allProjectPaths
         guard !projectPaths.isEmpty, !Task.isCancelled else { return nil }
 
         var requestGenerations: [String: UInt64] = [:]
         for path in projectPaths {
-            let generation = (workingTreeGenerationByPath[path] ?? 0) &+ 1
-            workingTreeGenerationByPath[path] = generation
+            let generation = (projectGitGenerationByPath[path] ?? 0) &+ 1
+            projectGitGenerationByPath[path] = generation
             requestGenerations[path] = generation
         }
 
@@ -117,13 +117,13 @@ actor ThreadSnapshotService {
         )
         guard !Task.isCancelled else { return nil }
         let currentResults = latestStatuses.filter { path, _ in
-            workingTreeGenerationByPath[path] == requestGenerations[path]
+            projectGitGenerationByPath[path] == requestGenerations[path]
         }
         guard !currentResults.isEmpty else { return nil }
 
         if requestedPaths == nil {
             projectGitStatuses = projectGitStatuses.filter { allProjectPaths.contains($0.key) }
-            workingTreeGenerationByPath = workingTreeGenerationByPath.filter { allProjectPaths.contains($0.key) }
+            projectGitGenerationByPath = projectGitGenerationByPath.filter { allProjectPaths.contains($0.key) }
         }
         let changedResults = currentResults.filter { projectGitStatuses[$0.key] != $0.value }
         for (path, status) in currentResults {

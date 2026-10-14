@@ -55,7 +55,7 @@ mark it read: Codex remains the source of truth.
 ## Refresh and monitoring
 
 `CodexDataChangeMonitor` watches catalog, unread, and account files.
-`WorkingTreeChangeMonitor` owns project and Git metadata watches, with recursive
+`ProjectGitChangeMonitor` owns project and Git metadata watches, with recursive
 project events from `RecursiveProjectChangeMonitor`. Debounce policies remain
 separate. Git metadata watches follow linked-worktree pointers. Codex activation
 forces a Git refresh; filesystem events and user actions accelerate polling.

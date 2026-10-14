@@ -131,7 +131,7 @@ final class AppCoordinator: ObservableObject {
         compatibilityWasTriggeredByUpdate = compatibilityMonitor.updateWasDetected
         refreshScheduler.start(
             synchronizeDashboard: { [weak self] in await self?.synchronizeDashboard() },
-            updateWorkingTrees: { [weak self] paths in
+            updateProjectGitStatuses: { [weak self] paths in
                 await self?.updateProjectGitStatuses(projectPaths: paths)
             },
             updateUnreadState: { [weak self] in await self?.refreshUnreadState() },
