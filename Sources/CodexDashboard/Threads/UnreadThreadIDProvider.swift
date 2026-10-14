@@ -20,11 +20,6 @@ enum UnreadThreadIDError: LocalizedError {
 }
 
 actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
-    private struct FileSignature: Equatable {
-        let size: UInt64
-        let modifiedAt: Date
-    }
-
     private struct GlobalState: Decodable {
         let threadReadState: ThreadReadState
 
@@ -65,19 +60,14 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     }
 
     func loadUnreadThreadIDs() throws -> Set<String> {
-        let attributes: [FileAttributeKey: Any]
+        let signature: FileSignature
         do {
-            attributes = try FileManager.default.attributesOfItem(atPath: stateURL.path)
+            signature = try FileSignature.read(at: stateURL)
         } catch CocoaError.fileReadNoSuchFile {
             throw UnreadThreadIDError.missingState(stateURL)
         } catch {
             throw UnreadThreadIDError.invalidState(stateURL)
         }
-        guard
-            let size = (attributes[.size] as? NSNumber)?.uint64Value,
-            let modifiedAt = attributes[.modificationDate] as? Date
-        else { throw UnreadThreadIDError.invalidState(stateURL) }
-        let signature = FileSignature(size: size, modifiedAt: modifiedAt)
         let identityKey = try identityKeyLoader()
         if signature == cachedSignature && identityKey == cachedIdentityKey {
             return cachedUnreadThreadIDs
@@ -113,13 +103,7 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
               let tokens = root["tokens"] as? [String: Any],
               let token = tokens["access_token"] as? String
         else { return nil }
-        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 3 else { return nil }
-        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
-        guard let data = Data(base64Encoded: payload),
-              let claims = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let claims = try JWTClaimsDecoder.decodeUnverifiedClaims(token),
               let auth = claims["https://api.openai.com/auth"] as? [String: Any],
               let accountID = auth["chatgpt_account_id"] as? String,
               let userID = auth["chatgpt_user_id"] as? String,

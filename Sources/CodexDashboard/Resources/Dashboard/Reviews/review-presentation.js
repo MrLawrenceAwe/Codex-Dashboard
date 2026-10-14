@@ -43,12 +43,15 @@ const reviewPresentation = (() => {
     const descriptions = { pending: 'Up next', done: 'Done', skipped: 'Not needed',
       active: 'In progress', blocked: 'Needs attention', paused: 'Paused', stopping: 'Stopping',
       stopped: 'Stopped', waiting: 'Waiting', incomplete: 'Incomplete' };
-    return labels.map((label, index) => ({
-      label,
-      state: states[index],
-      description: index === 1 && states[index] === 'active' && round?.fixVerification
-        ? 'Reverifying fixes' : descriptions[states[index]],
-    }));
+    return labels.map((label, index) => {
+      let description = descriptions[states[index]];
+      if (index === 1 && states[index] === 'active' && round?.fixVerification) {
+        description = 'Reverifying fixes';
+      } else if (index === 1 && outcome === 'withdrawn') {
+        description = 'Findings withdrawn; no commit needed';
+      }
+      return { label, state: states[index], description };
+    });
   }
 
   function updatedAtLabel(timestamp) {

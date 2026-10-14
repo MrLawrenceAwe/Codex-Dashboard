@@ -58,11 +58,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             .max { $0.path.count < $1.path.count } ?? assigned.first
     }
 
-    private struct FileSignature: Equatable {
-        let size: UInt64
-        let modifiedAt: Date
-    }
-
     private struct DatabaseSignature: Equatable {
         let database: FileSignature
         let writeAheadLog: FileSignature?
@@ -222,23 +217,15 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     private func signature(for databaseURL: URL) throws -> DatabaseSignature {
-        guard let database = fileSignature(at: databaseURL) else {
+        guard let database = try? FileSignature.read(at: databaseURL) else {
             throw ThreadCatalogError.missingDatabase(databaseURL)
         }
         return DatabaseSignature(
             database: database,
-            writeAheadLog: fileSignature(at: URL(fileURLWithPath: databaseURL.path + "-wal"))
+            writeAheadLog: try? FileSignature.read(at: URL(fileURLWithPath: databaseURL.path + "-wal"))
         )
     }
 
-    private func fileSignature(at url: URL) -> FileSignature? {
-        guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            let size = (attributes[.size] as? NSNumber)?.uint64Value,
-            let modifiedAt = attributes[.modificationDate] as? Date
-        else { return nil }
-        return FileSignature(size: size, modifiedAt: modifiedAt)
-    }
 
     private func query<Row: Decodable>(databaseURL: URL, sql: String) async throws -> [Row] {
         do {

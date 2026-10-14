@@ -20,6 +20,8 @@ jobs:
           plutil -lint Packaging/Info.plist
           python3 -m json.tool Sources/CodexDashboard/Resources/Dashboard/injection-manifest.json >/dev/null
           zsh -n install.sh uninstall.sh
+      - name: Test renderer presentation without UI
+        run: node --test Tests/Renderer/review-presentation.test.cjs
       - name: Test
         run: swift test
       - name: Build release

@@ -496,13 +496,13 @@ final class ReviewLoopCoordinator {
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         if result.outcome == .fixed, updated.pushToRemote {
-            updated.message = "Fixes committed. Pushing the verified commit to the remote."
+            updated.message = "Fixes committed. Reconciling remote changes and publishing the verified fixes."
             try persist(updated)
-            do {
-                try await driver.pushCommit(reportedCommit, at: updated.project.path, expectedRepository: repo)
-            } catch let integration as ReviewRemoteIntegrationRequired {
+            let publication = try await driver.reconcileAndPublishFix(
+                reportedCommit, at: updated.project.path, expectedRepository: repo)
+            if case .verificationRequired(let repository) = publication {
                 try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: fixTurn.id,
-                                                repository: integration.repository, using: driver, threadID: threadID)
+                                                repository: repository, using: driver, threadID: threadID)
                 return
             }
             guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
@@ -547,7 +547,7 @@ final class ReviewLoopCoordinator {
             if turn.status == "inProgress" { return false }
             try requireCompleted(turn)
             if try await waitForExtensionReload(turn, loop: loop, using: driver, threads: threads, threadID: threadID) { return false }
-            if verification.commit == repository.commit {
+            if verification.targetCommit == repository.commit {
                 let report = try ReviewReportContract.review(turn.finalMessage, priorityLimit: loop.priorityLimit)
                 guard report.outcome == .reviewed, report.findings.isEmpty else {
                     throw ReviewLoopError("Fix verification needs attention at the current HEAD: \(report.summary) "
@@ -568,14 +568,14 @@ final class ReviewLoopCoordinator {
         guard var updated = activeLoop(matching: loop.id, phase: .running) else { return }
         // Persist intent before submission so a crash or lost acknowledgement cannot duplicate verification.
         updated.rounds[updated.rounds.count - 1].fixVerification = ReviewFixVerification(
-            sourceFixTurnID: sourceFixTurnID, commit: repository.commit)
+            sourceFixTurnID: sourceFixTurnID, targetCommit: repository.commit)
         updated.rounds[updated.rounds.count - 1].continuationRequested = true
         updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
         updated.message = "The branch advanced after the fix. Verifying the original findings at the current HEAD before completing this round."
         try persist(updated)
         let turnID = try await driver.startTurn(
             threadID: threadID, projectPath: updated.project.path, expectedRepository: repository,
-            prompt: ReviewPrompts.verifyFix(for: updated, round: round, commit: repository.commit),
+            prompt: ReviewPrompts.verifyFix(for: updated, round: round, targetCommit: repository.commit),
             kind: .review(updated.priorityLimit), selection: updated.reviewSelection, speed: updated.speed)
         guard var current = matchingLoop(loop.id) else { return }
         current.rounds[current.rounds.count - 1].fixVerification?.turnID = turnID

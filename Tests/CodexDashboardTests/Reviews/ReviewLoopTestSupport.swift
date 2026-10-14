@@ -75,14 +75,15 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var onStartTurnAsync: (() async -> Void)?
     var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
-    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome {
         if failPush { throw ReviewLoopError("Remote push failed") }
         if integrateRemoteOnPush {
             integrateRemoteOnPush = false
             self.commit = "merged"
-            throw ReviewRemoteIntegrationRequired(repository: try await repository(at: path))
+            return .verificationRequired(try await repository(at: path))
         }
         pushedCommits.append(commit)
+        return .published
     }
     func repository(at path: String) async throws -> ReviewRepositoryState {
         await Task.yield()

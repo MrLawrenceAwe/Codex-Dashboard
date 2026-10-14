@@ -4,11 +4,6 @@ import Foundation
 final class CodexDataChangeMonitor {
     static let dataRefreshQuietPeriod: Duration = .milliseconds(100)
     static let dataRefreshMaximumDelay: Duration = .seconds(2)
-    private struct FileSignature: Equatable {
-        let size: UInt64
-        let modifiedAt: Date
-    }
-
     private struct CatalogSignature: Equatable {
         let database: FileSignature?
         let writeAheadLog: FileSignature?
@@ -56,9 +51,9 @@ final class CodexDataChangeMonitor {
         self.refreshUnread = refreshUnread
         self.refreshAccounts = refreshAccounts
         catalogSignature = Self.catalogSignature(at: catalogURL)
-        unreadSignature = Self.fileSignature(at: unreadStateURL)
-        accountMetadataSignature = Self.fileSignature(at: accountMetadataURL)
-        authenticationSignature = Self.fileSignature(at: authenticationURL)
+        unreadSignature = try? FileSignature.read(at: unreadStateURL)
+        accountMetadataSignature = try? FileSignature.read(at: accountMetadataURL)
+        authenticationSignature = try? FileSignature.read(at: authenticationURL)
 
         installDataWatches()
     }
@@ -98,7 +93,7 @@ final class CodexDataChangeMonitor {
         }
 
         if let unreadStateURL {
-            let latest = Self.fileSignature(at: unreadStateURL)
+            let latest = try? FileSignature.read(at: unreadStateURL)
             if latest != unreadSignature {
                 unreadSignature = latest
                 changed = true
@@ -109,7 +104,7 @@ final class CodexDataChangeMonitor {
 
         var accountStateChanged = false
         if let accountMetadataURL {
-            let latest = Self.fileSignature(at: accountMetadataURL)
+            let latest = try? FileSignature.read(at: accountMetadataURL)
             if latest != accountMetadataSignature {
                 accountMetadataSignature = latest
                 changed = true
@@ -119,7 +114,7 @@ final class CodexDataChangeMonitor {
         }
 
         if let authenticationURL {
-            let latest = Self.fileSignature(at: authenticationURL)
+            let latest = try? FileSignature.read(at: authenticationURL)
             if latest != authenticationSignature {
                 authenticationSignature = latest
                 changed = true
@@ -159,17 +154,8 @@ final class CodexDataChangeMonitor {
     }
     private static func catalogSignature(at url: URL) -> CatalogSignature {
         CatalogSignature(
-            database: fileSignature(at: url),
-            writeAheadLog: fileSignature(at: URL(fileURLWithPath: url.path + "-wal"))
+            database: try? FileSignature.read(at: url),
+            writeAheadLog: try? FileSignature.read(at: URL(fileURLWithPath: url.path + "-wal"))
         )
-    }
-
-    private static func fileSignature(at url: URL) -> FileSignature? {
-        guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            let size = (attributes[.size] as? NSNumber)?.uint64Value,
-            let modifiedAt = attributes[.modificationDate] as? Date
-        else { return nil }
-        return FileSignature(size: size, modifiedAt: modifiedAt)
     }
 }

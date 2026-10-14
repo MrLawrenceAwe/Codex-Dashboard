@@ -29,7 +29,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                     }
                 }
                 for prompt in [ReviewPrompts.fixPrompt(for: loop, round: round),
-                               ReviewPrompts.verifyFix(for: loop, round: round, commit: "head")] {
+                               ReviewPrompts.verifyFix(for: loop, round: round, targetCommit: "head")] {
                     XCTAssertEqual(prompt.contains("only when necessary"), conditional)
                     XCTAssertEqual(prompt.contains("Follow these extension reload instructions only when live verification is needed."), conditional)
                     if conditional {

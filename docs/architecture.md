@@ -22,6 +22,10 @@ Subprocess deadlines include termination and complete stdout/stderr draining.
 The shared `AsyncPipeReader` closes on timeout or cancellation even if descendants
 retain pipe write ends; account app-server reads use it as well.
 
+`FileSignature` shares size/modification-time reads across catalog, unread-state,
+and filesystem monitoring. `JWTClaimsDecoder.decodeUnverifiedClaims` shares token
+payload decoding for account and unread identity lookup; it does not verify signatures.
+
 ## Thread snapshots
 
 `CodexThreadCatalogProvider` reads `state_5.sqlite` and orders chats by indexed
@@ -164,7 +168,12 @@ by the loop contract. Exact prompt wording lives in `ReviewPrompts`, not duplica
 `ReviewRepositoryCheckpoint` validates Git state through argument-based subprocesses.
 A review must leave a clean checkout and unchanged HEAD. Fix completion requires the
 original branch, clean tree, a reported commit matching HEAD, and ancestry from the
-round's base commit. Optional remote push uses that verified commit without force.
+round's base commit. `reconcileAndPublishFix` fetches the destination and returns
+either `published`
+or `verificationRequired` with the merged checkout. Remote reconciliation can
+create a local merge commit; publication waits for read-only verification of that
+HEAD. The verification's `targetCommit` identifies this HEAD independently of the
+original fix commit. Publication never forces a push.
 Retries and restart reconciliation reuse the same fix rather than requesting another.
 
 `ReviewLoopFileStore` atomically persists

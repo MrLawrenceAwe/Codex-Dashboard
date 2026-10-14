@@ -39,7 +39,7 @@ enum ReviewLoopPresentation {
         if let verification = round.fixVerification {
             return ReviewPromptPreview(
                 title: "Reverify fixes · round \(round.number)",
-                text: ReviewPrompts.verifyFix(for: loop, round: round, commit: verification.commit),
+                text: ReviewPrompts.verifyFix(for: loop, round: round, targetCommit: verification.targetCommit),
                 note: verification.turnID == nil ? "Submission not yet confirmed." : ""
             )
         }

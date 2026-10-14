@@ -147,6 +147,11 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
+Review-loop version 12 renames the saved verification target from `commit` to
+`targetCommit`, preserving pending verification and round history. Current models,
+snapshots, and fixtures use `targetCommit`; the original fix stays in the round
+result's `commit` field.
+
 Review-loop version 11 renames `muteMedia` to `muteTestPlayback` at the storage
 boundary, preserving saved preferences and round history. Current actions, snapshots,
 and saved documents use `muteTestPlayback` and `setMuteTestPlayback`.
@@ -179,7 +184,9 @@ Review tests are split into coordinator, bridge, presentation, prompts, migratio
 and file-store suites, with doubles in `Reviews/ReviewLoopTestSupport.swift`.
 Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
-Run `swift test` for the complete native and WebKit suite. Web tests await to-do
+Run `swift test` for the complete native and WebKit suite. For the pure review-stage
+presentation checks without a browser or UI, run
+`node --test Tests/Renderer/review-presentation.test.cjs`. Web tests await to-do
 save completion; they do not assume persistence finishes during a DOM event.
 Persistence instrumentation requires each source anchor to match exactly once
 and fails on missing or duplicate anchors. Save waiters are required calls.

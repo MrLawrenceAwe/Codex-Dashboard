@@ -118,7 +118,7 @@ struct ReviewRound: Codable, Equatable, Sendable {
 
 struct ReviewFixVerification: Codable, Equatable, Sendable {
     let sourceFixTurnID: String
-    let commit: String
+    let targetCommit: String
     var turnID: String?
 }
 
@@ -186,7 +186,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 11
+    static let currentVersion = 12
     let version: Int
     let loops: [ReviewLoop]
 }

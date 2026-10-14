@@ -31,14 +31,8 @@ enum AccountIdentityDecoder {
         guard let idToken = tokens["id_token"] as? String else {
             return identity(identifier: directAccountID)
         }
-        let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 3 else { return identity(identifier: directAccountID) }
-        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
         guard
-            let payloadData = Data(base64Encoded: payload),
-            let claims = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
+            let claims = try? JWTClaimsDecoder.decodeUnverifiedClaims(idToken),
             let authentication = claims["https://api.openai.com/auth"] as? [String: Any]
         else { return identity(identifier: directAccountID) }
         let accountID = directAccountID ?? authentication["chatgpt_account_id"] as? String

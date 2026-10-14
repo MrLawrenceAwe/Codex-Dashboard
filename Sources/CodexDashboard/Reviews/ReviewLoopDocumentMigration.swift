@@ -30,6 +30,18 @@ enum ReviewLoopDocumentMigration {
         if let previousType = loop.removeValue(forKey: "focus") {
             loop["reviewType"] = previousType
         }
+        if let rounds = loop["rounds"] as? [[String: Any]] {
+            loop["rounds"] = rounds.map { savedRound in
+                var round = savedRound
+                if var verification = round["fixVerification"] as? [String: Any] {
+                    if let target = verification.removeValue(forKey: "commit") {
+                        verification["targetCommit"] = target
+                    }
+                    round["fixVerification"] = verification
+                }
+                return round
+            }
+        }
         let previousMutePreference = loop.removeValue(forKey: "muteMedia")
         loop["muteTestPlayback"] = loop["muteTestPlayback"] ?? previousMutePreference ?? false
         return loop

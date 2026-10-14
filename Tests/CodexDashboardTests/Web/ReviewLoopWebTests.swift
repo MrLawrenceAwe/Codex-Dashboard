@@ -35,7 +35,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           round.review = {outcome:'reviewed',findings:[{title:'Issue',body:'Details'}]};
           round.fixRequested = true;
           results.push(states());
-          round.fixVerification = {commit:'abc123'};
+          round.fixVerification = {targetCommit:'abc123'};
           results.push(states(), document.querySelector('[aria-current="step"] strong').textContent,
             document.querySelector('[aria-current="step"] .review-stage-description').textContent);
           loop.phase = 'blocked';

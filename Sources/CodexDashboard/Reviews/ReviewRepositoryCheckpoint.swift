@@ -2,13 +2,14 @@ import Foundation
 
 protocol ReviewRepositoryChecking: Sendable {
     func repository(at path: String) async throws -> ReviewRepositoryState
-    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome
     func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
 }
 
-struct ReviewRemoteIntegrationRequired: Error {
-    let repository: ReviewRepositoryState
+enum ReviewPublicationOutcome: Equatable, Sendable {
+    case published
+    case verificationRequired(ReviewRepositoryState)
 }
 
 struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
@@ -24,7 +25,7 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
         return ReviewRepositoryState(root: root, branch: branch, commit: head, clean: status.isEmpty)
     }
 
-    func pushCommit(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws {
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome {
         guard try await repository(at: path) == expectedRepository, expectedRepository.clean else {
             throw ReviewLoopError("The checkout changed before pushing. Inspect it before resuming.")
         }
@@ -76,20 +77,20 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
                 remoteCommit = try await git(["rev-parse", "FETCH_HEAD^{commit}"], at: path)
             }
             var alreadyPublished = false
-            var pushCommit = commit
+            var commitToPublish = commit
             if let remoteCommit {
                 alreadyPublished = try await isAncestor(commit, of: remoteCommit, at: path)
                 if !alreadyPublished, !(try await isAncestor(remoteCommit, of: commit, at: path)) {
                     if try await isAncestor(remoteCommit, of: expectedRepository.commit, at: path) {
                         // The current HEAD has been reverified by the coordinator and includes
                         // both histories. Publish it rather than retrying the pre-merge fix.
-                        pushCommit = expectedRepository.commit
+                        commitToPublish = expectedRepository.commit
                     } else {
                         guard try await repository(at: path) == expectedRepository else {
                             throw ReviewLoopError("The checkout changed during remote synchronization.")
                         }
                         try await mergeRemote(remoteCommit, at: path)
-                        throw ReviewRemoteIntegrationRequired(repository: try await repository(at: path))
+                        return .verificationRequired(try await repository(at: path))
                     }
                 }
             }
@@ -100,21 +101,20 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
                 let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
                     arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
                                 "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
-                                "--", remote, pushCommit + ":" + destination], timeout: 60)
+                                "--", remote, commitToPublish + ":" + destination], timeout: 60)
                 guard result.terminationStatus == 0 else {
                     throw ReviewLoopError(String(decoding: result.standardError, as: UTF8.self)
                         .trimmingCharacters(in: .whitespacesAndNewlines))
                 }
             }
-        } catch let integration as ReviewRemoteIntegrationRequired {
-            throw integration
         } catch {
-            throw ReviewLoopError("Remote push failed: \(error.localizedDescription) Inspect the remote and resume to retry.")
+            throw ReviewLoopError("Remote publication failed: \(error.localizedDescription) Inspect the remote and resume to retry.")
         }
         if needsUpstream {
             _ = try await git(["config", "branch.\(branch).remote", remote], at: path)
             _ = try await git(["config", "branch.\(branch).merge", destination], at: path)
         }
+        return .published
     }
 
     private func mergeRemote(_ commit: String, at path: String) async throws {

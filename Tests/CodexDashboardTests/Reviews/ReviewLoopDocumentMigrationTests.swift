@@ -3,6 +3,32 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testEarlierVerificationTargetsMigrateWithoutLosingRoundHistory() throws {
+        var loop = ReviewLoop(id: UUID(), startActionID: "verification", project: project,
+                              promptContext: .general, maxRounds: 3, priorityLimit: .p2)
+        loop.phase = .paused
+        loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread",
+                                  fixVerification: ReviewFixVerification(sourceFixTurnID: "fix-turn",
+                                                                         targetCommit: "merged-head", turnID: "verify-turn"))]
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        var rounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
+        var verification = try XCTUnwrap(rounds[0]["fixVerification"] as? [String: Any])
+        verification["commit"] = verification.removeValue(forKey: "targetCommit")
+        rounds[0]["fixVerification"] = verification
+        saved["rounds"] = rounds
+        for version in [1, 7, 8, 11] {
+            let data = try JSONSerialization.data(withJSONObject: ["version": version, "loops": [saved]])
+            XCTAssertEqual(try ReviewLoopDocumentMigration.decode(data), [loop])
+        }
+        let unversioned = try JSONSerialization.data(withJSONObject: [saved])
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(unversioned), [loop])
+        let current = try JSONEncoder().encode(ReviewLoopsDocument(version: ReviewLoopsDocument.currentVersion, loops: [loop]))
+        XCTAssertEqual(try ReviewLoopDocumentMigration.decode(current), [loop])
+        let currentText = try XCTUnwrap(String(data: current, encoding: .utf8))
+        XCTAssertTrue(currentText.contains("\"targetCommit\":\"merged-head\""))
+        XCTAssertFalse(currentText.contains("\"commit\":\"merged-head\""))
+    }
+
     func testVersionNineRenamesFocusWithoutLosingSettingsOrHistory() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "rename", project: project,
                               promptContext: .personal, maxRounds: 3,

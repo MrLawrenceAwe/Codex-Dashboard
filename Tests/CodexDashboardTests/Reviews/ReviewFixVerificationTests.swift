@@ -33,7 +33,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.integrateRemoteOnPush = true
         await enabled.advance(using: driver, threads: [])
         XCTAssertEqual(enabled.loops[0].phase, .running)
-        XCTAssertEqual(enabled.loops[0].rounds[0].fixVerification?.commit, "merged")
+        XCTAssertEqual(enabled.loops[0].rounds[0].fixVerification?.targetCommit, "merged")
         XCTAssertEqual(enabled.loops[0].completedRoundCount, 0)
         XCTAssertTrue(driver.pushedCommits.isEmpty)
         XCTAssertTrue(driver.prompts.last!.contains("read-only verification"))
@@ -87,7 +87,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 4)
-        XCTAssertEqual(coordinator.loops[0].rounds[0].fixVerification?.commit, "newer")
+        XCTAssertEqual(coordinator.loops[0].rounds[0].fixVerification?.targetCommit, "newer")
         XCTAssertTrue(driver.pushedCommits.isEmpty)
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
