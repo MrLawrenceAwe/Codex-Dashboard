@@ -22,18 +22,15 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         driver.finishTurn("# Fixes applied\nFindings addressed: 1\nFindings withdrawn: none\n\n## Summary\nFixed the issue and checked the files.")
     }
 
-    func testFolderFixAlwaysVerifiesAndStartsNextRoundWithoutGit() async throws {
+    func testFolderFixCompletesWithoutExtraVerificationAndStartsNextRoundWithoutGit() async throws {
         let (coordinator, _, driver) = try folderLoop()
         await startFix(coordinator, driver)
         XCTAssertEqual(coordinator.loops[0].workspaceKind, .folder)
         XCTAssertTrue(driver.prompts[1].contains("Do not initialise Git"))
         finishFolderFix(driver)
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(driver.prompts.count, 3)
-        XCTAssertNotNil(coordinator.loops[0].rounds[0].fixVerification)
-        XCTAssertNil(coordinator.loops[0].rounds[0].result)
-        driver.review(priorities: [])
-        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertNil(coordinator.loops[0].rounds[0].fixVerification)
         XCTAssertEqual(coordinator.loops[0].phase, .waiting)
         XCTAssertEqual(coordinator.loops[0].rounds[0].result?.commit, "")
         XCTAssertEqual(coordinator.loops[0].rounds[0].result?.verifiedRevision, "changed-files")
@@ -63,35 +60,31 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         XCTAssertThrowsError(try ReviewReportContract.fix("# Fixes committed\nFindings addressed: 1\nFindings withdrawn: none\nCommit: `abc`\n\n## Summary\nDone", workspaceKind: .folder))
     }
 
-    func testFolderVerificationRejectsRegressionsAndRechecksNewChanges() async throws {
-        let (coordinator, _, driver) = try folderLoop()
+    func testFolderFixHonoursRoundLimitWithoutExtraVerification() async throws {
+        let (coordinator, _, driver) = try folderLoop(limit: 1)
         await startFix(coordinator, driver)
         finishFolderFix(driver)
         await coordinator.advance(using: driver, threads: [])
-        driver.commit = "another-edit"
-        driver.review(priorities: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .limitReached)
+        XCTAssertEqual(coordinator.loops[0].completedRoundCount, 1)
+        XCTAssertNil(coordinator.loops[0].rounds[0].fixVerification)
+        XCTAssertEqual(driver.prompts.count, 2)
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(driver.prompts.count, 4)
-        XCTAssertEqual(coordinator.loops[0].rounds[0].fixVerification?.targetRevision, "another-edit")
-        driver.review(priorities: [.p1])
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops[0].phase, .blocked)
-        XCTAssertNil(coordinator.loops[0].rounds[0].result)
+        XCTAssertEqual(driver.prompts.count, 2)
     }
 
     func testFolderFixSurvivesRestartAndHonoursRoundLimit() async throws {
         let (coordinator, store, driver) = try folderLoop(limit: 1)
         await startFix(coordinator, driver)
         finishFolderFix(driver)
-        await coordinator.advance(using: driver, threads: [])
         let restored = ReviewLoopCoordinator(store: store)
         XCTAssertEqual(restored.loops[0].phase, .paused)
-        driver.review(priorities: [])
         try restored.apply(action(.resume, for: restored), projects: [project])
         await restored.advance(using: driver, threads: [])
         XCTAssertEqual(restored.loops[0].phase, .limitReached)
         XCTAssertEqual(restored.loops[0].completedRoundCount, 1)
-        XCTAssertEqual(driver.prompts.count, 3)
+        XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertNil(restored.loops[0].rounds[0].fixVerification)
     }
 
     func testPreviouslyPausedNonGitProjectCanResume() async throws {

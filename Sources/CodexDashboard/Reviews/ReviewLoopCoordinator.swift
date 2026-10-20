@@ -477,9 +477,6 @@ final class ReviewLoopCoordinator {
                 guard repo.revision != round.baseRevision else {
                     throw ReviewLoopError("The fix report claims changes, but the folder files are unchanged.")
                 }
-                // Folder fixes have no immutable commit report: always verify the actual files.
-                guard try await verifyAdvancedCheckout(thread: thread, loop: updated, round: round,
-                    sourceFixTurnID: fixTurn.id, repository: repo, using: driver, threads: threads, threadID: threadID) else { return }
             }
             try finishRound(loopID: updated.id, result: result, reportedCommit: "",
                             repository: repo, fixTurnID: fixTurn.id)
