@@ -10,6 +10,35 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testFolderSetupDisablesPushAndCardShowsVerificationWithoutCommitMetrics() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const git = {id:'git',name:'Code',path:'/tmp/code',workspaceKind:'git'};
+          const folder = {id:'folder',name:'Documents',path:'/tmp/docs',workspaceKind:'folder'};
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),projects:[git,folder],loops:[]});
+          api.openReviews();
+          const project = document.querySelector('[data-review-project]');
+          const push = document.querySelector('[data-review-push]');
+          push.value = 'true';
+          project.value = 'folder'; project.dispatchEvent(new Event('change'));
+          const folderDisabled = push.disabled && push.value === 'false';
+          const help = document.querySelector('[data-review-workspace-help]').textContent;
+          project.value = 'git'; project.dispatchEvent(new Event('change'));
+          const gitEnabled = !push.disabled;
+          const loop = {id:'loop',project:folder,workspaceKind:'folder',phase:'running',isFinished:false,completedRoundCount:0,maxRounds:2,
+            rounds:[{number:1,baseRevision:'base',fixRequested:true}]};
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),projects:[git,folder],loops:[loop]});
+          const card = document.querySelector('[data-loop-id="loop"]');
+          return [folderDisabled,gitEnabled,help.includes('Git is not required'),
+            card.textContent.includes('Fix & verify'),!card.textContent.includes('Fix commits'),
+            card.textContent.includes('Save and verify folder changes')];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true,true,true,true,true,true])
+    }
+
     func testStageFeedbackShowsTransitionsAndConditionalReverification() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
@@ -35,7 +64,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           round.review = {outcome:'reviewed',findings:[{title:'Issue',body:'Details'}]};
           round.fixRequested = true;
           results.fixStages = states();
-          round.fixVerification = {targetCommit:'abc123'};
+          round.fixVerification = {targetRevision:'abc123'};
           results.verificationStages = states();
           results.activeFixLabel = document.querySelector('[aria-current="step"] strong').textContent;
           results.verificationDescription = document.querySelector('[aria-current="step"] .review-stage-description').textContent;
@@ -48,7 +77,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           loop.phase = 'limitReached';
           round.result = {outcome:'fixed',commit:'abc123',addressedFindingCount:1};
           results.fixedStages = states();
-          round.result.verifiedCommit = 'abc123';
+          round.result.verifiedRevision = 'abc123';
           results.verifiedStages = states();
           results.metrics = [...document.querySelectorAll('.review-metrics dd')].map(item => item.textContent);
           round.result = {outcome:'clean',addressedFindingCount:0};

@@ -23,6 +23,6 @@ test('fixed, clean, and ongoing verification retain distinct stage descriptions'
   loop.rounds[0].result.outcome = 'clean';
   assert.equal(presentation.roundStages(loop)[1].description, 'Not needed');
   loop.phase = 'running';
-  loop.rounds[0] = { fixVerification: { targetCommit: 'merged-head' } };
+  loop.rounds[0] = { fixVerification: { targetRevision: 'merged-head' } };
   assert.equal(presentation.roundStages(loop)[1].description, 'Reverifying fixes');
 });

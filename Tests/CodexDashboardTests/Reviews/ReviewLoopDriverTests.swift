@@ -3,6 +3,26 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDriverTests: XCTestCase {
+    func testFolderFixUsesFolderReportAndChecksFingerprintBeforeSubmission() async throws {
+        let connection = ReviewReportDevTools()
+        let repository = ReviewRepositoryState(root: "/tmp/folder", branch: "", revision: "fingerprint", clean: true, kind: .folder)
+        let driver = ReviewLoopDriver(devTools: connection,
+            target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
+            repositoryCheckpoint: ReviewFixedRepositoryCheckpoint(state: repository))
+        _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/folder", expectedRepository: repository,
+            prompt: "Address findings", kind: .fix, selection: nil, speed: .standard)
+        let expression = await connection.expression
+        XCTAssertTrue(expression.contains("# Fixes applied"))
+        XCTAssertFalse(expression.contains("# Fixes committed"))
+        var changed = repository
+        changed.kind = .git
+        do {
+            _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/folder", expectedRepository: changed,
+                prompt: "Address findings", kind: .fix, selection: nil, speed: .standard)
+            XCTFail("Workspace identity must be checked before submission")
+        } catch {}
+    }
+
     func testSavedModelSelectionMigratesToCurrentNames() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
@@ -59,7 +79,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testTurnsRequestMarkdownWithoutForcingJSON() async throws {
         let connection = ReviewReportDevTools()
-        let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", commit: "base", clean: true)
+        let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", revision: "base", clean: true)
         let driver = ReviewLoopDriver(devTools: connection,
                                       target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
                                       repositoryCheckpoint: ReviewFixedRepositoryCheckpoint(state: repository))
@@ -87,7 +107,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testOnlyFixContinuationCanStartWithUnfinishedChanges() async throws {
         let connection = ReviewReportDevTools()
-        let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", commit: "base", clean: false)
+        let repository = ReviewRepositoryState(root: "/tmp/project", branch: "main", revision: "base", clean: false)
         let driver = ReviewLoopDriver(devTools: connection,
                                       target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
                                       repositoryCheckpoint: ReviewFixedRepositoryCheckpoint(state: repository))
@@ -101,7 +121,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let id = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedRepository: repository,
                                              prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
         XCTAssertEqual(id, "turn")
-        let changed = ReviewRepositoryState(root: repository.root, branch: "other", commit: repository.commit, clean: false)
+        let changed = ReviewRepositoryState(root: repository.root, branch: "other", revision: repository.revision, clean: false)
         do {
             _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedRepository: changed,
                                            prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
@@ -217,6 +237,19 @@ final class ReviewLoopDriverTests: XCTestCase {
         let initial = try await checkpoint.repository(at: directory.path)
         XCTAssertTrue(initial.clean)
         XCTAssertEqual(initial.branch, "main")
+        XCTAssertEqual(initial.kind, .git)
+        let nested = directory.appendingPathComponent("nested", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let nestedState = try await checkpoint.repository(at: nested.path)
+        XCTAssertEqual(nestedState.kind, .git)
+        XCTAssertEqual(nestedState.root, initial.root)
+        XCTAssertTrue(ReviewRepositoryCheckpoint.hasGitMetadata(at: nested.path))
+        let worktree = directory.appendingPathComponent("linked", isDirectory: true)
+        try await git(["worktree", "add", "-b", "linked", worktree.path])
+        let linkedState = try await checkpoint.repository(at: worktree.path)
+        XCTAssertEqual(linkedState.kind, .git)
+        XCTAssertTrue(ReviewRepositoryCheckpoint.hasGitMetadata(at: worktree.path))
+        try await git(["worktree", "remove", worktree.path])
         try Data("change".utf8).write(to: directory.appendingPathComponent("fix.txt"))
         let dirty = try await checkpoint.repository(at: directory.path)
         XCTAssertFalse(dirty.clean)
@@ -224,14 +257,14 @@ final class ReviewLoopDriverTests: XCTestCase {
         try await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fix"])
         let fixed = try await checkpoint.repository(at: directory.path)
         XCTAssertTrue(fixed.clean)
-        XCTAssertNotEqual(fixed.commit, initial.commit)
-        let isAncestor = try await checkpoint.isAncestor(initial.commit, of: fixed.commit, at: directory.path)
+        XCTAssertNotEqual(fixed.revision, initial.revision)
+        let isAncestor = try await checkpoint.isAncestor(initial.revision, of: fixed.revision, at: directory.path)
         XCTAssertTrue(isAncestor)
-        for reported in [fixed.commit, String(fixed.commit.prefix(7)), String(fixed.commit.prefix(7)).uppercased()] {
+        for reported in [fixed.revision, String(fixed.revision.prefix(7)), String(fixed.revision.prefix(7)).uppercased()] {
             let resolved = try await checkpoint.resolveCommit(reported, at: directory.path)
-            XCTAssertEqual(resolved, fixed.commit)
+            XCTAssertEqual(resolved, fixed.revision)
         }
-        for invalid in ["", "HEAD", "main", "--help", "abc", "deadbeef", fixed.commit + "~1"] {
+        for invalid in ["", "HEAD", "main", "--help", "abc", "deadbeef", fixed.revision + "~1"] {
             do {
                 _ = try await checkpoint.resolveCommit(invalid, at: directory.path)
                 XCTFail("Accepted invalid commit ID: \(invalid)")
@@ -241,7 +274,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testFixPromptDoesNotAskForTesting() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
-        let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseCommit: "abc"))
+        let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseRevision: "abc"))
         XCTAssertFalse(prompt.lowercased().contains("test"))
         XCTAssertFalse(prompt.lowercased().contains("checks"))
         XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
@@ -253,7 +286,7 @@ final class ReviewLoopDriverTests: XCTestCase {
             var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
             loop.reviewType = reviewType
             for (count, expected) in [(1, "Address the finding and commit"), (2, "Address both findings and commit"), (3, "Address all findings and commit")] {
-                var round = ReviewRound(number: 1, baseCommit: "abc")
+                var round = ReviewRound(number: 1, baseRevision: "abc")
                 round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
                     ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
                 }, summary: "Findings")

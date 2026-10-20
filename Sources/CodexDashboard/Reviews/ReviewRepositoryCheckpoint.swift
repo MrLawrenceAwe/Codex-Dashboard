@@ -13,7 +13,27 @@ enum ReviewPublicationOutcome: Equatable, Sendable {
 }
 
 struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
+    static func hasGitMetadata(at path: String) -> Bool {
+        var directory = FileSystemPath.canonicalURL(path)
+        while true {
+            if (try? FileManager.default.attributesOfItem(atPath: directory.appendingPathComponent(".git").path)) != nil { return true }
+            guard directory.path != "/", !directory.path.isEmpty else { return false }
+            directory.deleteLastPathComponent()
+        }
+    }
+
     func repository(at path: String) async throws -> ReviewRepositoryState {
+        let probe = try await runGit(["rev-parse", "--is-inside-work-tree"], at: path)
+        if probe.terminationStatus != 0 {
+            // A damaged or inaccessible repository must not silently become a folder loop.
+            if Self.hasGitMetadata(at: path) {
+                throw ReviewLoopError("The Git repository could not be inspected: " + String(decoding: probe.standardError, as: UTF8.self))
+            }
+            return try await ReviewFolderCheckpoint.repository(at: path)
+        }
+        guard String(decoding: probe.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == "true" else {
+            throw ReviewLoopError("Choose a working folder, rather than a bare Git repository.")
+        }
         let root = try await git(["rev-parse", "--show-toplevel"], at: path)
         let branch = try await git(["symbolic-ref", "--quiet", "--short", "HEAD"], at: path)
         let head = try await git(["rev-parse", "HEAD"], at: path)
@@ -22,7 +42,7 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
         guard head == (try await git(["rev-parse", "HEAD"], at: path)) else {
             throw ReviewLoopError("HEAD changed while checking the commit checkpoint.")
         }
-        return ReviewRepositoryState(root: root, branch: branch, commit: head, clean: status.isEmpty)
+        return ReviewRepositoryState(root: root, branch: branch, revision: head, clean: status.isEmpty)
     }
 
     func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome {
@@ -30,7 +50,7 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
             throw ReviewLoopError("The checkout changed before pushing. Inspect it before resuming.")
         }
         guard try await resolveCommit(commit, at: path) == commit,
-              try await isAncestor(commit, of: expectedRepository.commit, at: path) else {
+              try await isAncestor(commit, of: expectedRepository.revision, at: path) else {
             throw ReviewLoopError("The reported fix commit is not in the current checkout history. Inspect it before pushing.")
         }
         let remotes = try await git(["remote"], at: path).split(separator: "\n").map(String.init)
@@ -81,10 +101,10 @@ struct ReviewRepositoryCheckpoint: ReviewRepositoryChecking {
             if let remoteCommit {
                 alreadyPublished = try await isAncestor(commit, of: remoteCommit, at: path)
                 if !alreadyPublished, !(try await isAncestor(remoteCommit, of: commit, at: path)) {
-                    if try await isAncestor(remoteCommit, of: expectedRepository.commit, at: path) {
+                    if try await isAncestor(remoteCommit, of: expectedRepository.revision, at: path) {
                         // The current HEAD has been reverified by the coordinator and includes
                         // both histories. Publish it rather than retrying the pre-merge fix.
-                        commitToPublish = expectedRepository.commit
+                        commitToPublish = expectedRepository.revision
                     } else {
                         guard try await repository(at: path) == expectedRepository else {
                             throw ReviewLoopError("The checkout changed during remote synchronization.")

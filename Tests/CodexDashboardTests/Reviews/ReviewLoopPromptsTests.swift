@@ -9,7 +9,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 let loop = ReviewLoop(id: UUID(), startActionID: "verification", project: project,
                                       promptContext: .general, maxRounds: 3, reviewType: reviewType,
                                       liveTesting: liveTesting, reloadExtensionBeforeTesting: true)
-                var round = ReviewRound(number: 1, baseCommit: "base")
+                var round = ReviewRound(number: 1, baseRevision: "base")
                 let review = ReviewPrompts.reviewPrompt(for: loop)
                 XCTAssertEqual(review.contains("Use code review and live testing to find bugs and issues."),
                                liveTesting && reviewType == .bugs)
@@ -29,7 +29,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                     }
                 }
                 for prompt in [ReviewPrompts.fixPrompt(for: loop, round: round),
-                               ReviewPrompts.verifyFix(for: loop, round: round, targetCommit: "head")] {
+                               ReviewPrompts.verifyFix(for: loop, round: round, targetRevision: "head")] {
                     XCTAssertEqual(prompt.contains("only when necessary"), conditional)
                     XCTAssertEqual(prompt.contains("Follow these extension reload instructions only when live verification is needed."), conditional)
                     if conditional {
@@ -46,7 +46,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 let loop = ReviewLoop(id: UUID(), startActionID: "structure", project: project,
                                       promptContext: .general, maxRounds: 3, reviewType: reviewType,
                                       liveTesting: liveTesting, reloadExtensionBeforeTesting: true)
-                var round = ReviewRound(number: 1, baseCommit: "base")
+                var round = ReviewRound(number: 1, baseRevision: "base")
                 let review = ReviewPrompts.reviewPrompt(for: loop)
                 let fix = ReviewPrompts.fixPrompt(for: loop, round: round)
                 for fixRequested in [false, true] {
@@ -70,7 +70,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
     func testExtensionReloadRequiresEnabledPreferenceAndLiveTesting() {
         var loop = ReviewLoop(id: UUID(), startActionID: "extension", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true)
-        let round = ReviewRound(number: 1, baseCommit: "base")
+        let round = ReviewRound(number: 1, baseRevision: "base")
         for reviewType in ReviewType.allCases {
             loop.reviewType = reviewType
             for (liveTesting, reload) in [(true, true), (true, false), (false, true), (false, false)] {
@@ -101,7 +101,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
     func testMuteTestPlaybackAppliesToReviewAndFixOnlyWithLiveTesting() {
         var loop = ReviewLoop(id: UUID(), startActionID: "muted", project: project,
                               promptContext: .general, maxRounds: 3, liveTesting: true, muteTestPlayback: true)
-        let round = ReviewRound(number: 1, baseCommit: "base")
+        let round = ReviewRound(number: 1, baseRevision: "base")
         for reviewType in ReviewType.allCases {
             loop.reviewType = reviewType
             XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).contains("Mute only media playback that you start"), reviewType.supportsLiveTesting)

@@ -1,12 +1,24 @@
 import Foundation
 
 enum ReviewPrompts {
-    static func verifyFix(for loop: ReviewLoop, round: ReviewRound, targetCommit: String) -> String {
+    static func verifyFix(for loop: ReviewLoop, round: ReviewRound, targetRevision: String) -> String {
         let findings = round.review?.findings(upTo: loop.priorityLimit).enumerated().map { index, finding in
             "Finding \(index + 1): \(finding.title)\n\(finding.body)"
         }.joined(separator: "\n\n") ?? ""
+        if loop.workspaceKind == .folder {
+            return """
+            Verify the original findings against the current folder files (fingerprint `\(targetRevision)`).
+            This is read-only verification. Inspect each fix and run focused checks appropriate to the content. Recheck withdrawn findings. Do not edit files, initialise Git, commit, or push.
+            Return a review report, listing any original finding still present or any fix regression. If no findings remain, explain the evidence and checks. If verification cannot be completed, return a blocked review report.
+
+            Original findings:
+            \(findings)
+            """ + structureReviewInstruction(for: loop, verifyingFixes: true)
+                + bugVerificationInstruction(for: loop, verifyingFixes: true)
+                + extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
+        }
         return """
-        Reverify the original findings at current HEAD `\(targetCommit)`. The branch advanced after the fix report; Git ancestry alone does not establish that the fixes still work.
+        Reverify the original findings at current HEAD `\(targetRevision)`. The branch advanced after the fix report; Git ancestry alone does not establish that the fixes still work.
 
         This is a read-only verification. Inspect the actual current code and changes since the reported fix, and run focused checks that exercise each original failure. Check that later commits have not reverted or broken the fixes. Recheck the reasoning for withdrawn findings. Do not edit files, create commits, or push. If HEAD changes during verification, report the verification as blocked.
 
@@ -60,7 +72,10 @@ enum ReviewPrompts {
         let task = round.fixRequested
             ? "Continue the unfinished fix and verification task from where you stopped. Inspect and preserve existing changes and any commit already made; do not repeat completed work. Finish addressing the accepted findings, then return the final fix report with the resulting commit."
             : "Continue the unfinished read-only review from where you stopped, then return the final review report. Leave the checkout unchanged; fixes follow after acceptance."
-        return task + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
+        let continuation = loop.workspaceKind == .folder && round.fixRequested
+            ? "Continue the unfinished fix and verification task. Preserve existing changes, finish addressing accepted findings, and return the final folder fix report. Do not initialise Git, commit, or push."
+            : task
+        return continuation + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
             + bugVerificationInstruction(for: loop, verifyingFixes: round.fixRequested)
             + extensionReloadInstruction(for: loop, verifyingFixes: round.fixRequested)
             + testPlaybackInstruction(for: loop)
@@ -108,7 +123,10 @@ enum ReviewPrompts {
         } else {
             liveTesting = ""
         }
-        return task + "\n\nRead-only review; fixes follow after acceptance." + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + testPlaybackInstruction(for: loop)
+        let folderInstruction = loop.workspaceKind == .folder
+            ? "\n\nThis is an ordinary folder. Review its actual files and content, including documents when relevant. Stay within the project folder and do not follow symlinks outside it. Leave files unchanged. Do not initialise Git, commit, or push."
+            : ""
+        return task + "\n\nRead-only review; fixes follow after acceptance." + folderInstruction + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + testPlaybackInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
@@ -126,7 +144,9 @@ enum ReviewPrompts {
         case .organisation, .organisationAndNaming, .content, .performance:
             task = "Address \(findings) and commit"
         }
-        var prompt = task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+        var prompt = loop.workspaceKind == .folder
+            ? "Address \(findings) in this ordinary folder. Verify each finding first. Preserve unrelated files and edits. Mark invalid findings as withdrawn. Do not initialise Git, create commits, or push. Verify the changes and return the folder fix report."
+            : task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
         prompt += structureReviewInstruction(for: loop, verifyingFixes: true)
         prompt += bugVerificationInstruction(for: loop, verifyingFixes: true)
         if loop.liveTesting && loop.reviewType == .performance {

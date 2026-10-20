@@ -92,7 +92,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         var params: [String: Any] = [
             "threadId": threadID,
             "serviceTierForTurn": speed.serviceTier,
-            "input": [["type": "text", "text": prompt + "\n\n" + ReviewReportContract.instructions(for: kind), "text_elements": []]],
+            "input": [["type": "text", "text": prompt + "\n\n" + ReviewReportContract.instructions(for: kind, workspaceKind: expectedRepository.kind), "text_elements": []]],
         ]
         if let selection {
             params["model"] = selection.modelID

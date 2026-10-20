@@ -70,7 +70,7 @@ const reviewLoopCardView = (() => {
     return `<li data-outcome="${escape(round.result?.outcome || (loop.phase === 'running' && round === loop.rounds.at(-1) ? 'active' : 'pending'))}">
       <div class="review-round-number" aria-hidden="true">${round.number}</div><div class="review-round-body"><div class="review-round-heading">
       ${round.threadID ? `<button type="button" data-review-thread="${escape(round.threadID)}">Review ${round.number}</button>` : `Review ${round.number}`}
-      <span>${escape(reviewPresentation.roundStatus(round, loop.pushToRemote))}</span></div>
+      <span>${escape(reviewPresentation.roundStatus(round, loop.pushToRemote, loop.workspaceKind))}</span></div>
       ${findingsMarkup(round, loop.id, findingsState, loopFinished)}
       ${summaryMarkup(round, expandedRounds)}
     </div></li>`;
@@ -101,7 +101,7 @@ const reviewLoopCardView = (() => {
     const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID)}${selection.reasoningEffort ? ` · ${escape(composerPresets.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const reviewTypeLabel = reviewPresentation.reviewTypeLabel(loop.reviewType, reviewTypes);
     root.querySelector('[data-review-scope-label]').textContent = [reviewTypeLabel, loop.priorityLimit ? `P0${loop.priorityLimit === 'P0' ? '' : `–${loop.priorityLimit}`}` : ''].filter(Boolean).join(' · ');
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(reviewTypeLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.liveTesting ? '<span>Live testing enabled</span>' : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
+    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(reviewTypeLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.liveTesting ? '<span>Live testing enabled</span>' : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.workspaceKind === 'folder' ? 'Save and verify folder changes' : loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -155,7 +155,7 @@ const reviewLoopCardView = (() => {
       <dl class="review-metrics">
         <div><dt>Findings this round</dt><dd>${latest?.review ? latest.review.findings.length : '—'}</dd></div>
         <div><dt>Findings addressed</dt><dd>${addressed}</dd></div>
-        <div><dt>Fix commits</dt><dd>${commits}</dd></div>
+        ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits</dt><dd>${commits}</dd></div>`}
       </dl>`;
     if (feedback.dataset.markup !== markup) {
       feedback.innerHTML = markup;

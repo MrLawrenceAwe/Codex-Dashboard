@@ -26,8 +26,8 @@ enum ReviewLoopPresentation {
         case .paused: "Paused"
         case .waiting: "Waiting to review"
         case .running:
-            if round?.fixVerification != nil { "Reverifying fixes at current HEAD" }
-            else if round?.fixRequested == true { "Fixing & committing" }
+            if round?.fixVerification != nil { loop.workspaceKind == .folder ? "Verifying folder fixes" : "Reverifying fixes at current HEAD" }
+            else if round?.fixRequested == true { loop.workspaceKind == .folder ? "Fixing & verifying" : "Fixing & committing" }
             else if round?.review != nil { "Preparing fixes" }
             else { "Reviewing" }
         }
@@ -38,12 +38,12 @@ enum ReviewLoopPresentation {
         if let verification = round.fixVerification {
             return ReviewPromptPreview(
                 title: "Reverify fixes · round \(round.number)",
-                text: ReviewPrompts.verifyFix(for: loop, round: round, targetCommit: verification.targetCommit),
+                text: ReviewPrompts.verifyFix(for: loop, round: round, targetRevision: verification.targetRevision),
                 note: verification.turnID == nil ? "Submission not yet confirmed." : ""
             )
         }
         return ReviewPromptPreview(
-            title: "\(round.fixRequested ? "Fix & commit" : "Review") · round \(round.number)",
+            title: "\(round.fixRequested ? (loop.workspaceKind == .folder ? "Fix & verify" : "Fix & commit") : "Review") · round \(round.number)",
             text: round.fixRequested ? ReviewPrompts.fixPrompt(for: loop, round: round) : ReviewPrompts.reviewPrompt(for: loop),
             note: (round.fixRequested ? round.fixTurnID : round.reviewTurnID) == nil
                 ? "Submission not yet confirmed." : ""
@@ -63,25 +63,25 @@ enum ReviewLoopPresentation {
                                         note: "Reload the extension manually, then select Extension reloaded — continue."), "")
         }
         if loop.phase == .blocked {
-            return (nil, "Resume continues failed or interrupted work in the same chat. For a completed report that needs attention, resolve its blocker in the chat, then Resume to check the latest report and commit.")
+            return (nil, "Resume continues failed or interrupted work in the same chat. For a completed report that needs attention, resolve its blocker in the chat, then Resume to check the latest report and \(loop.workspaceKind == .folder ? "files" : "commit").")
         }
         if let round, unfinished, !round.fixRequested {
             return (ReviewPromptPreview(
-                title: "Fix & commit · round \(round.number)",
+                title: "\(loop.workspaceKind == .folder ? "Fix & verify" : "Fix & commit") · round \(round.number)",
                 text: ReviewPrompts.fixPrompt(for: loop, round: round),
                 note: round.review == nil
                     ? "Only if findings are found. Wording follows the finding count."
-                    : "After the checkout passes verification."
+                    : "After the project passes verification."
             ), noNextPrompt)
         }
         guard loop.completedRoundCount + (unfinished ? 1 : 0) < loop.maxRounds else {
             return (nil, "Round limit reached. No next review scheduled.")
         }
         let note: String
-        if loop.phase == .paused { note = "After resume and checkout verification." }
+        if loop.phase == .paused { note = "After resume and project verification." }
         else if loop.pauseRequested { note = "After this round pauses and you resume." }
-        else if unfinished { note = "After fixes commit and verification passes. The next review uses the verified HEAD." }
-        else { note = "After the project is idle and the checkout passes verification." }
+        else if unfinished { note = loop.workspaceKind == .folder ? "After fixes are applied and verification passes. The next review uses the verified files." : "After fixes commit and verification passes. The next review uses the verified HEAD." }
+        else { note = "After the project is idle and passes verification." }
         return (ReviewPromptPreview(
             title: "Review · round \(loop.rounds.count + 1)",
             text: ReviewPrompts.reviewPrompt(for: loop),

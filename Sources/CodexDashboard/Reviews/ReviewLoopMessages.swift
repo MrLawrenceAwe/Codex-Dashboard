@@ -24,7 +24,7 @@ struct ReviewLoopAction: Codable, Sendable {
 }
 
 struct ReviewPageSnapshot: Encodable, Sendable {
-    let projects: [ReviewProject]
+    let projects: [ReviewProjectChoice]
     let models: [ReviewModel]
     let reviewTypes: [ReviewTypeOption]
     let loops: [ReviewLoopDisplaySnapshot]
@@ -76,5 +76,20 @@ struct ReviewLoopDisplaySnapshot: Encodable, Sendable {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(loop.completedRoundCount, forKey: .completedRoundCount)
         try values.encode(loop.phase.isFinished, forKey: .isFinished)
+    }
+}
+
+/// Catalog hint for setup controls; launch still inspects the actual workspace.
+struct ReviewProjectChoice: Encodable, Sendable {
+    let id: String
+    let name: String
+    let path: String
+    let workspaceKind: ReviewWorkspaceKind
+
+    init(_ project: ReviewProject) {
+        id = project.id
+        name = project.name
+        path = project.path
+        workspaceKind = ReviewRepositoryCheckpoint.hasGitMetadata(at: path) ? .git : .folder
     }
 }

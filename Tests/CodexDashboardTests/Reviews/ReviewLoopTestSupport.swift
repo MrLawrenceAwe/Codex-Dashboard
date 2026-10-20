@@ -49,6 +49,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var pushedCommits: [String] = []
     var failPush = false
     var integrateRemoteOnPush = false
+    var workspaceKind: ReviewWorkspaceKind = .git
     var clean = true
     var commit = "base"
     var branch = "main"
@@ -89,7 +90,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
         await Task.yield()
         onRepository?()
         if failRepository || path == failingPath { throw ReviewLoopError("Git timed out") }
-        return ReviewRepositoryState(root: repositoryRoot ?? path, branch: branch, commit: commit, clean: clean)
+        return ReviewRepositoryState(root: repositoryRoot ?? path, branch: branch, revision: commit, clean: clean, kind: workspaceKind)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
     func resolveCommit(_ commit: String, at path: String) async throws -> String {

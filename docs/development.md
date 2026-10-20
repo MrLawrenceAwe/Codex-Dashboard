@@ -185,6 +185,14 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
+Review-loop version 14 adds ordinary-folder checkpoints and persists the workspace
+kind once selected. Shared checkpoint fields use `baseRevision`, `expectedRevision`,
+`targetRevision`, and `verifiedRevision`; actual Git fix IDs stay in the result's
+`commit` field. Migration renames earlier checkpoint fields and marks previously
+started loops as Git loops, preserving their history and pending verification.
+Previously unstarted loops retain automatic mode detection so paused non-Git projects
+can resume. Fingerprints are change identities, not stored copies of project files.
+
 Review-loop version 13 separates the names of two existing continuation states:
 `allowsFollowUpTurns` permits reconciliation of additional chat turns, while
 `extensionReloadContinuationPending` records a confirmed reload awaiting continuation
@@ -193,8 +201,8 @@ submission. Migration maps the former `continuationRequested` and
 Old names are confined to the migration boundary and legacy fixtures.
 
 Review-loop version 12 renames the saved verification target from `commit` to
-`targetCommit`, preserving pending verification and round history. Current models,
-snapshots, and fixtures use `targetCommit`; the original fix stays in the round
+`targetCommit`, preserving pending verification and round history. Version 14 moves
+this checkpoint to `targetRevision`; the original Git fix stays in the round
 result's `commit` field.
 
 Review-loop version 11 renames `muteMedia` to `muteTestPlayback` at the storage

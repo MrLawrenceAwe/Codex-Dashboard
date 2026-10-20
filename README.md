@@ -15,7 +15,7 @@ This is an independent personal project and is not affiliated with OpenAI.
 ## Features
 
 - **Chat monitoring:** recent activity, unread status, completion tracking, uncommitted files and unpushed Git commits.
-- **Review loops:** project reviews with automatic fixes and commits, separate model choices, pause/resume/stop controls, and optional remote pushing.
+- **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, pause/resume/stop controls, and optional remote pushing.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 
 See [Using Codex Dashboard](docs/usage.md) for feature behaviour and controls.

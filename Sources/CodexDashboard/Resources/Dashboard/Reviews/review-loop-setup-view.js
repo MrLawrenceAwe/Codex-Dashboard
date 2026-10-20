@@ -3,6 +3,7 @@ const reviewLoopSetupView = (() => {
   let modelsSignature = '';
   let reviewTypesSignature = '';
   let reviewTypes = [];
+  let projects = [];
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
@@ -18,6 +19,7 @@ const reviewLoopSetupView = (() => {
         <label class="review-project-context">Project context<select data-review-prompt-context aria-label="Project context">
           <option value="">General project</option><option value="personal">Personal project</option>
         </select></label>
+        <p class="review-field-help" data-review-workspace-help></p>
         </fieldset>
         <fieldset class="review-limits"><legend>Review settings</legend>
         <label>Review type<select data-review-type aria-label="Review type" aria-describedby="review-type-help"></select></label>
@@ -75,7 +77,7 @@ const reviewLoopSetupView = (() => {
       liveTesting,
       reloadExtensionBeforeTesting: liveTesting && value('[data-review-extension]') === 'true',
       muteTestPlayback: liveTesting && root.querySelector('[data-review-mute-test-playback]').checked,
-      pushToRemote: value('[data-review-push]') === 'true',
+      pushToRemote: projects.find(project => project.id === value('[data-review-project]'))?.workspaceKind !== 'folder' && value('[data-review-push]') === 'true',
       speed: value('[data-review-speed]'),
       promptContext: { kind: supportsProjectContext(reviewType) ? value('[data-review-prompt-context]') || 'general' : 'general' },
       priorityLimit: usesPriorities(reviewType) ? value('[data-review-priority]') : null,
@@ -86,6 +88,15 @@ const reviewLoopSetupView = (() => {
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
+    const folder = projects.find(project => project.id === root.querySelector('[data-review-project]').value)?.workspaceKind === 'folder';
+    const push = root.querySelector('[data-review-push]');
+    if (folder) push.value = 'false';
+    push.disabled = folder || root.querySelector('[data-review-start]').disabled;
+    push.querySelector('option[value="false"]').textContent = folder ? 'Save changes in folder' : 'Keep commits local';
+    root.querySelector('[data-review-workspace-help]').textContent = folder
+      ? 'Ordinary folder: fixes are saved directly and verified against the files. Git is not required.'
+      : 'Git project: fixes are committed and can optionally be pushed to remote.';
+    root.querySelector('.review-push-help').hidden = folder;
     const reviewType = root.querySelector('[data-review-type]').value;
     root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === reviewType)?.scopeDescription || '';
     root.querySelector('.review-priority').hidden = !usesPriorities(reviewType);
@@ -119,7 +130,8 @@ const reviewLoopSetupView = (() => {
   function render(snapshot, pendingAction) {
     const root = panel();
     if (!root) return;
-    const { loops, projects } = snapshot;
+    const { loops } = snapshot;
+    projects = snapshot.projects;
     const models = snapshot.models || [];
     reviewTypes = snapshot.reviewTypes || [];
     const nextReviewTypesSignature = JSON.stringify(reviewTypes);

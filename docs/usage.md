@@ -144,13 +144,23 @@ keep their expanded state during refresh.
 settings. It does not record the exact prompt submitted to a chat; setting changes
 apply to subsequent prompts.
 
-Each round starts a read-only review in a new chat on the current branch and
-checkout. Qualifying findings trigger a separate fix-and-commit follow-up in that
-chat. Excluded priorities remain visible but are not fixed. Findings are verified
+Each round starts a read-only review in a new chat. Git projects use the current
+branch and checkout; ordinary folders work without Git. Qualifying findings trigger
+a separate fix follow-up in that chat. Git fixes are committed; folder fixes are
+saved directly, then checked by a separate read-only verification turn. Excluded priorities remain visible but are not fixed. Findings are verified
 before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
 reviews finish without a commit. A clean review is an assessment, not proof that
 all defects are absent. Multiple projects can run loops, with one active loop per
 project and checkout. Avoid other edits in that checkout while a loop runs.
+
+For ordinary folders, the dashboard fingerprints file contents, names, permissions,
+and symlink destinations to detect changes during read-only reviews and between
+rounds. Hidden files are included; Finder's `.DS_Store` is ignored. Symlinks are not
+traversed. Folder loops never initialise Git or create commits, and remote push is
+disabled. Fingerprints identify changes; they are not backups or an undo history.
+Avoid other edits while the loop runs. Files changed during verification require
+another verification before completion. A paused loop that failed because its
+folder had no Git repository can now be resumed.
 
 With **Live testing** enabled, bug reviews use both code review and live testing
 to find bugs and issues. For findings discovered through code review, live testing
@@ -231,7 +241,7 @@ Dirty checkouts, unexpected branch/commit changes, malformed reports, interrupte
 turns, and approval requests stop progression with an explanation. Review edits
 block before any fix or push. Reaching the configured limit ends with **Round limit
 reached**, which means the configured rounds finished, not that findings are absent.
-Each loop card shows the latest round’s **Review → Fix & commit** stages,
+Each loop card shows the latest round’s **Review → Fix & commit** stages (**Fix & verify** for ordinary folders),
 with an active spinner, completed checks, and explicit paused or attention states.
 Verification normally happens within the fix task. When the checkout advances
 beyond the reported fix commit, a separate verification turn appears as

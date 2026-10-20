@@ -27,19 +27,28 @@ enum ReviewLoopDocumentMigration {
 
     private static func migrateSettings(_ saved: [String: Any]) -> [String: Any] {
         var loop = saved
+        // Preserve existing saved Git checkpoints while moving to workspace revisions.
+        if let value = loop.removeValue(forKey: "expectedCommit") { loop["expectedRevision"] = value }
+        if loop["workspaceKind"] == nil, loop["checkoutRoot"] != nil { loop["workspaceKind"] = "git" }
         if let previousType = loop.removeValue(forKey: "focus") {
             loop["reviewType"] = previousType
         }
         if let rounds = loop["rounds"] as? [[String: Any]] {
             loop["rounds"] = rounds.map { savedRound in
                 var round = savedRound
+                if let value = round.removeValue(forKey: "baseCommit") { round["baseRevision"] = value }
+                if var result = round["result"] as? [String: Any] {
+                    if let value = result.removeValue(forKey: "verifiedCommit") { result["verifiedRevision"] = value }
+                    round["result"] = result
+                }
                 let previousFollowUpPermission = round.removeValue(forKey: "continuationRequested") as? Bool
                 let previousReloadRequest = round.removeValue(forKey: "reloadContinuationRequested") as? Bool
                 round["allowsFollowUpTurns"] = round["allowsFollowUpTurns"] as? Bool ?? previousFollowUpPermission ?? false
                 round["extensionReloadContinuationPending"] = round["extensionReloadContinuationPending"] as? Bool ?? previousReloadRequest ?? false
                 if var verification = round["fixVerification"] as? [String: Any] {
+                    if let value = verification.removeValue(forKey: "targetCommit") { verification["targetRevision"] = value }
                     if let target = verification.removeValue(forKey: "commit") {
-                        verification["targetCommit"] = target
+                        verification["targetRevision"] = target
                     }
                     round["fixVerification"] = verification
                 }

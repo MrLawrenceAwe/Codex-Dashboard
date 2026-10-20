@@ -104,7 +104,7 @@ enum ReviewLoopPhase: String, Codable, Sendable {
 
 struct ReviewRound: Codable, Equatable, Sendable {
     let number: Int
-    let baseCommit: String
+    let baseRevision: String
     var threadID: String?
     var reviewTurnID: String?
     var fixTurnID: String?
@@ -120,7 +120,7 @@ struct ReviewRound: Codable, Equatable, Sendable {
 
 struct ReviewFixVerification: Codable, Equatable, Sendable {
     let sourceFixTurnID: String
-    let targetCommit: String
+    let targetRevision: String
     var turnID: String?
 }
 
@@ -154,7 +154,7 @@ struct ReviewRoundResult: Codable, Equatable, Sendable {
     let addressedFindingCount: Int
     let commit: String
     let summary: String
-    var verifiedCommit: String? = nil
+    var verifiedRevision: String? = nil
 }
 
 struct ReviewLoop: Codable, Equatable, Sendable {
@@ -172,11 +172,12 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var reloadExtensionBeforeTesting = false
     var muteTestPlayback = false
     var pushToRemote = false
+    var workspaceKind: ReviewWorkspaceKind? = nil
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
     var branch: String?
     var checkoutRoot: String?
-    var expectedCommit: String?
+    var expectedRevision: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
     /// Unix timestamp; absent for saved reviews predating timestamp tracking.
@@ -188,7 +189,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 13
+    static let currentVersion = 14
     let version: Int
     let loops: [ReviewLoop]
 }

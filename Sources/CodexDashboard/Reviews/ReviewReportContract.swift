@@ -9,7 +9,7 @@ enum ReviewReportContract {
         let withdrawn: [Int]
     }
 
-    static func instructions(for kind: ReviewTurnKind) -> String {
+    static func instructions(for kind: ReviewTurnKind, workspaceKind: ReviewWorkspaceKind = .git) -> String {
         let format: String
         switch kind {
         case .review(let limit):
@@ -32,6 +32,17 @@ enum ReviewReportContract {
             Impact and linked file location.
 
             \(findingGuidance) The dashboard counts finding sections automatically; do not include a findings total. If there are no findings, omit finding sections and say so in Summary. If blocked, use # Review blocked and explain why in Summary.
+            """
+        case _ where workspaceKind == .folder:
+            format = """
+            # Fixes applied
+            Findings addressed: N
+            Findings withdrawn: none or comma-separated review numbers
+
+            ## Summary
+            Brief description of changes and verification.
+
+            N is the number fixed. List invalid findings by their 1-based position in the review, or use none. If every finding is invalid, use # Findings withdrawn and Findings addressed: 0. If blocked, use # Fixes blocked and explain why in Summary. Do not include a Commit field. This is an ordinary folder; do not initialise Git, create commits, or push.
             """
         case .fix, .fixContinuation:
             format = """
@@ -114,17 +125,20 @@ enum ReviewReportContract {
         return ReviewReport(outcome: outcome, findings: findings, summary: summary)
     }
 
-    static func fix(_ text: String?) throws -> FixReport {
+    static func fix(_ text: String?, workspaceKind: ReviewWorkspaceKind = .git) throws -> FixReport {
         let sections = try sections(text)
         let header = lines(sections[0])
-        guard sections.count == 2, header.count == 4,
-              let outcome = ["# Fixes committed": ReviewRoundResult.Outcome.fixed,
+        let folder = workspaceKind == .folder
+        guard sections.count == 2, header.count == (folder ? 3 : 4),
+              let outcome = [folder ? "# Fixes applied" : "# Fixes committed": ReviewRoundResult.Outcome.fixed,
                              "# Findings withdrawn": .withdrawn,
                              "# Fixes blocked": .blocked][header[0]],
               let addressedCount = count(header[1], prefix: "Findings addressed: "),
-              header[2].hasPrefix("Findings withdrawn: "),
-              header[3].hasPrefix("Commit: `"), header[3].hasSuffix("`") else { throw invalid() }
-        let commit = String(header[3].dropFirst(9).dropLast())
+              header[2].hasPrefix("Findings withdrawn: ") else { throw invalid() }
+        if !folder {
+            guard header[3].hasPrefix("Commit: `"), header[3].hasSuffix("`") else { throw invalid() }
+        }
+        let commit = folder ? "none" : String(header[3].dropFirst(9).dropLast())
         let withdrawnValue = String(header[2].dropFirst("Findings withdrawn: ".count))
         let withdrawn: [Int]
         if withdrawnValue == "none" {
@@ -139,11 +153,11 @@ enum ReviewReportContract {
         guard !withdrawnValue.isEmpty,
               Set(withdrawn).count == withdrawn.count,
               !commit.isEmpty, !commit.contains("`"),
-              (outcome == .fixed && addressedCount > 0 && commit != "none") ||
+              (outcome == .fixed && addressedCount > 0 && (folder || commit != "none")) ||
               (outcome == .withdrawn && addressedCount == 0 && !withdrawn.isEmpty && commit == "none") ||
               (outcome == .blocked && commit == "none") else { throw invalid() }
         return FixReport(result: ReviewRoundResult(outcome: outcome, addressedFindingCount: addressedCount,
-                                                   commit: outcome == .fixed ? commit : "",
+                                                   commit: outcome == .fixed && !folder ? commit : "",
                                                    summary: try content(sections[1], prefix: "Summary\n")),
                          withdrawn: withdrawn)
     }

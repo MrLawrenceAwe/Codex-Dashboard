@@ -3,14 +3,14 @@ const reviewPresentation = (() => {
     return reviewTypes.find(type => type.id === reviewType)?.label || reviewType || '';
   }
 
-  function roundStatus(round, pushToRemote) {
+  function roundStatus(round, pushToRemote, workspaceKind) {
     let label;
     switch (round.result?.outcome) {
       case 'clean':
         label = round.review?.findings?.length ? 'No qualifying findings' : 'No findings';
         break;
       case 'fixed':
-        label = pushToRemote ? 'Fixes committed & pushed' : 'Fixes committed';
+        label = workspaceKind === 'folder' ? 'Fixes applied & verified' : pushToRemote ? 'Fixes committed & pushed' : 'Fixes committed';
         break;
       case 'withdrawn':
         label = 'Findings withdrawn';
@@ -30,7 +30,7 @@ const reviewPresentation = (() => {
     const round = loop.rounds.at(-1);
     const outcome = round?.result?.outcome;
     const current = round?.fixVerification || round?.fixRequested || round?.review?.outcome === 'reviewed' ? 1 : 0;
-    const labels = ['Review', 'Fix & commit'];
+    const labels = ['Review', loop.workspaceKind === 'folder' ? 'Fix & verify' : 'Fix & commit'];
     const states = ['pending', 'pending'];
     if (outcome && outcome !== 'blocked') {
       states[0] = 'done';
@@ -48,7 +48,7 @@ const reviewPresentation = (() => {
       if (index === 1 && states[index] === 'active' && round?.fixVerification) {
         description = 'Reverifying fixes';
       } else if (index === 1 && outcome === 'withdrawn') {
-        description = 'Findings withdrawn; no commit needed';
+        description = loop.workspaceKind === 'folder' ? 'Findings withdrawn; files unchanged' : 'Findings withdrawn; no commit needed';
       }
       return { label, state: states[index], description };
     });

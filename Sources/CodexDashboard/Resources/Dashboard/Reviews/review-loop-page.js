@@ -37,6 +37,7 @@ const reviewLoopPage = (() => {
       queueAction({ kind: 'start', ...reviewLoopSetupView.readSettings() });
     });
     details.querySelector('[data-review-live-testing]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
+    details.querySelector('[data-review-project]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     details.querySelector('[data-review-type]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     for (const kind of ['review', 'fix']) {
       const model = details.querySelector(`[data-${kind}-model]`);

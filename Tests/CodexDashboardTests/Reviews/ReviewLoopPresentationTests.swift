@@ -7,13 +7,13 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         var loop = ReviewLoop(id: UUID(), startActionID: "display", project: project,
                               promptContext: .general, maxRounds: 5)
         loop.rounds = [
-            ReviewRound(number: 1, baseCommit: "base", result: ReviewRoundResult(
+            ReviewRound(number: 1, baseRevision: "base", result: ReviewRoundResult(
                 outcome: .fixed, addressedFindingCount: 1, commit: "fixed", summary: "Fixed")),
-            ReviewRound(number: 2, baseCommit: "fixed", result: ReviewRoundResult(
+            ReviewRound(number: 2, baseRevision: "fixed", result: ReviewRoundResult(
                 outcome: .withdrawn, addressedFindingCount: 0, commit: "", summary: "Withdrawn")),
-            ReviewRound(number: 3, baseCommit: "fixed", result: ReviewRoundResult(
+            ReviewRound(number: 3, baseRevision: "fixed", result: ReviewRoundResult(
                 outcome: .blocked, addressedFindingCount: 0, commit: "", summary: "Blocked")),
-            ReviewRound(number: 4, baseCommit: "fixed"),
+            ReviewRound(number: 4, baseRevision: "fixed"),
         ]
         let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
             ReviewLoopDisplaySnapshot(loop: loop))) as? [String: Any]

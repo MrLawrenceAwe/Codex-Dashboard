@@ -170,14 +170,23 @@ report but submits only qualifying findings with original numbers when necessary
 Live testing adds instructions only when enabled; otherwise no test result is required
 by the loop contract. Exact prompt wording lives in `ReviewPrompts`, not duplicated here.
 
-`ReviewRepositoryCheckpoint` validates Git state through argument-based subprocesses.
+`ReviewRepositoryCheckpoint` detects Git working trees and ordinary folders. Folder
+state uses a SHA-256 fingerprint of content, paths, permissions, and symlink targets;
+`ReviewFolderCheckpoint` reads the tree twice off the main actor and rejects unstable
+snapshots. Read-only reviews must preserve this revision. Folder fix reports use
+`# Fixes applied` without a commit, and always trigger read-only verification of the
+current files before completion. Further changes invalidate that verification.
+Folder mode never initialises Git or publishes. Reservations reject overlapping
+parent/child folders as well as identical roots.
+
+For Git projects, `ReviewRepositoryCheckpoint` validates Git state through argument-based subprocesses.
 A review must leave a clean checkout and unchanged HEAD. Fix completion requires the
 original branch, clean tree, a reported commit matching HEAD, and ancestry from the
 round's base commit. `reconcileAndPublishFix` fetches the destination and returns
 either `published`
 or `verificationRequired` with the merged checkout. Remote reconciliation can
 create a local merge commit; publication waits for read-only verification of that
-HEAD. The verification's `targetCommit` identifies this HEAD independently of the
+HEAD. The verification's `targetRevision` identifies this HEAD independently of the
 original fix commit. Publication never forces a push.
 Retries and restart reconciliation reuse the same fix rather than requesting another.
 

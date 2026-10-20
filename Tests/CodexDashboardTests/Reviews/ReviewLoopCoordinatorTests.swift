@@ -128,7 +128,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.createCalls, 1)
         XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .blocked])
         XCTAssertEqual(recovered.loops.last?.message,
-                       "This Git checkout already has an active review loop for Example. Stop that loop before starting another.")
+                       "This project folder already has an active review loop for Example. Stop that loop before starting another.")
     }
 
     func testOneActiveLoopPerProjectIncludingPausedAndChangedPath() throws {
@@ -267,7 +267,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         driver.commit = fullCommit
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
-        XCTAssertEqual(coordinator.loops.last?.expectedCommit, fullCommit)
+        XCTAssertEqual(coordinator.loops.last?.expectedRevision, fullCommit)
         XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.commit, fullCommit)
         XCTAssertEqual(driver.prompts.count, 2)
     }
@@ -852,7 +852,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertTrue(loop.muteTestPlayback)
         loop.phase = .blocked
         loop.muteTestPlayback = false
-        loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread")]
+        loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread")]
         store.loops = [loop]
         let restored = ReviewLoopCoordinator(store: store)
         var action = startAction(id: "mute-update", kind: .setMuteTestPlayback, projectID: nil,
