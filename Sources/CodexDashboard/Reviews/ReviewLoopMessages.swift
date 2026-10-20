@@ -60,7 +60,6 @@ struct ReviewPromptPreview: Codable, Sendable {
 
 struct ReviewLoopProgress: Codable, Sendable {
     let step: String
-    let currentLabel: String
     let current: ReviewPromptPreview?
     let upcoming: ReviewPromptPreview?
     let nextMessage: String

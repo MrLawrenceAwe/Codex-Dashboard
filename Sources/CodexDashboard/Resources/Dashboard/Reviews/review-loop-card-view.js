@@ -38,7 +38,7 @@ const reviewLoopCardView = (() => {
         <div data-review-test-playback-setting></div>
         <div class="review-live" data-review-live hidden>
           <details class="review-prompt" data-review-current-prompt>
-            <summary class="review-prompt-heading"><span data-review-current-label>Configured prompt preview</span><span data-review-current-title></span></summary>
+            <summary class="review-prompt-heading"><span>Configured prompt preview</span><span data-review-current-title></span></summary>
             <p data-review-current-note></p><pre data-review-current-text></pre>
           </details>
           <details class="review-prompt" data-review-upcoming-prompt>
@@ -168,7 +168,6 @@ const reviewLoopCardView = (() => {
     root.querySelector('[data-review-live-heading]').hidden = live.hidden;
     if (live.hidden) return;
     root.querySelector('[data-review-step]').textContent = progress.step;
-    root.querySelector('[data-review-current-label]').textContent = progress.currentLabel;
     const task = root.querySelector('[data-review-current-task]');
     task.hidden = !progress.threadID;
     if (progress.threadID) task.dataset.reviewThread = progress.threadID;

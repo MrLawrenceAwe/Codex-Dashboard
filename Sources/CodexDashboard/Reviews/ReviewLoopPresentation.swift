@@ -8,7 +8,6 @@ enum ReviewLoopPresentation {
         let (upcoming, nextMessage) = nextPrompt(for: loop, round: round, unfinished: unfinished)
         return ReviewLoopProgress(
             step: step(for: loop, round: round),
-            currentLabel: "Configured prompt preview",
             current: round.map { configuredPromptPreview(for: loop, round: $0) },
             upcoming: upcoming,
             nextMessage: nextMessage,

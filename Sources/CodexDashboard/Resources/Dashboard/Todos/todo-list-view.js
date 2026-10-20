@@ -25,7 +25,7 @@ const todoListView = (() => {
   function itemPresetMarkup(item) {
     return `<details class="todo-preset" data-todo-preset-details>
       <summary>${domUtils.escapeHTML((composerPresets.summary(item.preset).join(' · ') || 'Model settings'))}</summary>
-      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Apply model settings</label>
+      <label class="todo-preset-toggle"><input type="checkbox" data-todo-preset-enabled${item.preset ? ' checked' : ''}>Save model settings</label>
       ${presetFields(item.preset, 'item')}
     </details>`;
   }
@@ -190,7 +190,7 @@ const todoListView = (() => {
               <select data-todo-new-tag aria-label="Tag to attach">${todoTagView.tagOptions([])}</select>
             </div>
             <div class="todo-new-preset">
-              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Apply model settings</label>
+              <label class="todo-preset-toggle"><input type="checkbox" data-todo-new-preset-enabled>Save model settings</label>
               ${presetFields(null, 'new')}
             </div>
           </div>

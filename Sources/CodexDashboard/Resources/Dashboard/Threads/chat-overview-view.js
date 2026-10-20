@@ -139,7 +139,7 @@ const chatOverviewView = (() => {
     if (!matchingThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'
-        : 'No chats found';
+        : filterMode === 'changedProjects' ? 'No projects with pending changes' : 'No chats found';
       updateMarkup(list, `<div class="dashboard-empty" data-dashboard-empty><strong>${emptyMessage}</strong></div>`);
       return true;
     }

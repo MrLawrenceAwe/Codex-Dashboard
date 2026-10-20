@@ -901,7 +901,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
-            progress:{[loop.id]:{step:'Round limit reached',currentLabel:'Configured prompt preview',current:null,upcoming:null,
+            progress:{[loop.id]:{step:'Round limit reached',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
           const badge = document.querySelector('[data-review-badge]');
@@ -928,7 +928,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],error:null,
             loops:[{id:'live',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
-            progress:{live:{step:'Reviewing',currentLabel:'Configured prompt preview',threadID:'task-1',nextMessage:'',
+            progress:{live:{step:'Reviewing',threadID:'task-1',nextMessage:'',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
           api.applyReviewPageSnapshot(snapshot);

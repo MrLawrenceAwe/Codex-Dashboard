@@ -53,6 +53,7 @@ With Codex closed or integration disabled, export uses the saved native library.
 settings. Right-click a sidebar chat and choose **Add to To-dos**; a chat already
 linked to an open to-do shows **Already in To-dos**. Tasks can be edited, completed,
 filtered, or deleted. Deleting a tag removes it from all to-dos.
+**Save model settings** stores settings on the to-do for its next transfer to a chat.
 
 For an open to-do with a project, **Paste into chat…** lets you choose a project
 chat; linked chats are labelled. For an open to-do without a linked chat, **New chat**

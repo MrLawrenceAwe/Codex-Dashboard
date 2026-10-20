@@ -98,14 +98,8 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       { timeout: 5000, interval: 25 },
     );
     if (!composer || !isDestination()) {
-      if (!isDestroyed()) {
-        if (failurePolicy === 'stayInChat') {
-          showComposerWarning(activeComposer(), 'Could not find the new chat editor. Return to To-dos and try again.');
-        } else {
-          pageState.open();
-          const notice = document.querySelector('[data-todo-composer-error]');
-          if (notice) notice.hidden = false;
-        }
+      if (!isDestroyed() && failurePolicy === 'stayInChat') {
+        showComposerWarning(activeComposer(), 'Could not find the new chat editor. Return to To-dos and try again.');
       }
       return false;
     }
@@ -115,11 +109,6 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
         if (failurePolicy === 'stayInChat') {
           presetFailed = true;
         } else {
-          if (!isDestroyed()) {
-            pageState.open();
-            const notice = document.querySelector('[data-todo-composer-error]');
-            if (notice) notice.hidden = false;
-          }
           return false;
         }
       }

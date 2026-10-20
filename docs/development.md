@@ -193,9 +193,9 @@ Review tests are split into coordinator, bridge, presentation, prompts, migratio
 and file-store suites, with doubles in `Reviews/ReviewLoopTestSupport.swift`.
 Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
-Run `swift test` for the complete native and WebKit suite. For the pure review-stage
-presentation checks without a browser or UI, run
-`node --test Tests/Renderer/review-presentation.test.cjs`. Web tests await to-do
+Run `swift test` for the complete native and WebKit suite. For renderer presentation
+and composer-transfer checks without a browser or UI, run
+`node --test Tests/Renderer/*.test.cjs`. Web tests await to-do
 save completion; they do not assume persistence finishes during a DOM event.
 Persistence instrumentation requires each source anchor to match exactly once
 and fails on missing or duplicate anchors. Save waiters are required calls.
