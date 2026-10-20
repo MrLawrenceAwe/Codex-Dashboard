@@ -81,18 +81,18 @@ const reviewLoopCardView = (() => {
     return loop.phase === 'limitReached' ? 'Round limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
   }
 
-  function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs, isFinished) {
+  function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs) {
     const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
     for (const [index, loop] of loops.entries()) {
       const card = cards.get(loop.id) || createCard(loop);
       if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
-      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id), isFinished, snapshot.models || [], snapshot.reviewTypes || []);
+      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id), snapshot.models || [], snapshot.reviewTypes || []);
       cards.delete(loop.id);
     }
     cards.forEach(card => card.remove());
   }
 
-  function renderCard(root, loop, progress, pendingAction, retained, isFinished, models, reviewTypes) {
+  function renderCard(root, loop, progress, pendingAction, retained, models, reviewTypes) {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
@@ -115,7 +115,7 @@ const reviewLoopCardView = (() => {
     renderFeedback(root, loop);
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : isFinished(loop) ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
+    controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
       ? '<button type="button" data-review-action="resume">Extension reloaded — continue</button>'
       : ['paused', 'blocked'].includes(loop.phase)
       ? '<button type="button" data-review-action="resume">Resume</button>'
@@ -124,7 +124,7 @@ const reviewLoopCardView = (() => {
     controls.querySelectorAll('button').forEach(button => { button.dataset.reviewLoopID = loop.id; });
     if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
     const playbackSetting = root.querySelector('[data-review-test-playback-setting]');
-    playbackSetting.hidden = isFinished(loop) || loop.phase === 'stopping' || !loop.liveTesting;
+    playbackSetting.hidden = loop.isFinished || loop.phase === 'stopping' || !loop.liveTesting;
     if (!playbackSetting.hidden) {
       if (!playbackSetting.firstElementChild) playbackSetting.innerHTML = '<label><input type="checkbox" data-review-loop-mute-test-playback> Mute test playback</label>';
       const input = playbackSetting.querySelector('input');
@@ -136,7 +136,7 @@ const reviewLoopCardView = (() => {
     const findingsState = new Map(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('.review-findings-details')].map(details => [details.dataset.round, { open: details.open, completed: details.dataset.completed === 'true' }]) : []);
     root.dataset.renderedLoop = loop?.id || '';
     root.querySelector('[data-review-rounds]').innerHTML = loop.rounds.map(round =>
-      roundMarkup(round, loop, expandedRounds, findingsState, isFinished(loop))).join('');
+      roundMarkup(round, loop, expandedRounds, findingsState, loop.isFinished)).join('');
   }
   function renderFeedback(root, loop) {
     const stages = reviewPresentation.roundStages(loop);

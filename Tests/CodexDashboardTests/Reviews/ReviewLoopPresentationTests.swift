@@ -22,6 +22,23 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         XCTAssertEqual((display?["rounds"] as? [Any])?.count, 4)
         let saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any]
         XCTAssertNil(saved?["completedRoundCount"], "Derived counts must not be persisted")
+        XCTAssertNil(saved?["isFinished"], "Derived phase state must not be persisted")
+    }
+
+    func testDisplaySnapshotMarksOnlyTerminalPhasesAsFinished() throws {
+        let cases: [(ReviewLoopPhase, Bool)] = [
+            (.waiting, false), (.running, false), (.paused, false),
+            (.blocked, false), (.awaitingExtensionReload, false), (.stopping, false),
+            (.completed, true), (.limitReached, true), (.stopped, true),
+        ]
+        for (phase, expected) in cases {
+            var loop = ReviewLoop(id: UUID(), startActionID: "display", project: project,
+                                  promptContext: .general, maxRounds: 5)
+            loop.phase = phase
+            let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
+                ReviewLoopDisplaySnapshot(loop: loop))) as? [String: Any]
+            XCTAssertEqual(display?["isFinished"] as? Bool, expected, "Phase: \(phase)")
+        }
     }
 
     func testProgressShowsConfiguredAndConditionalPromptPreviews() async throws {

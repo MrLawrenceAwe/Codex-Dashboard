@@ -35,9 +35,6 @@ public struct NativeAccountCredentialVault {
             currentCredential = try readCredential(
                 for: accountID,
                 service: service,
-                authenticationContext: interactionAllowed
-                    ? nil
-                    : authenticationContext(interactionAllowed: false),
                 interactionAllowed: interactionAllowed
             )
         } catch KeychainVaultError.status(let status)
@@ -60,9 +57,6 @@ public struct NativeAccountCredentialVault {
             previousCredential = try readCredential(
                 for: accountID,
                 service: previousUserPresenceService,
-                authenticationContext: authenticationContext(
-                    interactionAllowed: interactionAllowed
-                ),
                 interactionAllowed: interactionAllowed
             )
         } catch KeychainVaultError.status(let status) where status == errSecMissingEntitlement {
@@ -133,18 +127,15 @@ public struct NativeAccountCredentialVault {
     private func readCredential(
         for accountID: UUID,
         service: String,
-        authenticationContext: LAContext?,
         interactionAllowed: Bool
     ) throws -> Data? {
         var query = baseQuery(for: accountID, service: service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
-        if let authenticationContext {
-            query[kSecUseAuthenticationContext as String] = authenticationContext
-        }
         configureAuthentication(
             in: &query,
-            interactionAllowed: interactionAllowed
+            interactionAllowed: interactionAllowed,
+            usesMigrationPrompt: service == previousUserPresenceService
         )
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -155,25 +146,25 @@ public struct NativeAccountCredentialVault {
 
     private func deletePreviousCredentialWithoutPrompt(for accountID: UUID) {
         var query = baseQuery(for: accountID, service: previousUserPresenceService)
-        query[kSecUseAuthenticationContext as String] = authenticationContext(
-            interactionAllowed: false
-        )
         configureAuthentication(in: &query, interactionAllowed: false)
         _ = SecItemDelete(query as CFDictionary)
     }
 
     private func configureAuthentication(
         in query: inout [String: Any],
-        interactionAllowed: Bool
+        interactionAllowed: Bool,
+        usesMigrationPrompt: Bool = false
     ) {
-        guard !interactionAllowed else { return }
+        guard !interactionAllowed || usesMigrationPrompt else { return }
         query[kSecUseAuthenticationContext as String] = authenticationContext(
-            interactionAllowed: false
+            interactionAllowed: interactionAllowed
         )
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        if !interactionAllowed {
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        }
     }
 
-    private func authenticationContext(interactionAllowed: Bool = true) -> LAContext {
+    private func authenticationContext(interactionAllowed: Bool) -> LAContext {
         let context = LAContext()
         context.localizedReason = authenticationPrompt
         context.interactionNotAllowed = !interactionAllowed

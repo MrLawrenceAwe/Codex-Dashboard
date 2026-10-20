@@ -96,7 +96,7 @@ const reviewLoopPage = (() => {
     snapshot = nextSnapshot;
     if (pageState.isOpen()) {
       for (const loop of nextSnapshot.loops) {
-        if (!nextSnapshot.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
+        if (!loop.isFinished) retainedLoopIDs.add(loop.id);
       }
     }
     const knownIDs = new Set(nextSnapshot.loops.map(loop => loop.id));
@@ -108,7 +108,7 @@ const reviewLoopPage = (() => {
   function open() {
     if (!pageState.open()) return false;
     for (const loop of snapshot.loops) {
-      if (!snapshot.finishedLoopIDs?.includes(loop.id)) retainedLoopIDs.add(loop.id);
+      if (!loop.isFinished) retainedLoopIDs.add(loop.id);
     }
     render();
     return true;

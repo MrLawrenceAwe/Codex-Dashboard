@@ -83,5 +83,6 @@ See [architecture and behaviour](docs/architecture.md) for runtime, storage, ref
 and notification details. See [development and testing](docs/development.md) for
 renderer previews, resource organisation, migrations, and visual baselines.
 
-See [review-loop extension testing](docs/usage.md#review-loops) for reload controls,
-manual recovery, and static-review rules.
+See [review-loop controls](docs/usage.md#review-loops) for reload controls, manual
+recovery, and static-review rules, or [extension testing details](docs/development.md#review-loop-extension-testing)
+for installation checks and debugging connection cleanup.

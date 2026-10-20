@@ -168,35 +168,16 @@ that do not launch or drive a browser or application UI. Live browser testing,
 Computer Use, and extension reloads require an explicit request for that task.
 
 With **Reload browser extension** enabled, Codex reloads the extension before live
-testing and, when live verification is needed, again after building fixes. In the
-everyday Chrome profile, it uses Chrome Computer Use on `chrome://extensions` and
-the extension card’s **Reload** button. DevTools installation and reload tools are
-reserved for explicitly temporary test profiles, where removal on restart is intended.
+testing and again after fixes when live verification is needed. In your everyday
+Chrome profile, it uses the extension card’s **Reload** button on `chrome://extensions`.
+Chrome may ask you to approve a debugging connection. See
+[extension testing details](development.md#review-loop-extension-testing) for the
+agent’s installation checks and connection cleanup.
 
-The agent identifies the installed extension ID and source folder before reloading,
-then verifies the same ID and enabled state, refreshes affected test pages, and
-reopens extension UI as needed. Persistent installations must not have the
-`INSTALLED_VIA_CDP` creation flag (bit 32768). Restoring a missing registration
-requires backing up its registration and storage, retaining its original folder/key,
-and using **Load unpacked**. Live Chrome preferences are not edited, and Chrome is
-not restarted solely to test persistence.
-
-The globally configured `chrome-devtools` MCP server is used for read-only inventory
-and debugging that requires DevTools. Chrome may ask you to approve its connection.
-When debugging finishes, including on failure or cancellation, the agent disconnects
-its own session, verifies its debugging socket closed, and checks that the automation
-banner disappears when no other sessions remain. It leaves Chrome and your tabs open.
-If safe disconnection is unavailable, it explains the remaining connection and how
-to disconnect it.
-
-If a required reload cannot be completed, the loop waits for a manual reload and
-shows the reason and steps. Unavailable MCP tools are reported with any required
-chat reconnect/restart or Chrome connection approval. The chat reports
-`# Extension reload required` with a `## Summary` containing the browser, extension,
-steps, and reason; Dashboard shows **Waiting for extension reload**. Select
-**Extension reloaded — continue** after reloading to resume the same chat and round,
-preserving unfinished fixes. Final review and commit checks still run before the
-round can complete.
+If the loop shows **Waiting for extension reload**, follow its instructions to
+reload the named extension, then select **Extension reloaded — continue**. The
+same chat and round resume with unfinished fixes preserved. Final review and
+commit checks still run before the round can complete.
 
 The sidebar shows separate counts for running or waiting loops, an amber **!** for
 blocked loops or loops awaiting an extension reload, and a green **✓** for completed

@@ -458,14 +458,7 @@ final class ReviewLoopCoordinator {
         let fixReport = try ReviewReportContract.fix(fixTurn.finalMessage)
         let result = fixReport.result
         guard result.outcome != .blocked else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
-        let findings = report.findings(upTo: updated.priorityLimit)
-        let acceptedNumbers = Set(report.findings.enumerated().compactMap { index, finding in
-            findings.contains(finding) ? index + 1 : nil
-        })
-        guard result.addressedFindingCount + fixReport.withdrawn.count == findings.count,
-              fixReport.withdrawn.allSatisfy({ acceptedNumbers.contains($0) }) else {
-            throw ReviewLoopError("Commit checkpoint failed: the fix report accounted for \(result.addressedFindingCount + fixReport.withdrawn.count) of \(findings.count) findings.")
-        }
+        try ReviewFixCheckpoint.validateFindings(fixReport, against: report, priorityLimit: updated.priorityLimit)
         let reportedCommit = try await result.outcome == .fixed
             ? inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
             : round.baseCommit
@@ -474,19 +467,10 @@ final class ReviewLoopCoordinator {
         let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        if result.outcome == .fixed {
-            guard reportedCommit != round.baseCommit else {
-                throw ReviewLoopError("Commit checkpoint failed: no new fix commit was created.")
-            }
-            guard try await inspectGitProcess({ try await driver.isAncestor(round.baseCommit, of: reportedCommit, at: updated.project.path) }) else {
-                throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
-            }
-        }
-        if repo.commit != reportedCommit {
-            guard result.outcome == .fixed,
-                  try await inspectGitProcess({ try await driver.isAncestor(reportedCommit, of: repo.commit, at: updated.project.path) }) else {
-                throw ReviewLoopError("Commit checkpoint failed: the current branch no longer contains the reported fix commit. Restore its history or inspect the changes in the review chat before resuming.")
-            }
+        try await inspectGitProcess {
+            try await ReviewFixCheckpoint.validateCommit(
+                reportedCommit, result: result, baseCommit: round.baseCommit,
+                repository: repo, at: updated.project.path, using: driver)
         }
         if repo.commit != reportedCommit || round.fixVerification != nil {
             guard try await verifyAdvancedCheckout(thread: thread, loop: updated, round: round, sourceFixTurnID: fixTurn.id,
@@ -494,19 +478,39 @@ final class ReviewLoopCoordinator {
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        if result.outcome == .fixed, updated.pushToRemote {
-            updated.message = "Fixes committed. Reconciling remote changes and publishing the verified fixes."
-            try persist(updated)
-            let publication = try await driver.reconcileAndPublishFix(
-                reportedCommit, at: updated.project.path, expectedRepository: repo)
-            if case .verificationRequired(let repository) = publication {
-                try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: fixTurn.id,
-                                                repository: repository, using: driver, threadID: threadID)
-                return
-            }
-            guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
-            updated = current
+        guard try await publishFixIfNeeded(
+            loop: updated, round: round, result: result, reportedCommit: reportedCommit,
+            sourceFixTurnID: fixTurn.id, repository: repo, using: driver, threadID: threadID
+        ) else { return }
+        try finishRound(loopID: updated.id, result: result, reportedCommit: reportedCommit,
+                        repository: repo, fixTurnID: fixTurn.id)
+    }
+
+    /// Persists publication intent and schedules verification if reconciliation advances HEAD.
+    private func publishFixIfNeeded(
+        loop: ReviewLoop, round: ReviewRound, result: ReviewRoundResult, reportedCommit: String,
+        sourceFixTurnID: String, repository: ReviewRepositoryState,
+        using driver: any ReviewLoopDriving, threadID: String
+    ) async throws -> Bool {
+        guard result.outcome == .fixed, loop.pushToRemote else { return true }
+        var updated = loop
+        updated.message = "Fixes committed. Reconciling remote changes and publishing the verified fixes."
+        try persist(updated)
+        let publication = try await driver.reconcileAndPublishFix(
+            reportedCommit, at: updated.project.path, expectedRepository: repository)
+        if case .verificationRequired(let repository) = publication {
+            try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: sourceFixTurnID,
+                                            repository: repository, using: driver, threadID: threadID)
+            return false
         }
+        return true
+    }
+
+    private func finishRound(
+        loopID: UUID, result: ReviewRoundResult, reportedCommit: String,
+        repository repo: ReviewRepositoryState, fixTurnID: String
+    ) throws {
+        guard var updated = activeLoop(matching: loopID, phase: .running) else { return }
         if result.outcome == .withdrawn {
             updated.phase = .completed
             updated.message = "All review findings were withdrawn. No fix commit was needed."
@@ -524,7 +528,7 @@ final class ReviewLoopCoordinator {
         if repo.commit != reportedCommit {
             updated.message += " The fixes were reverified at the current HEAD."
         }
-        updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurn.id
+        updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurnID
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
             outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: reportedCommit,
             summary: result.summary, verifiedCommit: repo.commit)

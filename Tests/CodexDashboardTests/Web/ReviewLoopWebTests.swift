@@ -10,56 +10,95 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
-    func testVisualFeedbackShowsTwoStagesAndConditionalReverification() async throws {
+    func testStageFeedbackShowsTransitionsAndConditionalReverification() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const round = {number:1,fixRequested:false};
+          const loop = {id:'feedback',project,phase:'waiting',isFinished:false,completedRoundCount:0,maxRounds:3,rounds:[]};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop]};
+          const states = () => {
+            api.applyReviewPageSnapshot(snapshot);
+            return [...document.querySelectorAll('.review-stage-track > li')].map(item => item.dataset.stage).join(',');
+          };
+          const results = {waitingStages:states()};
+          api.openReviews();
+          loop.phase = 'running'; loop.rounds = [round];
+          results.reviewStages = states();
+          results.activeReviewLabel = document.querySelector('[aria-current="step"] strong').textContent;
+          results.initialFindingCount = document.querySelector('.review-metrics dd').textContent;
+          const activeStage = document.querySelector('[aria-current="step"]');
+          api.applyReviewPageSnapshot(snapshot);
+          results.activeStagePreserved = activeStage === document.querySelector('[aria-current="step"]');
+          round.review = {outcome:'reviewed',findings:[{title:'Issue',body:'Details'}]};
+          round.fixRequested = true;
+          results.fixStages = states();
+          round.fixVerification = {targetCommit:'abc123'};
+          results.verificationStages = states();
+          results.activeFixLabel = document.querySelector('[aria-current="step"] strong').textContent;
+          results.verificationDescription = document.querySelector('[aria-current="step"] .review-stage-description').textContent;
+          loop.phase = 'blocked';
+          results.blockedStages = states();
+          results.blockedDescription = document.querySelector('[data-stage="blocked"] .review-stage-description').textContent;
+          results.blockedStageIsCurrent = document.querySelector('[data-stage="blocked"]').hasAttribute('aria-current');
+          loop.phase = 'paused'; results.pausedStages = states();
+          loop.phase = 'stopped'; loop.isFinished = true; results.stoppedStages = states();
+          loop.phase = 'limitReached';
+          round.result = {outcome:'fixed',commit:'abc123',addressedFindingCount:1};
+          results.fixedStages = states();
+          round.result.verifiedCommit = 'abc123';
+          results.verifiedStages = states();
+          results.metrics = [...document.querySelectorAll('.review-metrics dd')].map(item => item.textContent);
+          round.result = {outcome:'clean',addressedFindingCount:0};
+          results.cleanStages = states();
+          return results;
+        })()
+        """) as? [String: Any]
+        XCTAssertEqual(result?["waitingStages"] as? String, "waiting,pending")
+        XCTAssertEqual(result?["reviewStages"] as? String, "active,pending")
+        XCTAssertEqual(result?["activeReviewLabel"] as? String, "Review")
+        XCTAssertEqual(result?["initialFindingCount"] as? String, "—")
+        XCTAssertEqual(result?["activeStagePreserved"] as? Bool, true)
+        XCTAssertEqual(result?["fixStages"] as? String, "done,active")
+        XCTAssertEqual(result?["verificationStages"] as? String, "done,active")
+        XCTAssertEqual(result?["activeFixLabel"] as? String, "Fix & commit")
+        XCTAssertEqual(result?["verificationDescription"] as? String, "Reverifying fixes")
+        XCTAssertEqual(result?["blockedStages"] as? String, "done,blocked")
+        XCTAssertEqual(result?["blockedDescription"] as? String, "Needs attention")
+        XCTAssertEqual(result?["blockedStageIsCurrent"] as? Bool, false)
+        XCTAssertEqual(result?["pausedStages"] as? String, "done,paused")
+        XCTAssertEqual(result?["stoppedStages"] as? String, "done,stopped")
+        XCTAssertEqual(result?["fixedStages"] as? String, "done,done")
+        XCTAssertEqual(result?["verifiedStages"] as? String, "done,done")
+        XCTAssertEqual(result?["metrics"] as? [String], ["1", "1", "1"])
+        XCTAssertEqual(result?["cleanStages"] as? String, "done,skipped")
+    }
+
+    func testStageTrackFitsNarrowPage() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         webView.frame = CGRect(x: 0, y: 0, width: 360, height: 900)
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const round = {number:1,fixRequested:false};
-          const loop = {id:'feedback',project,phase:'waiting',completedRoundCount:0,maxRounds:3,rounds:[]};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[]};
-          const states = () => {
-            api.applyReviewPageSnapshot(snapshot);
-            return [...document.querySelectorAll('.review-stage-track > li')].map(item => item.dataset.stage).join(',');
-          };
-          const results = [states()];
-          api.openReviews();
-          loop.phase = 'running'; loop.rounds = [round];
-          results.push(states(),document.querySelector('[aria-current="step"] strong').textContent,
-            document.querySelector('.review-metrics dd').textContent);
-          const activeStage = document.querySelector('[aria-current="step"]');
+          const loop = {id:'layout',project,phase:'running',isFinished:false,completedRoundCount:0,maxRounds:3,
+            rounds:[{number:1,result:{outcome:'clean',addressedFindingCount:0}}]};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop]};
           api.applyReviewPageSnapshot(snapshot);
-          results.push(activeStage === document.querySelector('[aria-current="step"]'));
-          round.review = {outcome:'reviewed',findings:[{title:'Issue',body:'Details'}]};
-          round.fixRequested = true;
-          results.push(states());
-          round.fixVerification = {targetCommit:'abc123'};
-          results.push(states(), document.querySelector('[aria-current="step"] strong').textContent,
-            document.querySelector('[aria-current="step"] .review-stage-description').textContent);
-          loop.phase = 'blocked';
-          results.push(states(),document.querySelector('[data-stage="blocked"] .review-stage-description').textContent,
-            document.querySelector('[data-stage="blocked"]').hasAttribute('aria-current'));
-          loop.phase = 'paused'; results.push(states());
-          loop.phase = 'stopped'; results.push(states());
-          loop.phase = 'limitReached'; snapshot.finishedLoopIDs = [loop.id];
-          round.result = {outcome:'fixed',commit:'abc123',addressedFindingCount:1};
-          results.push(states());
-          round.result.verifiedCommit = 'abc123';
-          results.push(states(),[...document.querySelectorAll('.review-metrics dd')].map(item => item.textContent).join(','));
-          round.result = {outcome:'clean',addressedFindingCount:0};
-          results.push(states());
+          api.openReviews();
+          loop.phase = 'completed'; loop.isFinished = true;
+          api.applyReviewPageSnapshot(snapshot);
           const track = document.querySelector('.review-stage-track');
-          results.push(track.getBoundingClientRect().right <= document.documentElement.clientWidth,
-            [...track.children].every(item => item.scrollWidth <= item.clientWidth));
-          return results;
+          return {
+            trackFitsViewport: track.getBoundingClientRect().right <= document.documentElement.clientWidth,
+            stageContentsFit: [...track.children].every(item => item.scrollWidth <= item.clientWidth),
+          };
         })()
-        """) as? [AnyHashable]
-        XCTAssertEqual(result, ["waiting,pending", "active,pending", "Review", "—", true,
-            "done,active", "done,active", "Fix & commit", "Reverifying fixes", "done,blocked", "Needs attention", false,
-            "done,paused", "done,stopped", "done,done", "done,done", "1,1,1",
-            "done,skipped", true, true])
+        """) as? [String: Bool]
+        XCTAssertEqual(result?["trackFitsViewport"], true)
+        XCTAssertEqual(result?["stageContentsFit"], true)
     }
 
     func testCardsResolveLabelsWithoutRenderingSetupAndPreserveUnavailableIdentifiers() async throws {
@@ -70,14 +109,14 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let injection = try InjectionBundle.load()
         let expression = try DashboardWebTestHarness.instrumentSource(
             injection.mountExpression,
-            anchor: "reviewLoopSetupView.render(snapshot, pendingAction, isFinished);",
+            anchor: "reviewLoopSetupView.render(snapshot, pendingAction);",
             replacement: ""
         )
         _ = try await webView.evaluateJavaScript(expression)
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'saved',project,phase:'paused',reviewType:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
+          const loop = {id:'saved',project,phase:'paused',isFinished:false,reviewType:'organisationAndNaming',completedRoundCount:0,maxRounds:5,rounds:[],
             reviewSelection:{modelID:'model-a',reasoningEffort:'low'},
             fixSelection:{modelID:'retired-model',reasoningEffort:'xhigh'}};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),
@@ -97,7 +136,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'reload',project,phase:'awaitingExtensionReload',message:'Reload Example in Chrome.',completedRoundCount:0,maxRounds:3,rounds:[]};
+          const loop = {id:'reload',project,phase:'awaitingExtensionReload',isFinished:false,message:'Reload Example in Chrome.',completedRoundCount:0,maxRounds:3,rounds:[]};
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),models:\(Self.modelsJSON),projects:[project],loops:[loop],error:null});
           const badge = document.querySelector('[data-review-badge]').textContent;
           const status = document.querySelector('[data-review-status]').textContent;
@@ -129,7 +168,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.querySelector('[data-fix-model]').value = 'model-a';
           document.querySelector('[data-review-form]').requestSubmit();
           const start = JSON.parse(api.pendingReviewAction());
-          const loop = {id:'blocked',project,phase:'blocked',liveTesting:true,muteTestPlayback:false,completedRoundCount:0,maxRounds:3,rounds:[]};
+          const loop = {id:'blocked',project,phase:'blocked',isFinished:false,liveTesting:true,muteTestPlayback:false,completedRoundCount:0,maxRounds:3,rounds:[]};
           api.applyReviewPageSnapshot({...snapshot,loops:[loop],acknowledgedActionID:start.id});
           const toggle = document.querySelector('[data-review-loop-mute-test-playback]');
           toggle.click();
@@ -170,9 +209,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'blocked',project,phase:'blocked',completedRoundCount:0,maxRounds:1,
+          const loop = {id:'blocked',project,phase:'blocked',isFinished:false,completedRoundCount:0,maxRounds:1,
             rounds:[{number:1,result:{outcome:'blocked',summary:'Missing evidence'}}]};
-          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null});
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null});
           const count = document.querySelector('[data-review-round-count]').textContent;
           const stop = !!document.querySelector('[data-review-action="stop"]');
           document.querySelector('[data-review-action="resume"]').click();
@@ -189,8 +228,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'stopping',project,phase:'stopping',completedRoundCount:0,maxRounds:2,rounds:[]};
-          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],finishedLoopIDs:[],error:null});
+          const loop = {id:'stopping',project,phase:'stopping',isFinished:false,completedRoundCount:0,maxRounds:2,rounds:[]};
+          api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null});
           const stop = document.querySelector('[data-review-action="stop"]');
           const values = [stop.textContent,
             !!document.querySelector('[data-review-action="resume"]'),
@@ -209,7 +248,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const projects = [{id:'a',name:'A',path:'/tmp/a'},{id:'b',name:'B',path:'/tmp/b'},{id:'c',name:'C',path:'/tmp/c'}];
-          const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:project.name}));
+          const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:project.name}));
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null});
           const cards = document.querySelectorAll('[data-review-activity]');
           const setup = document.querySelector('[data-review-project]');
@@ -233,9 +272,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const projects = ['Dashboard', 'Website', 'Archive'].map((name, i) => ({id:String(i),name,path:'/tmp/' + i}));
-          const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
+          const loops = projects.map((project, i) => ({id:project.id,project,phase:i === 2 ? 'completed' : 'running',isFinished:i === 2,priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             message:i === 2 ? 'Review complete' : 'Reviewing changes',rounds:[{number:1,result:{outcome:'fixed',summary:'Fixed issue',commit:'1234567890'}}]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['2'],error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null};
           api.applyReviewPageSnapshot(snapshot); api.openReviews();
           const cards = () => [...document.querySelectorAll('[data-review-activity]')];
           const first = cards()[0];
@@ -281,9 +320,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const projects = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => ({id,name:id,path:'/tmp/' + id}));
           const loops = projects.map((project, i) => ({id:project.id,project,
-            phase:['running','paused','completed','limitReached','stopped','blocked'][i],
+            phase:['running','paused','completed','limitReached','stopped','stopped'][i],isFinished:i >= 2,
             priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,finishedLoopIDs:['C','D','E','F'],error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null};
           const apply = () => api.applyReviewPageSnapshot(snapshot);
           const active = () => [...document.querySelectorAll('[data-review-board] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
           const history = () => [...document.querySelectorAll('[data-review-history-card] [data-review-activity]')].map(card => card.dataset.loopId).join(',');
@@ -295,7 +334,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           card.querySelector('.review-round-details').open = true;
           apply();
           states.push(history(),card === document.querySelector('[data-review-history-card] article'),card.querySelector('.review-round-details').open);
-          loops[0].phase = 'completed'; snapshot.finishedLoopIDs.push('A'); apply();
+          loops[0].phase = 'completed'; loops[0].isFinished = true; apply();
           states.push(active(),history(),select.options.length);
           snapshot.loops = loops.filter(loop => loop.id !== 'D'); apply();
           states.push(history(),select.value);
@@ -315,7 +354,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],finishedLoopIDs:['finished'],loops:[{id:'finished',project,phase:'completed',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[{id:'finished',project,phase:'completed',isFinished:true,priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
           api.applyReviewPageSnapshot(snapshot);
           const history = document.querySelector('[data-review-history]');
@@ -336,9 +375,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loops = ['old','new'].map((id,index) => ({id,project,reviewType:index ? 'performance' : 'organisationAndNaming',phase:'completed',completedRoundCount:1,maxRounds:5,rounds:[]}));
+          const loops = ['old','new'].map((id,index) => ({id,project,reviewType:index ? 'performance' : 'organisationAndNaming',phase:'completed',isFinished:true,completedRoundCount:1,maxRounds:5,rounds:[]}));
           loops[1].updatedAt = Date.UTC(2026,9,3,14,35) / 1000;
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:['old','new'],error:null};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,error:null};
           const dateText = timestamp => new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
           const expected = timestamp => 'Last updated: ' + dateText(timestamp);
           const label = () => document.querySelector('[data-review-history-updated]').textContent;
@@ -384,12 +423,19 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const phases = ['running','blocked','awaitingExtensionReload','completed','limitReached','stopped','paused','stopping'];
-          const loops = phases.map((phase,index) => ({id:`loop-${index}`,project,phase,completedRoundCount:0,maxRounds:5,rounds:[]}));
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,finishedLoopIDs:[],error:null};
+          const loops = phases.map((phase,index) => ({id:`loop-${index}`,project,phase,isFinished:false,completedRoundCount:0,maxRounds:5,rounds:[]}));
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,error:null};
           const marker = kind => document.querySelector(`[data-review-navigation-${kind}]`);
           const count = kind => marker(kind).querySelector(`[data-review-navigation-${kind}-count]`).textContent;
           const hidden = kind => marker(kind).hidden && getComputedStyle(marker(kind)).display === 'none';
           const states = [hidden('blocked'),hidden('done')];
+          for (const index of [3,4,5]) loops[index].phase = 'running';
+          api.applyReviewPageSnapshot(snapshot);
+          api.openReviews();
+          for (const index of [3,4,5]) {
+            loops[index].phase = phases[index];
+            loops[index].isFinished = true;
+          }
           api.applyReviewPageSnapshot(snapshot);
           states.push(!marker('running').hidden,!marker('blocked').hidden,!marker('done').hidden,
             count('blocked'),count('done'),marker('blocked').getAttribute('aria-label'),marker('done').title,
@@ -397,10 +443,11 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.getElementById('codex-dashboard-review-navigation').remove();
           api.ensureMounted();
           states.push(count('blocked'),count('done'),!marker('blocked').hidden,!marker('done').hidden);
-          loops[1].phase = 'running'; loops[2].phase = 'completed';
+          loops[1].phase = 'running'; loops[2].phase = 'completed'; loops[2].isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
           states.push(hidden('blocked'),count('done'),count('running'));
-          api.applyReviewPageSnapshot({...snapshot,loops:[loops[3]],finishedLoopIDs:['loop-3']});
+          api.openTodos();
+          api.applyReviewPageSnapshot({...snapshot,loops:[loops[3]]});
           states.push(marker('done').getAttribute('aria-label'),marker('done').title);
           api.applyReviewPageSnapshot({...snapshot,loops:[]});
           states.push(hidden('blocked'),hidden('done'),hidden('running'),count('done'));
@@ -422,7 +469,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'waiting',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
+          const loop = {id:'loop-1',project,phase:'waiting',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           const spinner = () => document.querySelector('[data-review-navigation-running]');
           const states = [spinner().hidden];
@@ -433,7 +480,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           document.getElementById('codex-dashboard-review-navigation').remove();
           api.ensureMounted();
           states.push(spinner().hidden, spinner().querySelector('[data-review-navigation-running-count]').textContent);
-          const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
+          const secondLoop = {id:'loop-2',project:{id:'p2',name:'Second',path:'/tmp/second'},phase:'waiting',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Waiting'};
           api.applyReviewPageSnapshot({...snapshot,loops:[loop,secondLoop]});
           states.push(spinner().querySelector('[data-review-navigation-running-count]').textContent, spinner().getAttribute('aria-label'), spinner().getAttribute('title'));
           loop.phase = 'paused'; api.applyReviewPageSnapshot({...snapshot,loops:[loop,secondLoop]});
@@ -584,7 +631,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes,projects:[project],models:[],
-            loops:[{id:'loop',project,reviewType:'organisationAndNaming',phase:'paused',rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
+            loops:[{id:'loop',project,reviewType:'organisationAndNaming',phase:'paused',isFinished:false,rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
           const select = document.querySelector('[data-review-type]');
           const labels = [...select.options].map(option => option.textContent);
           const namingHidesPriorities = document.querySelector('.review-priority').hidden;
@@ -716,7 +763,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example <project>',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Reviewing changes',rounds:[
+          const loop = {id:'loop-1',project,phase:'running',isFinished:false,priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Reviewing changes',rounds:[
             {number:1,threadID:'task-1',result:{outcome:'fixed',commit:'1234567890',summary:'Fixed <issue>'}},
             {number:2,threadID:'task-2',fixRequested:false}
           ]};
@@ -739,7 +786,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           active.push(document.querySelector('[data-review-action="pause"]').disabled,
             document.querySelector('[data-review-action="pause"]').textContent);
           loop.phase = 'completed';
-          snapshot.finishedLoopIDs = [loop.id];
+          loop.isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
           return [...active,document.querySelector('[data-review-form]').hidden,
             document.querySelector('[data-review-controls]').children.length,
@@ -755,8 +802,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',completedRoundCount:0,maxRounds:1,rounds:[],message:'Reviewing'};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[],error:null};
+          const loop = {id:'loop-1',project,phase:'running',isFinished:false,completedRoundCount:0,maxRounds:1,rounds:[],message:'Reviewing'};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           const board = () => document.querySelector('[data-review-board]');
           const history = () => document.querySelector('[data-review-history]');
           const done = () => document.querySelector('[data-review-navigation-done]');
@@ -765,7 +812,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.openReviews();
           loop.phase = 'completed';
           loop.message = 'No findings remain.';
-          snapshot.finishedLoopIDs = [loop.id];
+          loop.isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
           api.applyReviewPageSnapshot(snapshot);
           const retained = [board().children.length, board().querySelector('[data-review-status]').textContent,
@@ -784,10 +831,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.openReviews();
           const reopened = [board().children.length, history().hidden];
           loop.phase = 'running';
-          snapshot.finishedLoopIDs = [];
+          loop.isFinished = false;
           api.applyReviewPageSnapshot(snapshot);
           loop.phase = 'limitReached';
-          snapshot.finishedLoopIDs = [loop.id];
+          loop.isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
           const retainedAgain = [board().children.length, done().hidden, doneCount()];
           api.openTodos();
@@ -806,7 +853,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:3,message:'Reviewing',rounds:[
+          const loop = {id:'loop-1',project,phase:'running',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:3,message:'Reviewing',rounds:[
             {number:1,review:{findings:[
               {priority:'P1',title:'Broken <link>',body:'Fails on the first click.'},
               {priority:'P2',title:'Stale confirmation',body:'Can open the wrong step.'}
@@ -837,7 +884,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const round = number => ({number,review:{findings:[{title:'Issue',body:'Details'}]}});
-          const loop = {id:'loop',project,phase:'running',completedRoundCount:0,maxRounds:3,rounds:[round(1),round(2)]};
+          const loop = {id:'loop',project,phase:'running',isFinished:false,completedRoundCount:0,maxRounds:3,rounds:[round(1),round(2)]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           api.applyReviewPageSnapshot(snapshot); api.openReviews();
           const findings = () => [...document.querySelectorAll('.review-findings-details')];
@@ -856,7 +903,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           api.applyReviewPageSnapshot(snapshot);
           const completed = [findings()[1].open,visible(findings()[1]),findings()[2].open];
           loop.phase = 'stopped';
-          snapshot.finishedLoopIDs = [loop.id];
+          loop.isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
           const stopped = [findings()[2].open,visible(findings()[2])];
           findings()[2].querySelector('summary').click();
@@ -872,9 +919,9 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'completed',completedRoundCount:0,maxRounds:1,rounds:[{number:1,
+          const loop = {id:'loop-1',project,phase:'completed',isFinished:true,completedRoundCount:0,maxRounds:1,rounds:[{number:1,
             review:{findings:[{priority:'P2',title:'A <bug>',body:'See [source](/tmp/example/Sources/File.swift:12), [relative](File.swift:4), [docs](https://example.com/guide), and [unsafe](javascript:alert(1)).'}]}}]};
-          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:['loop-1'],error:null});
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null});
           window.__codexDashboard.openReviews();
           const finding = document.querySelector('.review-round-findings p');
           const file = finding.querySelector('[data-review-file]');
@@ -897,10 +944,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'limited',project,phase:'limitReached',priorityLimit:'P2',completedRoundCount:1,maxRounds:1,
+          const loop = {id:'limited',project,phase:'limitReached',isFinished:true,priorityLimit:'P2',completedRoundCount:1,maxRounds:1,
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',commit:'1234567890',summary:'Fixed issue'}}]};
-          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],finishedLoopIDs:[loop.id],error:null,
+          window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null,
             progress:{[loop.id]:{step:'Round limit reached',current:null,upcoming:null,
               nextMessage:'No further prompts scheduled.',threadID:null}}});
           window.__codexDashboard.openReviews();
@@ -927,7 +974,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],error:null,
-            loops:[{id:'live',project,phase:'running',priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
+            loops:[{id:'live',project,phase:'running',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
             progress:{live:{step:'Reviewing',threadID:'task-1',nextMessage:'',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
               upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
@@ -944,7 +991,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-current-text]').children.length,
             document.querySelector('[data-review-current-task]').dataset.reviewThread];
           snapshot.loops[0].phase = 'completed';
-          snapshot.finishedLoopIDs = ['live'];
+          snapshot.loops[0].isFinished = true;
           snapshot.progress.live.upcoming = null;
           snapshot.progress.live.nextMessage = 'No further prompts scheduled.';
           api.applyReviewPageSnapshot(snapshot);

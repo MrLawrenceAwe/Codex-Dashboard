@@ -28,7 +28,6 @@ struct ReviewPageSnapshot: Encodable, Sendable {
     let models: [ReviewModel]
     let reviewTypes: [ReviewTypeOption]
     let loops: [ReviewLoopDisplaySnapshot]
-    let finishedLoopIDs: [UUID]
     let progress: [String: ReviewLoopProgress]
     let error: String?
     let acknowledgedActionID: String?
@@ -70,11 +69,12 @@ struct ReviewLoopProgress: Codable, Sendable {
 struct ReviewLoopDisplaySnapshot: Encodable, Sendable {
     let loop: ReviewLoop
 
-    private enum CodingKeys: String, CodingKey { case completedRoundCount }
+    private enum CodingKeys: String, CodingKey { case completedRoundCount, isFinished }
 
     func encode(to encoder: Encoder) throws {
         try loop.encode(to: encoder)
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(loop.completedRoundCount, forKey: .completedRoundCount)
+        try values.encode(loop.phase.isFinished, forKey: .isFinished)
     }
 }

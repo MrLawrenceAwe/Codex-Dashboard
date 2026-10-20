@@ -116,7 +116,7 @@ const reviewLoopSetupView = (() => {
     select.disabled = !model || !!pendingAction;
   }
 
-  function render(snapshot, pendingAction, isFinished) {
+  function render(snapshot, pendingAction) {
     const root = panel();
     if (!root) return;
     const { loops, projects } = snapshot;
@@ -145,7 +145,7 @@ const reviewLoopSetupView = (() => {
       modelsSignature = nextModelsSignature;
     }
     const select = root.querySelector('[data-review-project]');
-    const busyProjects = new Set(loops.filter(loop => !isFinished(loop)).map(loop => loop.project.id));
+    const busyProjects = new Set(loops.filter(loop => !loop.isFinished).map(loop => loop.project.id));
     const availableProjects = projects.filter(project => !busyProjects.has(project.id));
     const signature = JSON.stringify([projects, [...busyProjects]]);
     if (signature !== projectsSignature) {

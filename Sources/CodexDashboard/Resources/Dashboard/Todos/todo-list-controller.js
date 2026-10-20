@@ -39,7 +39,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     })), nextTags),
   });
 
-  const createForm = createTodoFormController({
+  const formController = createTodoFormController({
     imageController,
     tagController,
     threadReferencesForProject,
@@ -56,7 +56,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   function refreshProjects() {
     if (destroyed) return;
     projects = codexUIContracts.projects();
-    createForm.updateProjects(projects);
+    formController.updateProjects(projects);
     todoListView.updateItemProjectOptions(projects, items);
     updateFilterOptions();
   }
@@ -287,7 +287,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     const pageHost = codexHost.pageHost();
     if (!pageHost) return false;
     const page = todoListView.createPage();
-    createForm.bind(page);
+    formController.bind(page);
     imageController.bind(page);
     tagController.bindManagement(page);
     bindFilters(page);
@@ -352,7 +352,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     mountPage,
     open,
     applyVisibility: pageState.applyVisibility,
-    refreshThreadOptions: createForm.refreshThreadOptions,
+    refreshThreadOptions: formController.refreshThreadOptions,
     refreshSidebarActions: sidebarActions.refresh,
   };
 }
