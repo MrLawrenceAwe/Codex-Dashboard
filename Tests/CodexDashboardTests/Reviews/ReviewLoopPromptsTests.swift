@@ -80,7 +80,17 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                     XCTAssertEqual(prompt.contains("chrome-devtools MCP server"), liveTesting && reload && reviewType.supportsLiveTesting)
                     XCTAssertEqual(prompt.contains("# Extension reload required"), liveTesting && reload && reviewType.supportsLiveTesting)
                     if liveTesting && reload && reviewType.supportsLiveTesting {
-                        XCTAssertTrue(prompt.contains("Verify reload success"))
+                        XCTAssertTrue(prompt.contains("Verify the original extension ID and enabled state"))
+                        XCTAssertTrue(prompt.contains("For the everyday Chrome profile, use Chrome Computer Use"))
+                        XCTAssertTrue(prompt.contains("only in an explicitly temporary test profile"))
+                        XCTAssertTrue(prompt.contains("INSTALLED_VIA_CDP (bit 32768)"))
+                        XCTAssertTrue(prompt.contains("back up the existing registration and extension storage"))
+                        XCTAssertTrue(prompt.contains("Clean up DevTools debugging connections"))
+                        XCTAssertTrue(prompt.contains("including on failure or cancellation"))
+                        XCTAssertTrue(prompt.contains("verify its debugging socket is closed"))
+                        XCTAssertTrue(prompt.contains("Never stop another task's connection"))
+                        XCTAssertTrue(prompt.contains("explain the remaining connection and how to disconnect it"))
+                        XCTAssertFalse(prompt.contains("Prefer these tools over Computer Use"))
                         XCTAssertTrue(prompt.contains("return # Extension reload required"))
                     }
                 }

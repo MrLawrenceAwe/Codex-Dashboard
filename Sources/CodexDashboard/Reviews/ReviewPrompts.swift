@@ -39,7 +39,15 @@ enum ReviewPrompts {
             : "Reload the browser extension before live testing to establish the current behaviour."
         let condition = verifyingFixes && (loop.reviewType == .bugs || loop.reviewType == .bugsAndPerformance)
             ? "\n\nFollow these extension reload instructions only when live verification is needed." : ""
-        return condition + "\n\nUse the globally configured chrome-devtools MCP server for Chrome extension reloads. Identify the installed extension ID and source folder with list_extensions and project context, then use reload_extension. Prefer these tools over Computer Use on chrome://extensions. \(timing) Verify reload success, refresh affected test pages, and reopen the popup or side panel as needed with trigger_extension_action. If the tools are unavailable or reload fails, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete." + "\n\n" + ReviewReportContract.extensionReloadInstructions
+        return condition + "\n\n" + """
+        Use the globally configured chrome-devtools MCP server for read-only extension inventory and development debugging that requires DevTools. Identify the installed extension ID, source folder, and profile before reloading. For the everyday Chrome profile, use Chrome Computer Use on chrome://extensions and the extension card's Reload button; do not use reload_extension, install_extension, or CDP Extensions.loadUnpacked. Use those tools only in an explicitly temporary test profile where removal on restart is intended. \(timing)
+
+        Verify the original extension ID and enabled state after reloading, refresh affected test pages, and reopen the popup or side panel as needed. For persistent installation, verify that creation_flags does not contain INSTALLED_VIA_CDP (bit 32768). If persistent registration needs restoring, back up the existing registration and extension storage, preserve the original source folder/key, and use Load unpacked. Do not edit live Chrome preferences or restart Chrome solely to test persistence.
+
+        Clean up DevTools debugging connections when testing finishes, including on failure or cancellation, without closing Chrome or the user's tabs. Disconnect only this task's session and verify its debugging socket is closed; confirm the automation banner disappears when no other debugging sessions remain. If no disconnect tool exists, stop only a server process verified to belong to this task and connect to Chrome's debugging port. Never stop another task's connection or the shared Codex host. If safe disconnection is unavailable, explain the remaining connection and how to disconnect it.
+
+        If the required reload cannot be completed, explain the reason and return # Extension reload required using the required report format; do not claim verification is complete. If MCP tools are unavailable, explain whether the chat needs to reconnect or restart and whether Chrome requires approval for the debugging connection.
+        """ + "\n\n" + ReviewReportContract.extensionReloadInstructions
     }
 
     private static func testPlaybackInstruction(for loop: ReviewLoop) -> String {

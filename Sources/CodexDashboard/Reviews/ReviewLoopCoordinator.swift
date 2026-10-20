@@ -153,7 +153,7 @@ final class ReviewLoopCoordinator {
     private func resumeLoop(_ loop: inout ReviewLoop) throws {
         switch loop.phase {
         case .awaitingExtensionReload:
-            loop.rounds[loop.rounds.count - 1].reloadContinuationRequested = true
+            loop.rounds[loop.rounds.count - 1].extensionReloadContinuationPending = true
             loop.phase = .running
             loop.message = "Extension reload confirmed. Preparing to continue the same chat."
         case .blocked:
@@ -167,7 +167,7 @@ final class ReviewLoopCoordinator {
                 guard round.threadID != nil else {
                     throw ReviewLoopError("The previous chat launch was not confirmed. Inspect recent chats before starting a new loop; it will not be sent twice.")
                 }
-                loop.rounds[loop.rounds.count - 1].continuationRequested = true
+                loop.rounds[loop.rounds.count - 1].allowsFollowUpTurns = true
                 loop.rounds[loop.rounds.count - 1].result = nil
                 loop.phase = .running
                 resumeRequestedIDs.insert(loop.id)
@@ -339,7 +339,7 @@ final class ReviewLoopCoordinator {
         guard FileSystemPath.canonicalPath(thread.cwd) == FileSystemPath.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
         guard let reviewTurn = round.reviewTurnID.flatMap({ id in thread.turns.first { $0.id == id } }) ?? thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
-              round.continuationRequested == true || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
+              round.allowsFollowUpTurns || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
             throw ReviewLoopError("The review chat has an unexpected turn. Inspect it before starting a new loop.")
         }
         let wasResumed = resumeRequestedIDs.remove(id) != nil
@@ -364,12 +364,12 @@ final class ReviewLoopCoordinator {
             updated.rounds[updated.rounds.count - 1] = round
             try persist(updated)
         }
-        if round.reloadContinuationRequested == true {
+        if round.extensionReloadContinuationPending {
             try await continueAfterExtensionReload(loop: updated, round: round, thread: thread, using: driver, threads: threads, threadID: threadID)
             return
         }
         if round.review == nil {
-            try await acceptReviewReport(round.continuationRequested == true ? thread.turns.last! : reviewTurn, loop: updated, round: round,
+            try await acceptReviewReport(round.allowsFollowUpTurns ? thread.turns.last! : reviewTurn, loop: updated, round: round,
                                          using: driver, threads: threads, threadID: threadID)
         } else if !round.fixRequested {
             try await submitFixTurn(loop: updated, round: round,
@@ -391,10 +391,9 @@ final class ReviewLoopCoordinator {
         if try await waitForExtensionReload(reviewTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
         guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
-        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID, reviewOnly: true)
+        let repo = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID, policy: .unchangedReview(baseCommit: round.baseCommit))
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        guard repo.commit == round.baseCommit else { throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.") }
         let findings = report.findings(upTo: updated.priorityLimit)
         round.reviewTurnID = reviewTurn.id
         round.review = report
@@ -449,7 +448,7 @@ final class ReviewLoopCoordinator {
             thread.turns.first { $0.id == verification.sourceFixTurnID }
         } ?? (round.fixVerification == nil ? thread.turns.last : nil)
         guard let fixTurn = sourceFixTurn,
-              round.fixVerification != nil || (round.continuationRequested == true && thread.turns.count >= 2) ||
+              round.fixVerification != nil || (round.allowsFollowUpTurns && thread.turns.count >= 2) ||
                 (thread.turns.count == 2 && (round.fixTurnID == nil || round.fixTurnID == fixTurn.id)) else {
             throw ReviewLoopError("The fix prompt was not acknowledged. Inspect the chat; it will not be sent twice.")
         }
@@ -569,8 +568,8 @@ final class ReviewLoopCoordinator {
         // Persist intent before submission so a crash or lost acknowledgement cannot duplicate verification.
         updated.rounds[updated.rounds.count - 1].fixVerification = ReviewFixVerification(
             sourceFixTurnID: sourceFixTurnID, targetCommit: repository.commit)
-        updated.rounds[updated.rounds.count - 1].continuationRequested = true
-        updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
+        updated.rounds[updated.rounds.count - 1].allowsFollowUpTurns = true
+        updated.rounds[updated.rounds.count - 1].extensionReloadContinuationPending = false
         updated.message = "The branch advanced after the fix. Verifying the original findings at the current HEAD before completing this round."
         try persist(updated)
         let turnID = try await driver.startTurn(
@@ -587,13 +586,9 @@ final class ReviewLoopCoordinator {
         threads: [RendererThread], threadID: String
     ) async throws -> Bool {
         guard let instructions = try ReviewReportContract.extensionReloadRequest(turn.finalMessage) else { return false }
-        let fixing = loop.rounds.last?.fixRequested == true
-        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
-        guard repo.branch == loop.branch,
-              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
-              fixing || (repo.clean && repo.commit == loop.rounds.last?.baseCommit) else {
-            throw ReviewLoopError("The checkout changed during the review. Inspect its chat before continuing.")
-        }
+        guard let round = loop.rounds.last else { throw ReviewLoopError("Missing review round.") }
+        _ = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                       policy: continuationCheckoutPolicy(for: round))
         guard var updated = activeLoop(matching: loop.id, phase: .running) else { return true }
         updated.phase = .awaitingExtensionReload
         updated.message = instructions
@@ -605,13 +600,8 @@ final class ReviewLoopCoordinator {
         loop: ReviewLoop, round: ReviewRound,
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
     ) async throws {
-        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
-        guard repo.branch == loop.branch,
-              FileSystemPath.canonicalPath(repo.root) == loop.checkoutRoot,
-              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
-              round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
-            throw ReviewLoopError("The checkout changed during the interrupted task. Inspect its chat before continuing.")
-        }
+        let repo = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                              policy: continuationCheckoutPolicy(for: round))
         try await submitContinuation(loop: loop, round: round, repository: repo,
                                      reason: .interrupted, using: driver, threadID: threadID)
     }
@@ -630,12 +620,8 @@ final class ReviewLoopCoordinator {
                                             repository: repo, using: driver, threadID: threadID)
             return
         }
-        let repo = try await inspect { try await driver.repository(at: loop.project.path) }
-        guard repo.branch == loop.branch,
-              !hasOtherRunningTask(threads, root: repo.root, excluding: threadID),
-              round.fixRequested || (repo.clean && repo.commit == round.baseCommit) else {
-            throw ReviewLoopError("The checkout changed while waiting for extension reload. Inspect its chat before continuing.")
-        }
+        let repo = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                              policy: continuationCheckoutPolicy(for: round))
         try await submitContinuation(loop: loop, round: round, repository: repo,
                                      reason: .extensionReload, using: driver, threadID: threadID)
     }
@@ -653,12 +639,12 @@ final class ReviewLoopCoordinator {
             updated.message = "Continuing the interrupted \(round.fixRequested ? "fix task" : "review") in its existing chat."
             prompt = ReviewPrompts.interruptedContinuation(for: updated, round: round)
         case .extensionReload:
-            updated.rounds[updated.rounds.count - 1].reloadContinuationRequested = false
+            updated.rounds[updated.rounds.count - 1].extensionReloadContinuationPending = false
             updated.message = "Continuing after the manual extension reload."
             prompt = ReviewPrompts.extensionReloadContinuation(for: updated, round: round)
         }
         // Persist intent before submission; polling must never repeat an unknown launch.
-        updated.rounds[updated.rounds.count - 1].continuationRequested = true
+        updated.rounds[updated.rounds.count - 1].allowsFollowUpTurns = true
         try persist(updated)
         let turnID = try await driver.startTurn(
             threadID: threadID, projectPath: updated.project.path, expectedRepository: repository,
@@ -671,18 +657,43 @@ final class ReviewLoopCoordinator {
         try persist(current)
     }
 
-    private func validateCheckout(using driver: any ReviewLoopDriving, loop: ReviewLoop,
-                            threads: [RendererThread], threadID: String, reviewOnly: Bool = false) async throws -> ReviewRepositoryState {
+    private enum CheckoutPolicy {
+        case clean
+        case unchangedReview(baseCommit: String)
+        case unfinishedFix
+    }
+
+    private func continuationCheckoutPolicy(for round: ReviewRound) -> CheckoutPolicy {
+        if round.fixVerification != nil { return .clean }
+        return round.fixRequested ? .unfinishedFix : .unchangedReview(baseCommit: round.baseCommit)
+    }
+
+    private func validateCheckout(
+        using driver: any ReviewLoopDriving, loop: ReviewLoop,
+        threads: [RendererThread], threadID: String, policy: CheckoutPolicy = .clean
+    ) async throws -> ReviewRepositoryState {
         let repo = try await inspect { try await driver.repository(at: loop.project.path) }
         guard !hasOtherRunningTask(threads, root: repo.root, excluding: threadID) else {
             throw ReviewLoopError("Another chat is running in this checkout. Inspect its changes before continuing.")
         }
-        if reviewOnly, !repo.clean {
-            throw ReviewLoopError("Uncommitted changes appeared during the review. The review must leave files unchanged. Inspect the changes in its chat before resuming; no fix prompt or push was sent.")
-        }
-        guard repo.clean, repo.branch == loop.branch,
+        guard repo.branch == loop.branch,
               FileSystemPath.canonicalPath(repo.root) == loop.checkoutRoot else {
-            throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")
+            throw ReviewLoopError("The checkout changed. Restore the original checkout and branch before continuing.")
+        }
+        switch policy {
+        case .clean:
+            guard repo.clean else {
+                throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")
+            }
+        case .unchangedReview(let baseCommit):
+            guard repo.clean else {
+                throw ReviewLoopError("Uncommitted changes appeared during the review. The review must leave files unchanged. Inspect the changes in its chat before resuming; no fix prompt or push was sent.")
+            }
+            guard repo.commit == baseCommit else {
+                throw ReviewLoopError("The review changed HEAD. Reviews must leave the checkout unchanged before fixes are requested.")
+            }
+        case .unfinishedFix:
+            break // Preserve partial edits and commits while continuing the fix.
         }
         return repo
     }

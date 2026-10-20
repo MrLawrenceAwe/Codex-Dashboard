@@ -3,6 +3,40 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testContinuationStateMigrationPreservesPermissionsAndPendingReloads() throws {
+        for permission in [nil, false, true] as [Bool?] {
+            for pendingReload in [nil, false, true] as [Bool?] {
+                var loop = ReviewLoop(id: UUID(), startActionID: "continuation", project: project,
+                                      promptContext: .general, maxRounds: 3, priorityLimit: .p2)
+                loop.phase = .awaitingExtensionReload
+                loop.rounds = [ReviewRound(number: 1, baseCommit: "base", threadID: "thread",
+                                          allowsFollowUpTurns: permission ?? false,
+                                          extensionReloadContinuationPending: pendingReload ?? false)]
+                var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+                var rounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
+                rounds[0].removeValue(forKey: "allowsFollowUpTurns")
+                rounds[0].removeValue(forKey: "extensionReloadContinuationPending")
+                rounds[0]["continuationRequested"] = permission
+                rounds[0]["reloadContinuationRequested"] = pendingReload
+                saved["rounds"] = rounds
+                let formats: [Any] = [saved, [saved]] + (1...12).map {
+                    ["version": $0, "loops": [saved]] as [String: Any]
+                }
+                for format in formats {
+                    let data = try JSONSerialization.data(withJSONObject: format)
+                    let migrated = try ReviewLoopDocumentMigration.decode(data)
+                    XCTAssertEqual(migrated, [loop])
+                    let currentData = try JSONEncoder().encode(ReviewLoopsDocument(
+                        version: ReviewLoopsDocument.currentVersion, loops: migrated))
+                    XCTAssertEqual(try ReviewLoopDocumentMigration.decode(currentData), [loop])
+                    let text = String(decoding: currentData, as: UTF8.self)
+                    XCTAssertFalse(text.contains("continuationRequested"))
+                    XCTAssertFalse(text.contains("reloadContinuationRequested"))
+                }
+            }
+        }
+    }
+
     func testEarlierVerificationTargetsMigrateWithoutLosingRoundHistory() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "verification", project: project,
                               promptContext: .general, maxRounds: 3, priorityLimit: .p2)

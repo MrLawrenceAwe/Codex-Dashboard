@@ -149,6 +149,13 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
 
+Review-loop version 13 separates the names of two existing continuation states:
+`allowsFollowUpTurns` permits reconciliation of additional chat turns, while
+`extensionReloadContinuationPending` records a confirmed reload awaiting continuation
+submission. Migration maps the former `continuationRequested` and
+`reloadContinuationRequested` fields without losing pending requests or round history.
+Old names are confined to the migration boundary and legacy fixtures.
+
 Review-loop version 12 renames the saved verification target from `commit` to
 `targetCommit`, preserving pending verification and round history. Current models,
 snapshots, and fixtures use `targetCommit`; the original fix stays in the round

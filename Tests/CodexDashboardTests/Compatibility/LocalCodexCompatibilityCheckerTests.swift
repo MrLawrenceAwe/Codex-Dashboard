@@ -96,7 +96,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
         ])
 
         XCTAssertEqual(report.blockingCount, 1)
-        XCTAssertEqual(report.warningCount, 2)
+        XCTAssertEqual(report.nonBlockingAttentionCount, 2)
         XCTAssertEqual(report.summary, "1 incompatible \u{00b7} 2 need attention")
     }
 

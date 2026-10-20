@@ -20,10 +20,14 @@ final class ReviewExtensionReloadTests: ReviewLoopTestCase {
         let restored = ReviewLoopCoordinator(store: store)
         XCTAssertEqual(restored.loops[0].phase, .awaitingExtensionReload)
         try restored.apply(action(.resume, for: restored), projects: [project])
+        XCTAssertTrue(restored.loops[0].rounds[0].extensionReloadContinuationPending)
+        XCTAssertFalse(restored.loops[0].rounds[0].allowsFollowUpTurns)
         await restored.advance(using: driver, threads: [])
         await restored.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createCalls, 1)
         XCTAssertEqual(driver.prompts.count, 2)
+        XCTAssertFalse(restored.loops[0].rounds[0].extensionReloadContinuationPending)
+        XCTAssertTrue(restored.loops[0].rounds[0].allowsFollowUpTurns)
         XCTAssertTrue(driver.prompts.last!.contains("read-only review"))
         XCTAssertEqual(driver.selections.last!, restored.loops[0].reviewSelection)
         driver.review(priorities: [])
@@ -72,6 +76,33 @@ final class ReviewExtensionReloadTests: ReviewLoopTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .blocked)
         XCTAssertEqual(driver.prompts.count, 1)
+    }
+
+    func testReloadHandlingRejectsChangedRepositoryRootForReviewAndFix() async throws {
+        for fixing in [false, true] {
+            for changeWhileWaiting in [false, true] {
+                let (coordinator, _, driver) = try make()
+                await coordinator.advance(using: driver, threads: [])
+                if fixing {
+                    driver.review(priorities: [.p1])
+                    await coordinator.advance(using: driver, threads: [])
+                    await coordinator.advance(using: driver, threads: [])
+                    driver.clean = false // Unfinished fixes may be dirty, but cannot change checkout.
+                }
+                driver.requestExtensionReload()
+                let submittedCount = driver.prompts.count
+                if changeWhileWaiting {
+                    await coordinator.advance(using: driver, threads: [])
+                    XCTAssertEqual(coordinator.loops[0].phase, .awaitingExtensionReload)
+                    try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+                }
+                driver.repositoryRoot = "/tmp/different-checkout"
+                await coordinator.advance(using: driver, threads: [])
+                XCTAssertEqual(coordinator.loops[0].phase, .blocked)
+                XCTAssertEqual(driver.prompts.count, submittedCount)
+                XCTAssertNil(coordinator.loops[0].rounds[0].result)
+            }
+        }
     }
 
     func testStopWhileAwaitingReloadReleasesLoopWithoutContinuing() async throws {

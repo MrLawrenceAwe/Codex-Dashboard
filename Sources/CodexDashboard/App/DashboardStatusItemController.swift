@@ -54,7 +54,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         status.isEnabled = false
         menu.addItem(status)
         if let report = coordinator.compatibilityReport,
-           report.blockingCount > 0 || report.warningCount > 0 {
+           report.blockingCount > 0 || report.nonBlockingAttentionCount > 0 {
             let compatibilityStatus = NSMenuItem(
                 title: "Compatibility: \(report.attentionSummary ?? report.summary)",
                 action: nil,
@@ -123,7 +123,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     static func requiresCompatibilityAttention(_ report: CompatibilityReport?) -> Bool {
         guard let report else { return false }
-        return report.blockingCount > 0 || report.warningCount > 0
+        return report.blockingCount > 0 || report.nonBlockingAttentionCount > 0
     }
 
     static func statusSymbolName(
@@ -132,7 +132,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         dashboardMaintenanceIsEnabled: Bool
     ) -> String {
         if let report, report.blockingCount > 0 { return "exclamationmark.octagon.fill" }
-        if let report, report.warningCount > 0 { return "exclamationmark.triangle.fill" }
+        if let report, report.nonBlockingAttentionCount > 0 { return "exclamationmark.triangle.fill" }
         return state.statusIconIsFilled(dashboardMaintenanceIsEnabled: dashboardMaintenanceIsEnabled)
             ? "rectangle.grid.2x2.fill"
             : "rectangle.grid.2x2"

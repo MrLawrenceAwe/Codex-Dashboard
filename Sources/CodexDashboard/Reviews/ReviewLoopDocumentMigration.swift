@@ -33,6 +33,10 @@ enum ReviewLoopDocumentMigration {
         if let rounds = loop["rounds"] as? [[String: Any]] {
             loop["rounds"] = rounds.map { savedRound in
                 var round = savedRound
+                let previousFollowUpPermission = round.removeValue(forKey: "continuationRequested") as? Bool
+                let previousReloadRequest = round.removeValue(forKey: "reloadContinuationRequested") as? Bool
+                round["allowsFollowUpTurns"] = round["allowsFollowUpTurns"] as? Bool ?? previousFollowUpPermission ?? false
+                round["extensionReloadContinuationPending"] = round["extensionReloadContinuationPending"] as? Bool ?? previousReloadRequest ?? false
                 if var verification = round["fixVerification"] as? [String: Any] {
                     if let target = verification.removeValue(forKey: "commit") {
                         verification["targetCommit"] = target

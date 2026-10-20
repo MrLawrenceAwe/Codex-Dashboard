@@ -120,6 +120,14 @@ extension AppCoordinatorTests {
         XCTAssertTrue(coordinator.threads.first?.isUnread == true)
     }
 
+    func testMonitoringFlagDescribesConfigurationIndependentlyOfStartedWatches() {
+        let configured = RefreshScheduler(observeFileChanges: true)
+        XCTAssertTrue(configured.isFileChangeMonitoringConfigured)
+        configured.stop()
+        XCTAssertTrue(configured.isFileChangeMonitoringConfigured)
+        XCTAssertFalse(RefreshScheduler(observeFileChanges: false).isFileChangeMonitoringConfigured)
+    }
+
     func testActivationRefreshUsesWorkingTreeCache() async {
         let thread = ThreadSummary.fixture(id: "thread-1", projectGitStatus: .notRepository)
         let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .uncommittedChanges)
@@ -143,7 +151,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(latestPolicy, .useCached)
     }
 
-    func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsAvailable() async throws {
+    func testActivationDoesNotDuplicateInitialWorkingTreeRefreshWhenMonitoringIsConfigured() async throws {
         let thread = ThreadSummary.fixture(id: "thread-1", projectGitStatus: .notRepository)
         let projectGitStatusProvider = MutableProjectGitStatusProvider(status: .clean)
         let coordinator = makeAppCoordinator(
@@ -169,7 +177,7 @@ extension AppCoordinatorTests {
         XCTAssertEqual(requestCount, 1)
     }
 
-    func testCatalogPollingKeepsLifecycleTrackingResponsiveWhenFileEventsAreAvailable() {
+    func testCatalogPollingKeepsLifecycleTrackingResponsiveWhenMonitoringIsConfigured() {
         XCTAssertEqual(
             RefreshScheduler.Schedule.catalog(active: true),
             .seconds(2)
@@ -179,11 +187,11 @@ extension AppCoordinatorTests {
             .seconds(8)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.unread(active: true, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.unread(active: true, fileChangeMonitoringConfigured: true),
             .seconds(15)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.unread(active: false, fileEventsAvailable: true),
+            RefreshScheduler.Schedule.unread(active: false, fileChangeMonitoringConfigured: true),
             .seconds(60)
         )
     }
@@ -224,11 +232,11 @@ extension AppCoordinatorTests {
             .seconds(8)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.unread(active: true, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.unread(active: true, fileChangeMonitoringConfigured: false),
             .milliseconds(500)
         )
         XCTAssertEqual(
-            RefreshScheduler.Schedule.unread(active: false, fileEventsAvailable: false),
+            RefreshScheduler.Schedule.unread(active: false, fileChangeMonitoringConfigured: false),
             .seconds(1)
         )
     }

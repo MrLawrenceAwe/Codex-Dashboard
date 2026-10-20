@@ -10,8 +10,8 @@ final class RefreshScheduler {
         static func projectGitStatus(active: Bool) -> Duration {
             return active ? .seconds(15) : .seconds(60)
         }
-        static func unread(active: Bool, fileEventsAvailable: Bool) -> Duration {
-            if fileEventsAvailable { return active ? .seconds(15) : .seconds(60) }
+        static func unread(active: Bool, fileChangeMonitoringConfigured: Bool) -> Duration {
+            if fileChangeMonitoringConfigured { return active ? .seconds(15) : .seconds(60) }
             return active ? .milliseconds(500) : .seconds(1)
         }
         static func accountUsage(active: Bool) -> Duration {
@@ -28,7 +28,7 @@ final class RefreshScheduler {
     private let dataChanges: CodexDataChangeMonitor?
     private let projectGitChanges: ProjectGitChangeMonitor?
 
-    var hasFileChangeMonitoring: Bool { dataChanges != nil }
+    var isFileChangeMonitoringConfigured: Bool { dataChanges != nil }
 
     init(observeFileChanges: Bool = true) {
         dataChanges = observeFileChanges ? CodexDataChangeMonitor() : nil
@@ -72,7 +72,7 @@ final class RefreshScheduler {
             interval: { [self] in
                 Schedule.unread(
                     active: Self.isUserActive,
-                    fileEventsAvailable: dataChanges != nil
+                    fileChangeMonitoringConfigured: isFileChangeMonitoringConfigured
                 )
             },
             action: updateUnreadState

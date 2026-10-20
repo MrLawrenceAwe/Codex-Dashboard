@@ -82,7 +82,7 @@ extension AppCoordinator {
         await refreshUnreadState()
         await synchronizeDashboard()
         await refreshAccountUsage()
-        if !refreshScheduler.hasFileChangeMonitoring {
+        if !refreshScheduler.isFileChangeMonitoringConfigured {
             await updateProjectGitStatuses()
         }
     }

@@ -57,8 +57,13 @@ mark it read: Codex remains the source of truth.
 `CodexDataChangeMonitor` watches catalog, unread, and account files.
 `ProjectGitChangeMonitor` owns project and Git metadata watches, with recursive
 project events from `RecursiveProjectChangeMonitor`. Debounce policies remain
-separate. Git metadata watches follow linked-worktree pointers. Codex activation
-forces a Git refresh; filesystem events and user actions accelerate polling.
+separate. `isFileChangeMonitoringConfigured` describes monitor configuration, not
+whether individual filesystem watches successfully started. Git metadata watches
+follow linked-worktree pointers. Codex activation
+refreshes unread state and the catalog. With file monitoring configured, Git status
+uses filesystem events and periodic polling; activation does not request another
+Git scan. Without monitoring configured, activation requests a cache-aware Git
+status update. Newly discovered projects receive their own initial Git refresh.
 `refreshThreadState` applies the latest snapshot and observes completions; normal
 synchronization explicitly calls `handleThreadCompletions` for usage refresh and
 automatic chat opening. Restart and account-switch preflights consume the snapshot
@@ -69,8 +74,8 @@ without those completion actions.
 | Refresh | Active | Background |
 | --- | --- | --- |
 | Thread catalog | 2 seconds | 8 seconds |
-| Unread state, with file monitoring | 15 seconds | 60 seconds |
-| Unread state, without file monitoring | 500 milliseconds | 1 second |
+| Unread state, file monitoring configured | 15 seconds | 60 seconds |
+| Unread state, file monitoring disabled | 500 milliseconds | 1 second |
 | Git status fallback | 15 seconds | 60 seconds |
 | Active-account usage | 2 minutes | Skipped |
 | Inactive-account usage | 5 minutes | 5 minutes |

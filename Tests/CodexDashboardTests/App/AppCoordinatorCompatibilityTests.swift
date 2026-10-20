@@ -258,7 +258,7 @@ extension AppCoordinatorTests {
         await coordinator.checkCompatibility()
 
         XCTAssertEqual(notifier.reports.count, 1)
-        XCTAssertEqual(notifier.reports.first?.warningCount, 1)
+        XCTAssertEqual(notifier.reports.first?.nonBlockingAttentionCount, 1)
     }
 
     func testVersionTriggeredCompatibleReportDoesNotSendNotification() async throws {

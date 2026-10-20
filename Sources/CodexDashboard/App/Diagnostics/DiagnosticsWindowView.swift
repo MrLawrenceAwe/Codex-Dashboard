@@ -103,7 +103,7 @@ private struct CompatibilityCard: View {
                             .font(.system(size: 11, weight: .medium))
                     } icon: {
                         Circle()
-                            .fill(report.blockingCount > 0 ? Color.red : (report.warningCount > 0 ? Color.orange : Color.green))
+                            .fill(report.blockingCount > 0 ? Color.red : (report.nonBlockingAttentionCount > 0 ? Color.orange : Color.green))
                             .frame(width: 7, height: 7)
                     }
                 }
@@ -114,7 +114,7 @@ private struct CompatibilityCard: View {
         .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(0.07)))
         .onChange(of: coordinator.compatibilityReport) { _, report in
-            detailsAreExpanded = report.map { $0.blockingCount > 0 || $0.warningCount > 0 } ?? false
+            detailsAreExpanded = report.map { $0.blockingCount > 0 || $0.nonBlockingAttentionCount > 0 } ?? false
         }
     }
 }

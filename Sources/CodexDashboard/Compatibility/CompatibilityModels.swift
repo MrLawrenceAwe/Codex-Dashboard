@@ -34,20 +34,20 @@ struct CompatibilityReport: Equatable, Sendable {
         checks.count { $0.status == .incompatible }
     }
 
-    var warningCount: Int {
+    var nonBlockingAttentionCount: Int {
         checks.count { $0.status == .warning || $0.status == .unavailable }
     }
 
     var summary: String {
         if blockingCount > 0 {
-            return "\(blockingCount) incompatible \u{00b7} \(warningCount) need attention"
+            return "\(blockingCount) incompatible \u{00b7} \(nonBlockingAttentionCount) need attention"
         }
         let uncheckedCount = checks.count { $0.status == .unavailable }
         if uncheckedCount > 0 {
-            return "Compatibility checks incomplete \u{00b7} \(uncheckedCount) not checked \u{00b7} \(warningCount) need attention"
+            return "Compatibility checks incomplete \u{00b7} \(uncheckedCount) not checked \u{00b7} \(nonBlockingAttentionCount) need attention"
         }
-        if warningCount > 0 {
-            return "Compatibility checks need attention \u{00b7} \(warningCount) \(warningCount == 1 ? "warning" : "warnings")"
+        if nonBlockingAttentionCount > 0 {
+            return "Compatibility checks need attention \u{00b7} \(nonBlockingAttentionCount) \(nonBlockingAttentionCount == 1 ? "warning" : "warnings")"
         }
         if checks.isEmpty { return "Compatibility not checked" }
         return "All checked contracts are compatible"

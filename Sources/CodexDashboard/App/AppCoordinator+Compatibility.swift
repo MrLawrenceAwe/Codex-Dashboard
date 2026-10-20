@@ -23,7 +23,7 @@ extension AppCoordinator {
 
         guard compatibilityWasTriggeredByUpdate,
               !didNotifyAboutDetectedUpdate,
-              report.blockingCount > 0 || report.warningCount > 0
+              report.blockingCount > 0 || report.nonBlockingAttentionCount > 0
         else { return }
         didNotifyAboutDetectedUpdate = true
         await compatibilityIssueNotifier.notify(report: report)

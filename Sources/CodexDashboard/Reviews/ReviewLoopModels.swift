@@ -109,8 +109,10 @@ struct ReviewRound: Codable, Equatable, Sendable {
     var reviewTurnID: String?
     var fixTurnID: String?
     var fixRequested = false
-    var continuationRequested: Bool? = nil
-    var reloadContinuationRequested: Bool? = nil
+    /// Allows reconciliation of additional turns after explicit Resume or native submission.
+    var allowsFollowUpTurns = false
+    /// Consumed when the confirmed extension-reload continuation is submitted.
+    var extensionReloadContinuationPending = false
     var fixVerification: ReviewFixVerification?
     var review: ReviewReport?
     var result: ReviewRoundResult?
@@ -186,7 +188,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 12
+    static let currentVersion = 13
     let version: Int
     let loops: [ReviewLoop]
 }
