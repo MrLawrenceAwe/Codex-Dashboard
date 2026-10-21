@@ -149,12 +149,12 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         let result = try await view.evaluateAsyncJavaScript("""
         (async () => {
           const store = window.__todoStoreForTests;
-          const deleted = store.create('Delete in another window');
-          const survivor = store.create('Keep this task');
+          const deleted = store.create({ title: 'Delete in another window' });
+          const survivor = store.create({ title: 'Keep this task' });
           const base = [deleted, survivor];
           await store.save(base, [], [], []);
           await store.save([{ ...survivor, body: 'Remote notes' }], [], base, []);
-          const added = store.create('New local task');
+          const added = store.create({ title: 'New local task' });
           const saved = await store.save([
             { ...deleted, title: 'Stale edit' }, survivor, added,
           ], [], base, []);
@@ -264,7 +264,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             storage.setItem('codex-dashboard.todos', original);
             const loaded = store.load();
             const reason = store.writeProtectionReason();
-            const saved = await store.save([store.create('Replacement')], []);
+            const saved = await store.save([store.create({ title: 'Replacement' })], []);
             results.push(loaded.length === 0 && Boolean(reason) && !saved
               && storage.getItem('codex-dashboard.todos') === original);
           }
@@ -384,12 +384,12 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             await gate;
             return originalPersist(items);
           };
-          const local = store.create('Local addition');
+          const local = store.create({ title: 'Local addition' });
           const saving = store.save([local], [], [], []);
           await startedGate;
           // Another window falls back to inline storage while this save is pending.
           const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'inline.png' };
-          const external = store.create('Other window image', '', image);
+          const external = store.create({ title: 'Other window image', image });
           localStorage.setItem(store.storageKey, JSON.stringify({ version: 9, items: [external] }));
           release();
           const saved = await saving;
@@ -421,7 +421,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             },
           }});
           const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'test.png' };
-          const item = store.create('Image draft', '', image, ['Work']);
+          const item = store.create({ title: 'Image draft', image, tags: ['Work'] });
           const first = store.save([item], ['Work']);
           const failed = store.save([{ ...item, title: 'Failed edit' }], ['Temporary']);
           const last = store.save([{ ...item, title: 'Latest edit' }], ['Work']);
@@ -449,7 +449,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
           const store = window.__todoStoreForTests;
           const oldImage = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'old.png' };
           const newImage = { dataURL: 'data:image/png;base64,Yg==', type: 'image/png', size: 1, name: 'new.png' };
-          const item = store.create('Saved image', '', oldImage);
+          const item = store.create({ title: 'Saved image', image: oldImage });
           await store.save([item], []);
           const replacement = store.normalizeItem({ ...item, image: newImage });
           const storage = window.localStorage;
@@ -476,7 +476,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         (async () => {
           const store = window.__todoStoreForTests;
           const image = { dataURL: 'data:image/png;base64,aA==', type: 'image/png', size: 1, name: 'test.png' };
-          const item = store.create('Saved image', '', image);
+          const item = store.create({ title: 'Saved image', image });
           await store.save([item], []);
           const storage = window.localStorage;
           Object.defineProperty(window, 'localStorage', { configurable: true, value: {

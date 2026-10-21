@@ -249,7 +249,7 @@ const todoStore = (() => {
     }
   }
 
-  function create(title, body = '', image = null, tags = []) {
+  function create({ title, body = '', image = null, tags = [], project = null, thread = null, preset = null }) {
     const now = Date.now();
     return normalizeItem({
       id: crypto.randomUUID(),
@@ -257,6 +257,9 @@ const todoStore = (() => {
       body,
       image,
       tags,
+      project,
+      thread,
+      preset,
       createdAt: now,
       updatedAt: now,
     });

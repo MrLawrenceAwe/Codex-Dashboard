@@ -194,7 +194,7 @@ struct DiagnosticsWindowView: View {
                         }
                         Button("Send Test") { Task { await coordinator.testPhoneNotification() } }
                     }
-                    Text("The topic is the subscription secret. Reset details are sent through ntfy.sh.")
+                    Text("The topic is the subscription secret. Usage-alert titles and messages, including account names, are sent through ntfy.sh.")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }

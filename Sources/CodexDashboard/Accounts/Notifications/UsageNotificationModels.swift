@@ -7,17 +7,23 @@ enum UsageDeadlineStyle: Equatable, Sendable {
     case todayOrTomorrow
 }
 
-enum ScheduledUsageNotificationKind: Equatable, Sendable {
-    case fiveHourReset
-    case weeklyReset
-    case bankedResetExpiry
+enum ScheduledUsageNotificationKind: String, CaseIterable, Hashable, Sendable {
+    case fiveHourReset = "5-hour"
+    case weeklyReset = "weekly"
+    case bankedResetExpiry = "banked-reset-expiry"
+
+    func deadline(in usage: CodexAccountUsage) -> Date? {
+        switch self {
+        case .fiveHourReset: usage.fiveHour?.resetsAt
+        case .weeklyReset: usage.weekly?.resetsAt
+        case .bankedResetExpiry: usage.bankedResets?.nextExpiration
+        }
+    }
 }
 
 struct ScheduledUsageNotification: Equatable, Sendable {
-    let identifier: String
-    let accountID: UUID
+    let notificationID: UsageDeadlineNotificationID
     let accountName: String
-    let kind: ScheduledUsageNotificationKind
     let title: String
     let body: String
     let deadlineUpdateTitle: String
@@ -26,23 +32,16 @@ struct ScheduledUsageNotification: Equatable, Sendable {
     let notificationDate: Date
     let deadlineDate: Date
 
-    var sourceIdentifier: String {
-        guard let range = identifier.range(of: "-deadline-update-", options: .backwards) else {
-            return identifier
-        }
-        return String(identifier[..<range.lowerBound])
-    }
-
-    var isDeadlineUpdate: Bool {
-        identifier.contains("-deadline-update-")
-    }
+    var identifier: String { notificationID.rawValue }
+    var accountID: UUID { notificationID.accountID }
+    var kind: ScheduledUsageNotificationKind { notificationID.kind }
+    var sourceIdentifier: String { notificationID.sourceIdentifier }
+    var isDeadlineUpdate: Bool { notificationID.isDeadlineUpdate }
 
     func deadlineUpdateNotification(at date: Date) -> ScheduledUsageNotification {
         ScheduledUsageNotification(
-            identifier: "\(identifier)-deadline-update-\(Int(deadlineDate.timeIntervalSinceReferenceDate))",
-            accountID: accountID,
+            notificationID: notificationID.updatingDeadline(to: deadlineDate),
             accountName: accountName,
-            kind: kind,
             title: deadlineUpdateTitle,
             body: "\(deadlineDescription): \(UsageNotificationPlanner.formattedDeadline(deadlineDate, style: deadlineStyle, relativeTo: date)).",
             deadlineUpdateTitle: deadlineUpdateTitle,

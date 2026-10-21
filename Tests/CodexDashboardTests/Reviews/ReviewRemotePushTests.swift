@@ -33,8 +33,9 @@ final class ReviewRemotePushTests: XCTestCase {
         var statuses = await provider.loadStatuses(for: [checkout], policy: .refresh)
         XCTAssertEqual(statuses[checkout], .unpushedCommits, "A branch without an upstream still has unpublished commits")
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let initial = try await checkpoint.workspace(at: checkout)
-        _ = try await checkpoint.reconcileAndPublishFix(initial.revision, at: checkout, expectedWorkspace: initial)
+        _ = try await publisher.reconcileAndPublishFix(initial.revision, at: checkout, expectedWorkspace: initial)
         let remoteHead = try await git(["rev-parse", "refs/heads/main"], at: remote)
         XCTAssertEqual(remoteHead, initial.revision)
         let upstream = try await git(["rev-parse", "--abbrev-ref", "@{upstream}"], at: checkout)
@@ -50,7 +51,7 @@ final class ReviewRemotePushTests: XCTestCase {
         XCTAssertEqual(statuses[checkout], .uncommittedChangesAndUnpushedCommits)
         try FileManager.default.removeItem(at: note)
         let fixed = try await checkpoint.workspace(at: checkout)
-        _ = try await checkpoint.reconcileAndPublishFix(fixed.revision, at: checkout, expectedWorkspace: fixed)
+        _ = try await publisher.reconcileAndPublishFix(fixed.revision, at: checkout, expectedWorkspace: fixed)
         statuses = await provider.loadStatuses(for: [checkout], policy: .refresh)
         XCTAssertEqual(statuses[checkout], .clean)
     }
@@ -58,11 +59,12 @@ final class ReviewRemotePushTests: XCTestCase {
     func testPushPublishesReportedFixWithoutLaterCommits() async throws {
         let (checkout, remote) = try await fixture()
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         _ = try await git(["commit", "--allow-empty", "-m", "Fix"], at: checkout)
         let fix = try await checkpoint.workspace(at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Later work"], at: checkout)
         let current = try await checkpoint.workspace(at: checkout)
-        _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: current)
+        _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: current)
         let pushed = try await git(["rev-parse", "refs/heads/main"], at: remote)
         XCTAssertEqual(pushed, fix.revision)
         let local = try await checkpoint.workspace(at: checkout)
@@ -72,11 +74,12 @@ final class ReviewRemotePushTests: XCTestCase {
     func testPushRecognizesFixAlreadyPublishedInLaterRemoteHistory() async throws {
         let (checkout, remote) = try await fixture()
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Later published work"], at: checkout)
         let current = try await checkpoint.workspace(at: checkout)
-        _ = try await checkpoint.reconcileAndPublishFix(current.revision, at: checkout, expectedWorkspace: current)
-        _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: current)
+        _ = try await publisher.reconcileAndPublishFix(current.revision, at: checkout, expectedWorkspace: current)
+        _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: current)
         let pushed = try await git(["rev-parse", "refs/heads/main"], at: remote)
         XCTAssertEqual(pushed, current.revision)
     }
@@ -87,15 +90,16 @@ final class ReviewRemotePushTests: XCTestCase {
         let base = try await git(["rev-parse", "HEAD"], at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Review fix"], at: checkout)
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fixed = try await checkpoint.workspace(at: checkout)
-        _ = try await checkpoint.reconcileAndPublishFix(fixed.revision, at: checkout, expectedWorkspace: fixed)
+        _ = try await publisher.reconcileAndPublishFix(fixed.revision, at: checkout, expectedWorkspace: fixed)
         let pushed = try await git(["rev-parse", "refs/heads/published"], at: remote)
         XCTAssertEqual(pushed, fixed.revision)
         // Preserve both histories and require verification before publishing the merge.
         _ = try await git(["reset", "--hard", base], at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Divergent fix"], at: checkout)
         let divergent = try await checkpoint.workspace(at: checkout)
-        let publication = try await checkpoint.reconcileAndPublishFix(divergent.revision, at: checkout, expectedWorkspace: divergent)
+        let publication = try await publisher.reconcileAndPublishFix(divergent.revision, at: checkout, expectedWorkspace: divergent)
         if case .verificationRequired(let repository) = publication {
             XCTAssertTrue(repository.clean)
             let containsFix = try await checkpoint.isAncestor(divergent.revision, of: repository.revision, at: checkout)
@@ -122,12 +126,13 @@ final class ReviewRemotePushTests: XCTestCase {
         let (checkout, remote) = try await fixture()
         _ = try await git(["push", "-u", "origin", "main"], at: checkout)
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
         let other = try await otherCheckout(remote)
         _ = try await git(["commit", "--allow-empty", "-m", "Remote work"], at: other)
         _ = try await git(["push", "origin", "main"], at: other)
         let remoteHead = try await git(["rev-parse", "HEAD"], at: other)
-        _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
+        _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
         let unchanged = try await checkpoint.workspace(at: checkout)
         XCTAssertEqual(unchanged, fix)
         let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
@@ -143,8 +148,9 @@ final class ReviewRemotePushTests: XCTestCase {
         let remoteHead = try await git(["rev-parse", "HEAD"], at: other)
         _ = try await git(["commit", "--allow-empty", "-m", "Local fix"], at: checkout)
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
-        let publication = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
+        let publication = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
         guard case .verificationRequired = publication else {
             return XCTFail("Requires verification")
         }
@@ -153,7 +159,7 @@ final class ReviewRemotePushTests: XCTestCase {
         XCTAssertEqual(beforeVerification, remoteHead)
         XCTAssertNotEqual(merged.revision, fix.revision)
         // The coordinator supplies this checkpoint only after read-only verification.
-        _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: merged)
+        _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: merged)
         let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
         XCTAssertEqual(published, merged.revision)
         let hasFix = try await checkpoint.isAncestor(fix.revision, of: published, at: checkout)
@@ -177,9 +183,10 @@ final class ReviewRemotePushTests: XCTestCase {
         try Data("local\n".utf8).write(to: file)
         _ = try await git(["commit", "-am", "Local fix"], at: checkout)
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
         do {
-            _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
+            _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
             XCTFail("Conflicts require attention")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("could not be merged automatically"))
@@ -202,10 +209,11 @@ final class ReviewRemotePushTests: XCTestCase {
         _ = try await git(["merge", "--no-commit", "--no-ff", "origin/main"], at: checkout)
         let pending = try await git(["rev-parse", "MERGE_HEAD"], at: checkout)
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
         XCTAssertTrue(fix.clean, "An empty pending merge is invisible to porcelain status")
         do {
-            _ = try await checkpoint.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
+            _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
             XCTFail("An existing Git operation must be left alone")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("existing Git operation"))
@@ -217,10 +225,11 @@ final class ReviewRemotePushTests: XCTestCase {
     func testPushRejectsChangedCheckoutAndMissingRemote() async throws {
         let (checkout, _) = try await fixture()
         let checkpoint = ReviewWorkspaceCheckpoint()
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let initial = try await checkpoint.workspace(at: checkout)
         _ = try await git(["commit", "--allow-empty", "-m", "Unexpected"], at: checkout)
         do {
-            _ = try await checkpoint.reconcileAndPublishFix(initial.revision, at: checkout, expectedWorkspace: initial)
+            _ = try await publisher.reconcileAndPublishFix(initial.revision, at: checkout, expectedWorkspace: initial)
             XCTFail("Changed HEAD must prevent pushing")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("checkout changed"))
@@ -228,7 +237,7 @@ final class ReviewRemotePushTests: XCTestCase {
         _ = try await git(["remote", "remove", "origin"], at: checkout)
         let current = try await checkpoint.workspace(at: checkout)
         do {
-            _ = try await checkpoint.reconcileAndPublishFix(current.revision, at: checkout, expectedWorkspace: current)
+            _ = try await publisher.reconcileAndPublishFix(current.revision, at: checkout, expectedWorkspace: current)
             XCTFail("A missing remote must prevent pushing")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("Push needs a remote"))

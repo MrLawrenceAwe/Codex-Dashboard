@@ -27,7 +27,6 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
         let task: Task<Void, Never>
     }
 
-    private static let accountDeadlineIdentifierPrefix = "codex-dashboard-account-deadline-"
     private static let fallbackDelay: TimeInterval = 30
 
     private let notificationCenter: any DesktopNotificationCenter
@@ -85,7 +84,7 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
             .sorted { $0.identifier < $1.identifier }
         let pendingRequests = await notificationCenter.pendingRequests()
         let existingIdentifiers = pendingRequests.compactMap { request in
-            request.identifier.hasPrefix(Self.accountDeadlineIdentifierPrefix) ? request.identifier : nil
+            UsageDeadlineNotificationID.isDeadlineIdentifier(request.identifier) ? request.identifier : nil
         }
         notificationCenter.removePendingRequests(withIdentifiers: existingIdentifiers)
         await removeOutdatedDeliveredNotifications(using: usageByAccountID)
@@ -232,31 +231,18 @@ final class DesktopUsageNotifier: DesktopUsageNotifying {
     ) async {
         let delivered = await notificationCenter.deliveredNotifications()
         let outdated = delivered.compactMap { notification -> String? in
-            for (accountID, snapshot) in usageByAccountID {
-                let prefix = "codex-dashboard-account-deadline-v2-\(accountID.uuidString.lowercased())-"
-                guard notification.identifier.hasPrefix(prefix) else { continue }
-                let kind = notification.identifier.dropFirst(prefix.count)
-                let currentDeadline: Date?
-                if kind.hasPrefix("weekly-") {
-                    currentDeadline = snapshot.usage.weekly?.resetsAt
-                } else if kind.hasPrefix("5-hour-") {
-                    currentDeadline = snapshot.usage.fiveHour?.resetsAt
-                } else if kind.hasPrefix("banked-reset-expiry-") {
-                    currentDeadline = snapshot.usage.bankedResets?.nextExpiration
-                } else {
-                    continue
-                }
-                let baseIdentifier = notification.identifier.components(separatedBy: "-fresh-")[0]
-                let recordedDeadline = notification.deadlineDate
-                    ?? history.deliveredDeadline(for: baseIdentifier)
-                if notification.title.hasPrefix("Codex limit resets in ") {
-                    return notification.identifier
-                }
-                guard let currentDeadline else { return notification.identifier }
-                if let recordedDeadline,
-                   UsageNotificationPlanner.deadlinesDifferMeaningfully(recordedDeadline, currentDeadline) {
-                    return notification.identifier
-                }
+            guard let notificationID = UsageDeadlineNotificationID(rawValue: notification.identifier),
+                  let snapshot = usageByAccountID[notificationID.accountID] else { return nil }
+            let currentDeadline = notificationID.kind.deadline(in: snapshot.usage)
+            let recordedDeadline = notification.deadlineDate
+                ?? history.deliveredDeadline(for: notificationID.deliveryIdentifier)
+            if notification.title.hasPrefix("Codex limit resets in ") {
+                return notification.identifier
+            }
+            guard let currentDeadline else { return notification.identifier }
+            if let recordedDeadline,
+               UsageNotificationPlanner.deadlinesDifferMeaningfully(recordedDeadline, currentDeadline) {
+                return notification.identifier
             }
             return nil
         }

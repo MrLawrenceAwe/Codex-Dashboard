@@ -118,8 +118,8 @@ rather than sending the old deadline.
 
 Enable **Send usage alerts to my phone** in Diagnostics. In the ntfy app, choose
 Add Subscription and enter the generated secret topic, then use **Send Test**.
-Only alert titles and messages are sent through `ntfy.sh`. **New Topic** changes the
-subscription secret; subscribe to the replacement topic. Send Test remains
+Usage-alert titles and messages, including account names, are sent through
+`ntfy.sh`. **New Topic** changes the subscription secret; subscribe to the replacement topic. Send Test remains
 available even when usage alerts are suppressed.
 
 ## Review loops

@@ -301,7 +301,6 @@ private struct ReviewFixedWorkspaceCheckpoint: ReviewWorkspaceChecking {
     let state: ReviewWorkspaceState
 
     func workspace(at path: String) async throws -> ReviewWorkspaceState { state }
-    func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome { .published }
     func resolveCommit(_ commit: String, at path: String) async throws -> String { commit }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { true }
 }

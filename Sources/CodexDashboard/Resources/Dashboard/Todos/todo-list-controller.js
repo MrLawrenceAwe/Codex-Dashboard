@@ -218,12 +218,9 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     return saved;
   }
 
-  async function addTodo({ title, body = '', image = null, tags = [], project = null, thread = null, preset = null }) {
-    const item = todoStore.create(title, body, image, tags);
+  async function addTodo(draft) {
+    const item = todoStore.create(draft);
     if (!item) return false;
-    item.project = todoStore.normalizeProject(project);
-    item.thread = todoStore.normalizeThread(thread);
-    item.preset = composerPresets.normalize(preset) || null;
     const saved = await commitItems([item, ...items]);
     if (saved && !destroyed) {
       filterMode = 'open';

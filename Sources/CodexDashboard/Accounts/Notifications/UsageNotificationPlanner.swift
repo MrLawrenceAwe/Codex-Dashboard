@@ -93,32 +93,25 @@ enum UsageNotificationPlanner {
         sentUpdates: [String: Date],
         now: Date
     ) -> [ScheduledUsageNotification] {
-        let deliveredUpdateResetIdentifiers = Set<String>(notifications.compactMap { notification -> String? in
+        let deliveredUpdateGroups = Set<UsageDeadlineNotificationID.Group>(notifications.compactMap { notification -> UsageDeadlineNotificationID.Group? in
             guard let sentDeadline = sentUpdates[notification.sourceIdentifier],
                   !deadlinesDifferMeaningfully(sentDeadline, notification.deadlineDate)
             else { return nil }
-            return resetIdentifier(for: notification)
+            return notification.notificationID.group
         })
         let candidates = notifications.compactMap { notification -> ScheduledUsageNotification? in
             guard let previousDeadline = previousDeadlines[notification.identifier],
                   deadlinesDifferMeaningfully(previousDeadline, notification.deadlineDate),
                   notification.notificationDate <= now,
-                  !deliveredUpdateResetIdentifiers.contains(resetIdentifier(for: notification))
+                  !deliveredUpdateGroups.contains(notification.notificationID.group)
             else { return nil }
             return notification
         }
-        let latestMissedWarningByReset = Dictionary(grouping: candidates, by: resetIdentifier)
+        let latestMissedWarningByReset = Dictionary(grouping: candidates, by: { $0.notificationID.group })
             .compactMapValues { warnings in warnings.max { $0.notificationDate < $1.notificationDate } }
         return latestMissedWarningByReset.values
             .map { $0.deadlineUpdateNotification(at: now.addingTimeInterval(1)) }
             .sorted { $0.identifier < $1.identifier }
-    }
-
-    private static func resetIdentifier(for notification: ScheduledUsageNotification) -> String {
-        guard let separator = notification.identifier.lastIndex(of: "-") else {
-            return notification.identifier
-        }
-        return String(notification.identifier[..<separator])
     }
 
     static func deadlinesDifferMeaningfully(_ lhs: Date, _ rhs: Date) -> Bool {
@@ -225,10 +218,9 @@ enum UsageNotificationPlanner {
             let notificationDate = resetsAt.addingTimeInterval(-leadTime)
             let deadlineStyle = windowKind.deadlineStyle
             return ScheduledUsageNotification(
-                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(identifierComponent(for: leadTime))",
-                accountID: account.id,
+                notificationID: UsageDeadlineNotificationID(accountID: account.id, kind: windowKind.notificationKind,
+                                                          leadTimeHours: Int(leadTime / oneHour)),
                 accountName: account.name,
-                kind: windowKind.notificationKind,
                 title: "Codex \(windowKind.displayName.lowercased()) usage resets in \(leadTimeDescription)",
                 body: "\(account.name)’s \(windowKind.displayName) usage resets \(formattedDeadline(resetsAt, style: deadlineStyle, relativeTo: notificationDate)).",
                 deadlineUpdateTitle: "\(windowKind.displayName) reset time changed",
@@ -317,10 +309,9 @@ enum UsageNotificationPlanner {
         return extendedLeadTimes.map { leadTime in
             let leadTimeDescription = description(for: leadTime)
             return ScheduledUsageNotification(
-                identifier: "codex-dashboard-account-deadline-v2-\(account.id.uuidString.lowercased())-banked-reset-expiry-\(identifierComponent(for: leadTime))",
-                accountID: account.id,
+                notificationID: UsageDeadlineNotificationID(accountID: account.id, kind: .bankedResetExpiry,
+                                                          leadTimeHours: Int(leadTime / oneHour)),
                 accountName: account.name,
-                kind: .bankedResetExpiry,
                 title: "Banked Codex reset expires in \(leadTimeDescription)",
                 body: "\(account.name)’s next banked reset expires \(formattedDeadline(expiration)).",
                 deadlineUpdateTitle: "Banked reset expiry changed",
@@ -373,7 +364,7 @@ enum UsageNotificationPlanner {
                 + usageSummary(for: usage, includesBankedResets: false)
         }
         return ImmediateUsageNotification(
-            identifier: "\(notification.identifier)-fresh-\(Int(snapshot.fetchedAt.timeIntervalSince1970))",
+            identifier: notification.notificationID.refreshed(at: snapshot.fetchedAt).rawValue,
             title: notification.title,
             body: body
         )
@@ -382,10 +373,6 @@ enum UsageNotificationPlanner {
     private static func description(for leadTime: TimeInterval) -> String {
         let hours = Int(leadTime / oneHour)
         return hours == 1 ? "one hour" : "\(hours) hours"
-    }
-
-    private static func identifierComponent(for leadTime: TimeInterval) -> String {
-        "\(Int(leadTime / 60 / 60))h"
     }
 
     private static func usageSummary(

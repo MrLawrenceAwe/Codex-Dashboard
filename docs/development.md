@@ -95,7 +95,10 @@ See [architecture](architecture.md) for refresh, persistence, account transactio
 notifications and review execution, and [usage](usage.md) for user controls.
 `ReviewWorkspaceCheckpoint` inspects Git checkouts and ordinary folders through
 `workspace(at:)`, returning `ReviewWorkspaceState`. `ReviewFolderCheckpoint` owns
-folder fingerprints; Git publication and ancestry operations retain Git terminology.
+folder fingerprints. `ReviewWorkspaceChecking` exposes read-only workspace and
+ancestry inspection; `ReviewGitPublishing` and `ReviewGitPublisher` own remote fetch,
+merge/abort, push, and upstream configuration. `ReviewLoopDriver` receives these as
+separate dependencies. Both implementations use `ReviewGitCommand` for subprocesses.
 `ReviewFixCheckpoint` validates finding accounting and commit ancestry; the review
 coordinator owns publication intent, verification scheduling, and final state writes.
 

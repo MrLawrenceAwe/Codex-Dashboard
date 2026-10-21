@@ -7,13 +7,16 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     private let devTools: any DevToolsServing
     private let target: DevToolsTarget
     private let workspaceCheckpoint: any ReviewWorkspaceChecking
+    private let gitPublisher: any ReviewGitPublishing
     private let stateDatabaseURL: URL
     init(devTools: any DevToolsServing, target: DevToolsTarget,
          workspaceCheckpoint: any ReviewWorkspaceChecking = ReviewWorkspaceCheckpoint(),
+         gitPublisher: any ReviewGitPublishing = ReviewGitPublisher(),
          stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL) {
         self.devTools = devTools
         self.target = target
         self.workspaceCheckpoint = workspaceCheckpoint
+        self.gitPublisher = gitPublisher
         self.stateDatabaseURL = stateDatabaseURL
     }
 
@@ -63,7 +66,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     }
 
     func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome {
-        try await workspaceCheckpoint.reconcileAndPublishFix(commit, at: path, expectedWorkspace: expectedWorkspace)
+        try await gitPublisher.reconcileAndPublishFix(commit, at: path, expectedWorkspace: expectedWorkspace)
     }
 
     func resolveCommit(_ commit: String, at path: String) async throws -> String {

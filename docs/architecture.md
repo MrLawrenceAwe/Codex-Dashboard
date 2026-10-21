@@ -95,6 +95,8 @@ rolling backups. Concurrent prompt/section deletions beat stale edits; new or mo
 prompts targeting a concurrently deleted section move to General.
 
 To-dos live in renderer storage, with image data in IndexedDB and an inline fallback.
+`todoStore.create` accepts a complete draft object and normalises text, image, tags,
+project, linked thread, and model preset before the controller queues persistence.
 Writes merge changed fields into the latest shared document, preserving other
 windows' edits and image references. Concurrent deletion beats stale edits; storage
 notifications refresh open windows. Text saves update existing rows so click targets
@@ -134,6 +136,11 @@ homes are removed after each request. Batch refreshes preserve interaction polic
 and perform one cache write. Non-sensitive usage snapshots persist with timestamps.
 
 ## Notifications
+
+Deadline alerts use `UsageDeadlineNotificationID` for account/kind grouping,
+lead times, revised-deadline keys, and refreshed-delivery keys. The planner and desktop
+cleanup share that contract. Existing identifier strings remain unchanged because
+saved delivery history uses them to prevent duplicate alerts.
 
 `UsageNotificationPlanner` builds one pure plan per observation time.
 `UsageNotificationUpdateCoordinator` serializes updates. `DesktopUsageNotifier` and
@@ -185,9 +192,9 @@ parent/child folders as well as identical roots.
 For Git projects, `ReviewWorkspaceCheckpoint` validates Git state through argument-based subprocesses.
 A review must leave a clean checkout and unchanged HEAD. Fix completion requires the
 original branch, clean tree, a reported commit matching HEAD, and ancestry from the
-round's base commit. `reconcileAndPublishFix` fetches the destination and returns
-either `published`
-or `verificationRequired` with the merged checkout. Remote reconciliation can
+round's base commit. `ReviewGitPublisher.reconcileAndPublishFix` fetches the
+destination and returns either `published` or `verificationRequired` with the merged
+checkout. Remote reconciliation can
 create a local merge commit; publication waits for read-only verification of that
 HEAD. The verification's `targetRevision` identifies this HEAD independently of the
 original fix commit. Publication never forces a push.
