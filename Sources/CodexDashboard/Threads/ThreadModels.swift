@@ -1,5 +1,10 @@
 import Foundation
 
+struct ThreadActivityObservation {
+    let completion: ThreadCompletionTracker.Result
+    let questionThreadIDToOpen: String?
+}
+
 enum ThreadRunState: String, Codable, Equatable, Sendable {
     case running
     case idle
@@ -38,6 +43,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     let model: String?
     let runState: ThreadRunState
     let latestLifecycleEvent: ThreadLifecycleEvent?
+    var latestQuestionEvent: ThreadQuestionEvent? = nil
     var projectID: String? = nil
     var projectGroupPath: String? = nil
     var sharesProjectRepository = false

@@ -112,6 +112,7 @@ actor SequencedCatalogProvider: ThreadCatalogProviding {
 
 @MainActor
 final class RecordingCodexForegrounder: CodexForegrounding {
+    var isCodexFrontmost = false
     private(set) var callCount = 0
 
     func foregroundCodex() {

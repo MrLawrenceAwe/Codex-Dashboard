@@ -109,6 +109,12 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         )
         completionOpeningItem.state = coordinator.automaticallyOpenCompletedChats ? .on : .off
         menu.addItem(completionOpeningItem)
+        let questionOpeningItem = actionItem(
+            "Open chats with questions automatically",
+            action: #selector(toggleAutomaticallyOpenQuestionChats)
+        )
+        questionOpeningItem.state = coordinator.automaticallyOpenQuestionChats ? .on : .off
+        menu.addItem(questionOpeningItem)
         menu.addItem(actionItem("Copy Diagnostics", action: #selector(copyDiagnostics)))
         menu.addItem(actionItem("Export Prompt Library…", action: #selector(exportPromptLibrary)))
         menu.addItem(.separator())
@@ -176,6 +182,10 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func toggleLaunchAtLogin() {
         launchAtLogin.setEnabled(!launchAtLogin.isEnabled)
+    }
+
+    @objc private func toggleAutomaticallyOpenQuestionChats() {
+        coordinator.automaticallyOpenQuestionChats.toggle()
     }
 
     @objc private func toggleAutomaticallyOpenCompletedChats() {

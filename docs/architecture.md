@@ -32,7 +32,11 @@ payload decoding for account and unread identity lookup; it does not verify sign
 recency. The recent-history limit is 500; required unread chats and currently active
 chats can extend that catalog. `RolloutActivityReader` reads explicit lifecycle
 events and reconciles them against the current Codex launch so interrupted work
-does not stay running indefinitely.
+does not stay running indefinitely. `RolloutQuestionReader` observes structured async
+question items and blocking question calls, with replies and interruptions clearing
+the previous question. Both readers share a cached reverse JSONL scanner.
+`ThreadQuestionTracker` consumes each newly observed question once; initial
+snapshots establish a baseline without opening historical questions.
 
 Project grouping uses saved projects and canonical roots, including symlink aliases.
 Removed projects lose change indicators; their chats retain their original checkout
@@ -64,9 +68,10 @@ refreshes unread state and the catalog. With file monitoring configured, Git sta
 uses filesystem events and periodic polling; activation does not request another
 Git scan. Without monitoring configured, activation requests a cache-aware Git
 status update. Newly discovered projects receive their own initial Git refresh.
-`refreshThreadState` applies the latest snapshot and observes completions; normal
-synchronization explicitly calls `handleThreadCompletions` for usage refresh and
-automatic chat opening. Restart and account-switch preflights consume the snapshot
+`refreshThreadState` applies the latest snapshot and observes completions and questions; normal
+synchronization explicitly calls `handleThreadActivity` for usage refresh and
+automatic chat opening, including new questions. Frontmost Codex suppresses
+both activation and navigation; events consumed while frontmost are not replayed. Restart and account-switch preflights consume the snapshot
 without those completion actions.
 
 `RefreshScheduler.Schedule` defines waits after each operation completes:

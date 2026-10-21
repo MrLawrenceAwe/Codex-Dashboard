@@ -28,11 +28,13 @@ selection is pending. Git status uses local remote-tracking refs without fetchin
 repositories without a remote show only uncommitted changes.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
-finishes. Turn off **Open completed chats automatically** in the menu bar if
-unwanted. Review-loop chats and chats
+finishes or it asks a structured question, including questions asked while work
+continues. The menu bar has separate **Open completed chats automatically** and
+**Open chats with questions automatically** toggles. If Codex is already frontmost,
+Dashboard leaves the selected chat alone. Review-loop chats and chats
 started in the ChatGPT Chrome extension are excluded. Typing, voice chat, and
-dictation suppress automatic focus changes; suppressed completions are not opened
-later.
+dictation suppress automatic focus changes; suppressed events are not opened
+later. Existing questions at Dashboard startup do not trigger focus changes.
 
 ## Prompts and to-dos
 

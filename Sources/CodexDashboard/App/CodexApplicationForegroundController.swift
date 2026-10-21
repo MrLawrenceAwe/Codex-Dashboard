@@ -2,13 +2,18 @@ import AppKit
 
 @MainActor
 protocol CodexForegrounding {
+    var isCodexFrontmost: Bool { get }
     func foregroundCodex()
 }
 
 @MainActor
 final class CodexApplicationForegroundController: CodexForegrounding {
+    var isCodexFrontmost: Bool {
+        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
+    }
+
     func foregroundCodex() {
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier != CodexConfiguration.bundleIdentifier else {
+        guard !isCodexFrontmost else {
             return
         }
         let application = NSRunningApplication.runningApplications(

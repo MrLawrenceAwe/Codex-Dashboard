@@ -65,6 +65,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
 
     private let stateDatabaseURL: URL
     private let loadedThreadLimit: Int
+    private var rolloutQuestionReader = RolloutQuestionReader()
     private var rolloutActivityReader = RolloutActivityReader()
     private var cachedDatabaseSignature: DatabaseSignature?
     private var cachedLaunchMilliseconds: Int64?
@@ -147,6 +148,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         }
         let activityPaths = Set(threads.map(\.rolloutPath))
         rolloutActivityReader.retainCache(for: activityPaths)
+        rolloutQuestionReader.retainCache(for: activityPaths)
         var repositoryRoots: [String: String] = [:]
         var resolvedRepositoryPaths = Set<String>()
         func repositoryRoot(_ path: String) -> String? {
@@ -188,6 +190,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 latestLifecycleEvent: latestLifecycleEvent,
                 projectGitStatus: .notRepository
             )
+            summary.latestQuestionEvent = rolloutQuestionReader.latestRecordedEvent(at: thread.rolloutPath)
             summary.projectID = root?.id
             if let root {
                 let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)

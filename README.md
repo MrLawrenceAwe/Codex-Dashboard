@@ -14,7 +14,7 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 ## Features
 
-- **Chat monitoring:** recent activity, unread status, completion tracking, uncommitted files and unpushed Git commits.
+- **Chat monitoring:** recent activity, unread status, completion and question tracking, uncommitted files and unpushed Git commits.
 - **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, pause/resume/stop controls, and optional remote pushing.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 
@@ -71,7 +71,7 @@ It moves the installed app to the Trash.
    the main content pane while the rest of Codex navigation stays available.
 
 Keep Dashboard running to refresh activity and restore its controls after Codex
-reloads. Use the menu bar for Diagnostics, Launch at Login, automatic completion
+reloads. Use the menu bar for Diagnostics, Launch at Login, automatic completion and question
 focus, and **Disable dashboard integration**.
 
 See [Using Codex Dashboard](docs/usage.md) for chat filters, prompts, to-dos,

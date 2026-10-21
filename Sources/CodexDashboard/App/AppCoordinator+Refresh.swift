@@ -3,8 +3,8 @@ import Foundation
 extension AppCoordinator {
     func synchronizeRuntime() async {
         do {
-            if let completion = try await refreshThreadState() {
-                await handleThreadCompletions(completion)
+            if let activity = try await refreshThreadState() {
+                await handleThreadActivity(activity)
             }
         } catch {
             catalogWarning = "Thread data could not be refreshed. Showing the last successful snapshot. \(error.localizedDescription)"
@@ -107,10 +107,10 @@ extension AppCoordinator {
         await publishSnapshotIfMaintained()
     }
 
-    func refreshThreadState() async throws -> ThreadCompletionTracker.Result? {
+    func refreshThreadState() async throws -> ThreadActivityObservation? {
         let snapshot = try await threadSnapshotService.loadSnapshot(codexLaunchDate: dashboardRuntime?.codexLaunchDate)
         guard !Task.isCancelled else { return nil }
-        let completion = observeCompletions(in: snapshot.catalog.threads)
+        let activity = observeThreadActivity(in: snapshot.catalog.threads)
         applyThreadSnapshot(
             snapshot.catalog.threads,
             totalCount: snapshot.catalog.totalThreadCount,
@@ -119,20 +119,33 @@ extension AppCoordinator {
         catalogWarning = nil
         unreadStateWarning = snapshot.unreadStateWarning
         refreshThreadDataWarning()
-        return completion
+        return activity
     }
 
-    func handleThreadCompletions(_ completion: ThreadCompletionTracker.Result) async {
-        if completion.hasCompletion {
+    func handleThreadActivity(_ activity: ThreadActivityObservation) async {
+        if activity.completion.hasCompletion {
             Task { await self.refreshAccountUsage() }
         }
-        if let completedThreadID = completion.threadIDToOpen {
+        // Consume events even while Codex is frontmost, so changing apps later
+        // cannot replay them and navigate away from the user's selected chat.
+        guard !codexForegrounder.isCodexFrontmost else { return }
+        if automaticallyOpenQuestionChats, let threadID = activity.questionThreadIDToOpen {
+            guard !keyboardActivityDetector.hasRecentKeyboardActivity,
+                  await dashboardRuntime?.hasActiveSpeechInput() != true,
+                  !Task.isCancelled, !codexForegrounder.isCodexFrontmost,
+                  !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
+            codexForegrounder.foregroundCodex()
+            await dashboardRuntime?.openThread(threadID)
+            return
+        }
+        if let completedThreadID = activity.completion.threadIDToOpen {
             let completedThread = threads.first { $0.id == completedThreadID }
             if automaticallyOpenCompletedChats,
                completedThread?.originatesFromChromeExtension != true,
                !keyboardActivityDetector.hasRecentKeyboardActivity {
                 guard await dashboardRuntime?.hasActiveSpeechInput() != true,
                       !Task.isCancelled,
+                      !codexForegrounder.isCodexFrontmost,
                       !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)

@@ -6,6 +6,7 @@ import Foundation
 final class AppCoordinator: ObservableObject {
     // Keep the persisted key so a rename does not reset the saved preference.
     static let automaticallyOpenCompletedChatsKey = "foregroundOnTaskCompletion"
+    static let automaticallyOpenQuestionChatsKey = "automaticallyOpenQuestionChats"
     private static let maximumLiveMonitoredProjectCount = 60
     @Published var connectionState: DashboardConnectionState = .checking
     @Published var connectionError: String?
@@ -25,6 +26,10 @@ final class AppCoordinator: ObservableObject {
     @Published var phoneNotificationStatusMessage: String?
     @Published var automaticallyOpenCompletedChats: Bool {
         didSet { userDefaults.set(automaticallyOpenCompletedChats, forKey: Self.automaticallyOpenCompletedChatsKey) }
+    }
+
+    @Published var automaticallyOpenQuestionChats: Bool {
+        didSet { userDefaults.set(automaticallyOpenQuestionChats, forKey: Self.automaticallyOpenQuestionChatsKey) }
     }
 
     let threadSnapshotService: ThreadSnapshotService
@@ -49,6 +54,7 @@ final class AppCoordinator: ObservableObject {
     private var activationObserver: NSObjectProtocol?
     private var codexActivationObserver: NSObjectProtocol?
     private var accountStateObserver: AnyCancellable?
+    private var threadQuestionTracker = ThreadQuestionTracker()
     private var threadCompletionTracker = ThreadCompletionTracker()
     var didNotifyAboutDetectedUpdate = false
     var statusPresentation: (title: String, detail: String) {
@@ -106,6 +112,7 @@ final class AppCoordinator: ObservableObject {
         )
         notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
         automaticallyOpenCompletedChats = userDefaults.object(forKey: Self.automaticallyOpenCompletedChatsKey) as? Bool ?? true
+        automaticallyOpenQuestionChats = userDefaults.object(forKey: Self.automaticallyOpenQuestionChatsKey) as? Bool ?? true
         refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
         compatibilityMonitor = CompatibilityMonitor(
             localChecker: compatibilityChecker,
@@ -327,11 +334,15 @@ final class AppCoordinator: ObservableObject {
         return paths
     }
 
-    func observeCompletions(in threads: [ThreadSummary]) -> ThreadCompletionTracker.Result {
-        threadCompletionTracker.observeCompletions(
+    func observeThreadActivity(in threads: [ThreadSummary]) -> ThreadActivityObservation {
+        let completion = threadCompletionTracker.observeCompletions(
             in: threads,
             excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
         )
+        let questionThreadIDToOpen = threadQuestionTracker.observeQuestions(
+            in: threads, excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
+        )
+        return ThreadActivityObservation(completion: completion, questionThreadIDToOpen: questionThreadIDToOpen)
     }
 
     static let incompatibleContractMessage =
