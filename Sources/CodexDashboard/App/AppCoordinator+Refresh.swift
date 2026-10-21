@@ -126,13 +126,10 @@ extension AppCoordinator {
         if activity.completion.hasCompletion {
             Task { await self.refreshAccountUsage() }
         }
-        // Consume events even while Codex is frontmost, so changing apps later
-        // cannot replay them and navigate away from the user's selected chat.
-        guard !codexForegrounder.isCodexFrontmost else { return }
         if automaticallyOpenQuestionChats, let threadID = activity.questionThreadIDToOpen {
             guard !keyboardActivityDetector.hasRecentKeyboardActivity,
                   await dashboardRuntime?.hasActiveSpeechInput() != true,
-                  !Task.isCancelled, !codexForegrounder.isCodexFrontmost,
+                  !Task.isCancelled,
                   !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
             codexForegrounder.foregroundCodex()
             await dashboardRuntime?.openThread(threadID)
@@ -145,7 +142,6 @@ extension AppCoordinator {
                !keyboardActivityDetector.hasRecentKeyboardActivity {
                 guard await dashboardRuntime?.hasActiveSpeechInput() != true,
                       !Task.isCancelled,
-                      !codexForegrounder.isCodexFrontmost,
                       !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
                 codexForegrounder.foregroundCodex()
                 await dashboardRuntime?.openThread(completedThreadID)

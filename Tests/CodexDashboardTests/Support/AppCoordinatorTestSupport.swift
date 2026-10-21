@@ -116,6 +116,7 @@ final class RecordingCodexForegrounder: CodexForegrounding {
     private(set) var callCount = 0
 
     func foregroundCodex() {
+        guard !isCodexFrontmost else { return }
         callCount += 1
     }
 }

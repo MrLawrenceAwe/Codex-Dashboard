@@ -68,11 +68,13 @@ refreshes unread state and the catalog. With file monitoring configured, Git sta
 uses filesystem events and periodic polling; activation does not request another
 Git scan. Without monitoring configured, activation requests a cache-aware Git
 status update. Newly discovered projects receive their own initial Git refresh.
-`refreshThreadState` applies the latest snapshot and observes completions and questions; normal
-synchronization explicitly calls `handleThreadActivity` for usage refresh and
-automatic chat opening, including new questions. Frontmost Codex suppresses
-both activation and navigation; events consumed while frontmost are not replayed. Restart and account-switch preflights consume the snapshot
-without those completion actions.
+`refreshThreadState` applies the latest snapshot and observes completions and
+questions; normal synchronization explicitly calls `handleThreadActivity` for
+usage refresh and automatic chat opening. Questions and completions can navigate
+to their chat even when Codex is already frontmost. Recent typing, dictation, or
+voice chat suppress activation and navigation; suppressed events are consumed
+without replay. Restart and account-switch preflights consume the snapshot
+without those actions.
 
 `RefreshScheduler.Schedule` defines waits after each operation completes:
 
