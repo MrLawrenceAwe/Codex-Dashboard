@@ -19,7 +19,7 @@ final class AccountPopoverActionPoller {
                 let outcome = await handleAction()
                 if outcome == .unavailable {
                     try? await Task.sleep(for: Schedule.unavailableRetry(
-                        active: RefreshScheduler.isUserActive
+                        active: RefreshScheduler.isDashboardOrCodexForeground
                     ))
                 } else if outcome == .empty {
                     try? await Task.sleep(for: .milliseconds(250))

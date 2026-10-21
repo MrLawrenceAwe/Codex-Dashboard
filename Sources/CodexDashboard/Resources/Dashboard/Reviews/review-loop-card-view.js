@@ -143,7 +143,7 @@ const reviewLoopCardView = (() => {
     const icons = { done: '✓', skipped: '–', blocked: '!', paused: 'Ⅱ', stopped: '■', stopping: '■' };
     const latest = loop.rounds.at(-1);
     const addressed = loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0);
-    const commits = new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.commit).map(round => round.result.commit)).size;
+    const commits = new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.fixCommit).map(round => round.result.fixCommit)).size;
     const feedback = root.querySelector('[data-review-feedback]');
     const markup = `
       <div class="review-feedback-heading"><strong>${latest ? `Round ${latest.number}` : 'First round'}</strong></div>

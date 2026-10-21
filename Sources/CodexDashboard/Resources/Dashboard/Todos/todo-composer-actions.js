@@ -65,7 +65,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     (composer?.closest('form') || composer?.parentElement || document.body).append(notice);
   }
 
-  async function insertTodoIntoComposer(item, { failurePolicy = 'returnToTodos', waitForStableComposer = false, threadID = null, newProjectID } = {}) {
+  async function insertTodoIntoComposer(item, { continueOnPresetFailure = false, showErrorsInComposer = false, waitForStableComposer = false, threadID = null, newProjectID } = {}) {
     const isDestination = () => !isDestroyed()
       && (!threadID || codexUIContracts.activeComposerThreadID() === threadID)
       && (newProjectID === undefined || (!codexUIContracts.activeComposerThreadID()
@@ -98,7 +98,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       { timeout: 5000, interval: 25 },
     );
     if (!composer || !isDestination()) {
-      if (!isDestroyed() && failurePolicy === 'stayInChat') {
+      if (!isDestroyed() && showErrorsInComposer) {
         showComposerWarning(activeComposer(), 'Could not find the new chat editor. Return to To-dos and try again.');
       }
       return false;
@@ -106,7 +106,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     let presetFailed = false;
     if (item.preset) {
       if (!await composerModelPicker.applyPreset(item.preset, { isCurrent: isDestination })) {
-        if (failurePolicy === 'stayInChat') {
+        if (continueOnPresetFailure) {
           presetFailed = true;
         } else {
           return false;
@@ -126,7 +126,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       return text.includes(normalizeText(item.title)) && (!item.body || text.includes(normalizeText(item.body)));
     };
     const reportTransferFailure = () => {
-      if (failurePolicy === 'stayInChat' && activeComposer()) showComposerWarning(
+      if (showErrorsInComposer && activeComposer()) showComposerWarning(
         activeComposer(),
         'Could not insert this to-do in the new chat. Return to To-dos and try again.',
       );
@@ -173,7 +173,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
       if (!await codexHost.newChat(projectID) || isDestroyed()) return;
       pageState.close();
       await insertTodoIntoComposer(item, {
-        failurePolicy: 'stayInChat', waitForStableComposer: true, newProjectID: projectID,
+        continueOnPresetFailure: true, showErrorsInComposer: true, waitForStableComposer: true, newProjectID: projectID,
       });
     } finally {
       transferring = false;

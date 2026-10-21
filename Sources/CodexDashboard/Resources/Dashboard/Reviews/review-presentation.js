@@ -23,7 +23,7 @@ const reviewPresentation = (() => {
         else if (round.review) label = `${round.review.findings.length} findings`;
         else label = 'Reviewing';
     }
-    return round.result?.commit ? `${label} · ${round.result.commit.slice(0, 8)}` : label;
+    return round.result?.fixCommit ? `${label} · ${round.result.fixCommit.slice(0, 8)}` : label;
   }
 
   function roundStages(loop) {

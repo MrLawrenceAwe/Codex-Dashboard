@@ -199,6 +199,8 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
+        XCTAssertNil(coordinator.loops.last?.rounds.last?.result?.fixCommit)
+        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.verifiedRevision, "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads.count, 2)
     }
@@ -252,6 +254,8 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
         XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.outcome, .withdrawn)
+        XCTAssertNil(coordinator.loops.last?.rounds.last?.result?.fixCommit)
+        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.verifiedRevision, "base")
         XCTAssertEqual(driver.createdThreads.count, 1)
     }
 
@@ -268,7 +272,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .waiting)
         XCTAssertEqual(coordinator.loops.last?.expectedRevision, fullCommit)
-        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.commit, fullCommit)
+        XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.fixCommit, fullCommit)
         XCTAssertEqual(driver.prompts.count, 2)
     }
 

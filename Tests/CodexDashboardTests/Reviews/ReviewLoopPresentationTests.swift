@@ -8,11 +8,11 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
                               promptContext: .general, maxRounds: 5)
         loop.rounds = [
             ReviewRound(number: 1, baseRevision: "base", result: ReviewRoundResult(
-                outcome: .fixed, addressedFindingCount: 1, commit: "fixed", summary: "Fixed")),
+                outcome: .fixed, addressedFindingCount: 1, fixCommit: "fixed", summary: "Fixed")),
             ReviewRound(number: 2, baseRevision: "fixed", result: ReviewRoundResult(
-                outcome: .withdrawn, addressedFindingCount: 0, commit: "", summary: "Withdrawn")),
+                outcome: .withdrawn, addressedFindingCount: 0, fixCommit: nil, summary: "Withdrawn")),
             ReviewRound(number: 3, baseRevision: "fixed", result: ReviewRoundResult(
-                outcome: .blocked, addressedFindingCount: 0, commit: "", summary: "Blocked")),
+                outcome: .blocked, addressedFindingCount: 0, fixCommit: nil, summary: "Blocked")),
             ReviewRound(number: 4, baseRevision: "fixed"),
         ]
         let display = try JSONSerialization.jsonObject(with: JSONEncoder().encode(

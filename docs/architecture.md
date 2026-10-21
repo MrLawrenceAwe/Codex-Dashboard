@@ -197,7 +197,9 @@ destination and returns either `published` or `verificationRequired` with the me
 checkout. Remote reconciliation can
 create a local merge commit; publication waits for read-only verification of that
 HEAD. The verification's `targetRevision` identifies this HEAD independently of the
-original fix commit. Publication never forces a push.
+original fix commit. Results record an optional `fixCommit` only for committed fixes;
+`verifiedRevision` records the checked file state, including clean and withdrawn
+rounds. Publication never forces a push.
 Retries and restart reconciliation reuse the same fix rather than requesting another.
 
 `ReviewLoopFileStore` atomically persists

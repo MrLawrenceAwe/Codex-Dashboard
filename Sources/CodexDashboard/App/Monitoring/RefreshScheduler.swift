@@ -60,27 +60,27 @@ final class RefreshScheduler {
 
         catalogPollingTask = recurringTask(
             interval: {
-                Schedule.catalog(active: Self.isUserActive)
+                Schedule.catalog(active: Self.isDashboardOrCodexForeground)
             },
             action: synchronizeDashboard
         )
         projectGitPollingTask = recurringTask(
-            interval: { Schedule.projectGitStatus(active: Self.isUserActive) },
+            interval: { Schedule.projectGitStatus(active: Self.isDashboardOrCodexForeground) },
             action: { await updateProjectGitStatuses(nil) }
         )
         unreadPollingTask = recurringTask(
             interval: { [self] in
                 Schedule.unread(
-                    active: Self.isUserActive,
+                    active: Self.isDashboardOrCodexForeground,
                     fileChangeMonitoringConfigured: isFileChangeMonitoringConfigured
                 )
             },
             action: updateUnreadState
         )
         accountUsagePollingTask = recurringTask(
-            interval: { Self.Schedule.accountUsage(active: Self.isUserActive) },
+            interval: { Self.Schedule.accountUsage(active: Self.isDashboardOrCodexForeground) },
             action: {
-                guard Self.isUserActive else { return }
+                guard Self.isDashboardOrCodexForeground else { return }
                 await refreshAccountUsage()
             }
         )
@@ -104,7 +104,7 @@ final class RefreshScheduler {
         projectGitChanges?.updateProjectPaths(paths)
     }
 
-    static var isUserActive: Bool {
+    static var isDashboardOrCodexForeground: Bool {
         NSApp?.isActive == true
             || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
     }

@@ -32,7 +32,7 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.prompts.count, 2)
         XCTAssertNil(coordinator.loops[0].rounds[0].fixVerification)
         XCTAssertEqual(coordinator.loops[0].phase, .waiting)
-        XCTAssertEqual(coordinator.loops[0].rounds[0].result?.commit, "")
+        XCTAssertNil(coordinator.loops[0].rounds[0].result?.fixCommit)
         XCTAssertEqual(coordinator.loops[0].rounds[0].result?.verifiedRevision, "changed-files")
         XCTAssertTrue(driver.pushedCommits.isEmpty)
         await coordinator.advance(using: driver, threads: [])
@@ -101,7 +101,7 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await restored.advance(using: driver, threads: [])
         XCTAssertEqual(restored.loops[0].phase, .completed)
-        XCTAssertEqual(restored.loops[0].rounds[0].result?.commit, "")
+        XCTAssertNil(restored.loops[0].rounds[0].result?.fixCommit)
     }
 
     func testNestedFolderCannotStartWhileParentLoopIsReserved() async throws {

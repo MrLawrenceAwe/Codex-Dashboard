@@ -86,7 +86,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
         XCTAssertEqual(restarted.loops[0].phase, .waiting)
         XCTAssertEqual(restarted.loops[0].rounds[0].result?.verifiedRevision, "later")
         XCTAssertEqual(restarted.loops[0].expectedRevision, "later")
-        XCTAssertEqual(restarted.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(restarted.loops[0].rounds[0].result?.fixCommit, "fixed")
         XCTAssertEqual(driver.pushedCommits, ["fixed"])
         XCTAssertEqual(driver.prompts.count, 3)
         await restarted.advance(using: driver, threads: [])

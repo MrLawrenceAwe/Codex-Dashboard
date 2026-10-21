@@ -9,7 +9,7 @@ const presentation = vm.runInNewContext(`${source}\nreviewPresentation`);
 
 test('withdrawn findings finish evaluation without claiming a commit', () => {
   const loop = { phase: 'completed', rounds: [{ fixRequested: true,
-    result: { outcome: 'withdrawn', commit: '' } }] };
+    result: { outcome: 'withdrawn', fixCommit: null } }] };
   const stages = presentation.roundStages(loop);
   assert.equal(stages[0].state, 'done');
   assert.equal(stages[1].state, 'done');
@@ -25,4 +25,16 @@ test('fixed, clean, and ongoing verification retain distinct stage descriptions'
   loop.phase = 'running';
   loop.rounds[0] = { fixVerification: { targetRevision: 'merged-head' } };
   assert.equal(presentation.roundStages(loop)[1].description, 'Reverifying fixes');
+});
+
+test('only fixed rounds display a fix commit; checked revisions are separate', () => {
+  assert.equal(presentation.roundStatus({ result: {
+    outcome: 'fixed', fixCommit: '1234567890', verifiedRevision: 'later-head',
+  } }, false), 'Fixes committed · 12345678');
+  for (const [outcome, label] of [['clean', 'No findings'], ['withdrawn', 'Findings withdrawn']]) {
+    assert.equal(presentation.roundStatus({ result: { outcome, verifiedRevision: 'base-head' } }, false), label);
+  }
+  assert.equal(presentation.roundStatus({ result: {
+    outcome: 'fixed', verifiedRevision: 'folder-fingerprint',
+  } }, false, 'folder'), 'Fixes applied & verified');
 });

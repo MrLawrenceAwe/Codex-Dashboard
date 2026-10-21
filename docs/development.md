@@ -189,12 +189,17 @@ presets; version 7 added `project` and `thread`. Older readers convert `projectT
 `projectBadge`, and the version 6 `chat` field. Failed migration writes leave the
 stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
-`hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**All chats**).
+`hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**Recent and running**).
+
+Review-loop version 15 separates optional `fixCommit` from `verifiedRevision`.
+Only committed fixes have a `fixCommit`; clean, withdrawn, and folder rounds do not.
+Migration preserves old fix commits and unchanged HEAD revisions from the former
+`commit` field, retaining any separately verified revision already recorded.
 
 Review-loop version 14 adds ordinary-folder checkpoints and persists the workspace
 kind once selected. Shared checkpoint fields use `baseRevision`, `expectedRevision`,
-`targetRevision`, and `verifiedRevision`; actual Git fix IDs stay in the result's
-`commit` field. Migration renames earlier checkpoint fields and marks previously
+`targetRevision`, and `verifiedRevision`; Git fix IDs remain separate from these
+checkpoint revisions. Migration renames earlier checkpoint fields and marks previously
 started loops as Git loops, preserving their history and pending verification.
 Previously unstarted loops retain automatic mode detection so paused non-Git projects
 can resume. Fingerprints are change identities, not stored copies of project files.
@@ -208,8 +213,8 @@ Old names are confined to the migration boundary and legacy fixtures.
 
 Review-loop version 12 renames the saved verification target from `commit` to
 `targetCommit`, preserving pending verification and round history. Version 14 moves
-this checkpoint to `targetRevision`; the original Git fix stays in the round
-result's `commit` field.
+this checkpoint to `targetRevision`. Version 15 renames the original Git fix's
+result field to `fixCommit`.
 
 Review-loop version 11 renames `muteMedia` to `muteTestPlayback` at the storage
 boundary, preserving saved preferences and round history. Current actions, snapshots,

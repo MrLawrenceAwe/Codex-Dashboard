@@ -407,7 +407,7 @@ final class ReviewLoopCoordinator {
         round.review = report
         if findings.isEmpty {
             round.result = ReviewRoundResult(outcome: .clean, addressedFindingCount: 0,
-                                             commit: workspace.kind == .git ? workspace.revision : "", summary: report.summary)
+                                             fixCommit: nil, summary: report.summary, verifiedRevision: workspace.revision)
             updated.phase = .completed
             updated.message = "Review \(round.number) found no \(updated.priorityLimit.map { "\($0.rangeLabel) " } ?? "")findings. No fix prompt was sent."
         } else {
@@ -482,9 +482,13 @@ final class ReviewLoopCoordinator {
                             workspace: workspace, fixTurnID: fixTurn.id)
             return
         }
-        let reportedCommit = try await result.outcome == .fixed
-            ? inspectGitProcess { try await driver.resolveCommit(result.commit, at: updated.project.path) }
-            : round.baseRevision
+        let reportedCommit: String
+        if result.outcome == .fixed {
+            guard let fixCommit = result.fixCommit else { throw ReviewLoopError("The fix report is missing its commit.") }
+            reportedCommit = try await inspectGitProcess { try await driver.resolveCommit(fixCommit, at: updated.project.path) }
+        } else {
+            reportedCommit = round.baseRevision
+        }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
@@ -554,7 +558,8 @@ final class ReviewLoopCoordinator {
         }
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurnID
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
-            outcome: result.outcome, addressedFindingCount: result.addressedFindingCount, commit: reportedCommit,
+            outcome: result.outcome, addressedFindingCount: result.addressedFindingCount,
+            fixCommit: result.outcome == .fixed && workspace.kind == .git ? reportedCommit : nil,
             summary: result.summary, verifiedRevision: workspace.revision)
         updated.expectedRevision = workspace.revision
         try persist(updated)
@@ -598,9 +603,7 @@ final class ReviewLoopCoordinator {
             sourceFixTurnID: sourceFixTurnID, targetRevision: workspace.revision)
         updated.rounds[updated.rounds.count - 1].allowsFollowUpTurns = true
         updated.rounds[updated.rounds.count - 1].extensionReloadContinuationPending = false
-        updated.message = workspace.kind == .folder
-            ? "Verifying the original findings against the current folder files before completing this round."
-            : "The branch advanced after the fix. Verifying the original findings at the current HEAD before completing this round."
+        updated.message = "The branch advanced after the fix. Verifying the original findings at the current HEAD before completing this round."
         try persist(updated)
         let turnID = try await driver.startTurn(
             threadID: threadID, projectPath: updated.project.path, expectedWorkspace: workspace,

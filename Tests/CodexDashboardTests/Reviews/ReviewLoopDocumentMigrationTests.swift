@@ -3,6 +3,37 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testLegacyResultCommitsPreserveRevisionsWithoutInventingFixCommits() throws {
+        let cases: [(String, String, String?, String?, String?)] = [
+            ("fixed", "fix", "head", "fix", "head"),
+            ("fixed", "fix", nil, "fix", nil),
+            ("clean", "base", nil, nil, "base"),
+            ("withdrawn", "base", nil, nil, "base"),
+            ("fixed", "", "fingerprint", nil, "fingerprint"),
+            ("blocked", "", nil, nil, nil),
+        ]
+        for (outcome, commit, verified, expectedFix, expectedRevision) in cases {
+            let loop = ReviewLoop(id: UUID(), startActionID: "result-migration", project: project,
+                                  promptContext: .general, maxRounds: 2)
+            var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+            var result: [String: Any] = ["outcome": outcome, "commit": commit,
+                                       "addressedFindingCount": outcome == "fixed" ? 1 : 0, "summary": "Saved"]
+            result["verifiedRevision"] = verified
+            saved["rounds"] = [["number": 1, "baseRevision": "base", "fixRequested": true,
+                                 "allowsFollowUpTurns": false, "extensionReloadContinuationPending": false,
+                                 "result": result]]
+            for version in [1, 8, 13, 14] {
+                let data = try JSONSerialization.data(withJSONObject: ["version": version, "loops": [saved]])
+                let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first?.rounds.first?.result)
+                XCTAssertEqual(migrated.fixCommit, expectedFix)
+                XCTAssertEqual(migrated.verifiedRevision, expectedRevision)
+                let current = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(migrated)) as? [String: Any])
+                XCTAssertNil(current["commit"])
+                XCTAssertEqual(try JSONDecoder().decode(ReviewRoundResult.self, from: JSONEncoder().encode(migrated)), migrated)
+            }
+        }
+    }
+
     func testVersionThirteenPreservesGitHistoryAndLeavesUnstartedFolderModeUndecided() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "old", project: project, promptContext: .general, maxRounds: 2)
         loop.workspaceKind = .git
@@ -11,7 +42,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
         loop.expectedRevision = "head"
         loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread",
             fixVerification: ReviewFixVerification(sourceFixTurnID: "fix", targetRevision: "head", turnID: "verify"),
-            result: ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1, commit: "fix", summary: "Saved", verifiedRevision: "head"))]
+            result: ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1, fixCommit: "fix", summary: "Saved", verifiedRevision: "head"))]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         saved.removeValue(forKey: "workspaceKind")
         saved["expectedCommit"] = saved.removeValue(forKey: "expectedRevision")
@@ -21,6 +52,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
         verification["targetCommit"] = verification.removeValue(forKey: "targetRevision")
         rounds[0]["fixVerification"] = verification
         var result = try XCTUnwrap(rounds[0]["result"] as? [String: Any])
+        result["commit"] = result.removeValue(forKey: "fixCommit")
         result["verifiedCommit"] = result.removeValue(forKey: "verifiedRevision")
         rounds[0]["result"] = result
         saved["rounds"] = rounds
@@ -239,11 +271,12 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
             ReviewFinding(priority: .p2, title: "Issue", body: "Details")
         ], summary: "One finding")
         round.result = ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1,
-                                         commit: "fixed", summary: "Done")
+                                         fixCommit: "fixed", summary: "Done")
         loop.rounds = [round]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         var savedRounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
         var savedResult = try XCTUnwrap(savedRounds[0]["result"] as? [String: Any])
+        savedResult["commit"] = savedResult.removeValue(forKey: "fixCommit")
         savedResult["findings"] = savedResult.removeValue(forKey: "addressedFindingCount")
         savedRounds[0]["result"] = savedResult
         saved["rounds"] = savedRounds

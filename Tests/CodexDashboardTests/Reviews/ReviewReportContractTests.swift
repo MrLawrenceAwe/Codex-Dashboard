@@ -119,7 +119,7 @@ final class ReviewReportContractTests: XCTestCase {
         let result = try ReviewReportContract.fix(text).result
         XCTAssertEqual(result.outcome, .fixed)
         XCTAssertEqual(result.addressedFindingCount, 2)
-        XCTAssertEqual(result.commit, "abc1234")
+        XCTAssertEqual(result.fixCommit, "abc1234")
         XCTAssertEqual(result.summary, "Fixed both races.")
         let blocked = text.replacingOccurrences(of: "committed", with: "blocked").replacingOccurrences(of: "abc1234", with: "none")
         XCTAssertEqual(try ReviewReportContract.fix(blocked).result.outcome, .blocked)
@@ -160,9 +160,10 @@ final class ReviewReportContractTests: XCTestCase {
     }
 
     func testRoundResultUsesAddressedFindingCount() throws {
-        let stored = Data(#"{"outcome":"fixed","addressedFindingCount":2,"commit":"abc1234","summary":"Done"}"#.utf8)
+        let stored = Data(#"{"outcome":"fixed","addressedFindingCount":2,"fixCommit":"abc1234","summary":"Done"}"#.utf8)
         let result = try JSONDecoder().decode(ReviewRoundResult.self, from: stored)
         XCTAssertEqual(result.addressedFindingCount, 2)
+        XCTAssertEqual(result.fixCommit, "abc1234")
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
         XCTAssertEqual(encoded?["addressedFindingCount"] as? Int, 2)
         XCTAssertNil(encoded?["findings"])

@@ -5,18 +5,6 @@ enum ReviewPrompts {
         let findings = round.review?.findings(upTo: loop.priorityLimit).enumerated().map { index, finding in
             "Finding \(index + 1): \(finding.title)\n\(finding.body)"
         }.joined(separator: "\n\n") ?? ""
-        if loop.workspaceKind == .folder {
-            return """
-            Verify the original findings against the current folder files (fingerprint `\(targetRevision)`).
-            This is read-only verification. Inspect each fix and run focused checks appropriate to the content. Recheck withdrawn findings. Do not edit files, initialise Git, commit, or push.
-            Return a review report, listing any original finding still present or any fix regression. If no findings remain, explain the evidence and checks. If verification cannot be completed, return a blocked review report.
-
-            Original findings:
-            \(findings)
-            """ + structureReviewInstruction(for: loop, verifyingFixes: true)
-                + bugVerificationInstruction(for: loop, verifyingFixes: true)
-                + extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
-        }
         return """
         Reverify the original findings at current HEAD `\(targetRevision)`. The branch advanced after the fix report; Git ancestry alone does not establish that the fixes still work.
 

@@ -40,7 +40,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await enabled.advance(using: driver, threads: [])
         XCTAssertEqual(enabled.loops[0].phase, .limitReached)
-        XCTAssertEqual(enabled.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(enabled.loops[0].rounds[0].result?.fixCommit, "fixed")
         XCTAssertEqual(enabled.loops[0].rounds[0].result?.verifiedRevision, "merged")
         XCTAssertEqual(driver.pushedCommits, ["fixed"])
     }
@@ -92,7 +92,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].rounds[0].result?.verifiedRevision, "newer")
-        XCTAssertEqual(coordinator.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(coordinator.loops[0].rounds[0].result?.fixCommit, "fixed")
         XCTAssertEqual(driver.pushedCommits, ["fixed"])
     }
 
@@ -110,7 +110,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         XCTAssertTrue(driver.prompts.last!.contains("read-only verification"))
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops[0].rounds[0].result?.commit, "fixed")
+        XCTAssertEqual(coordinator.loops[0].rounds[0].result?.fixCommit, "fixed")
     }
 
     func testVerificationCannotAcceptDirtyCheckoutOrInvalidReport() async throws {

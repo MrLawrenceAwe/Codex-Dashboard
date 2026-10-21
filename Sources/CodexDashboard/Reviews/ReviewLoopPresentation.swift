@@ -26,7 +26,7 @@ enum ReviewLoopPresentation {
         case .paused: "Paused"
         case .waiting: "Waiting to review"
         case .running:
-            if round?.fixVerification != nil { loop.workspaceKind == .folder ? "Verifying folder fixes" : "Reverifying fixes at current HEAD" }
+            if round?.fixVerification != nil { "Reverifying fixes at current HEAD" }
             else if round?.fixRequested == true { loop.workspaceKind == .folder ? "Fixing & verifying" : "Fixing & committing" }
             else if round?.review != nil { "Preparing fixes" }
             else { "Reviewing" }

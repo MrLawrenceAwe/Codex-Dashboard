@@ -152,7 +152,7 @@ struct ReviewRoundResult: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Sendable { case clean, fixed, withdrawn, blocked }
     let outcome: Outcome
     let addressedFindingCount: Int
-    let commit: String
+    let fixCommit: String?
     let summary: String
     var verifiedRevision: String? = nil
 }
@@ -189,7 +189,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 14
+    static let currentVersion = 15
     let version: Int
     let loops: [ReviewLoop]
 }

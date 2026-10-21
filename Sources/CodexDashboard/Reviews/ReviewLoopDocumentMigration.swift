@@ -39,6 +39,16 @@ enum ReviewLoopDocumentMigration {
                 if let value = round.removeValue(forKey: "baseCommit") { round["baseRevision"] = value }
                 if var result = round["result"] as? [String: Any] {
                     if let value = result.removeValue(forKey: "verifiedCommit") { result["verifiedRevision"] = value }
+                    // Earlier results also stored the unchanged HEAD as a "commit".
+                    // Preserve that revision without claiming a fix was committed.
+                    if let commit = result.removeValue(forKey: "commit") as? String,
+                       !commit.isEmpty, commit != "none" {
+                        if result["outcome"] as? String == "fixed" {
+                            result["fixCommit"] = commit
+                        } else if result["verifiedRevision"] == nil {
+                            result["verifiedRevision"] = commit
+                        }
+                    }
                     round["result"] = result
                 }
                 let previousFollowUpPermission = round.removeValue(forKey: "continuationRequested") as? Bool
