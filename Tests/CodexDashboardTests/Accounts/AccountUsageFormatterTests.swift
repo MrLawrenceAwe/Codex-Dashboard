@@ -130,6 +130,39 @@ final class AccountUsageFormatterTests: XCTestCase {
         XCTAssertTrue(rows[2].value.hasPrefix("Updated "))
     }
 
+    func testCachedUsageTimestampDistinguishesTodayFromOlderDates() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        for (age, expected) in [
+            (0.0, "Updated 3:33"),
+            (86_400.0, "Updated 17 May 2033 at 3:33"),
+            (365 * 86_400.0, "Updated 18 May 2032 at 3:33"),
+        ] {
+            let snapshot = CodexAccountUsageSnapshot(
+                usage: CodexAccountUsage(fiveHour: nil, weekly: nil),
+                fetchedAt: now.addingTimeInterval(-age)
+            )
+            let rows = AccountUsageFormatter.rows(
+                for: .stale(snapshot), now: now, staleTimestampPrefix: "Updated ",
+                includesAbsoluteDate: false,
+                locale: Locale(identifier: "en_GB"), timeZone: TimeZone(secondsFromGMT: 0)!
+            )
+            XCTAssertEqual(rows, [AccountUsageRow(label: nil, value: expected)])
+        }
+    }
+
+    func testCachedUsageDateBoundaryUsesTheDisplayTimeZone() {
+        // Both instants are May 18 in UTC, but straddle midnight in UTC−4.
+        let fetchedAt = Date(timeIntervalSince1970: 2_000_000_000)
+        let snapshot = CodexAccountUsageSnapshot(
+            usage: CodexAccountUsage(fiveHour: nil, weekly: nil), fetchedAt: fetchedAt
+        )
+        let rows = AccountUsageFormatter.rows(
+            for: .stale(snapshot), now: fetchedAt.addingTimeInterval(3_600),
+            locale: Locale(identifier: "en_GB"), timeZone: TimeZone(secondsFromGMT: -4 * 3_600)!
+        )
+        XCTAssertEqual(rows, [AccountUsageRow(label: nil, value: "Usage may be stale · updated 17 May 2033 at 23:33")])
+    }
+
     func testLoadingAndUnavailableAccountUsageHaveUsefulPlaceholders() {
         XCTAssertEqual(
             AccountUsageFormatter.rows(for: .loading(previous: nil)),

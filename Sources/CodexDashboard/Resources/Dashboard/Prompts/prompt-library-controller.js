@@ -236,9 +236,9 @@ function createPromptLibrary({ findThread }) {
     if (stageLibraryUpdate(nextPrompts)) renderDialog();
   }
 
-  function confirmDeletion(button, attribute, id, label) {
+  function confirmDeletion(button, attribute, id, label, text = 'Confirm delete') {
     button.setAttribute(attribute, id);
-    button.textContent = 'Confirm delete';
+    button.textContent = text;
     button.setAttribute('aria-label', label);
   }
 
@@ -289,7 +289,7 @@ function createPromptLibrary({ findThread }) {
     ['section-rename', (button) => setDialogState({ mode: 'renameSection', section: button.dataset.promptSectionRename })],
     ['section-delete-confirm', (button) => deleteSection(button.dataset.promptSectionDeleteConfirm)],
     ['section-delete', (button) => confirmDeletion(button, 'data-prompt-section-delete-confirm', button.dataset.promptSectionDelete,
-      `Confirm section deletion; prompts will move to ${promptLibraryContract.defaultSection}`)],
+      `Confirm delete across all projects; move prompts to ${promptLibraryContract.defaultSection}`, 'Confirm delete across projects')],
     ['move-up', (button) => movePrompt(button.dataset.promptMoveUp, -1)],
     ['move-down', (button) => movePrompt(button.dataset.promptMoveDown, 1)],
     ['new', () => setDialogState({ mode: 'create' })],

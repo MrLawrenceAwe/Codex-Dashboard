@@ -157,7 +157,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
             let count = driver.prompts.count
             if change == "dirty-review" { driver.clean = false }
             if change == "review-commit" { driver.commit = "other" }
-            if change == "root" { driver.repositoryRoot = "/tmp/other" }
+            if change == "root" { driver.workspaceRoot = "/tmp/other" }
             try coordinator.apply(action(.resume, for: coordinator), projects: [project])
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(coordinator.loops.last?.phase, .blocked, change)
@@ -196,7 +196,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
         failLatest(driver, status: "failed")
         await coordinator.advance(using: driver, threads: [])
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
-        driver.onRepository = { self.stop(coordinator) }
+        driver.onWorkspace = { self.stop(coordinator) }
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 1)
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)

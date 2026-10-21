@@ -93,6 +93,9 @@ Renderer resources are listed in `injection-manifest.json`:
 Feature controllers own mounting and teardown; views own markup and presentation.
 See [architecture](architecture.md) for refresh, persistence, account transactions,
 notifications and review execution, and [usage](usage.md) for user controls.
+`ReviewWorkspaceCheckpoint` inspects Git checkouts and ordinary folders through
+`workspace(at:)`, returning `ReviewWorkspaceState`. `ReviewFolderCheckpoint` owns
+folder fingerprints; Git publication and ancestry operations retain Git terminology.
 `ReviewFixCheckpoint` validates finding accounting and commit ancestry; the review
 coordinator owns publication intent, verification scheduling, and final state writes.
 

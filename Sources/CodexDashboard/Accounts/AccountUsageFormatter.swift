@@ -69,7 +69,8 @@ enum AccountUsageFormatter {
             if rows.isEmpty { rows.append(AccountUsageRow(label: nil, value: "Usage details unavailable")) }
         case .stale(let snapshot):
             if let staleTimestampPrefix {
-                rows.append(AccountUsageRow(label: nil, value: "\(staleTimestampPrefix)\(timeString(snapshot.fetchedAt))"))
+                let updatedAt = updatedAtDescription(snapshot.fetchedAt, now: now, locale: locale, timeZone: timeZone)
+                rows.append(AccountUsageRow(label: nil, value: "\(staleTimestampPrefix)\(updatedAt)"))
             }
         case .unavailable:
             rows.append(AccountUsageRow(label: nil, value: "Usage details unavailable"))
@@ -133,7 +134,15 @@ enum AccountUsageFormatter {
         return "in \(parts.joined(separator: " "))"
     }
 
-    private static func timeString(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
+    private static func updatedAtDescription(_ date: Date, now: Date, locale: Locale, timeZone: TimeZone) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let isToday = calendar.isDate(date, inSameDayAs: now)
+        return date.formatted(Date.FormatStyle(
+            date: isToday ? .omitted : .abbreviated,
+            time: .shortened,
+            locale: locale,
+            timeZone: timeZone
+        ))
     }
 }

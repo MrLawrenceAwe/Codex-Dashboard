@@ -57,9 +57,9 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var resolvedCommit: String?
     var onResolveCommit: (() -> Void)?
     var failCreate = false
-    var failRepository = false
+    var failWorkspace = false
     var failingPath: String?
-    var repositoryRoot: String?
+    var workspaceRoot: String?
     var failReadThread = false
     var failStopThread = false
     var stopChatMissing = false
@@ -70,27 +70,27 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var selections: [ReviewModelSelection?] = []
     var speeds: [ReviewSpeed] = []
     var thread = ReviewThreadState(cwd: "/tmp/example", turns: [])
-    var onRepository: (() -> Void)?
+    var onWorkspace: (() -> Void)?
     var onCreateThread: (() -> Void)?
     var onStartTurn: (() -> Void)?
     var onStartTurnAsync: (() async -> Void)?
     var onReadThread: (() -> Void)?
     func projects() async throws -> [ReviewProject] { [] }
-    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome {
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome {
         if failPush { throw ReviewLoopError("Remote push failed") }
         if integrateRemoteOnPush {
             integrateRemoteOnPush = false
             self.commit = "merged"
-            return .verificationRequired(try await repository(at: path))
+            return .verificationRequired(try await workspace(at: path))
         }
         pushedCommits.append(commit)
         return .published
     }
-    func repository(at path: String) async throws -> ReviewRepositoryState {
+    func workspace(at path: String) async throws -> ReviewWorkspaceState {
         await Task.yield()
-        onRepository?()
-        if failRepository || path == failingPath { throw ReviewLoopError("Git timed out") }
-        return ReviewRepositoryState(root: repositoryRoot ?? path, branch: branch, revision: commit, clean: clean, kind: workspaceKind)
+        onWorkspace?()
+        if failWorkspace || path == failingPath { throw ReviewLoopError("Git timed out") }
+        return ReviewWorkspaceState(root: workspaceRoot ?? path, branch: branch, revision: commit, clean: clean, kind: workspaceKind)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
     func resolveCommit(_ commit: String, at path: String) async throws -> String {
@@ -107,7 +107,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
         onCreateThread?()
         return id
     }
-    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState,
+    func startTurn(threadID: String, projectPath: String, expectedWorkspace: ReviewWorkspaceState,
                    prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         prompts.append(prompt)
         selections.append(selection)

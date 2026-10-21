@@ -6,14 +6,14 @@ import Foundation
 final class ReviewLoopDriver: ReviewLoopDriving {
     private let devTools: any DevToolsServing
     private let target: DevToolsTarget
-    private let repositoryCheckpoint: any ReviewRepositoryChecking
+    private let workspaceCheckpoint: any ReviewWorkspaceChecking
     private let stateDatabaseURL: URL
     init(devTools: any DevToolsServing, target: DevToolsTarget,
-         repositoryCheckpoint: any ReviewRepositoryChecking = ReviewRepositoryCheckpoint(),
+         workspaceCheckpoint: any ReviewWorkspaceChecking = ReviewWorkspaceCheckpoint(),
          stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL) {
         self.devTools = devTools
         self.target = target
-        self.repositoryCheckpoint = repositoryCheckpoint
+        self.workspaceCheckpoint = workspaceCheckpoint
         self.stateDatabaseURL = stateDatabaseURL
     }
 
@@ -58,20 +58,20 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return rows
     }
 
-    func repository(at path: String) async throws -> ReviewRepositoryState {
-        try await repositoryCheckpoint.repository(at: path)
+    func workspace(at path: String) async throws -> ReviewWorkspaceState {
+        try await workspaceCheckpoint.workspace(at: path)
     }
 
-    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome {
-        try await repositoryCheckpoint.reconcileAndPublishFix(commit, at: path, expectedRepository: expectedRepository)
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome {
+        try await workspaceCheckpoint.reconcileAndPublishFix(commit, at: path, expectedWorkspace: expectedWorkspace)
     }
 
     func resolveCommit(_ commit: String, at path: String) async throws -> String {
-        try await repositoryCheckpoint.resolveCommit(commit, at: path)
+        try await workspaceCheckpoint.resolveCommit(commit, at: path)
     }
 
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool {
-        try await repositoryCheckpoint.isAncestor(commit, of: head, at: path)
+        try await workspaceCheckpoint.isAncestor(commit, of: head, at: path)
     }
 
     func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String {
@@ -88,11 +88,11 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         return id
     }
 
-    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
+    func startTurn(threadID: String, projectPath: String, expectedWorkspace: ReviewWorkspaceState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String {
         var params: [String: Any] = [
             "threadId": threadID,
             "serviceTierForTurn": speed.serviceTier,
-            "input": [["type": "text", "text": prompt + "\n\n" + ReviewReportContract.instructions(for: kind, workspaceKind: expectedRepository.kind), "text_elements": []]],
+            "input": [["type": "text", "text": prompt + "\n\n" + ReviewReportContract.instructions(for: kind, workspaceKind: expectedWorkspace.kind), "text_elements": []]],
         ]
         if let selection {
             params["model"] = selection.modelID
@@ -100,10 +100,10 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         }
         // This is the last local checkpoint before the renderer can start a turn.
         // It also covers the time spent creating and naming a new review thread.
-        let current = try await repositoryCheckpoint.repository(at: projectPath)
+        let current = try await workspaceCheckpoint.workspace(at: projectPath)
         let permitsUnfinishedFixes: Bool
         if case .fixContinuation = kind { permitsUnfinishedFixes = true } else { permitsUnfinishedFixes = false }
-        guard (current.clean || permitsUnfinishedFixes), current == expectedRepository else {
+        guard (current.clean || permitsUnfinishedFixes), current == expectedWorkspace else {
             throw ReviewLoopError("The checkout changed before the review chat started. Inspect its changes before continuing.")
         }
         let response = try await request("turn/start", params)

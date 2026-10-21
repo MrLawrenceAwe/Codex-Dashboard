@@ -39,7 +39,7 @@ final class ReviewLoopStoppingTests: ReviewLoopTestCase {
         let nested = ReviewProject(id: "nested", name: "Nested", path: project.path + "/nested")
         try recovered.apply(startAction(id: "nested", kind: .start, projectID: nested.id,
                                         promptContext: .general, maxRounds: 2, loopID: nil), projects: [nested])
-        driver.repositoryRoot = project.path
+        driver.workspaceRoot = project.path
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(driver.prompts.count, 1)
         XCTAssertEqual(recovered.loops.map(\.phase), [.stopping, .blocked])

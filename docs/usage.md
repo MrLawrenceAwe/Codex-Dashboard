@@ -36,8 +36,10 @@ later.
 
 **Prompts**, beside the composer's Add button, opens the local library. Prompts can
 be global or scoped to the current project, searched, grouped into collapsible
-sections, and reordered by keyboard or drag and drop. Deleting a section moves its
-prompts to **General**. `{{selection}}` and `{{clipboard}}` insert captured selection
+sections, and reordered by keyboard or drag and drop. Sections are shared across
+the entire library. Renaming or deleting one affects prompts in every project,
+including projects currently hidden. Deleting a section moves its prompts to
+**General** without changing their project scope. `{{selection}}` and `{{clipboard}}` insert captured selection
 and clipboard text. Inserting a prompt fills the draft without sending it.
 
 Optional model settings select a model, reasoning effort, and Standard/Fast speed.
@@ -147,7 +149,9 @@ apply to subsequent prompts.
 Each round starts a read-only review in a new chat. Git projects use the current
 branch and checkout; ordinary folders work without Git. Qualifying findings trigger
 a separate fix follow-up in that chat. Git fixes are committed; folder fixes are
-saved directly, then checked by a separate read-only verification turn. Excluded priorities remain visible but are not fixed. Findings are verified
+saved and verified within the fix task. Dashboard checks the fix report and folder
+fingerprint before completing the round; it does not send a separate verification
+turn for folder fixes. Excluded priorities remain visible but are not fixed. Findings are verified
 before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
 reviews finish without a commit. A clean review is an assessment, not proof that
 all defects are absent. Multiple projects can run loops, with one active loop per
@@ -158,8 +162,8 @@ and symlink destinations to detect changes during read-only reviews and between
 rounds. Hidden files are included; Finder's `.DS_Store` is ignored. Symlinks are not
 traversed. Folder loops never initialise Git or create commits, and remote push is
 disabled. Fingerprints identify changes; they are not backups or an undo history.
-Avoid other edits while the loop runs. Files changed during verification require
-another verification before completion. A paused loop that failed because its
+Avoid other edits while the loop runs: fingerprints detect changes but do not
+establish that a fix works. A paused loop that failed because its
 folder had no Git repository can now be resumed.
 
 With **Live testing** enabled, bug reviews use both code review and live testing

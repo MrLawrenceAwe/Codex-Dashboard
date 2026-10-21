@@ -123,7 +123,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         let second = ReviewProject(id: "nested", name: "Nested", path: "/tmp/example/subdir")
         try recovered.apply(startAction(id: "nested-start", kind: .start, projectID: second.id,
                                             promptContext: .general, maxRounds: 3, loopID: nil), projects: [second])
-        driver.repositoryRoot = project.path
+        driver.workspaceRoot = project.path
         await recovered.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createCalls, 1)
         XCTAssertEqual(recovered.loops.map(\.phase), [.paused, .blocked])
@@ -383,13 +383,13 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertTrue(driver.createdThreads.isEmpty)
     }
 
-    func testRepositoryReadFailurePausesUntilResumeWithoutLaunching() async throws {
+    func testWorkspaceReadFailurePausesUntilResumeWithoutLaunching() async throws {
         let (coordinator, _, driver) = try make()
-        driver.failRepository = true
+        driver.failWorkspace = true
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .paused)
         XCTAssertTrue(driver.createdThreads.isEmpty)
-        driver.failRepository = false
+        driver.failWorkspace = false
         await coordinator.advance(using: driver, threads: [])
         XCTAssertTrue(driver.createdThreads.isEmpty)
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
@@ -416,11 +416,11 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
         driver.review(priorities: [.p2])
-        driver.failRepository = true
+        driver.failWorkspace = true
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .paused)
         XCTAssertEqual(driver.prompts.count, 1)
-        driver.failRepository = false
+        driver.failWorkspace = false
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
@@ -450,7 +450,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             if failure == "commit" { driver.commit = "unexpected"; driver.ancestor = false }
             if failure == "ancestry" { driver.ancestor = false }
             if failure == "branch" { driver.branch = "elsewhere" }
-            if failure == "root" { driver.repositoryRoot = "/tmp/other" }
+            if failure == "root" { driver.workspaceRoot = "/tmp/other" }
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(coordinator.loops.last?.phase, .blocked, failure)
             await coordinator.advance(using: driver, threads: [])
@@ -604,9 +604,9 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
     }
 
-    func testStopDuringRepositoryCheckPreventsReviewLaunch() async throws {
+    func testStopDuringWorkspaceCheckPreventsReviewLaunch() async throws {
         let (coordinator, _, driver) = try make()
-        driver.onRepository = { self.stop(coordinator) }
+        driver.onWorkspace = { self.stop(coordinator) }
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
         XCTAssertTrue(driver.createdThreads.isEmpty)

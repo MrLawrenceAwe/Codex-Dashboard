@@ -2,7 +2,7 @@ import Foundation
 
 enum ReviewWorkspaceKind: String, Codable, Sendable { case git, folder }
 
-struct ReviewRepositoryState: Equatable, Sendable {
+struct ReviewWorkspaceState: Equatable, Sendable {
     let root: String
     let branch: String
     let revision: String
@@ -34,12 +34,12 @@ struct ReviewChatMissingError: LocalizedError {
 @MainActor
 protocol ReviewLoopDriving: Sendable {
     func projects() async throws -> [ReviewProject]
-    func repository(at path: String) async throws -> ReviewRepositoryState
-    func reconcileAndPublishFix(_ commit: String, at path: String, expectedRepository: ReviewRepositoryState) async throws -> ReviewPublicationOutcome
+    func workspace(at path: String) async throws -> ReviewWorkspaceState
+    func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome
     func resolveCommit(_ commit: String, at path: String) async throws -> String
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool
     func createThread(project: ReviewProject, title: String, speed: ReviewSpeed) async throws -> String
-    func startTurn(threadID: String, projectPath: String, expectedRepository: ReviewRepositoryState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
+    func startTurn(threadID: String, projectPath: String, expectedWorkspace: ReviewWorkspaceState, prompt: String, kind: ReviewTurnKind, selection: ReviewModelSelection?, speed: ReviewSpeed) async throws -> String
     func interruptLatestTurn(_ threadID: String) async throws
     func readThread(_ threadID: String, reportTurnIDs: Set<String>) async throws -> ReviewThreadState
 }

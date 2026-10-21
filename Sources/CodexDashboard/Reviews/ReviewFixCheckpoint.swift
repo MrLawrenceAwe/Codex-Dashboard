@@ -21,7 +21,7 @@ enum ReviewFixCheckpoint {
     @MainActor
     static func validateCommit(
         _ reportedCommit: String, result: ReviewRoundResult, baseRevision: String,
-        repository: ReviewRepositoryState, at path: String, using driver: any ReviewLoopDriving
+        workspace: ReviewWorkspaceState, at path: String, using driver: any ReviewLoopDriving
     ) async throws {
         if result.outcome == .fixed {
             guard reportedCommit != baseRevision else {
@@ -31,9 +31,9 @@ enum ReviewFixCheckpoint {
                 throw ReviewLoopError("Commit checkpoint failed: the fix commit is not a descendant of the starting commit.")
             }
         }
-        if repository.revision != reportedCommit {
+        if workspace.revision != reportedCommit {
             guard result.outcome == .fixed,
-                  try await driver.isAncestor(reportedCommit, of: repository.revision, at: path) else {
+                  try await driver.isAncestor(reportedCommit, of: workspace.revision, at: path) else {
                 throw ReviewLoopError("Commit checkpoint failed: the current branch no longer contains the reported fix commit. Restore its history or inspect the changes in the review chat before resuming.")
             }
         }

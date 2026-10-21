@@ -89,10 +89,10 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
 
     func testPreviouslyPausedNonGitProjectCanResume() async throws {
         let (coordinator, store, driver) = try make()
-        driver.failRepository = true
+        driver.failWorkspace = true
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .paused)
-        driver.failRepository = false
+        driver.failWorkspace = false
         driver.workspaceKind = .folder
         driver.branch = ""
         let restored = ReviewLoopCoordinator(store: store)

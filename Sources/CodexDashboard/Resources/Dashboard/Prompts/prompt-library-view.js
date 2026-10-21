@@ -9,6 +9,7 @@ const promptLibraryView = (() => {
     const formAttribute = renaming ? 'data-prompt-section-rename-form' : 'data-prompt-section-form';
     content.innerHTML = `
       <form class="dashboard-prompt-form" ${formAttribute}>
+        <p class="dashboard-prompt-section-help">Sections are shared across all projects. Renaming or deleting a section affects every prompt in it, including prompts in other projects.</p>
         <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" ${renaming ? `value="${domUtils.escapeHTML(dialogState.section)}"` : 'placeholder="e.g. Code review"'} required /></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
@@ -123,7 +124,7 @@ const promptLibraryView = (() => {
               <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
             </button>
             <div class="dashboard-prompt-section-actions">
-              ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section">Rename</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section">Delete</button>` : ''}
+              ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section across all projects" title="Renames this section across all projects">Rename across projects</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section across all projects" title="Moves this section’s prompts to General across all projects">Delete across projects</button>` : ''}
             </div>
             <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
           </section>`;

@@ -119,7 +119,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
             driver.review(priorities: [])
             if failure == "dirty" { driver.clean = false }
             if failure == "branch" { driver.branch = "other" }
-            if failure == "root" { driver.repositoryRoot = "/tmp/other" }
+            if failure == "root" { driver.workspaceRoot = "/tmp/other" }
             if failure == "report" { driver.finishTurn("Looks fine") }
             if failure == "blocked" { driver.finishTurn("# Review blocked\n\n## Summary\nCould not run checks") }
             await coordinator.advance(using: driver, threads: [])

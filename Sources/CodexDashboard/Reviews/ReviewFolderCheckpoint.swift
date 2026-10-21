@@ -4,14 +4,14 @@ import Foundation
 /// Content identity for ordinary folders. Never writes into the reviewed project.
 /// Symlinks are recorded as links, without traversing their targets.
 enum ReviewFolderCheckpoint {
-    static func repository(at path: String) async throws -> ReviewRepositoryState {
+    static func workspace(at path: String) async throws -> ReviewWorkspaceState {
         try await Task.detached(priority: .utility) {
             let root = FileSystemPath.canonicalURL(path)
             let first = try fingerprint(root)
             guard first == (try fingerprint(root)) else {
                 throw ReviewLoopError("The folder changed while checking its files. Wait for other edits to finish, then Resume.")
             }
-            return ReviewRepositoryState(root: root.path, branch: "", revision: first, clean: true, kind: .folder)
+            return ReviewWorkspaceState(root: root.path, branch: "", revision: first, clean: true, kind: .folder)
         }.value
     }
 

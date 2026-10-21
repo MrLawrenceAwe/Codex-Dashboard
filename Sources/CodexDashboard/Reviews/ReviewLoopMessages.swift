@@ -90,6 +90,6 @@ struct ReviewProjectChoice: Encodable, Sendable {
         id = project.id
         name = project.name
         path = project.path
-        workspaceKind = ReviewRepositoryCheckpoint.hasGitMetadata(at: path) ? .git : .folder
+        workspaceKind = ReviewWorkspaceCheckpoint.hasGitMetadata(at: path) ? .git : .folder
     }
 }

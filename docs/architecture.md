@@ -170,16 +170,19 @@ report but submits only qualifying findings with original numbers when necessary
 Live testing adds instructions only when enabled; otherwise no test result is required
 by the loop contract. Exact prompt wording lives in `ReviewPrompts`, not duplicated here.
 
-`ReviewRepositoryCheckpoint` detects Git working trees and ordinary folders. Folder
+`ReviewWorkspaceCheckpoint` detects Git working trees and ordinary folders. Folder
 state uses a SHA-256 fingerprint of content, paths, permissions, and symlink targets;
 `ReviewFolderCheckpoint` reads the tree twice off the main actor and rejects unstable
 snapshots. Read-only reviews must preserve this revision. Folder fix reports use
-`# Fixes applied` without a commit, and always trigger read-only verification of the
-current files before completion. Further changes invalidate that verification.
+`# Fixes applied` without a commit. The fix task performs verification; the
+coordinator validates finding accounting and requires a changed fingerprint for
+applied fixes or an unchanged fingerprint when all findings are withdrawn. It
+records the current fingerprint as `verifiedRevision` without submitting a separate
+verification turn. The fingerprint identifies file state, not fix correctness.
 Folder mode never initialises Git or publishes. Reservations reject overlapping
 parent/child folders as well as identical roots.
 
-For Git projects, `ReviewRepositoryCheckpoint` validates Git state through argument-based subprocesses.
+For Git projects, `ReviewWorkspaceCheckpoint` validates Git state through argument-based subprocesses.
 A review must leave a clean checkout and unchanged HEAD. Fix completion requires the
 original branch, clean tree, a reported commit matching HEAD, and ancestry from the
 round's base commit. `reconcileAndPublishFix` fetches the destination and returns

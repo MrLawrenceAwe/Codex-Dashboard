@@ -78,7 +78,7 @@ final class ReviewExtensionReloadTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.prompts.count, 1)
     }
 
-    func testReloadHandlingRejectsChangedRepositoryRootForReviewAndFix() async throws {
+    func testReloadHandlingRejectsChangedWorkspaceRootForReviewAndFix() async throws {
         for fixing in [false, true] {
             for changeWhileWaiting in [false, true] {
                 let (coordinator, _, driver) = try make()
@@ -96,7 +96,7 @@ final class ReviewExtensionReloadTests: ReviewLoopTestCase {
                     XCTAssertEqual(coordinator.loops[0].phase, .awaitingExtensionReload)
                     try coordinator.apply(action(.resume, for: coordinator), projects: [project])
                 }
-                driver.repositoryRoot = "/tmp/different-checkout"
+                driver.workspaceRoot = "/tmp/different-checkout"
                 await coordinator.advance(using: driver, threads: [])
                 XCTAssertEqual(coordinator.loops[0].phase, .blocked)
                 XCTAssertEqual(driver.prompts.count, submittedCount)
