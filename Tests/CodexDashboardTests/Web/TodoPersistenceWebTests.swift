@@ -5,6 +5,49 @@ import XCTest
 
 @MainActor
 final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
+    func testListSizingBatchesLayoutReadsAndKeepsTitleHeights() async throws {
+        let view = try await webView()
+        view.frame = CGRect(x: 0, y: 0, width: 1000, height: 700)
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const items = Array.from({length: 40}, (_, i) => store.create({
+            title: i % 2 ? 'Short title' : 'A long title that wraps across multiple lines. '.repeat(5),
+          }));
+          await store.save(items, []);
+          window.dispatchEvent(new StorageEvent('storage', { key: store.storageKey }));
+          window.__codexDashboard.openTodos();
+          const titles = [...document.querySelectorAll('[data-todo-title]')];
+          const expected = titles.map(title => {
+            title.style.height = 'auto';
+            return Math.min(title.scrollHeight, 144);
+          });
+          titles.forEach((title, i) => { title.style.height = expected[i] + 'px'; });
+          const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight');
+          let reads = 0;
+          let batched = true;
+          Object.defineProperty(Element.prototype, 'scrollHeight', {
+            ...descriptor,
+            get() {
+              if (this.matches('[data-todo-title]')) {
+                reads++;
+                batched &&= titles.every(title => title.style.height === 'auto');
+              }
+              return descriptor.get.call(this);
+            },
+          });
+          try {
+            document.querySelector('[data-todo-filter="all"]').click();
+            return [titles.length, reads, batched,
+              titles.every((title, i) => title.isConnected && parseFloat(title.style.height) === expected[i])];
+          } finally {
+            Object.defineProperty(Element.prototype, 'scrollHeight', descriptor);
+          }
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [40, 40, true, true])
+    }
+
     func testImageWriteExceptionKeepsInlineFallbackAndRetriesLater() async throws {
         let view = try await webView()
         let result = try await view.evaluateAsyncJavaScript("""

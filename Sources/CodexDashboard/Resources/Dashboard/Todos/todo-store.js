@@ -6,6 +6,7 @@ const todoStore = (() => {
   const supportedVersions = new Set([1, 2, 3, 4, 5, 6, 7, 8, version]);
   const maximumTags = 8;
   const maximumProjectNameLength = 40;
+  const imageValidation = new WeakMap();
 
   function cleanText(value) {
     return String(value || '').trim();
@@ -26,17 +27,27 @@ const todoStore = (() => {
 
   function normalizeImage(image, allowDeferredData = false) {
     if (!image || typeof image !== 'object') return null;
-    const dataURL = cleanText(image.dataURL);
-    const match = dataURL.match(/^data:([^;,]+);base64,[a-z0-9+/=\s]+$/i);
-    if (!match && !allowDeferredData) return null;
-    const type = match?.[1]?.toLowerCase() || cleanText(image.type).toLowerCase();
+    const source = image.dataURL;
+    let validation = imageValidation.get(image);
+    if (!validation || validation.source !== source) {
+      const dataURL = cleanText(source);
+      const match = dataURL.match(/^data:([^;,]+);base64,[a-z0-9+/=\s]+$/i);
+      validation = { source, dataURL, type: match?.[1]?.toLowerCase() };
+      imageValidation.set(image, validation);
+    }
+    if (!validation.type && !allowDeferredData) return null;
+    const type = validation.type || cleanText(image.type).toLowerCase();
     if (!isAcceptedImageType(type)) return null;
-    return {
-      dataURL,
+    const normalized = {
+      dataURL: validation.dataURL,
       name: cleanText(image.name) || 'Attached image',
       type,
       size: Math.max(0, Number(image.size) || 0),
     };
+    // Keep validation with the normalized copy too. Text edits and save baselines
+    // reuse attachment objects; weak keys release their data when items go away.
+    imageValidation.set(normalized, { ...validation, source: normalized.dataURL });
+    return normalized;
   }
 
   function normalizeProject(project) {

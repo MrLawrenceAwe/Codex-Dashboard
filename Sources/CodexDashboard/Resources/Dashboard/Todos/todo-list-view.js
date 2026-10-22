@@ -66,8 +66,13 @@ const todoListView = (() => {
   }
 
   function sizeTitle(title) {
-    title.style.height = 'auto';
-    title.style.height = `${Math.min(title.scrollHeight, 144)}px`;
+    sizeTitles([title]);
+  }
+
+  function sizeTitles(titles) {
+    titles.forEach((title) => { title.style.height = 'auto'; });
+    const heights = titles.map((title) => Math.min(title.scrollHeight, 144));
+    titles.forEach((title, index) => { title.style.height = `${heights[index]}px`; });
   }
 
   function render({ items, filterMode, availableTags, projects, filterProjects, filters }) {
@@ -127,7 +132,7 @@ const todoListView = (() => {
       existingRows.delete(item.id);
     });
     existingRows.forEach((row) => row.remove());
-    list.querySelectorAll('[data-todo-title]').forEach(sizeTitle);
+    sizeTitles([...list.querySelectorAll('[data-todo-title]')]);
   }
 
   function itemMarkup(item, projects, availableTags) {
