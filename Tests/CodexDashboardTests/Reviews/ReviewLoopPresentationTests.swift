@@ -74,6 +74,13 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         XCTAssertNotNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.nextMessage,
+                       "Final round in progress; no further review scheduled.")
+        driver.finish(findings: 1, commit: "fixed")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Round limit reached")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.nextMessage,
+                       "No further prompts scheduled.")
         let (clean, _, cleanDriver) = try make()
         await clean.advance(using: cleanDriver, threads: [])
         cleanDriver.review(priorities: [])

@@ -83,13 +83,11 @@ struct UsageNotificationHistory {
             accountWindows.keys.first { identifier.contains("-\($0)-") }
         }
         let retained = deliveredImmediateIdentifiers().filter { identifier in
-            guard let id = accountID(in: identifier) else { return false }
+            guard let parsed = ImmediateUsageNotificationID(rawValue: identifier),
+                  activeIDs.contains(parsed.accountID) else { return false }
             if retainingImmediateIdentifiers.contains(identifier) { return true }
-            let parts = identifier.split(separator: "-")
-            let banked = identifier.hasPrefix("codex-dashboard-account-banked-resets-added-")
-            guard let timestamp = Double(String(banked ? parts.dropLast().last ?? "" : parts.last ?? "")) else { return false }
-            let date = banked ? Date(timeIntervalSince1970: timestamp) : Date(timeIntervalSinceReferenceDate: timestamp)
-            return date >= cutoff || accountWindows[id, default: []].contains {
+            let date = parsed.retentionDate
+            return date >= cutoff || accountWindows[parsed.accountID.uuidString.lowercased(), default: []].contains {
                 abs($0.timeIntervalSince(date)) < 1
             }
         }

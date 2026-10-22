@@ -10,7 +10,7 @@ enum UsageNotificationPlanner {
         case fiveHour, weekly
 
         var displayName: String { self == .fiveHour ? "5-hour" : "Weekly" }
-        var identifier: String { self == .fiveHour ? "5-hour" : "weekly" }
+        var notificationWindow: ImmediateUsageNotificationID.Window { self == .fiveHour ? .fiveHour : .weekly }
         var duration: TimeInterval { self == .fiveHour ? 5 * 60 * 60 : 7 * 24 * 60 * 60 }
         var deadlineStyle: UsageDeadlineStyle { self == .fiveHour ? .todayOrTomorrow : .fullDate }
         var notificationKind: ScheduledUsageNotificationKind {
@@ -160,7 +160,8 @@ enum UsageNotificationPlanner {
                 " · next expires \(formattedDeadline($0))"
             } ?? ""
             return ImmediateUsageNotification(
-                identifier: "codex-dashboard-account-banked-resets-added-\(account.id.uuidString.lowercased())-\(Int(snapshot.fetchedAt.timeIntervalSince1970))-\(total)",
+                identifier: ImmediateUsageNotificationID(accountID: account.id,
+                    event: .bankedResetsAdded(observedAt: snapshot.fetchedAt, total: total)).rawValue,
                 title: added == 1 ? "Banked Codex reset added" : "\(added) banked Codex resets added",
                 body: "\(account.name): \(total) banked \(total == 1 ? "reset" : "resets") available\(expiration)."
             )
@@ -249,7 +250,8 @@ enum UsageNotificationPlanner {
         let previousAllowance = max(0, min(100, 100 - previous.usedPercent))
         let currentAllowance = max(0, min(100, 100 - current.usedPercent))
         let nextResetDescription = formattedDeadline(nextReset, style: windowKind.deadlineStyle, relativeTo: now)
-        let identifier = "codex-dashboard-account-limit-reset-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(Int(previousReset.timeIntervalSinceReferenceDate))"
+        let identifier = ImmediateUsageNotificationID(accountID: account.id,
+            event: .reset(window: windowKind.notificationWindow, previousReset: previousReset)).rawValue
         // Usage can rise quickly after a real reset. A full new window is still
         // evidence of a reset, while a revised deadline alone is not.
         let windowDuration = windowKind.duration
@@ -291,7 +293,9 @@ enum UsageNotificationPlanner {
         return thresholds.compactMap { threshold in
             guard previousRemaining >= threshold, currentRemaining < threshold else { return nil }
             return ImmediateUsageNotification(
-                identifier: "codex-dashboard-account-usage-threshold-\(account.id.uuidString.lowercased())-\(windowKind.identifier)-\(threshold)-\(Int(previousReset.timeIntervalSinceReferenceDate))",
+                identifier: ImmediateUsageNotificationID(accountID: account.id,
+                    event: .threshold(window: windowKind.notificationWindow, remainingPercent: threshold,
+                                      reset: previousReset)).rawValue,
                 title: "Codex \(windowKind.displayName): less than \(threshold)% remaining",
                 body: "\(account.name)’s \(windowKind.displayName): \(currentRemaining)% left · resets \(formattedDeadline(reset, style: windowKind.deadlineStyle, relativeTo: now)).\n\(usageSummary)"
             )

@@ -91,6 +91,8 @@ final class InjectionBundleTests: XCTestCase {
     func testManifestDefinesRendererContractResources() throws {
         let contract = try InjectionBundle.loadRendererContractSource()
 
+        XCTAssertTrue(contract.hasPrefix(ComposerPresetSchema.javascriptDeclaration + "\n"))
+        XCTAssertTrue(contract.contains("COMPOSER_PRESET_SCHEMA.reasoningEfforts.includes(effort)"))
         XCTAssertTrue(contract.contains("const dashboardElements"))
         XCTAssertTrue(contract.contains("const domUtils"))
         XCTAssertTrue(contract.contains("const codexUIContracts"))

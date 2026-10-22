@@ -67,7 +67,7 @@ struct InjectionBundle: Sendable {
     }
 
     static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
-        try loadContract(named: "renderer", bundle: bundle)
+        ComposerPresetSchema.javascriptDeclaration + "\n" + (try loadContract(named: "renderer", bundle: bundle))
     }
 
     private static func loadContract(named name: String, bundle: Bundle?) throws -> String {

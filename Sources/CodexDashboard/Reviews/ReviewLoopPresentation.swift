@@ -75,7 +75,7 @@ enum ReviewLoopPresentation {
             ), noNextPrompt)
         }
         guard loop.completedRoundCount + (unfinished ? 1 : 0) < loop.maxRounds else {
-            return (nil, "Round limit reached. No next review scheduled.")
+            return (nil, "Final round in progress; no further review scheduled.")
         }
         let note: String
         if loop.phase == .paused { note = "After resume and project verification." }

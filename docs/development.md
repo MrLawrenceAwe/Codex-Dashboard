@@ -143,6 +143,8 @@ and mutation detection for lifecycle repair, to-do actions, and usage-limit indi
 `review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
 `review-loop-page.js` validates submissions and queues actions.
 `review-presentation.js` supplies shared labels independently of setup rendering.
+The standalone renderer contract bundle includes `ComposerPresetSchema` so model-picker
+compatibility checks use the same reasoning-effort values as preset validation.
 Reasoning order and labels come from the shared composer preset schema and
 presentation helpers. Chat rows and review model cards resolve display names and
 fall back to identifiers when no display name is known. Navigation counts describe running or waiting loops.
@@ -269,7 +271,8 @@ cover filesystem and Git inspection, and prompt and migration tests stay in thei
 respective suites.
 Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
-Run `swift test` for the complete native and WebKit suite. For renderer presentation
+The installer runs `swift test` for the native and WebKit suite; CI also runs the
+separate renderer checks below. For renderer presentation
 and composer-transfer checks without a browser or UI, run
 `node --test Tests/Renderer/*.test.cjs`. Web tests await to-do
 save completion; they do not assume persistence finishes during a DOM event.

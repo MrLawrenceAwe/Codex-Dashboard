@@ -36,10 +36,12 @@ Run:
 ./install.sh
 ```
 
-This runs the test suite, builds and signs `Codex Dashboard.app`, then
-atomically installs it in `$HOME/Applications`, preserving the previous bundle until the replacement is verified. Use `./install.sh --relaunch` to open the
-new build, or `--skip-tests` during local iteration. `--no-launch` is the
-default and is also accepted explicitly.
+This runs the native and WebKit test suite (`swift test`), builds and signs
+`Codex Dashboard.app`, then atomically installs it in `$HOME/Applications`, preserving
+the previous bundle until the replacement is verified. Use `./install.sh --relaunch`
+to open the new build, or `--skip-tests` during local iteration. `--no-launch` is the
+default and is also accepted explicitly. The separate renderer checks run with
+`node --test Tests/Renderer/*.test.cjs`; see [testing details](docs/development.md#testing).
 
 Local installs create and reuse a **Codex Dashboard Local Development** signing
 certificate in your login Keychain. Saved-account credentials are accessed by a

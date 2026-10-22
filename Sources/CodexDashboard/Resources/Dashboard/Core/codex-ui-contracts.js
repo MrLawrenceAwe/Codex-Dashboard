@@ -430,7 +430,7 @@ const codexUIContracts = (() => {
       const picker = await waitFor(modelPicker);
       if (!picker) return false;
       const effort = trigger.dataset.selectedReasoningEffort;
-      const hasSupportedEffort = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(effort);
+      const hasSupportedEffort = COMPOSER_PRESET_SCHEMA.reasoningEfforts.includes(effort);
       return hasSupportedEffort
         && Boolean(picker.querySelector('[data-model-picker-view-toggle]'))
         && Boolean(picker.querySelector('[data-reasoning-slider]'));

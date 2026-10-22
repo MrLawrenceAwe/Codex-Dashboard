@@ -148,8 +148,9 @@ and perform one cache write. Non-sensitive usage snapshots persist with timestam
 
 Deadline alerts use `UsageDeadlineNotificationID` for account/kind grouping,
 lead times, revised-deadline keys, and refreshed-delivery keys. The planner and desktop
-cleanup share that contract. Existing identifier strings remain unchanged because
-saved delivery history uses them to prevent duplicate alerts.
+cleanup share that contract. `ImmediateUsageNotificationID` similarly owns immediate-alert construction, parsing,
+and retention dates, including the timestamp epoch for each event. Existing identifier
+strings remain unchanged because saved delivery history uses them to prevent duplicate alerts.
 
 `UsageNotificationPlanner` builds one pure plan per observation time.
 `UsageNotificationUpdateCoordinator` serializes updates. `DesktopUsageNotifier` and
