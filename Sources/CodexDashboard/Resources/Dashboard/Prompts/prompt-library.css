@@ -11,10 +11,10 @@
   --dashboard-green: var(--app-color-decoration-added, #79c98c);
   --dashboard-amber: var(--app-color-decoration-modified, #c9a86a);
   --dashboard-unread: var(--app-color-text-accent, #78a9ff);
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: inherit;
 }
 
-.dashboard-prompt-library-button { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--app-color-text-foreground-secondary, #a2a2a2); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; }
+.dashboard-prompt-library-button { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: var(--dashboard-row-radius); background: transparent; color: var(--app-color-text-foreground-secondary, #a2a2a2); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; }
 .dashboard-prompt-library-button svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .dashboard-prompt-library-button:hover { background: var(--app-color-background-button-secondary-hover, rgba(255,255,255,.06)); color: var(--app-color-text-foreground, #ececec); }
 .dashboard-prompt-library-button:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 1px; }
@@ -29,7 +29,7 @@
 #codex-dashboard-prompt-library-dialog select:focus-visible,
 #codex-dashboard-prompt-library-dialog textarea:focus-visible { outline: 1px solid var(--app-color-border-focus, rgba(121, 201, 140, .75)); outline-offset: 2px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--dashboard-line-strong); border-radius: 16px; background: var(--app-color-background-elevated-primary-opaque, #292929); box-shadow: 0 24px 80px rgba(0,0,0,.48); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); width: min(620px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--dashboard-line-strong); border-radius: 16px; background: var(--app-color-background-elevated-primary-opaque, #292929); box-shadow: 0 12px 40px rgba(0,0,0,.24); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 20px; border-bottom: 1px solid var(--dashboard-line); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-header h2 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -.01em; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-storage-error { margin: 0; padding: 9px 20px; border-bottom: 1px solid var(--app-color-border-error, rgba(255, 120, 120, .22)); background: var(--app-color-background-status-error, rgba(180, 45, 45, .13)); color: var(--app-color-text-error, #ffb0b0); font-size: 11px; line-height: 1.4; }
@@ -45,11 +45,11 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-search input[type="search"]:focus { border-color: var(--app-color-border-focus, rgba(121, 201, 140, .75)); }
 #codex-dashboard-prompt-library-dialog .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-list { display: grid; gap: 12px; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-scope { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--dashboard-line); border-radius: 12px; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-scope > h3 { margin: 0; color: var(--dashboard-text); font-size: 12px; font-weight: 620; letter-spacing: -.01em; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-scope { display: grid; gap: 9px; padding: 10px 0; border: 0; border-radius: 0; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-scope > h3 { margin: 0; color: var(--dashboard-text); font-size: 12px; font-weight: 500; letter-spacing: -.01em; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-scope-empty { padding: 10px 4px; color: var(--dashboard-dim); font-size: 11px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section { display: grid; gap: 6px; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-section-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 5px; border: 0; border-radius: 6px; background: transparent; color: var(--dashboard-muted); cursor: pointer; text-align: left; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-section-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 5px; border: 0; border-radius: var(--dashboard-control-radius); background: transparent; color: var(--dashboard-muted); cursor: pointer; text-align: left; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-toggle:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-actions { display: flex; gap: 6px; padding: 0 5px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-actions button { border: 0; background: transparent; color: var(--dashboard-dim); cursor: pointer; font-size: 10px; }
@@ -61,7 +61,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-count { min-width: 19px; padding: 1px 5px; border-radius: 5px; background: var(--dashboard-surface-hover); color: var(--dashboard-dim); font-size: 9px; text-align: center; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-body { display: grid; gap: 7px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-section-body[hidden] { display: none; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 5px; border: 1px solid var(--dashboard-line); border-radius: 10px; background: var(--dashboard-surface); }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 5px; border: 0; border-radius: var(--dashboard-row-radius); background: transparent; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:hover { border-color: var(--dashboard-line-strong); background: var(--dashboard-surface-hover); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-drag-handle { padding-left: 4px; color: var(--dashboard-dim); font-size: 14px; cursor: grab; user-select: none; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:active .dashboard-prompt-drag-handle { cursor: grabbing; }
@@ -70,7 +70,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row.is-drop-after::after { position: absolute; right: 4px; left: 4px; height: 2px; content: ""; border-radius: 2px; background: var(--dashboard-green); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row.is-drop-before::before { top: -5px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row.is-drop-after::after { bottom: -5px; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-section.is-drop-target { border-radius: 8px; outline: 1px dashed rgba(121, 201, 140, .62); outline-offset: 3px; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-section.is-drop-target { border-radius: var(--dashboard-row-radius); outline: 1px dashed rgba(121, 201, 140, .62); outline-offset: 3px; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-main { display: grid; min-width: 0; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-use-preset { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px 6px; color: var(--dashboard-dim); font-size: 10px; cursor: pointer; user-select: none; }
@@ -81,7 +81,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-summary em { padding: 2px 5px; border-radius: 5px; background: var(--dashboard-surface-hover); color: var(--dashboard-dim); font-size: 9px; font-style: normal; line-height: 1.2; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions { display: flex; gap: 3px; opacity: 0; pointer-events: none; transition: opacity 100ms ease; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:hover .dashboard-prompt-row-actions, #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:focus-within .dashboard-prompt-row-actions { opacity: 1; pointer-events: auto; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions button { padding: 6px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--dashboard-dim); font-size: 10px; cursor: pointer; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions button { padding: 6px 7px; border: 0; border-radius: var(--dashboard-control-radius); background: transparent; color: var(--dashboard-dim); font-size: 10px; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions button:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-empty { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 6px; padding: 22px; color: var(--dashboard-muted); text-align: center; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-empty strong { color: var(--dashboard-text); font-size: 13px; font-weight: 570; }
@@ -100,7 +100,7 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-preset-fields legend { padding: 0 5px; color: var(--dashboard-muted); font-size: 11px; font-weight: 570; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form input,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea,
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-form select { width: 100%; padding: 9px 10px; border: 1px solid var(--dashboard-line-strong); border-radius: 8px; outline: 0; background: var(--dashboard-control); color: var(--dashboard-text); font-size: 12px; line-height: 1.45; }
+#codex-dashboard-prompt-library-dialog .dashboard-prompt-form select { width: 100%; padding: 9px 10px; border: 1px solid var(--dashboard-line-strong); border-radius: var(--dashboard-row-radius); outline: 0; background: var(--dashboard-control); color: var(--dashboard-text); font-size: 12px; line-height: 1.45; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea { min-height: 170px; resize: vertical; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form input:focus,
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-form textarea:focus,

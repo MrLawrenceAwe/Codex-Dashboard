@@ -1,0 +1,12 @@
+/* Shared proportions for injected surfaces. Inherit the host's font family. */
+:is(#codex-dashboard-chat-overview-page, #codex-dashboard-todo-page,
+    #codex-dashboard-review-page, #codex-dashboard-prompt-library-dialog,
+    #codex-dashboard-todo-dialogs, .dashboard-prompt-library-button,
+    [data-todo-preset-warning]) {
+  --dashboard-title-size: 22px;
+  --dashboard-title-weight: 550;
+  --dashboard-control-radius: 6px;
+  --dashboard-row-radius: 8px;
+  --dashboard-page-top: 40px;
+  font-family: inherit;
+}

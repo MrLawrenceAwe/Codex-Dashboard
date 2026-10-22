@@ -90,6 +90,12 @@ Renderer resources are listed in `injection-manifest.json`:
 | `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
 | `Reviews` | Review page controls, setup, cards, history, and app-server requests |
 
+Shared page title sizes, corner radii, and default top spacing live in
+`Core/dashboard-theme.css`, loaded before feature styles. Injected surfaces inherit
+the host font. Prefer unboxed list rows and muted section headings; reserve borders
+for inputs, dialogs, and meaningful separators. Keep unread emphasis to the dot and
+title weight, with actions visible on hover and keyboard focus.
+
 Feature controllers own mounting and teardown; views own markup and presentation.
 See [architecture](architecture.md) for refresh, persistence, account transactions,
 notifications and review execution, and [usage](usage.md) for user controls.

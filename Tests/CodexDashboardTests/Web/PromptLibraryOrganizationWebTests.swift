@@ -46,7 +46,7 @@ extension PromptLibraryWebTests {
         XCTAssertEqual(values["searchSelection"] as? [Int], [6, 6])
         XCTAssertEqual(values["namesAfterClear"] as? [String], ["Review code", "Write summary"])
         XCTAssertEqual(values["hasTransferActions"] as? Bool, false)
-        XCTAssertNil(values["searchPlaceholder"] as? String)
+        XCTAssertEqual(values["searchPlaceholder"] as? String, "Search prompts…")
         XCTAssertNil(values["headerSubtitle"] as? String)
         XCTAssertEqual(values["searchHeight"] as? String, "32px")
         XCTAssertEqual(values["searchFontSize"] as? String, "12px")

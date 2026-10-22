@@ -57,6 +57,7 @@
     "Core/dashboard-bridge"
   ],
   "stylesheets": [
+    "Core/dashboard-theme",
     "Threads/chat-overview",
     "Sidebar/project-highlights",
     "Sidebar/thread-todo-actions",
