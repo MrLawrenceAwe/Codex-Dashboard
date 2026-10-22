@@ -18,7 +18,8 @@ struct ReviewGitPublisher: ReviewGitPublishing {
     }
 
     func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome {
-        guard try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace, expectedWorkspace.clean else {
+        guard let git = expectedWorkspace.git, git.isClean,
+              try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace else {
             throw ReviewLoopError("The checkout changed before pushing. Inspect it before resuming.")
         }
         guard try await workspaceCheckpoint.resolveCommit(commit, at: path) == commit,
@@ -26,7 +27,7 @@ struct ReviewGitPublisher: ReviewGitPublishing {
             throw ReviewLoopError("The reported fix commit is not in the current checkout history. Inspect it before pushing.")
         }
         let remotes = try await ReviewGitCommand.output(["remote"], at: path).split(separator: "\n").map(String.init)
-        let branch = expectedWorkspace.branch
+        let branch = git.branch
         let configuredRemote = try await configuration("branch.\(branch).remote", at: path)
         let configuredMerge = try await configuration("branch.\(branch).merge", at: path)
         let remote: String

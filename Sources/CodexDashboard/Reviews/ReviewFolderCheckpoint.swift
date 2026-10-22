@@ -11,7 +11,7 @@ enum ReviewFolderCheckpoint {
             guard first == (try fingerprint(root)) else {
                 throw ReviewLoopError("The folder changed while checking its files. Wait for other edits to finish, then Resume.")
             }
-            return ReviewWorkspaceState(root: root.path, branch: "", revision: first, clean: true, kind: .folder)
+            return ReviewWorkspaceState(root: root.path, revision: first, git: nil)
         }.value
     }
 

@@ -9,6 +9,7 @@ final class ReviewFolderCheckpointTests: XCTestCase {
         let checkpoint = ReviewWorkspaceCheckpoint()
         let empty = try await checkpoint.workspace(at: root.path)
         XCTAssertEqual(empty.kind, .folder)
+        XCTAssertNil(empty.git)
         let file = root.appendingPathComponent("CV.docx")
         try Data([0, 1, 255]).write(to: file)
         let initial = try await checkpoint.workspace(at: root.path)

@@ -498,7 +498,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             driver.review(priorities: [])
             driver.thread = ReviewThreadState(cwd: failure == "moved" ? "/tmp/another" : project.path, turns: [
                 ReviewTurnState(id: failure == "newTurn" ? "another-turn" : "turn-1",
-                                status: ["failed", "interrupted"].contains(failure) ? failure : "completed",
+                                status: ["failed", "interrupted"].contains(failure) ? ReviewTurnStatus(rawValue: failure)! : .completed,
                                 finalMessage: failure == "malformed" ? "Done" : driver.thread.turns.last?.finalMessage)
             ])
             await coordinator.advance(using: driver, threads: [])
@@ -575,7 +575,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             try coordinator.apply(action(.stop, for: coordinator), projects: [project])
             try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
             XCTAssertEqual(driver.interruptedTurns, [fixing ? "turn-2" : "turn-1"])
-            XCTAssertEqual(driver.thread.turns.last?.status, "interrupted")
+            XCTAssertEqual(driver.thread.turns.last?.status, .interrupted)
             XCTAssertEqual(store.loops.last?.message, "Stopped loop and its running chat.")
             await coordinator.advance(using: driver, threads: [])
             XCTAssertEqual(driver.prompts.count, fixing ? 2 : 1)
@@ -589,7 +589,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
         XCTAssertTrue(driver.interruptedTurns.isEmpty)
-        XCTAssertEqual(driver.thread.turns.last?.status, "completed")
+        XCTAssertEqual(driver.thread.turns.last?.status, .completed)
     }
 
     func testInterruptFailureKeepsCheckoutReservedAndCanBeRetried() async throws {

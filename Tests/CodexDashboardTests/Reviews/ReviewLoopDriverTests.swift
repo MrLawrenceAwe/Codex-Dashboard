@@ -5,7 +5,7 @@ import XCTest
 final class ReviewLoopDriverTests: XCTestCase {
     func testFolderFixUsesFolderReportAndChecksFingerprintBeforeSubmission() async throws {
         let connection = ReviewReportDevTools()
-        let workspace = ReviewWorkspaceState(root: "/tmp/folder", branch: "", revision: "fingerprint", clean: true, kind: .folder)
+        let workspace = ReviewWorkspaceState(root: "/tmp/folder", revision: "fingerprint", git: nil)
         let driver = ReviewLoopDriver(devTools: connection,
             target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
             workspaceCheckpoint: ReviewFixedWorkspaceCheckpoint(state: workspace))
@@ -15,36 +15,13 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertTrue(expression.contains("# Fixes applied"))
         XCTAssertFalse(expression.contains("# Fixes committed"))
         var changed = workspace
-        changed.kind = .git
+        changed = ReviewWorkspaceState(root: workspace.root, revision: workspace.revision,
+                                       git: .init(branch: "main", isClean: true))
         do {
             _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/folder", expectedWorkspace: changed,
                 prompt: "Address findings", kind: .fix, selection: nil, speed: .standard)
             XCTFail("Workspace identity must be checked before submission")
         } catch {}
-    }
-
-    func testSavedModelSelectionMigratesToCurrentNames() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved["reviewSelection"] = ["model": "chosen", "effort": "high"]
-        let selection = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first?.reviewSelection)
-        XCTAssertEqual(selection.modelID, "chosen")
-        XCTAssertEqual(selection.reasoningEffort, "high")
-        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(selection)) as? [String: String])
-        XCTAssertEqual(encoded, ["modelID": "chosen", "reasoningEffort": "high"])
-    }
-
-    func testSavedLoopCarriesPreviousSelectionIntoBothTurns() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
-        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
-        saved["selection"] = ["modelID": "previous-model", "reasoningEffort": "high"]
-        let restored = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first)
-        XCTAssertEqual(restored.reviewSelection?.modelID, "previous-model")
-        XCTAssertEqual(restored.fixSelection?.reasoningEffort, "high")
-        let rewritten = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
-        XCTAssertNil(rewritten["selection"])
-        XCTAssertNotNil(rewritten["reviewSelection"])
-        XCTAssertNotNil(rewritten["fixSelection"])
     }
 
     func testProjectAndModelListsReadEveryPage() async throws {
@@ -79,7 +56,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testTurnsRequestMarkdownWithoutForcingJSON() async throws {
         let connection = ReviewReportDevTools()
-        let workspace = ReviewWorkspaceState(root: "/tmp/project", branch: "main", revision: "base", clean: true)
+        let workspace = ReviewWorkspaceState(root: "/tmp/project", revision: "base", git: .init(branch: "main", isClean: true))
         let driver = ReviewLoopDriver(devTools: connection,
                                       target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
                                       workspaceCheckpoint: ReviewFixedWorkspaceCheckpoint(state: workspace))
@@ -107,7 +84,7 @@ final class ReviewLoopDriverTests: XCTestCase {
 
     func testOnlyFixContinuationCanStartWithUnfinishedChanges() async throws {
         let connection = ReviewReportDevTools()
-        let workspace = ReviewWorkspaceState(root: "/tmp/project", branch: "main", revision: "base", clean: false)
+        let workspace = ReviewWorkspaceState(root: "/tmp/project", revision: "base", git: .init(branch: "main", isClean: false))
         let driver = ReviewLoopDriver(devTools: connection,
                                       target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil),
                                       workspaceCheckpoint: ReviewFixedWorkspaceCheckpoint(state: workspace))
@@ -121,7 +98,7 @@ final class ReviewLoopDriverTests: XCTestCase {
         let id = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedWorkspace: workspace,
                                              prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
         XCTAssertEqual(id, "turn")
-        let changed = ReviewWorkspaceState(root: workspace.root, branch: "other", revision: workspace.revision, clean: false)
+        let changed = ReviewWorkspaceState(root: workspace.root, revision: workspace.revision, git: .init(branch: "other", isClean: false))
         do {
             _ = try await driver.startTurn(threadID: "thread", projectPath: "/tmp/project", expectedWorkspace: changed,
                                            prompt: "Continue", kind: .fixContinuation, selection: nil, speed: .standard)
@@ -130,7 +107,7 @@ final class ReviewLoopDriverTests: XCTestCase {
     }
 
     func testStopReadsLatestMetadataAndInterruptsOnlyRunningTurns() async throws {
-        for status in ["inProgress", "completed", "interrupted", "empty"] {
+        for status in ["inProgress", "completed", "interrupted", "failed", "empty"] {
             let connection = ReviewStopDevTools(status: status)
             let driver = ReviewLoopDriver(devTools: connection, target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
             try await driver.interruptLatestTurn("thread")
@@ -210,6 +187,28 @@ final class ReviewLoopDriverTests: XCTestCase {
         XCTAssertThrowsError(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": Array(repeating: turn, count: 101)]]))
     }
 
+    func testTurnStatusesDecodeConsistentlyAndUnknownStatusesAreRejected() async throws {
+        for status in ReviewTurnStatus.allCases {
+            let turn: [String: Any] = ["id": "review", "status": status.rawValue]
+            let thread: [String: Any] = ["cwd": "/tmp/project", "status": ["type": "active"], "turns": [turn]]
+            let state = try ReviewLoopDriver.threadState(["thread": thread])
+            XCTAssertEqual(state.turns.first?.status, status)
+        }
+        for status in ["queued", "", "COMPLETED"] {
+            let turn: [String: Any] = ["id": "review", "status": status]
+            XCTAssertThrowsError(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "turns": [turn]]]))
+            let connection = ReviewStopDevTools(status: status)
+            let driver = ReviewLoopDriver(devTools: connection,
+                target: DevToolsTarget(id: "test", type: "page", url: nil, webSocketURL: nil))
+            do {
+                try await driver.interruptLatestTurn("thread")
+                XCTFail("Unknown statuses must not release the checkout")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains("invalid review turn"))
+            }
+        }
+    }
+
     func testApprovalAndStaleInProgressTurnNeedAttention() throws {
         let turn: [String: Any] = ["id": "review", "status": "inProgress", "items": []]
         for status: [String: Any] in [
@@ -220,81 +219,9 @@ final class ReviewLoopDriverTests: XCTestCase {
             XCTAssertThrowsError(try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "status": status, "turns": [turn]]]))
         }
         let running = try ReviewLoopDriver.threadState(["thread": ["cwd": "/tmp/project", "status": ["type": "active", "activeFlags": []], "turns": [turn]]])
-        XCTAssertEqual(running.turns.first?.status, "inProgress")
+        XCTAssertEqual(running.turns.first?.status, .inProgress)
     }
 
-    func testRealGitCheckpointIncludesUntrackedFilesAndCommitAncestry() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("review-git-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        func git(_ arguments: [String]) async throws {
-            let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["-C", directory.path] + arguments, timeout: 5)
-            XCTAssertEqual(result.terminationStatus, 0)
-        }
-        try await git(["init", "-b", "main"])
-        try await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "Initial"])
-        let checkpoint = ReviewWorkspaceCheckpoint()
-        let initial = try await checkpoint.workspace(at: directory.path)
-        XCTAssertTrue(initial.clean)
-        XCTAssertEqual(initial.branch, "main")
-        XCTAssertEqual(initial.kind, .git)
-        let nested = directory.appendingPathComponent("nested", isDirectory: true)
-        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
-        let nestedState = try await checkpoint.workspace(at: nested.path)
-        XCTAssertEqual(nestedState.kind, .git)
-        XCTAssertEqual(nestedState.root, initial.root)
-        XCTAssertTrue(ReviewWorkspaceCheckpoint.hasGitMetadata(at: nested.path))
-        let worktree = directory.appendingPathComponent("linked", isDirectory: true)
-        try await git(["worktree", "add", "-b", "linked", worktree.path])
-        let linkedState = try await checkpoint.workspace(at: worktree.path)
-        XCTAssertEqual(linkedState.kind, .git)
-        XCTAssertTrue(ReviewWorkspaceCheckpoint.hasGitMetadata(at: worktree.path))
-        try await git(["worktree", "remove", worktree.path])
-        try Data("change".utf8).write(to: directory.appendingPathComponent("fix.txt"))
-        let dirty = try await checkpoint.workspace(at: directory.path)
-        XCTAssertFalse(dirty.clean)
-        try await git(["add", "fix.txt"])
-        try await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fix"])
-        let fixed = try await checkpoint.workspace(at: directory.path)
-        XCTAssertTrue(fixed.clean)
-        XCTAssertNotEqual(fixed.revision, initial.revision)
-        let isAncestor = try await checkpoint.isAncestor(initial.revision, of: fixed.revision, at: directory.path)
-        XCTAssertTrue(isAncestor)
-        for reported in [fixed.revision, String(fixed.revision.prefix(7)), String(fixed.revision.prefix(7)).uppercased()] {
-            let resolved = try await checkpoint.resolveCommit(reported, at: directory.path)
-            XCTAssertEqual(resolved, fixed.revision)
-        }
-        for invalid in ["", "HEAD", "main", "--help", "abc", "deadbeef", fixed.revision + "~1"] {
-            do {
-                _ = try await checkpoint.resolveCommit(invalid, at: directory.path)
-                XCTFail("Accepted invalid commit ID: \(invalid)")
-            } catch { }
-        }
-    }
-
-    func testFixPromptDoesNotAskForTesting() throws {
-        let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
-        let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseRevision: "abc"))
-        XCTAssertFalse(prompt.lowercased().contains("test"))
-        XCTAssertFalse(prompt.lowercased().contains("checks"))
-        XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
-        XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
-    }
-
-    func testOrganisationFixPromptNamesFindingsAndCommitForEachCount() {
-        for reviewType in [ReviewType.organisation, .organisationAndNaming] {
-            var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
-            loop.reviewType = reviewType
-            for (count, expected) in [(1, "Address the finding and commit"), (2, "Address both findings and commit"), (3, "Address all findings and commit")] {
-                var round = ReviewRound(number: 1, baseRevision: "abc")
-                round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
-                    ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
-                }, summary: "Findings")
-                let prompt = ReviewPrompts.fixPrompt(for: loop, round: round)
-                XCTAssertEqual(prompt.components(separatedBy: "\n\n").first, expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
-            }
-        }
-    }
 }
 
 private struct ReviewFixedWorkspaceCheckpoint: ReviewWorkspaceChecking {

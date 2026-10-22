@@ -100,7 +100,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         let (coordinator, _, driver) = try await verifying()
         let latest = driver.thread.turns.last!
         driver.thread = ReviewThreadState(cwd: driver.thread.cwd, turns: driver.thread.turns.dropLast() + [
-            ReviewTurnState(id: latest.id, status: "failed", finalMessage: nil)
+            ReviewTurnState(id: latest.id, status: .failed, finalMessage: nil)
         ])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .blocked)
@@ -168,9 +168,9 @@ private actor VerificationReportDevTools: DevToolsServing {
         switch request["method"] as? String {
         case "thread/read":
             result = ["thread": ["cwd": thread.cwd,
-                "status": ["type": thread.turns.last?.status == "inProgress" ? "active" : "idle"]]]
+                "status": ["type": thread.turns.last?.status == .inProgress ? "active" : "idle"]]]
         case "thread/turns/list":
-            result = ["data": thread.turns.map { ["id": $0.id, "status": $0.status] }, "nextCursor": NSNull()]
+            result = ["data": thread.turns.map { ["id": $0.id, "status": $0.status.rawValue] }, "nextCursor": NSNull()]
         case "thread/items/list":
             let turn = try XCTUnwrap(thread.turns.first { $0.id == params["turnId"] as? String })
             let text = try XCTUnwrap(turn.finalMessage)

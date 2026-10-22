@@ -101,16 +101,19 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
     }
 
     func testReportDoesNotClaimCompatibilityWithoutCompleteChecks() {
-        let unchecked = CompatibilityCheck(id: "renderer", title: "Renderer", status: .unavailable, detail: "Closed")
+        let unavailable = CompatibilityCheck(id: "renderer", title: "Renderer", status: .unavailable, detail: "Closed")
         let warning = CompatibilityCheck(id: "storage", title: "Storage", status: .warning, detail: "Not verified")
         let compatible = CompatibilityCheck(id: "catalog", title: "Catalog", status: .compatible, detail: "Verified")
-        for checks in [[unchecked], [unchecked, compatible], [unchecked, warning]] {
+        for checks in [[unavailable], [unavailable, compatible], [unavailable, warning]] {
             let report = CompatibilityReport(checks: checks)
             XCTAssertTrue(report.summary.hasPrefix("Compatibility checks incomplete"))
+            XCTAssertTrue(report.summary.contains("1 unavailable"))
+            XCTAssertFalse(report.summary.contains("not checked"))
             XCTAssertFalse(report.summary.contains("compatible"))
         }
         XCTAssertEqual(CompatibilityReport(checks: [warning]).summary,
                        "Compatibility checks need attention · 1 warning")
+        XCTAssertEqual(CompatibilityStatus.unavailable.label, "Unavailable")
         XCTAssertEqual(CompatibilityReport(checks: []).summary, "Compatibility not checked")
         XCTAssertEqual(CompatibilityReport(checks: [compatible]).summary, "All checked contracts are compatible")
     }

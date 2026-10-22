@@ -11,7 +11,7 @@ enum CompatibilityStatus: Sendable {
         case .compatible: "Compatible"
         case .warning: "Warning"
         case .incompatible: "Incompatible"
-        case .unavailable: "Not checked"
+        case .unavailable: "Unavailable"
         }
     }
 }
@@ -42,9 +42,9 @@ struct CompatibilityReport: Equatable, Sendable {
         if blockingCount > 0 {
             return "\(blockingCount) incompatible \u{00b7} \(nonBlockingAttentionCount) need attention"
         }
-        let uncheckedCount = checks.count { $0.status == .unavailable }
-        if uncheckedCount > 0 {
-            return "Compatibility checks incomplete \u{00b7} \(uncheckedCount) not checked \u{00b7} \(nonBlockingAttentionCount) need attention"
+        let unavailableCount = checks.count { $0.status == .unavailable }
+        if unavailableCount > 0 {
+            return "Compatibility checks incomplete \u{00b7} \(unavailableCount) unavailable \u{00b7} \(nonBlockingAttentionCount) need attention"
         }
         if nonBlockingAttentionCount > 0 {
             return "Compatibility checks need attention \u{00b7} \(nonBlockingAttentionCount) \(nonBlockingAttentionCount == 1 ? "warning" : "warnings")"

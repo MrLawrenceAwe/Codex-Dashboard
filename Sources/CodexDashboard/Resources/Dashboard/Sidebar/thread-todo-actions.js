@@ -63,8 +63,8 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
     const thread = reference(row);
     if (!thread) { menuContext = null; return; }
     const projects = codexUIContracts.projects();
-    const projectRow = row.closest('[data-app-action-sidebar-project-id]');
-    const project = projects.find((candidate) => candidate.id === projectRow?.getAttribute('data-app-action-sidebar-project-id'))
+    const projectRow = codexUIContracts.sidebarProjects.containingRow(row);
+    const project = projects.find((candidate) => candidate.id === codexUIContracts.sidebarProjects.metadata(projectRow).id)
       || projects.find((candidate) => candidate.id === thread.projectID)
       || null;
     menuContext = {

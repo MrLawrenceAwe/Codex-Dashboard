@@ -286,15 +286,15 @@ final class ReviewLoopCoordinator {
         // Reserve synchronously after inspection, before any launch can suspend.
         checkoutOwners[root] = id
         if hasOtherRunningTask(threads, root: workspace.root, excluding: nil) { return }
-        guard workspace.clean else { throw ReviewLoopError("Commit or set aside existing changes before starting a review. The loop will not commit unrelated work.") }
+        guard workspace.git?.isClean != false else { throw ReviewLoopError("Commit or set aside existing changes before starting a review. The loop will not commit unrelated work.") }
         if workspace.kind == .folder, updated.pushToRemote {
             throw ReviewLoopError("Remote push requires Git. Stop this loop and start a folder loop with remote push off.")
         }
         if let kind = updated.workspaceKind, kind != workspace.kind {
             throw ReviewLoopError("The project changed between Git and folder mode. Start a new loop for its current files.")
         }
-        guard workspace.kind == .folder || !workspace.branch.isEmpty else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
-        if let branch = updated.branch, branch != workspace.branch { throw ReviewLoopError("The checkout changed branch. Start a new loop for the new branch.") }
+        guard workspace.git?.branch.isEmpty != true else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
+        if let git = workspace.git, let branch = updated.branch, branch != git.branch { throw ReviewLoopError("The checkout changed branch. Start a new loop for the new branch.") }
         if let head = updated.expectedRevision, head != workspace.revision { throw ReviewLoopError("The project changed outside the review loop. Inspect the changes before starting a new loop.") }
         guard updated.completedRoundCount < updated.maxRounds else {
             updated.phase = .limitReached
@@ -304,7 +304,7 @@ final class ReviewLoopCoordinator {
         }
         updated.workspaceKind = workspace.kind
         updated.checkoutRoot = root
-        updated.branch = workspace.branch
+        updated.branch = workspace.git?.branch
         updated.expectedRevision = workspace.revision
         let round = ReviewRound(number: updated.rounds.count + 1, baseRevision: workspace.revision)
         updated.rounds.append(round)
@@ -352,7 +352,7 @@ final class ReviewLoopCoordinator {
         }
         let wasResumed = resumeRequestedIDs.remove(id) != nil
         if wasResumed,
-           let latest = thread.turns.last, ["interrupted", "failed"].contains(latest.status) {
+           let latest = thread.turns.last, [.interrupted, .failed].contains(latest.status) {
             if let verification = round.fixVerification {
                 guard verification.turnID != nil else {
                     throw ReviewLoopError("The verification launch was not acknowledged. Inspect the chat; it will not be sent twice.")
@@ -366,7 +366,7 @@ final class ReviewLoopCoordinator {
             return
         }
         if wasResumed, let verification = round.fixVerification, verification.turnID != nil,
-           let latest = thread.turns.last, latest.status == "completed", latest.id != verification.turnID {
+           let latest = thread.turns.last, latest.status == .completed, latest.id != verification.turnID {
             // Resume explicitly reconciles a corrected verification report from the same chat.
             round.fixVerification?.turnID = latest.id
             updated.rounds[updated.rounds.count - 1] = round
@@ -394,7 +394,7 @@ final class ReviewLoopCoordinator {
     ) async throws {
         var updated = loop
         var round = round
-        if reviewTurn.status == "inProgress" { return }
+        if reviewTurn.status == .inProgress { return }
         try requireCompleted(reviewTurn)
         if try await waitForExtensionReload(reviewTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
@@ -460,7 +460,7 @@ final class ReviewLoopCoordinator {
                 (thread.turns.count == 2 && (round.fixTurnID == nil || round.fixTurnID == fixTurn.id)) else {
             throw ReviewLoopError("The fix prompt was not acknowledged. Inspect the chat; it will not be sent twice.")
         }
-        if fixTurn.status == "inProgress" { return }
+        if fixTurn.status == .inProgress { return }
         try requireCompleted(fixTurn)
         if try await waitForExtensionReload(fixTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let fixReport = try ReviewReportContract.fix(fixTurn.finalMessage, workspaceKind: updated.workspaceKind ?? .git)
@@ -478,7 +478,7 @@ final class ReviewLoopCoordinator {
                     throw ReviewLoopError("The fix report claims changes, but the folder files are unchanged.")
                 }
             }
-            try finishRound(loopID: updated.id, result: result, reportedCommit: "",
+            try finishRound(loopID: updated.id, result: result, fixCommit: nil,
                             workspace: workspace, fixTurnID: fixTurn.id)
             return
         }
@@ -509,7 +509,8 @@ final class ReviewLoopCoordinator {
             loop: updated, round: round, result: result, reportedCommit: reportedCommit,
             sourceFixTurnID: fixTurn.id, workspace: workspace, using: driver, threadID: threadID
         ) else { return }
-        try finishRound(loopID: updated.id, result: result, reportedCommit: reportedCommit,
+        try finishRound(loopID: updated.id, result: result,
+                        fixCommit: result.outcome == .fixed ? reportedCommit : nil,
                         workspace: workspace, fixTurnID: fixTurn.id)
     }
 
@@ -534,7 +535,7 @@ final class ReviewLoopCoordinator {
     }
 
     private func finishRound(
-        loopID: UUID, result: ReviewRoundResult, reportedCommit: String,
+        loopID: UUID, result: ReviewRoundResult, fixCommit: String?,
         workspace: ReviewWorkspaceState, fixTurnID: String
     ) throws {
         guard var updated = activeLoop(matching: loopID, phase: .running) else { return }
@@ -553,13 +554,13 @@ final class ReviewLoopCoordinator {
             updated.message = completion + " Ready for a fresh review."
         }
         if result.outcome == .fixed, updated.pushToRemote { updated.message += " Fixes pushed to remote." }
-        if workspace.kind == .git, workspace.revision != reportedCommit {
+        if let fixCommit, workspace.revision != fixCommit {
             updated.message += " The fixes were reverified at the current HEAD."
         }
         updated.rounds[updated.rounds.count - 1].fixTurnID = fixTurnID
         updated.rounds[updated.rounds.count - 1].result = ReviewRoundResult(
             outcome: result.outcome, addressedFindingCount: result.addressedFindingCount,
-            fixCommit: result.outcome == .fixed && workspace.kind == .git ? reportedCommit : nil,
+            fixCommit: fixCommit,
             summary: result.summary, verifiedRevision: workspace.revision)
         updated.expectedRevision = workspace.revision
         try persist(updated)
@@ -576,7 +577,7 @@ final class ReviewLoopCoordinator {
             guard let turnID = verification.turnID, let turn = thread.turns.last, turn.id == turnID else {
                 throw ReviewLoopError("The fix verification turn was not acknowledged or the chat changed. Inspect its chat before resuming; it will not be sent twice.")
             }
-            if turn.status == "inProgress" { return false }
+            if turn.status == .inProgress { return false }
             try requireCompleted(turn)
             if try await waitForExtensionReload(turn, loop: loop, using: driver, threads: threads, threadID: threadID) { return false }
             if verification.targetRevision == workspace.revision {
@@ -643,7 +644,7 @@ final class ReviewLoopCoordinator {
         loop: ReviewLoop, round: ReviewRound, thread: ReviewThreadState,
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
     ) async throws {
-        guard let latest = thread.turns.last, latest.status == "completed",
+        guard let latest = thread.turns.last, latest.status == .completed,
               try ReviewReportContract.extensionReloadRequest(latest.finalMessage) != nil else {
             throw ReviewLoopError("The chat changed while waiting for extension reload. Inspect its chat before resuming.")
         }
@@ -709,17 +710,18 @@ final class ReviewLoopCoordinator {
         guard !hasOtherRunningTask(threads, root: workspace.root, excluding: threadID) else {
             throw ReviewLoopError("Another chat is running in this checkout. Inspect its changes before continuing.")
         }
-        guard workspace.kind == loop.workspaceKind, workspace.branch == loop.branch,
+        guard workspace.kind == loop.workspaceKind,
+              workspace.git == nil || workspace.git?.branch == loop.branch,
               FileSystemPath.canonicalPath(workspace.root) == loop.checkoutRoot else {
             throw ReviewLoopError("The checkout changed. Restore the original checkout and branch before continuing.")
         }
         switch policy {
         case .clean:
-            guard workspace.clean else {
+            guard workspace.git?.isClean != false else {
                 throw ReviewLoopError("Commit checkpoint failed: the checkout must be clean and on the original branch.")
             }
         case .unchangedReview(let baseRevision):
-            guard workspace.clean else {
+            guard workspace.git?.isClean != false else {
                 throw ReviewLoopError("Uncommitted changes appeared during the review. The review must leave files unchanged. Inspect the changes in its chat before resuming; no fix prompt or push was sent.")
             }
             guard workspace.revision == baseRevision else {
@@ -732,7 +734,7 @@ final class ReviewLoopCoordinator {
     }
 
     private func requireCompleted(_ turn: ReviewTurnState) throws {
-        guard turn.status == "completed" else {
+        guard turn.status == .completed else {
             throw ReviewLoopError("The chat was interrupted or failed. Select Resume to continue in the same chat once the issue is resolved.")
         }
     }

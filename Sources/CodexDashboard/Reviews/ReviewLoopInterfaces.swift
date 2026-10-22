@@ -3,16 +3,25 @@ import Foundation
 enum ReviewWorkspaceKind: String, Codable, Sendable { case git, folder }
 
 struct ReviewWorkspaceState: Equatable, Sendable {
+    struct Git: Equatable, Sendable {
+        let branch: String
+        let isClean: Bool
+    }
+
     let root: String
-    let branch: String
     let revision: String
-    let clean: Bool
-    var kind: ReviewWorkspaceKind = .git
+    let git: Git?
+
+    var kind: ReviewWorkspaceKind { git == nil ? .folder : .git }
+}
+
+enum ReviewTurnStatus: String, CaseIterable, Sendable {
+    case inProgress, completed, interrupted, failed
 }
 
 struct ReviewTurnState: Sendable {
     let id: String
-    let status: String
+    let status: ReviewTurnStatus
     let finalMessage: String?
 }
 

@@ -101,7 +101,7 @@ final class ReviewRemotePushTests: XCTestCase {
         let divergent = try await checkpoint.workspace(at: checkout)
         let publication = try await publisher.reconcileAndPublishFix(divergent.revision, at: checkout, expectedWorkspace: divergent)
         if case .verificationRequired(let repository) = publication {
-            XCTAssertTrue(repository.clean)
+            XCTAssertEqual(repository.git?.isClean, true)
             let containsFix = try await checkpoint.isAncestor(divergent.revision, of: repository.revision, at: checkout)
             let containsRemote = try await checkpoint.isAncestor(fixed.revision, of: repository.revision, at: checkout)
             XCTAssertTrue(containsFix)
@@ -211,7 +211,7 @@ final class ReviewRemotePushTests: XCTestCase {
         let checkpoint = ReviewWorkspaceCheckpoint()
         let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
         let fix = try await checkpoint.workspace(at: checkout)
-        XCTAssertTrue(fix.clean, "An empty pending merge is invisible to porcelain status")
+        XCTAssertEqual(fix.git?.isClean, true, "An empty pending merge is invisible to porcelain status")
         do {
             _ = try await publisher.reconcileAndPublishFix(fix.revision, at: checkout, expectedWorkspace: fix)
             XCTFail("An existing Git operation must be left alone")

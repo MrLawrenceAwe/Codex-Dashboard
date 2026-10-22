@@ -106,7 +106,7 @@ final class ReviewLoopDriver: ReviewLoopDriving {
         let current = try await workspaceCheckpoint.workspace(at: projectPath)
         let permitsUnfinishedFixes: Bool
         if case .fixContinuation = kind { permitsUnfinishedFixes = true } else { permitsUnfinishedFixes = false }
-        guard (current.clean || permitsUnfinishedFixes), current == expectedWorkspace else {
+        guard (current.git?.isClean != false || permitsUnfinishedFixes), current == expectedWorkspace else {
             throw ReviewLoopError("The checkout changed before the review chat started. Inspect its changes before continuing.")
         }
         let response = try await request("turn/start", params)
@@ -119,15 +119,15 @@ final class ReviewLoopDriver: ReviewLoopDriving {
     func interruptLatestTurn(_ threadID: String) async throws {
         // Read only the latest turn metadata so stopping also works while the chat
         // is waiting for approval or input, without loading its report.
-        if let turn = try await latestTurn(threadID), turn.status == "inProgress" {
+        if let turn = try await latestTurn(threadID), turn.status == .inProgress {
             _ = try await request("turn/interrupt", ["threadId": threadID, "turnId": turn.id])
-            if let latest = try await latestTurn(threadID), latest.status == "inProgress" {
+            if let latest = try await latestTurn(threadID), latest.status == .inProgress {
                 throw ReviewLoopError("The chat is still stopping. Its checkout stays reserved until the turn is inactive.")
             }
         }
     }
 
-    private func latestTurn(_ threadID: String) async throws -> (id: String, status: String)? {
+    private func latestTurn(_ threadID: String) async throws -> (id: String, status: ReviewTurnStatus)? {
         let page: [String: Any]
         do {
             page = try await request("thread/turns/list", [
@@ -143,8 +143,8 @@ final class ReviewLoopDriver: ReviewLoopDriving {
             throw ReviewLoopError("Codex returned invalid review turn metadata.")
         }
         guard let turn = turns.first else { return nil }
-        guard let id = turn["id"] as? String, let status = turn["status"] as? String,
-              ["inProgress", "completed", "interrupted", "failed"].contains(status) else {
+        guard let id = turn["id"] as? String, let rawStatus = turn["status"] as? String,
+              let status = ReviewTurnStatus(rawValue: rawStatus) else {
             throw ReviewLoopError("Codex returned an invalid review turn.")
         }
         return (id, status)
@@ -214,10 +214,11 @@ final class ReviewLoopDriver: ReviewLoopDriving {
             throw ReviewLoopError("The review chat needs your approval or input. Open its chat; the loop will not continue automatically.")
         }
         let states = try turns.map { turn -> ReviewTurnState in
-            guard let id = turn["id"] as? String, let status = turn["status"] as? String else {
+            guard let id = turn["id"] as? String, let rawStatus = turn["status"] as? String,
+                  let status = ReviewTurnStatus(rawValue: rawStatus) else {
                 throw ReviewLoopError("Codex returned an invalid review turn.")
             }
-            if status == "inProgress", statusType != "active" {
+            if status == .inProgress, statusType != "active" {
                 throw ReviewLoopError("The review chat is no longer active. Open its chat before restarting the loop.")
             }
             let items = turn["items"] as? [[String: Any]] ?? []

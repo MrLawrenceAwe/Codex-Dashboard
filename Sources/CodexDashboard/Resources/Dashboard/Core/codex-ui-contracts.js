@@ -89,13 +89,40 @@ const codexUIContracts = (() => {
     return [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')];
   }
 
+  const projectAttributes = {
+    row: 'data-app-action-sidebar-project-row',
+    id: 'data-app-action-sidebar-project-id',
+    name: 'data-app-action-sidebar-project-label',
+  };
+  const sidebarProjects = {
+    selector: `[${projectAttributes.row}][${projectAttributes.id}]`,
+    observedAttributes: Object.values(projectAttributes),
+    metadata(row) {
+      return {
+        id: String(row?.getAttribute(projectAttributes.id) || '').trim(),
+        name: String(row?.getAttribute(projectAttributes.name) || '').trim(),
+      };
+    },
+    containingRow(element) {
+      return element.closest(`[${projectAttributes.id}]`);
+    },
+    findRow(projectID) {
+      return document.querySelector(`[${projectAttributes.id}="${CSS.escape(projectID)}"]`);
+    },
+    changedIn(records) {
+      const selector = `[${projectAttributes.row}]`;
+      const containsProject = node => node instanceof Element
+        && (node.matches(selector) || Boolean(node.querySelector(selector)));
+      return records.some(record => record.type === 'attributes'
+        ? record.attributeName === projectAttributes.row || record.target.matches(selector)
+        : [...record.addedNodes, ...record.removedNodes].some(containsProject));
+    },
+  };
+
   function projects() {
     const seen = new Set();
-    return [...document.querySelectorAll(
-      '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]',
-    )].reduce((result, row) => {
-      const id = String(row.getAttribute('data-app-action-sidebar-project-id') || '').trim();
-      const name = String(row.getAttribute('data-app-action-sidebar-project-label') || '').trim();
+    return [...document.querySelectorAll(sidebarProjects.selector)].reduce((result, row) => {
+      const { id, name } = sidebarProjects.metadata(row);
       if (!id || !name || seen.has(id)) return result;
       let path = '';
       for (const fiber of parentFibers(row)) {
@@ -112,9 +139,7 @@ const codexUIContracts = (() => {
   }
 
   function selectProject(projectID) {
-    const row = document.querySelector(
-      `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
-    );
+    const row = sidebarProjects.findRow(projectID);
     if (!row) return false;
     for (const fiber of parentFibers(row)) {
       const props = fiber.memoizedProps || fiber.pendingProps;
@@ -201,9 +226,7 @@ const codexUIContracts = (() => {
     const projectID = activeComposerProjectID();
     if (!projectID) return null;
 
-    const projectRow = document.querySelector(
-      `[data-app-action-sidebar-project-id="${CSS.escape(projectID)}"]`,
-    );
+    const projectRow = sidebarProjects.findRow(projectID);
     for (const fiber of parentFibers(projectRow)) {
       const props = fiber.memoizedProps || fiber.pendingProps;
       const group = props?.group;
@@ -424,6 +447,7 @@ const codexUIContracts = (() => {
     profileMenuAccountAnchor,
     threadRows,
     projects,
+    sidebarProjects,
     selectProject,
     threadRow,
     isThreadSelected,

@@ -68,13 +68,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   }
 
   function handleProjectMutations(records) {
-    const selector = '[data-app-action-sidebar-project-row]';
-    const containsProject = (node) => node instanceof Element
-      && (node.matches(selector) || Boolean(node.querySelector(selector)));
-    const projectsChanged = records.some((record) => record.type === 'attributes'
-      ? record.attributeName === 'data-app-action-sidebar-project-row' || record.target.matches(selector)
-      : [...record.addedNodes, ...record.removedNodes].some(containsProject));
-    if (projectsChanged) refreshProjects();
+    if (codexUIContracts.sidebarProjects.changedIn(records)) refreshProjects();
   }
 
   function startProjectObserver() {
@@ -85,7 +79,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     observedProjectSidebar = sidebar;
     if (!sidebar) return;
     projectObserver.observe(sidebar, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['data-app-action-sidebar-project-row', 'data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
+      attributeFilter: codexUIContracts.sidebarProjects.observedAttributes });
   }
 
   function renderTags() {

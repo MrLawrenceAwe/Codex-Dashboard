@@ -266,7 +266,9 @@ uses creation order, regardless of the displayed last updated dates.
 
 Codex updates can change the private contracts used by this unofficial integration.
 Dashboard checks compatibility after version changes. Warning icons and Diagnostics
-identify failed checks; blocking drift prevents remounting. Diagnostics also shows
-versions, refresh state, loaded chats, renderer targets, and copyable details.
+identify failed checks; **Unavailable** means a check could not complete, while
+**Compatibility not checked** means no checks have run. Blocking drift prevents
+remounting. Diagnostics also shows versions, refresh state, loaded chats, renderer
+targets, and copyable details.
 **Disable dashboard integration** immediately removes all injected controls; a normal
 Codex restart also removes them. The signed Codex application bundle is never modified.

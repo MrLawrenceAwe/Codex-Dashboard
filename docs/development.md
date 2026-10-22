@@ -94,7 +94,9 @@ Feature controllers own mounting and teardown; views own markup and presentation
 See [architecture](architecture.md) for refresh, persistence, account transactions,
 notifications and review execution, and [usage](usage.md) for user controls.
 `ReviewWorkspaceCheckpoint` inspects Git checkouts and ordinary folders through
-`workspace(at:)`, returning `ReviewWorkspaceState`. `ReviewFolderCheckpoint` owns
+`workspace(at:)`, returning `ReviewWorkspaceState`. Its optional `git` metadata
+holds the branch and clean-tree state; ordinary folders have no Git metadata.
+`ReviewFolderCheckpoint` owns
 folder fingerprints. `ReviewWorkspaceChecking` exposes read-only workspace and
 ancestry inspection; `ReviewGitPublishing` and `ReviewGitPublisher` own remote fetch,
 merge/abort, push, and upstream configuration. `ReviewLoopDriver` receives these as
@@ -127,6 +129,8 @@ removed assignments as unavailable.
 The `restartForSignIn` action uses `prepareForSignIn` to prepare a signed-out
 state for either a new account or reauthentication. Accounts are saved separately
 through `saveCurrentAccount`.
+`codex-ui-contracts.js` owns sidebar project-row selectors, metadata access, and
+observed attributes; project highlights and to-do monitoring consume that contract.
 `review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
 `review-loop-page.js` validates submissions and queues actions.
 `review-presentation.js` supplies shared labels independently of setup rendering.
@@ -244,8 +248,12 @@ storage keys remain unchanged to preserve saved filters and collapsed projects.
 
 ## Testing
 
-Review tests are split into coordinator, bridge, presentation, prompts, migration,
-and file-store suites, with doubles in `Reviews/ReviewLoopTestSupport.swift`.
+Review tests are split into coordinator, driver, workspace checkpoint, folder checkpoint,
+bridge, presentation, prompts, migration, and file-store suites, with doubles in
+`Reviews/ReviewLoopTestSupport.swift`. Driver tests cover app-server requests and
+response decoding, including the shared `ReviewTurnStatus` enum; checkpoint tests
+cover filesystem and Git inspection, and prompt and migration tests stay in their
+respective suites.
 Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
 Run `swift test` for the complete native and WebKit suite. For renderer presentation

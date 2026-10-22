@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class ReviewLoopResumeTests: ReviewLoopTestCase {
-    private func failLatest(_ driver: ReviewTestDriver, status: String) {
+    private func failLatest(_ driver: ReviewTestDriver, status: ReviewTurnStatus) {
         let latest = driver.thread.turns.last!
         driver.thread = ReviewThreadState(cwd: driver.thread.cwd, turns: driver.thread.turns.dropLast() + [
             ReviewTurnState(id: latest.id, status: status, finalMessage: nil)
@@ -12,7 +12,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
 
     func testResumeContinuesFailedReviewAndFixInSameChatOnce() async throws {
         for fixing in [false, true] {
-            for status in ["failed", "interrupted"] {
+            for status in [ReviewTurnStatus.failed, .interrupted] {
                 let (coordinator, store, driver) = try make(limit: 1)
                 await coordinator.advance(using: driver, threads: [])
                 if fixing {
@@ -117,7 +117,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
     func testResumeAfterRestartContinuesInterruptedTurn() async throws {
         let (coordinator, store, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "interrupted")
+        failLatest(driver, status: .interrupted)
         let recovered = ReviewLoopCoordinator(store: store)
         try recovered.apply(action(.resume, for: recovered), projects: [project])
         await recovered.advance(using: driver, threads: [])
@@ -128,11 +128,11 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
     func testResumeDoesNotRetryFailedContinuationWithoutAnotherClick() async throws {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "failed")
+        failLatest(driver, status: .failed)
         await coordinator.advance(using: driver, threads: [])
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "failed")
+        failLatest(driver, status: .failed)
         await coordinator.advance(using: driver, threads: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
@@ -152,7 +152,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
                 await coordinator.advance(using: driver, threads: [])
                 driver.branch = "other"
             }
-            failLatest(driver, status: "interrupted")
+            failLatest(driver, status: .interrupted)
             await coordinator.advance(using: driver, threads: [])
             let count = driver.prompts.count
             if change == "dirty-review" { driver.clean = false }
@@ -170,7 +170,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
         try coordinator.apply(action(.pause, for: coordinator), projects: [project])
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "failed")
+        failLatest(driver, status: .failed)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .blocked)
         XCTAssertEqual(driver.prompts.count, 1)
@@ -179,7 +179,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
     func testResumeDoesNotStartAlongsideAnotherRunningChat() async throws {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "failed")
+        failLatest(driver, status: .failed)
         await coordinator.advance(using: driver, threads: [])
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         let other = ThreadSummary(id: "other", title: "Other", preview: "Other", projectName: "Example",
@@ -193,7 +193,7 @@ final class ReviewLoopResumeTests: ReviewLoopTestCase {
     func testStopDuringResumePreflightPreventsContinuation() async throws {
         let (coordinator, _, driver) = try make()
         await coordinator.advance(using: driver, threads: [])
-        failLatest(driver, status: "failed")
+        failLatest(driver, status: .failed)
         await coordinator.advance(using: driver, threads: [])
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         driver.onWorkspace = { self.stop(coordinator) }

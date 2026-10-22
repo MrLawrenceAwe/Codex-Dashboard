@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testFixPromptDoesNotAskForTesting() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
+        let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseRevision: "abc"))
+        XCTAssertFalse(prompt.lowercased().contains("test"))
+        XCTAssertFalse(prompt.lowercased().contains("checks"))
+        XCTAssertEqual(prompt, "Fix all findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+        XCTAssertFalse(ReviewReportContract.instructions(for: .fix).lowercased().contains("test"))
+    }
+
+    func testOrganisationFixPromptNamesFindingsAndCommitForEachCount() {
+        for reviewType in [ReviewType.organisation, .organisationAndNaming] {
+            var loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
+            loop.reviewType = reviewType
+            for (count, expected) in [(1, "Address the finding and commit"), (2, "Address both findings and commit"), (3, "Address all findings and commit")] {
+                var round = ReviewRound(number: 1, baseRevision: "abc")
+                round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
+                    ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
+                }, summary: "Findings")
+                let prompt = ReviewPrompts.fixPrompt(for: loop, round: round)
+                XCTAssertEqual(prompt.components(separatedBy: "\n\n").first, expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+            }
+        }
+    }
+
     func testLiveDiscoveryMatchesReviewTypeAndUsesConditionalBugVerification() {
         for reviewType in ReviewType.allCases {
             for liveTesting in [false, true] {

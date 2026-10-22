@@ -36,7 +36,7 @@ struct ReviewWorkspaceCheckpoint: ReviewWorkspaceChecking {
         guard head == (try await ReviewGitCommand.output(["rev-parse", "HEAD"], at: path)) else {
             throw ReviewLoopError("HEAD changed while checking the commit checkpoint.")
         }
-        return ReviewWorkspaceState(root: root, branch: branch, revision: head, clean: status.isEmpty)
+        return ReviewWorkspaceState(root: root, revision: head, git: .init(branch: branch, isClean: status.isEmpty))
     }
 
     func resolveCommit(_ commit: String, at path: String) async throws -> String {

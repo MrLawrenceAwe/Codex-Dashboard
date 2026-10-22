@@ -97,7 +97,8 @@ final class ReviewTestDriver: ReviewLoopDriving {
         onWorkspace?()
         await onWorkspaceAsync?()
         if failWorkspace || path == failingPath { throw ReviewLoopError("Git timed out") }
-        return ReviewWorkspaceState(root: workspaceRoot ?? path, branch: branch, revision: commit, clean: clean, kind: workspaceKind)
+        return ReviewWorkspaceState(root: workspaceRoot ?? path, revision: commit,
+                                    git: workspaceKind == .git ? .init(branch: branch, isClean: clean) : nil)
     }
     func isAncestor(_ commit: String, of head: String, at path: String) async throws -> Bool { ancestor }
     func resolveCommit(_ commit: String, at path: String) async throws -> String {
@@ -120,7 +121,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
         selections.append(selection)
         speeds.append(speed)
         let id = "turn-\(prompts.count)"
-        thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: "inProgress", finalMessage: nil)])
+        thread = ReviewThreadState(cwd: "/tmp/example", turns: thread.turns + [ReviewTurnState(id: id, status: .inProgress, finalMessage: nil)])
         onStartTurn?()
         await onStartTurnAsync?()
         return id
@@ -128,10 +129,10 @@ final class ReviewTestDriver: ReviewLoopDriving {
     func interruptLatestTurn(_ threadID: String) async throws {
         if stopChatMissing { throw ReviewChatMissingError() }
         if failStopThread { throw ReviewLoopError("Connection timed out") }
-        guard let last = thread.turns.last, last.status == "inProgress" else { return }
+        guard let last = thread.turns.last, last.status == .inProgress else { return }
         interruptedTurns.append(last.id)
         thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
-            ReviewTurnState(id: last.id, status: "interrupted", finalMessage: nil)
+            ReviewTurnState(id: last.id, status: .interrupted, finalMessage: nil)
         ])
     }
     func readThread(_ threadID: String, reportTurnIDs: Set<String>) async throws -> ReviewThreadState {
@@ -153,7 +154,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     }
     func userFollowup() {
         thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns + [
-            ReviewTurnState(id: "followup-\(thread.turns.count + 1)", status: "inProgress", finalMessage: nil)
+            ReviewTurnState(id: "followup-\(thread.turns.count + 1)", status: .inProgress, finalMessage: nil)
         ])
     }
     func requestExtensionReload() {
@@ -165,7 +166,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     func finishTurn(_ report: String) {
         let last = thread.turns.last!
         thread = ReviewThreadState(cwd: thread.cwd, turns: thread.turns.dropLast() + [
-            ReviewTurnState(id: last.id, status: "completed", finalMessage: report)
+            ReviewTurnState(id: last.id, status: .completed, finalMessage: report)
         ])
     }
 }

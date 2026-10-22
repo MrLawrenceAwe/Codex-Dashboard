@@ -6,7 +6,6 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
     private func folderLoop(limit: Int = 2) throws -> (ReviewLoopCoordinator, ReviewTestStore, ReviewTestDriver) {
         let (coordinator, store, driver) = try make(limit: limit)
         driver.workspaceKind = .folder
-        driver.branch = ""
         return (coordinator, store, driver)
     }
 
@@ -26,6 +25,7 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         let (coordinator, _, driver) = try folderLoop()
         await startFix(coordinator, driver)
         XCTAssertEqual(coordinator.loops[0].workspaceKind, .folder)
+        XCTAssertNil(coordinator.loops[0].branch)
         XCTAssertTrue(driver.prompts[1].contains("Do not initialise Git"))
         finishFolderFix(driver)
         await coordinator.advance(using: driver, threads: [])
@@ -77,6 +77,8 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         let (coordinator, store, driver) = try folderLoop(limit: 1)
         await startFix(coordinator, driver)
         finishFolderFix(driver)
+        // Existing saved folder rounds may still contain the former empty branch.
+        store.loops[0].branch = ""
         let restored = ReviewLoopCoordinator(store: store)
         XCTAssertEqual(restored.loops[0].phase, .paused)
         try restored.apply(action(.resume, for: restored), projects: [project])
@@ -94,7 +96,6 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops[0].phase, .paused)
         driver.failWorkspace = false
         driver.workspaceKind = .folder
-        driver.branch = ""
         let restored = ReviewLoopCoordinator(store: store)
         try restored.apply(action(.resume, for: restored), projects: [project])
         await restored.advance(using: driver, threads: [])
@@ -133,7 +134,6 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         try coordinator.apply(start, projects: [project])
         let driver = ReviewTestDriver()
         driver.workspaceKind = .folder
-        driver.branch = ""
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .blocked)
         XCTAssertTrue(coordinator.loops[0].message.contains("Remote push requires Git"))

@@ -1,6 +1,7 @@
 const sidebarProjectHighlights = (() => {
   const key = 'codex-dashboard.sidebar-project-highlights';
-  const selector = '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
+  const projectContract = codexUIContracts.sidebarProjects;
+  const selector = projectContract.selector;
   const palette = { Yellow: '#d6b64c', Green: '#69b883', Blue: '#719fe8', Purple: '#ae87d9', Pink: '#d781af', Red: '#dc6b6b', Orange: '#d89459' };
   let colours = new Map();
   let observer;
@@ -24,7 +25,7 @@ const sidebarProjectHighlights = (() => {
 
   function updateRow(row) {
     if (!row?.isConnected) return;
-    const id = row.getAttribute('data-app-action-sidebar-project-id');
+    const { id, name } = projectContract.metadata(row);
     const colour = palette[colours.get(id)];
     const label = row.querySelector('[data-marquee-text]');
     const highlighted = label?.hasAttribute('data-codex-project-highlight-name');
@@ -46,9 +47,8 @@ const sidebarProjectHighlights = (() => {
       button.textContent = '◉';
       row.append(button);
     }
-    const name = row.getAttribute('data-app-action-sidebar-project-label') || 'project';
-    setAttribute(button, 'aria-label', `Highlight colour for ${name}`);
-    setAttribute(button, 'title', `Highlight colour for ${name}`);
+    setAttribute(button, 'aria-label', `Highlight colour for ${name || 'project'}`);
+    setAttribute(button, 'title', `Highlight colour for ${name || 'project'}`);
     setAttribute(button, 'aria-haspopup', 'dialog');
     setAttribute(button, 'aria-expanded', String(Boolean(dialog && activeID === id)));
     if (button.style.color !== (colour || '')) button.style.color = colour || '';
@@ -77,11 +77,12 @@ const sidebarProjectHighlights = (() => {
     if (!row) return;
     opener = button;
     activeRow = row;
-    activeID = row.getAttribute('data-app-action-sidebar-project-id');
+    const { id, name } = projectContract.metadata(row);
+    activeID = id;
     dialog = document.createElement('div');
     dialog.id = 'codex-sidebar-project-colours';
     dialog.setAttribute('role', 'dialog');
-    dialog.setAttribute('aria-label', `Highlight ${row.getAttribute('data-app-action-sidebar-project-label') || 'project'}`);
+    dialog.setAttribute('aria-label', `Highlight ${name || 'project'}`);
     const title = document.createElement('strong');
     title.textContent = 'Project highlight';
     dialog.append(title);
@@ -157,7 +158,7 @@ const sidebarProjectHighlights = (() => {
     observer = new MutationObserver(handleMutations);
     if (sidebar) {
       observer.observe(sidebar, { childList: true, subtree: true, attributes: true,
-        attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
+        attributeFilter: projectContract.observedAttributes });
       updateRows(sidebar);
     }
   }
