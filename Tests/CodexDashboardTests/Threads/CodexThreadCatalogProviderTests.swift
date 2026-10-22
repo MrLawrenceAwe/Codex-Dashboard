@@ -3,6 +3,48 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testCrossProjectCheckoutUsesActualFolderForGitGroupName() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let advisor = workspace.appendingPathComponent("CV Fit Advisor")
+        let jobs = workspace.appendingPathComponent("Job Hunting")
+        let nested = jobs.appendingPathComponent("applications")
+        for folder in [advisor, nested] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        let git = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["init", jobs.path], timeout: 3)
+        XCTAssertEqual(git.terminationStatus, 0)
+        try Data("application".utf8).write(to: jobs.appendingPathComponent("notes.txt"))
+        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
+        let setup = """
+        DELETE FROM project_roots;
+        DELETE FROM projects;
+        INSERT INTO projects (id, name) VALUES ('advisor', 'CV Fit Advisor'), ('jobs', 'Job Hunting');
+        INSERT INTO project_roots (project_id, path) VALUES ('advisor', \(sql(advisor.path))), ('advisor', \(sql(jobs.path))), ('jobs', \(sql(jobs.path)));
+        UPDATE threads SET project_id = 'advisor';
+        UPDATE threads SET cwd = \(sql(advisor.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sql(nested.path)) WHERE id = 'updated';
+        UPDATE threads SET cwd = \(sql(jobs.path)), project_id = 'jobs' WHERE id = 'idle';
+        """
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, setup], timeout: 3)
+        XCTAssertEqual(result.terminationStatus, 0)
+        let catalog = try await CodexThreadCatalogProvider(stateDatabaseURL: url)
+            .loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        let crossProject = try XCTUnwrap(catalog.threads.first { $0.id == "updated" })
+        XCTAssertEqual(crossProject.projectID, "advisor", "Preserve actual chat membership")
+        XCTAssertEqual(crossProject.projectName, "Job Hunting")
+        XCTAssertEqual(crossProject.projectGroupPath, jobs.path)
+        XCTAssertTrue(crossProject.sharesProjectRepository)
+        XCTAssertEqual(catalog.threads.first { $0.id == "idle" }?.projectName, crossProject.projectName)
+        let statuses = await ProjectGitStatusProvider().loadStatuses(
+            for: Set(catalog.threads.compactMap(\.projectGroupPath)), policy: .refresh)
+        XCTAssertEqual(statuses[advisor.path], .notRepository)
+        XCTAssertEqual(statuses[jobs.path], .uncommittedChanges)
+    }
+
     func testGitActionEligibilityUsesRepositoryIdentityWithinProjectGroups() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)

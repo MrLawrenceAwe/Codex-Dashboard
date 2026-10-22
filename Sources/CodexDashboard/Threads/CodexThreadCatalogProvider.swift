@@ -161,6 +161,19 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         // write. The reader checks file signatures and only parses changed rollouts.
         let candidates: [ThreadSummary] = threads.map { thread in
             let root = registeredRoot(for: thread, in: cachedProjectRoots)
+            let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
+            // Project membership can differ from the checkout (for example, a
+            // CV chat working in Job Hunting). Label and scan the same folder.
+            let matchingRoots = cachedProjectRoots.filter {
+                cwd == $0.path || cwd.hasPrefix($0.path + "/")
+            }
+            let checkoutRoot = matchingRoots.max { $0.path.count < $1.path.count }
+            let checkoutName = checkoutRoot.map { checkout in
+                let names = Set(matchingRoots.filter { $0.path == checkout.path }.map(\.name))
+                // Duplicate registrations can give the same folder different
+                // project names. Its own name is the unambiguous group label.
+                return names.count > 1 ? URL(fileURLWithPath: checkout.path).lastPathComponent : checkout.name
+            }
             let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
             let isCurrentEvent = recordedEvent.map { event in
                 codexLaunchDate.map { event.timestamp >= $0 } ?? false
@@ -181,7 +194,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                projectName: root?.name ?? "Other chats",
+                projectName: checkoutName ?? root?.name ?? "Other chats",
                 checkoutPath: thread.checkoutPath,
                 recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
@@ -193,9 +206,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             summary.latestQuestionEvent = rolloutQuestionReader.latestRecordedEvent(at: thread.rolloutPath)
             summary.projectID = root?.id
             if let root {
-                let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
                 // Worktree chats can be assigned to a project outside its saved root.
-                summary.projectGroupPath = cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd
+                summary.projectGroupPath = checkoutRoot?.path
+                    ?? (cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd)
                 if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
                     summary.sharesProjectRepository = repositoryRoot(cwd) == repository
                 }

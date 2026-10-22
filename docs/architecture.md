@@ -39,6 +39,9 @@ the previous question. Both readers share a cached reverse JSONL scanner.
 snapshots establish a baseline without opening historical questions.
 
 Project grouping uses saved projects and canonical roots, including symlink aliases.
+When a chat's checkout is inside another saved project, its dashboard group uses
+that folder's name and root for Git status, while preserving the chat's project membership.
+Conflicting names for duplicate registrations of one root use the folder's own name.
 Removed projects lose change indicators; their chats retain their original checkout
 paths under Other chats. Worktree chats retain appropriate checkout grouping.
 `ThreadSnapshotService` applies cached Git status and unread state to the catalog.
