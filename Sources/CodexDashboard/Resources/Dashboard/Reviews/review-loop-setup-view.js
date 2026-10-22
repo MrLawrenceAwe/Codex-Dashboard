@@ -29,7 +29,7 @@ const reviewLoopSetupView = (() => {
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
         </select></label>
         <label>Round limit<input data-review-limit type="number" min="1" max="20" value="5" required aria-describedby="review-limit-help"></label>
-        <p id="review-limit-help" class="review-field-help">Stops when no qualifying findings remain or this limit is reached.</p>
+        <p id="review-limit-help" class="review-field-help">Stops early when no qualifying findings remain.</p>
         </fieldset>
         <details class="review-execution-options" open><summary>Model &amp; speed</summary>
         <fieldset class="review-execution"><legend class="review-execution-legend">Execution settings</legend>
@@ -43,12 +43,12 @@ const reviewLoopSetupView = (() => {
         <details class="review-testing-options"><summary>Testing &amp; publishing</summary>
         <fieldset class="review-limits"><legend class="review-visually-hidden">Testing and publishing settings</legend>
         <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
-        <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Include live testing alongside the normal review.</p>
+        <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Test the running app during review.</p>
         <label class="review-extension">Reload browser extension<select data-review-extension aria-label="Reload browser extension before testing" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
-        <p id="review-extension-help" class="review-field-help review-extension-help">Reload before live testing and, when live verification is needed, after building fixes. If a required reload fails, the loop waits for a manual reload.</p>
+        <p id="review-extension-help" class="review-field-help review-extension-help">Reload before testing and after fixes that need live verification. Failed reloads wait for you.</p>
         <label class="review-mute-test-playback"><input type="checkbox" data-review-mute-test-playback> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
-        <p class="review-field-help review-push-help">Pushing requires a configured remote. Uses the branch’s upstream, or origin (or the sole remote) for a new branch. If remote history diverges, Dashboard merges it into the local checkout, creates a merge commit, and verifies the merged changes before pushing. Push failures block the loop. Resolve the issue, then Resume to retry.</p>
+        <p class="review-field-help review-push-help">Requires an upstream, origin, or sole remote. Diverged history is merged, committed and verified before pushing. Push failures block the loop; resolve them, then Resume.</p>
         </fieldset>
         </details>
         <p class="review-availability" data-review-availability role="status" hidden></p>
@@ -94,8 +94,8 @@ const reviewLoopSetupView = (() => {
     push.disabled = folder || root.querySelector('[data-review-start]').disabled;
     push.querySelector('option[value="false"]').textContent = folder ? 'Save changes in folder' : 'Keep commits local';
     root.querySelector('[data-review-workspace-help]').textContent = folder
-      ? 'Ordinary folder: fixes are saved directly and verified against the files. Git is not required.'
-      : 'Git project: fixes are committed and can optionally be pushed to remote.';
+      ? 'Fixes are saved and verified in this folder.'
+      : 'Fixes are committed locally. Remote push is optional.';
     root.querySelector('.review-push-help').hidden = folder;
     const reviewType = root.querySelector('[data-review-type]').value;
     root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === reviewType)?.scopeDescription || '';
@@ -172,7 +172,7 @@ const reviewLoopSetupView = (() => {
     root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
     const availability = root.querySelector('[data-review-availability]');
     availability.hidden = availableProjects.length > 0;
-    availability.textContent = projects.length ? 'Every project already has an active loop. Finish or stop a loop to start another.' : 'Review loops require a local project with one folder. Add or choose a single-folder project in Codex.';
+    availability.textContent = projects.length ? 'All projects have active loops. Finish or stop one to continue.' : 'Choose a local, single-folder project in Codex to start.';
   }
 
   function reset() {

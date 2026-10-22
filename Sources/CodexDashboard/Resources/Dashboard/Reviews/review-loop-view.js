@@ -31,7 +31,7 @@ const reviewLoopView = (() => {
           <button type="button" data-review-history-action="deleteOlder" aria-describedby="review-history-delete-help">Delete loops created earlier</button>
           <button type="button" data-review-history-action="deleteAll">Delete all history</button>
         </div>
-        <p id="review-history-delete-help" class="review-field-help">Deletes saved loops created before the selected loop, regardless of their last updated date. Review chats remain available.</p>
+        <p id="review-history-delete-help" class="review-field-help">Deletes loops created before this one. Review chats are kept.</p>
         </details>
         <details class="review-history-details" data-review-history-details>
           <summary>Loop details</summary>

@@ -215,7 +215,7 @@ const todoListView = (() => {
             <select data-todo-project-filter aria-label="Filter by project"><option value="">All projects</option></select>
             <select data-todo-tag-filter aria-label="Filter by tag"><option value="">All tags</option></select>
           </div>
-          <button type="button" class="todo-clear" data-todo-clear-completed hidden>Delete all completed to-dos</button>
+          <button type="button" class="todo-clear" data-todo-clear-completed hidden>Delete completed</button>
         </div>
         <main class="todo-list" data-todo-list></main>
       </div>`;

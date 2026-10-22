@@ -71,7 +71,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             rounds:[{number:1,baseRevision:'base',fixRequested:true}]};
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),projects:[git,folder],loops:[loop]});
           const card = document.querySelector('[data-loop-id="loop"]');
-          return [folderDisabled,gitEnabled,help.includes('Git is not required'),
+          return [folderDisabled,gitEnabled,help.includes('saved and verified in this folder'),
             card.textContent.includes('Fix & verify'),!card.textContent.includes('Fix commits'),
             card.textContent.includes('Save and verify folder changes')];
         })()

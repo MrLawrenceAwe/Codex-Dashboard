@@ -9,7 +9,7 @@ const promptLibraryView = (() => {
     const formAttribute = renaming ? 'data-prompt-section-rename-form' : 'data-prompt-section-form';
     content.innerHTML = `
       <form class="dashboard-prompt-form" ${formAttribute}>
-        <p class="dashboard-prompt-section-help">Sections are shared across all projects. Renaming or deleting a section affects every prompt in it, including prompts in other projects.</p>
+        <p class="dashboard-prompt-section-help">Sections are shared. Changes apply to their prompts across all projects.</p>
         <label>Section name<input name="sectionName" autocomplete="off" maxlength="80" ${renaming ? `value="${domUtils.escapeHTML(dialogState.section)}"` : 'placeholder="e.g. Code review"'} required /></label>
         <div class="dashboard-prompt-form-actions">
           <button type="button" class="dashboard-prompt-secondary" data-prompt-cancel>Cancel</button>
@@ -129,7 +129,7 @@ const promptLibraryView = (() => {
             <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
           </section>`;
       }).join('');
-      const emptyMessage = query ? 'No matching prompts' : 'No prompts saved here yet';
+      const emptyMessage = query ? 'No matching prompts' : 'No saved prompts';
       return `
         <section class="dashboard-prompt-scope" data-prompt-scope="${domUtils.escapeHTML(promptLibraryContract.scopeKey(group.scope))}">
           <h3>${domUtils.escapeHTML(group.title)}</h3>
@@ -138,7 +138,7 @@ const promptLibraryView = (() => {
     }).join('');
     content.innerHTML = `
       <div class="dashboard-prompt-tools">
-        <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search value="${domUtils.escapeHTML(searchTerm)}" /></label>
+        <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search placeholder="Search prompts…" value="${domUtils.escapeHTML(searchTerm)}" /></label>
       </div>
       <div class="dashboard-prompt-list">
         ${groups}

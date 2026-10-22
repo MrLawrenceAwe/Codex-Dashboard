@@ -44,7 +44,7 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop p { line-height:1.6; margin:0; color:var(--review-muted); }
 .dashboard-review-loop form { display:grid; grid-template-columns:minmax(0, 1fr); gap:18px; min-width:0; padding:22px; border:1px solid var(--review-border); border-radius:16px; background:var(--review-tint); }
 .dashboard-review-loop .review-section-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; grid-column:1 / -1; }
-.dashboard-review-loop label { display:flex; flex-direction:column; gap:9px; min-width:0; font-weight:500; font-size:12px; }
+.dashboard-review-loop label { display:flex; flex-direction:column; gap:6px; min-width:0; font-weight:500; font-size:12px; }
 .dashboard-review-loop select, .dashboard-review-loop input { width:100%; min-width:0; min-height:42px; background:var(--app-color-background-surface, #212121); color:inherit; border:1px solid var(--review-border); border-radius:8px; padding:10px 12px; font:inherit; font-size:13px; font-weight:400; }
 .dashboard-review-loop :is(select, input):hover:not(:disabled) { border-color:color-mix(in srgb, currentColor 35%, transparent); }
 .dashboard-review-loop select { appearance:none; padding-right:34px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m5 6 3 3 3-3' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
@@ -138,7 +138,10 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop .review-limits { grid-template-columns:90px minmax(0, 1fr); padding-top:4px; }
 .dashboard-review-loop .review-limits > label:has([data-review-type]), .dashboard-review-loop [data-review-type-help], .dashboard-review-loop .review-priority, .dashboard-review-loop .review-remote-push, .dashboard-review-loop .review-push-help { grid-column:1 / -1; }
 .dashboard-review-loop .review-scope { grid-template-columns:minmax(0, 1fr); }
-.dashboard-review-loop .review-field-help { align-self:end; font-size:11px; }
+.dashboard-review-loop .review-field-help { align-self:end; font-size:12px; line-height:1.5; }
+.dashboard-review-loop [data-review-workspace-help] { grid-column:1 / -1; }
+.dashboard-review-loop .review-testing-options .review-limits { grid-template-columns:minmax(0, 1fr); gap:12px; }
+.dashboard-review-loop .review-testing-options .review-field-help { margin-top:-6px; }
 .dashboard-review-loop .review-availability { padding:12px; border-radius:8px; background:var(--review-tint); font-size:12px; }
 
 

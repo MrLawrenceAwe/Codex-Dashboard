@@ -335,7 +335,11 @@ extension PromptLibraryWebTests {
               const defaults = {
                 hasPreset: document.querySelector('[name="hasPreset"]').checked,
                 fieldsDisabled: fields.disabled,
+                fieldsHidden: getComputedStyle(fields).display === 'none',
               };
+              document.querySelector('[name="hasPreset"]').click();
+              defaults.fieldsVisibleWhenEnabled = getComputedStyle(fields).display !== 'none';
+              document.querySelector('[name="hasPreset"]').click();
               document.querySelector('[name="name"]').value = 'Plain prompt';
               document.querySelector('[name="content"]').value = 'Insert without changing my model';
               document.querySelector('[data-prompt-form] button[type="submit"]').click();
@@ -356,6 +360,8 @@ extension PromptLibraryWebTests {
 
         XCTAssertEqual(defaults["hasPreset"] as? Bool, false)
         XCTAssertEqual(defaults["fieldsDisabled"] as? Bool, true)
+        XCTAssertEqual(defaults["fieldsHidden"] as? Bool, true)
+        XCTAssertEqual(defaults["fieldsVisibleWhenEnabled"] as? Bool, true)
         XCTAssertNil(storedPrompt["preset"])
         XCTAssertNil(storedPrompt["usePreset"])
         XCTAssertEqual(values["hasPresetSummary"] as? Bool, false)
