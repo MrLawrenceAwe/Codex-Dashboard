@@ -34,6 +34,7 @@ struct ReviewChatMissingError: LocalizedError {
 @MainActor
 protocol ReviewLoopDriving: Sendable {
     func projects() async throws -> [ReviewProject]
+    func models() async throws -> [ReviewModel]
     func workspace(at path: String) async throws -> ReviewWorkspaceState
     func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome
     func resolveCommit(_ commit: String, at path: String) async throws -> String

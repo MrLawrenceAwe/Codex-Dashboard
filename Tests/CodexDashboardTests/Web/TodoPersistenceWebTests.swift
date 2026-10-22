@@ -5,6 +5,60 @@ import XCTest
 
 @MainActor
 final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
+    func testImageWriteExceptionKeepsInlineFallbackAndRetriesLater() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const item = store.create({title:'Image',image:{dataURL:'data:image/png;base64,AAAA',size:3}});
+          const originalPut = IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put = function() { throw new DOMException('Full', 'QuotaExceededError'); };
+          let saved;
+          try { saved = await store.save([item], []); }
+          finally { IDBObjectStore.prototype.put = originalPut; }
+          const inline = store.load()[0];
+          await store.save([{...inline,title:'Retry'}], [], [inline], []);
+          const stored = store.load()[0];
+          const [hydrated] = await window.__todoImageStoreForTests.load([stored]);
+          return [saved, inline.image.dataURL === item.image.dataURL,
+            stored.image.dataURL === '', hydrated.image.dataURL === item.image.dataURL];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, true, true, true])
+    }
+
+    func testTextOnlySavesDoNotRewriteImagesAndMissingImagesAreRestored() async throws {
+        let view = try await webView()
+        let result = try await view.evaluateAsyncJavaScript("""
+        (async () => {
+          const store = window.__todoStoreForTests;
+          const images = window.__todoImageStoreForTests;
+          const originalPut = IDBObjectStore.prototype.put;
+          let writes = 0;
+          IDBObjectStore.prototype.put = function(...args) {
+            writes++;
+            return originalPut.apply(this, args);
+          };
+          try {
+            const item = store.create({title:'Image',image:{dataURL:'data:image/png;base64,AAAA',size:3}});
+            await store.save([item], []);
+            let [hydrated] = await images.load(store.load());
+            for (const title of ['First edit', 'Second edit']) {
+              const edited = {...hydrated, title};
+              await store.save([edited], [], [hydrated], []);
+              hydrated = edited;
+            }
+            const writesAfterTextEdits = writes;
+            await images.prune([]);
+            await store.save([hydrated], [], [hydrated], []);
+            const [restored] = await images.load(store.load());
+            return [writesAfterTextEdits, writes, restored.image.dataURL === item.image.dataURL];
+          } finally { IDBObjectStore.prototype.put = originalPut; }
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, [1, 2, true])
+    }
+
     func testTextSavePreservesRowControlsAndFocusUntilNextAction() async throws {
         for field in ["title", "body"] {
             let view = try await webView()

@@ -73,6 +73,11 @@ final class DashboardRenderer {
         return targets
     }
 
+    func waitForReviewOperations() async {
+        await waitForSynchronizationsToFinish()
+        await reviewLoopBridge?.waitForOperations()
+    }
+
     func prepareForRestart() {
         maintainsDashboard = true
         clearMountState()
@@ -215,7 +220,7 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
-        try await reviewLoopBridge?.advanceAndSynchronize(targets: targets, threads: snapshot.threads)
+        try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
     }
@@ -224,6 +229,7 @@ final class DashboardRenderer {
         let wasMaintainingDashboard = maintainsDashboard
         maintainsDashboard = false
         await waitForSynchronizationsToFinish()
+        await waitForReviewOperations()
 
         do {
             let targets = await targets(forceRefresh: true)

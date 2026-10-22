@@ -5,6 +5,32 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testRestartAndAccountPreflightsDrainReviewsBeforeCheckingRunningChats() async throws {
+        for accountChange in [false, true] {
+            let catalog = SequencedCatalogProvider(catalogs: [ThreadCatalog(
+                threads: [.fixture(id: "late-review", runState: .running)], totalThreadCount: 1
+            )])
+            let runtime = StubDashboardRuntime(codexIsRunning: true)
+            var release: CheckedContinuation<Void, Never>?
+            runtime.onWaitForReviewOperations = {
+                await withCheckedContinuation { release = $0 }
+            }
+            let coordinator = makeAppCoordinator(catalogProvider: catalog, runtimeFactory: { _ in runtime })
+            let transition = Task { @MainActor in
+                if accountChange { await coordinator.prepareForSignIn() }
+                else { await coordinator.restartCodexAndEnableDashboard() }
+            }
+            try await waitUntil { release != nil }
+            let requestsBeforeDrain = await catalog.requestCount
+            XCTAssertEqual(requestsBeforeDrain, 0)
+            XCTAssertEqual(runtime.restartCallCount, 0)
+            release?.resume()
+            await transition.value
+            XCTAssertEqual(coordinator.threads.first?.runState, .running)
+            XCTAssertEqual(runtime.restartCallCount, 0)
+        }
+    }
+
     func testDisableWithoutRendererPreservesCodexProcessState() async {
         for isRunning in [false, true] {
             let runtime = StubDashboardRuntime(codexIsRunning: isRunning)

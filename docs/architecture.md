@@ -105,8 +105,10 @@ To-dos live in renderer storage, with image data in IndexedDB and an inline fall
 `todoStore.create` accepts a complete draft object and normalises text, image, tags,
 project, linked thread, and model preset before the controller queues persistence.
 Writes merge changed fields into the latest shared document, preserving other
-windows' edits and image references. Concurrent deletion beats stale edits; storage
-notifications refresh open windows. Text saves update existing rows so click targets
+windows' edits and image references. Image saves check immutable attachment keys in
+IndexedDB and write only missing keys, restoring pruned data when it is still in memory
+without rewriting existing image payloads for text edits. Concurrent deletion beats stale edits;
+storage notifications refresh open windows. Text saves update existing rows so click targets
 and keyboard focus survive the save. Draft protection prevents replacement of an
 actively edited field before its change is committed. View preferences and project
 highlights persist separately.
@@ -173,7 +175,11 @@ the review response does not include a separate total. Malformed reports explain
 format correction needed before resuming. Investigation and progress messages remain unrestricted.
 `ReviewLoopPresentation` builds progress and configured prompt previews from current
 settings. These previews are not records of submitted turns. The renderer submits actions
-and displays snapshots without owning execution.
+and displays snapshots without owning execution. Review inspection, remote publication,
+choice loading, and stop requests run outside snapshot synchronization, so slow work
+does not hold up chat updates or control receipt. Restart, disable, and account-change
+preflights drain those operations before checking active chats or tearing down the renderer.
+Unchanged review controls and round details retain their DOM elements and keyboard focus.
 
 `ReviewLoopDriver` uses the renderer's local app-server connection and reads bounded
 turn/item pages. It loads reports for the first and latest turns and the saved checkpoint

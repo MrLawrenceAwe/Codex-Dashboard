@@ -278,6 +278,7 @@ final class AppCoordinator: ObservableObject {
 
     private func cancelSynchronization() async {
         await synchronizationCoalescer.cancelAndWait()
+        await dashboardRuntime?.waitForReviewOperations()
     }
 
     func setFailure(_ error: Error, lastKnownState: DashboardConnectionState) {

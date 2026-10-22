@@ -1,5 +1,13 @@
 const reviewLoopCardView = (() => {
   const escape = domUtils.escapeHTML;
+  const renderedMarkup = new WeakMap();
+  const renderedRounds = new WeakMap();
+
+  function updateMarkup(element, markup) {
+    if (renderedMarkup.get(element) === markup) return;
+    element.innerHTML = markup;
+    renderedMarkup.set(element, markup);
+  }
 
   function findingBody(body, loopID) {
     const text = String(body || '');
@@ -101,7 +109,7 @@ const reviewLoopCardView = (() => {
     const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID)}${selection.reasoningEffort ? ` · ${escape(composerPresets.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
     const reviewTypeLabel = reviewPresentation.reviewTypeLabel(loop.reviewType, reviewTypes);
     root.querySelector('[data-review-scope-label]').textContent = [reviewTypeLabel, loop.priorityLimit ? `P0${loop.priorityLimit === 'P0' ? '' : `–${loop.priorityLimit}`}` : ''].filter(Boolean).join(' · ');
-    root.querySelector('[data-review-context]').innerHTML = `<span>${escape(reviewTypeLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.liveTesting ? '<span>Live testing enabled</span>' : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.workspaceKind === 'folder' ? 'Save and verify folder changes' : loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`;
+    updateMarkup(root.querySelector('[data-review-context]'), `<span>${escape(reviewTypeLabel)}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.liveTesting ? '<span>Live testing enabled</span>' : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.workspaceKind === 'folder' ? 'Save and verify folder changes' : loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`);
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -115,14 +123,16 @@ const reviewLoopCardView = (() => {
     renderFeedback(root, loop);
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    controls.innerHTML = loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
+    updateMarkup(controls, loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
       ? '<button type="button" data-review-action="resume">Extension reloaded — continue</button>'
       : ['paused', 'blocked'].includes(loop.phase)
       ? '<button type="button" data-review-action="resume">Resume</button>'
       : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
-      <button type="button" data-review-action="stop">Stop loop</button>`;
+      <button type="button" data-review-action="stop">Stop loop</button>`);
     controls.querySelectorAll('button').forEach(button => { button.dataset.reviewLoopID = loop.id; });
-    if (pendingAction) controls.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    controls.querySelectorAll('button').forEach(button => {
+      button.disabled = !!pendingAction || (button.dataset.reviewAction === 'pause' && !!loop.pauseRequested);
+    });
     const playbackSetting = root.querySelector('[data-review-test-playback-setting]');
     playbackSetting.hidden = loop.isFinished || loop.phase === 'stopping' || !loop.liveTesting;
     if (!playbackSetting.hidden) {
@@ -132,11 +142,16 @@ const reviewLoopCardView = (() => {
       input.checked = !!loop.muteTestPlayback;
       input.disabled = !!pendingAction;
     }
-    const expandedRounds = new Set(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('.review-round-details[open]')].map(details => details.dataset.round) : []);
-    const findingsState = new Map(root.dataset.renderedLoop === loop?.id ? [...root.querySelectorAll('.review-findings-details')].map(details => [details.dataset.round, { open: details.open, completed: details.dataset.completed === 'true' }]) : []);
-    root.dataset.renderedLoop = loop?.id || '';
-    root.querySelector('[data-review-rounds]').innerHTML = loop.rounds.map(round =>
-      roundMarkup(round, loop, expandedRounds, findingsState, loop.isFinished)).join('');
+    const rounds = root.querySelector('[data-review-rounds]');
+    const signature = JSON.stringify([loop.id, loop.rounds, loop.phase, loop.isFinished, loop.pushToRemote, loop.workspaceKind]);
+    if (renderedRounds.get(rounds) !== signature) {
+      const expandedRounds = new Set(root.dataset.renderedLoop === loop.id ? [...rounds.querySelectorAll('.review-round-details[open]')].map(details => details.dataset.round) : []);
+      const findingsState = new Map(root.dataset.renderedLoop === loop.id ? [...rounds.querySelectorAll('.review-findings-details')].map(details => [details.dataset.round, { open: details.open, completed: details.dataset.completed === 'true' }]) : []);
+      root.dataset.renderedLoop = loop.id;
+      rounds.innerHTML = loop.rounds.map(round =>
+        roundMarkup(round, loop, expandedRounds, findingsState, loop.isFinished)).join('');
+      renderedRounds.set(rounds, signature);
+    }
   }
   function renderFeedback(root, loop) {
     const stages = reviewPresentation.roundStages(loop);

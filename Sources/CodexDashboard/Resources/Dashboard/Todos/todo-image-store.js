@@ -21,7 +21,7 @@ const todoImageStore = (() => {
     try {
       return await new Promise((resolve, reject) => {
         const transaction = database.transaction(storeName, mode);
-        const result = operation(transaction.objectStore(storeName));
+        const result = operation(transaction.objectStore(storeName), transaction);
         transaction.addEventListener('complete', () => resolve(result));
         transaction.addEventListener('abort', () => reject(transaction.error));
         transaction.addEventListener('error', () => reject(transaction.error));
@@ -32,9 +32,19 @@ const todoImageStore = (() => {
   }
 
   function persist(items) {
-    return withStore('readwrite', (store) => {
-      items.filter((item) => item.image?.dataURL)
-        .forEach((item) => store.put(item.image.dataURL, item.image.storageKey));
+    const images = items.filter((item) => item.image?.dataURL).map((item) => item.image);
+    if (!images.length) return Promise.resolve();
+    return withStore('readwrite', (store, transaction) => {
+      // Image keys identify immutable attachments. Check keys without cloning the
+      // stored base64 data; a missing key is restored even after pruning or eviction.
+      images.forEach((image) => {
+        const existing = store.getKey(image.storageKey);
+        existing.addEventListener('success', () => {
+          if (existing.result !== undefined) return;
+          try { store.put(image.dataURL, image.storageKey); }
+          catch (_) { transaction.abort(); }
+        });
+      });
     });
   }
 

@@ -376,6 +376,8 @@ final class StubDashboardRuntime: DashboardRuntime {
         if let synchronizationError { throw synchronizationError }
         try await onPromptLibraryFlush?()
     }
+    var onWaitForReviewOperations: (() async -> Void)?
+    func waitForReviewOperations() async { await onWaitForReviewOperations?() }
     func prepareForRestart() {}
     func restartCodex() async throws -> [DevToolsTarget] {
         restartCallCount += 1

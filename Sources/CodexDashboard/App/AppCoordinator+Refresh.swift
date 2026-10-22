@@ -152,7 +152,7 @@ extension AppCoordinator {
     func publishSnapshotIfMaintained() async {
         guard !Task.isCancelled, !isPerformingAction, let dashboardRuntime, dashboardRuntime.maintainsDashboard else { return }
         let targets = await dashboardRuntime.rendererTargets()
-        guard !Task.isCancelled, !targets.isEmpty else { return }
+        guard !Task.isCancelled, !isPerformingAction, !targets.isEmpty else { return }
         try? await publishSnapshot(to: targets, using: dashboardRuntime)
     }
 

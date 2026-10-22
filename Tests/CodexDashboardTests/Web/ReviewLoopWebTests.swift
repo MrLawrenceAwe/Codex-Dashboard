@@ -10,6 +10,46 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testUnchangedReviewRefreshPreservesFocusedControlsAndFindings() async throws {
+        let view = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-focus.test"))
+        let result = try await view.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const loop = {id:'focus', project:{id:'p',name:'Example',path:'/tmp/example'},
+            phase:'running',isFinished:false,completedRoundCount:0,maxRounds:3,
+            rounds:[{number:1,threadID:'chat',review:{outcome:'reviewed',
+              findings:[{title:'Issue',body:'Details'}]}}]};
+          const snapshot = {projects:[],models:[],loops:[loop]};
+          api.applyReviewPageSnapshot(snapshot);
+          api.openReviews();
+          const pause = document.querySelector('[data-review-action="pause"]');
+          pause.focus();
+          api.applyReviewPageSnapshot(snapshot);
+          const controlRetained = pause.isConnected && document.activeElement === pause;
+          pause.click();
+          const disabledWhilePending = pause.disabled;
+          snapshot.acknowledgedActionID = JSON.parse(api.pendingReviewAction()).id;
+          api.applyReviewPageSnapshot(snapshot);
+          const enabledAfterAcknowledgement = !pause.disabled;
+          const details = document.querySelector('.review-findings-details');
+          details.open = false;
+          const summary = details.querySelector('summary');
+          summary.focus();
+          loop.message = 'Updated progress';
+          api.applyReviewPageSnapshot(snapshot);
+          const findingsRetained = summary.isConnected && document.activeElement === summary && !details.open;
+          loop.rounds[0].review.findings[0].body = 'Updated finding';
+          api.applyReviewPageSnapshot(snapshot);
+          loop.phase = 'paused';
+          api.applyReviewPageSnapshot(snapshot);
+          return [controlRetained, findingsRetained, disabledWhilePending, enabledAfterAcknowledgement,
+            document.querySelector('.review-round-findings').textContent.includes('Updated finding'),
+            !!document.querySelector('[data-review-action="resume"]')];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, true, true, true, true, true])
+    }
+
     func testFolderSetupDisablesPushAndCardShowsVerificationWithoutCommitMetrics() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""

@@ -5,6 +5,10 @@ import Foundation
 final class ReviewLoopBridge {
     private let devTools: any DevToolsServing
     private let coordinator: ReviewLoopCoordinator
+    private let makeDriver: (DevToolsTarget) -> any ReviewLoopDriving
+    private var choicesTask: Task<Void, Never>?
+    private var advanceTask: Task<Void, Never>?
+    private var stopTasks: [UUID: Task<Void, Never>] = [:]
     private var models: [ReviewModel] = []
     private var projects: [ReviewProject] = []
     private var lastChoicesRefresh: Date?
@@ -14,31 +18,67 @@ final class ReviewLoopBridge {
 
     var threadIDs: Set<String> { coordinator.threadIDs }
 
-    init(devTools: any DevToolsServing, store: any ReviewLoopStoring) {
+    init(
+        devTools: any DevToolsServing,
+        store: any ReviewLoopStoring,
+        makeDriver: ((DevToolsTarget) -> any ReviewLoopDriving)? = nil
+    ) {
         self.devTools = devTools
+        self.makeDriver = makeDriver ?? { ReviewLoopDriver(devTools: devTools, target: $0) }
         coordinator = ReviewLoopCoordinator(store: store)
     }
 
-    func advanceAndSynchronize(targets: [DevToolsTarget], threads: [RendererThread]) async throws {
+    deinit {
+        choicesTask?.cancel()
+        advanceTask?.cancel()
+        for task in stopTasks.values { task.cancel() }
+    }
+
+    // Restart/account preflights drain work before checking for active chats.
+    // Normal snapshot delivery must never await remote publication or inspection.
+    func waitForOperations() async {
+        let tasks = [choicesTask, advanceTask].compactMap { $0 } + Array(stopTasks.values)
+        for task in tasks { await task.value }
+    }
+
+    func synchronize(targets: [DevToolsTarget], threads: [RendererThread]) async throws {
         guard let target = targets.first else { return }
-        let driver = ReviewLoopDriver(devTools: devTools, target: target)
-        await refreshChoicesIfNeeded(using: driver)
+        let driver = makeDriver(target)
+        scheduleChoicesRefresh(using: driver)
         try await handleActions(in: targets, using: driver)
-        if lastAdvance == nil || Date.now.timeIntervalSince(lastAdvance!) >= 5 {
-            await coordinator.advance(using: driver, threads: threads)
-            lastAdvance = .now
+        if advanceTask == nil, lastAdvance == nil || Date.now.timeIntervalSince(lastAdvance!) >= 5 {
+            advanceTask = Task { [self] in
+                await coordinator.advance(using: driver, threads: threads)
+                lastAdvance = .now
+                advanceTask = nil
+            }
         }
         for window in targets { try await deliver(to: window) }
     }
 
-    private func refreshChoicesIfNeeded(using driver: ReviewLoopDriver) async {
-        guard lastChoicesRefresh.map({ Date.now.timeIntervalSince($0) > 60 }) ?? true else { return }
-        do {
-            projects = try await driver.projects()
-            models = try await driver.models()
-            lastChoicesRefresh = .now
-            actionError = nil
-        } catch { actionError = error.localizedDescription }
+    private func scheduleChoicesRefresh(using driver: any ReviewLoopDriving) {
+        guard choicesTask == nil,
+              lastChoicesRefresh.map({ Date.now.timeIntervalSince($0) > 60 }) ?? true else { return }
+        choicesTask = Task { [self] in
+            defer { choicesTask = nil }
+            do {
+                let latestProjects = try await driver.projects()
+                let latestModels = try await driver.models()
+                projects = latestProjects
+                models = latestModels
+                lastChoicesRefresh = .now
+                actionError = nil
+            } catch { actionError = error.localizedDescription }
+        }
+    }
+
+    private func scheduleStop(for id: UUID, using driver: any ReviewLoopDriving) {
+        guard stopTasks[id] == nil else { return }
+        stopTasks[id] = Task { [self] in
+            defer { stopTasks[id] = nil }
+            do { try await coordinator.stopRunningTask(for: id, using: driver) }
+            catch { actionError = error.localizedDescription }
+        }
     }
 
     private func handleActions(in targets: [DevToolsTarget], using driver: any ReviewLoopDriving) async throws {
@@ -53,7 +93,7 @@ final class ReviewLoopBridge {
                             try validateSelections(in: action)
                             try coordinator.apply(action, projects: projects)
                             if action.kind == .stop, let id = action.loopID {
-                                try await coordinator.stopRunningTask(for: id, using: driver)
+                                scheduleStop(for: id, using: driver)
                             }
                         }
                         actionError = nil

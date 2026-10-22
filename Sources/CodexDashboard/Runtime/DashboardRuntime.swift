@@ -13,6 +13,7 @@ protocol DashboardRuntime: AnyObject {
     var reviewLoopThreadIDs: Set<String> { get }
 
     func rendererTargets() async -> [DevToolsTarget]
+    func waitForReviewOperations() async
     func prepareForRestart()
     func restartCodex() async throws -> [DevToolsTarget]
     func synchronizeDashboard(
@@ -60,6 +61,10 @@ final class CodexDashboardRuntime: DashboardRuntime {
         let processChanged = launchDate != lastObservedCodexLaunchDate
         lastObservedCodexLaunchDate = launchDate
         return await renderer.targets(forceRefresh: processChanged)
+    }
+
+    func waitForReviewOperations() async {
+        await renderer.waitForReviewOperations()
     }
 
     func prepareForRestart() {

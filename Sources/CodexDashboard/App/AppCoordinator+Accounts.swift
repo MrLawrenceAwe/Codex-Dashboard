@@ -101,6 +101,7 @@ extension AppCoordinator {
         defer { isPerformingAction = false }
         refreshGeneration += 1
         await synchronizationCoalescer.cancelAndWait()
+        await dashboardRuntime.waitForReviewOperations()
         accounts.invalidateUsage()
         do {
             _ = try await refreshThreadState()

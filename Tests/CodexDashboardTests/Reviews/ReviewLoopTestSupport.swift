@@ -75,7 +75,13 @@ final class ReviewTestDriver: ReviewLoopDriving {
     var onStartTurn: (() -> Void)?
     var onStartTurnAsync: (() async -> Void)?
     var onReadThread: (() -> Void)?
-    func projects() async throws -> [ReviewProject] { [] }
+    var onProjectsAsync: (() async -> Void)?
+    var onWorkspaceAsync: (() async -> Void)?
+    func projects() async throws -> [ReviewProject] {
+        await onProjectsAsync?()
+        return []
+    }
+    func models() async throws -> [ReviewModel] { [] }
     func reconcileAndPublishFix(_ commit: String, at path: String, expectedWorkspace: ReviewWorkspaceState) async throws -> ReviewPublicationOutcome {
         if failPush { throw ReviewLoopError("Remote push failed") }
         if integrateRemoteOnPush {
@@ -89,6 +95,7 @@ final class ReviewTestDriver: ReviewLoopDriving {
     func workspace(at path: String) async throws -> ReviewWorkspaceState {
         await Task.yield()
         onWorkspace?()
+        await onWorkspaceAsync?()
         if failWorkspace || path == failingPath { throw ReviewLoopError("Git timed out") }
         return ReviewWorkspaceState(root: workspaceRoot ?? path, branch: branch, revision: commit, clean: clean, kind: workspaceKind)
     }
