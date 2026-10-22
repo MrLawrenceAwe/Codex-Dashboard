@@ -423,7 +423,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         )
     }
 
-    func testUsageLimitedThreadShowsInterruptedMarkerInNativeSidebar() async throws {
+    func testUsageLimitedThreadShowsUsageLimitMarkerInNativeSidebar() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><body>
@@ -457,7 +457,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(haltedPayload)).threads);
-              const marker = document.querySelector('[data-codex-sidebar-interrupted]');
+              const marker = document.querySelector('[data-codex-sidebar-usage-limit]');
               return [
                 Boolean(marker?.parentElement?.querySelector('[data-thread-title-trigger]')),
                 marker?.nextElementSibling?.matches('[data-thread-title-trigger]') === true,
@@ -487,7 +487,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "Boolean(document.querySelector('[data-codex-sidebar-interrupted]'))",
+            "Boolean(document.querySelector('[data-codex-sidebar-usage-limit]'))",
             in: webView
         )
 
@@ -495,14 +495,14 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.applyThreads((\(runningPayload)).threads);
-              return document.querySelector('[data-codex-sidebar-interrupted]') === null;
+              return document.querySelector('[data-codex-sidebar-usage-limit]') === null;
             })()
             """
         ) as? Bool
         XCTAssertEqual(removedAfterRestart, true)
     }
 
-    func testInterruptedMarkerTracksReusedSidebarRowWithoutAnotherSnapshot() async throws {
+    func testUsageLimitMarkerTracksReusedSidebarRowWithoutAnotherSnapshot() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html><html><body>
@@ -533,7 +533,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "Boolean(document.querySelector('[data-codex-sidebar-interrupted]'))",
+            "Boolean(document.querySelector('[data-codex-sidebar-usage-limit]'))",
             in: webView
         )
         // A reused row must not carry the previous task's status.
@@ -545,7 +545,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-codex-sidebar-interrupted]') === null",
+            "document.querySelector('[data-codex-sidebar-usage-limit]') === null",
             in: webView
         )
     }

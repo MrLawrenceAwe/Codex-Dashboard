@@ -279,7 +279,7 @@ function createChatOverview({ catalog }) {
   }
 
   function applyThreads() {
-    threadInterruptionIndicators.applyThreads(currentThreads());
+    threadUsageLimitIndicators.applyThreads(currentThreads());
     unreadState.applyThreads(currentThreads());
     checkReadConfirmation();
     // A native refresh can update the catalog, unread state, and Git state in a
@@ -302,7 +302,7 @@ function createChatOverview({ catalog }) {
     cancelScheduledRender();
     unreadState.destroy();
     completionIndicators.destroy();
-    threadInterruptionIndicators.destroy();
+    threadUsageLimitIndicators.destroy();
     viewNeedsRender = true;
   }
 
@@ -313,7 +313,7 @@ function createChatOverview({ catalog }) {
     applyVisibility: pageState.applyVisibility,
     startMonitoring: unreadState.startMonitoring,
     requestRender,
-    syncInterruptedSidebarMarkers: () => threadInterruptionIndicators.applyThreads(currentThreads()),
+    syncUsageLimitSidebarMarkers: () => threadUsageLimitIndicators.applyThreads(currentThreads()),
     syncUnread: unreadState.syncUnread,
     destroy,
     open: openChatOverview,

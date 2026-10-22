@@ -45,7 +45,7 @@
     "Todos/todo-list-controller",
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
-    "Sidebar/thread-interruption-indicators",
+    "Sidebar/thread-usage-limit-indicators",
     "Threads/chat-overview-controller",
     "Reviews/review-rpc-client",
     "Reviews/review-presentation",

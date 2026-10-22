@@ -29,7 +29,7 @@ const dashboardLifecycle = createDashboardLifecycle({
   },
   syncComposer: promptLibraryButton.scheduleSync,
   requestRender: chatOverview.requestRender,
-  syncInterruptedSidebarMarkers: chatOverview.syncInterruptedSidebarMarkers,
+  syncUsageLimitSidebarMarkers: chatOverview.syncUsageLimitSidebarMarkers,
   syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
     reviewRPCClient.destroy();

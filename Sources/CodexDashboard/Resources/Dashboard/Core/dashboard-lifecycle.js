@@ -95,7 +95,7 @@ function createDashboardLifecycle(hooks) {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['data-app-action-sidebar-thread-id', 'data-thread-title-trigger'],
+        attributeFilter: codexUIContracts.sidebarThreads.observedAttributes,
       });
       observedMutationSidebar = sidebar;
     }
@@ -124,7 +124,7 @@ function createDashboardLifecycle(hooks) {
         hooks.rebindFeatures();
       }
       if (shouldSyncUnread) {
-        hooks.syncInterruptedSidebarMarkers();
+        hooks.syncUsageLimitSidebarMarkers();
         if (hooks.syncUnread()) hooks.requestRender();
       }
     });
@@ -145,21 +145,9 @@ function createDashboardLifecycle(hooks) {
     scheduleRepair({ rebindHosts: true });
   }
 
-  function containsThreadRow(node) {
-    if (!(node instanceof Element)) return false;
-    return node.matches('[data-app-action-sidebar-thread-id]')
-      || Boolean(node.querySelector('[data-app-action-sidebar-thread-id]'));
-  }
-
   function handleSidebarMutations(records) {
-    const threadRowsChanged = records.some((record) => {
-      if (record.type === 'attributes') return true;
-      const target = record.target instanceof Element ? record.target : record.target?.parentElement;
-      if (target?.closest('[data-app-action-sidebar-thread-id]')) return true;
-      return [...record.addedNodes, ...record.removedNodes].some(containsThreadRow);
-    });
-    if (threadRowsChanged) {
-      hooks.syncInterruptedSidebarMarkers();
+    if (codexUIContracts.sidebarThreads.changedIn(records)) {
+      hooks.syncUsageLimitSidebarMarkers();
       scheduleRepair({ syncUnread: true });
     }
   }
@@ -190,7 +178,7 @@ function createDashboardLifecycle(hooks) {
     mountPagesAndNavigation();
     // Reconcile markers on health checks too, including after host DOM repairs
     // when the catalog itself has not changed.
-    hooks.syncInterruptedSidebarMarkers();
+    hooks.syncUsageLimitSidebarMarkers();
     syncContentInset();
     hooks.mountFeatures();
     if (!structureObserver) {

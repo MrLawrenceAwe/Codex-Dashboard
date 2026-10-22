@@ -85,8 +85,38 @@ const codexUIContracts = (() => {
     return menu ? visibleAction('Settings', menu) || null : null;
   }
 
+  const threadIDAttribute = 'data-app-action-sidebar-thread-id';
+  const threadTitleSelector = '[data-thread-title-trigger]';
+  const sidebarThreads = {
+    selector: `[${threadIDAttribute}]`,
+    observedAttributes: [threadIDAttribute, 'data-thread-title-trigger'],
+    localID(row) {
+      const value = row?.getAttribute(threadIDAttribute) || '';
+      return value.startsWith('local:') ? value.slice('local:'.length) || null : null;
+    },
+    titleElement(row) {
+      return row?.querySelector(threadTitleSelector) || null;
+    },
+    title(row) {
+      return String(row.querySelector(`${threadTitleSelector}, [data-marquee-text]`)?.textContent
+        || [...row.childNodes].filter(node => !(node instanceof Element)
+          || !node.matches('button, svg'))
+          .map(node => node.textContent).join('')).trim();
+    },
+    changedIn(records) {
+      const containsRow = node => node instanceof Element
+        && (node.matches(sidebarThreads.selector) || Boolean(node.querySelector(sidebarThreads.selector)));
+      return records.some(record => {
+        if (record.type === 'attributes') return sidebarThreads.observedAttributes.includes(record.attributeName);
+        const target = record.target instanceof Element ? record.target : record.target?.parentElement;
+        return Boolean(target?.closest(sidebarThreads.selector))
+          || [...record.addedNodes, ...record.removedNodes].some(containsRow);
+      });
+    },
+  };
+
   function threadRows() {
-    return [...document.querySelectorAll('[data-app-action-sidebar-thread-id]')];
+    return [...document.querySelectorAll(sidebarThreads.selector)];
   }
 
   const projectAttributes = {
@@ -157,7 +187,7 @@ const codexUIContracts = (() => {
     // Codex retains hidden workspace/sidebar copies. Clicking those rows can
     // select a stale chat surface instead of navigating the visible workspace.
     return [...document.querySelectorAll(
-      `[data-app-action-sidebar-thread-id="${CSS.escape(`local:${threadID}`)}"]`,
+      `[${threadIDAttribute}="${CSS.escape(`local:${threadID}`)}"]`,
     )].find(isVisible) || null;
   }
 
@@ -182,9 +212,8 @@ const codexUIContracts = (() => {
   function selectedThreadID() {
     const composerID = activeComposerThreadID();
     if (composerID) return composerID;
-    const rowID = threadRows().find((row) => isVisible(row) && row.getAttribute('aria-current') === 'page')
-      ?.getAttribute('data-app-action-sidebar-thread-id');
-    return rowID?.startsWith('local:') ? rowID.slice('local:'.length) : null;
+    const row = threadRows().find((row) => isVisible(row) && row.getAttribute('aria-current') === 'page');
+    return sidebarThreads.localID(row);
   }
 
   function activeComposerHasNoProject() {
@@ -271,9 +300,7 @@ const codexUIContracts = (() => {
     const unreadStates = new Map();
     const fiberCache = new Map();
     threadRows().forEach((row) => {
-      const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
-      if (!sidebarID.startsWith('local:')) return;
-      const threadID = sidebarID.slice('local:'.length);
+      const threadID = sidebarThreads.localID(row);
       if (!threadID) return;
       let fiber = committedFiber(reactFiber(row), fiberCache);
       while (fiber) {
@@ -308,7 +335,7 @@ const codexUIContracts = (() => {
     const fiberCache = new Map();
     let markRead = null;
     for (const row of threadRows()) {
-      if (!row.getAttribute('data-app-action-sidebar-thread-id')?.startsWith('local:')) continue;
+      if (!sidebarThreads.localID(row)) continue;
       let fiber = committedFiber(reactFiber(row), fiberCache);
       while (fiber && !markRead) {
         const visited = new Set();
@@ -446,6 +473,7 @@ const codexUIContracts = (() => {
     profileMenuTrigger,
     profileMenuAccountAnchor,
     threadRows,
+    sidebarThreads,
     projects,
     sidebarProjects,
     selectProject,

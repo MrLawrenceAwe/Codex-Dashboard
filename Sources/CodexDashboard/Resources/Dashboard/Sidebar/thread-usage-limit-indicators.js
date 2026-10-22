@@ -1,27 +1,27 @@
-const threadInterruptionIndicators = (() => {
+const threadUsageLimitIndicators = (() => {
   function applyThreads(threads) {
-    const nextInterruptedThreadIDs = new Set(
+    const usageLimitedThreadIDs = new Set(
       threads
         .filter((thread) => thread.latestLifecycleEventKind === 'usageLimitReached')
         .map((thread) => thread.id),
     );
-    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => {
-      const threadID = marker.dataset.codexSidebarInterrupted;
+    document.querySelectorAll('[data-codex-sidebar-usage-limit]').forEach((marker) => {
+      const threadID = marker.dataset.codexSidebarUsageLimit;
       const row = codexUIContracts.threadRow(threadID);
-      const title = row?.querySelector('[data-thread-title-trigger]');
-      if (!nextInterruptedThreadIDs.has(threadID) || !row?.contains(marker)
+      const title = codexUIContracts.sidebarThreads.titleElement(row);
+      if (!usageLimitedThreadIDs.has(threadID) || !row?.contains(marker)
           || marker.parentElement !== title?.parentElement) marker.remove();
     });
-    nextInterruptedThreadIDs.forEach((threadID) => {
+    usageLimitedThreadIDs.forEach((threadID) => {
       const row = codexUIContracts.threadRow(threadID);
       if (!row) return;
-      let marker = row.querySelector('[data-codex-sidebar-interrupted]');
+      let marker = row.querySelector('[data-codex-sidebar-usage-limit]');
       if (!marker) {
-        const title = row.querySelector('[data-thread-title-trigger]');
+        const title = codexUIContracts.sidebarThreads.titleElement(row);
         const markerHost = title?.parentElement;
         if (!markerHost) return;
         marker = document.createElement('span');
-        marker.setAttribute('data-codex-sidebar-interrupted', threadID);
+        marker.setAttribute('data-codex-sidebar-usage-limit', threadID);
         marker.textContent = 'Interrupted';
         markerHost.insertBefore(marker, title);
       }
@@ -32,7 +32,7 @@ const threadInterruptionIndicators = (() => {
   }
 
   function destroy() {
-    document.querySelectorAll('[data-codex-sidebar-interrupted]').forEach((marker) => marker.remove());
+    document.querySelectorAll('[data-codex-sidebar-usage-limit]').forEach((marker) => marker.remove());
   }
 
   return { applyThreads, destroy };

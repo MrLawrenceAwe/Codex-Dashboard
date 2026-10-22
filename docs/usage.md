@@ -261,7 +261,9 @@ Motion follows the system’s reduced-motion preference.
 
 Finished loops move to history. Expand **Manage history** to delete saved loops and their
 round records; the review chats remain available. **Delete loops created earlier**
-uses creation order, regardless of the displayed last updated dates.
+uses creation order, regardless of the displayed last updated dates. **Delete all
+finished loops** removes every finished loop. Both bulk deletion actions include
+finished loops still shown under **Current loops**; unfinished loops are kept.
 
 ## Compatibility and diagnostics
 

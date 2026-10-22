@@ -67,7 +67,7 @@ aside [data-app-action-sidebar-project-row][aria-expanded="true"]::before {
   transform: rotate(45deg);
 }
 
-aside [data-codex-sidebar-interrupted] {
+aside [data-codex-sidebar-usage-limit] {
   display: inline-flex;
   min-height: 16px;
   flex: 0 0 auto;

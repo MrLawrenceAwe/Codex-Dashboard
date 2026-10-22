@@ -138,6 +138,8 @@ state for either a new account or reauthentication. Accounts are saved separatel
 through `saveCurrentAccount`.
 `codex-ui-contracts.js` owns sidebar project-row selectors, metadata access, and
 observed attributes; project highlights and to-do monitoring consume that contract.
+Its `sidebarThreads` contract owns thread selectors, local ID decoding, title lookup,
+and mutation detection for lifecycle repair, to-do actions, and usage-limit indicators.
 `review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
 `review-loop-page.js` validates submissions and queues actions.
 `review-presentation.js` supplies shared labels independently of setup rendering.

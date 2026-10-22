@@ -100,8 +100,8 @@ const codexHost = {
           || data?.type === 'new-projectless-task') navigationCancelled = true;
       } else if (event.type === 'click') {
         const target = event.target instanceof Element ? event.target : null;
-        const row = target?.closest('[data-app-action-sidebar-thread-id]');
-        if (target?.closest('aside') && row?.getAttribute('data-app-action-sidebar-thread-id') !== `local:${thread.id}`) {
+        const row = target?.closest(codexUIContracts.sidebarThreads.selector);
+        if (target?.closest('aside') && codexUIContracts.sidebarThreads.localID(row) !== thread.id) {
           navigationCancelled = true;
         }
       } else if (event.type === 'keydown') {

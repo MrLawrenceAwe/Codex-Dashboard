@@ -1,5 +1,5 @@
 function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
-  const selector = '[data-app-action-sidebar-thread-id]';
+  const threadContract = codexUIContracts.sidebarThreads;
   const events = ['contextmenu', 'pointerdown', 'mousedown', 'click', 'keydown'];
   let menuContext;
   let observedBody;
@@ -11,15 +11,10 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
   const pending = new Set();
 
   function reference(row) {
-    const sidebarID = row.getAttribute('data-app-action-sidebar-thread-id') || '';
-    if (!sidebarID.startsWith('local:')) return null;
-    const id = sidebarID.slice('local:'.length);
+    const id = threadContract.localID(row);
+    if (!id) return null;
     const thread = findThread(id);
-    const title = String(thread?.title
-      || row.querySelector('[data-thread-title-trigger], [data-marquee-text]')?.textContent
-      || [...row.childNodes].filter((node) => !(node instanceof Element)
-        || !node.matches('button, svg'))
-        .map((node) => node.textContent).join('')).trim();
+    const title = String(thread?.title || threadContract.title(row)).trim();
     return id && title ? { id, title, projectID: thread?.projectID } : null;
   }
 
@@ -199,7 +194,7 @@ function createSidebarThreadTodoActions({ findThread, getItems, addTodo }) {
 
   function handle(event) {
     const target = event.target instanceof Element ? event.target : null;
-    const row = target?.closest(selector);
+    const row = target?.closest(threadContract.selector);
     if (event.type === 'contextmenu') {
       if (row && codexHost.sidebar()?.contains(row)) {
         prepareMenu(row);
