@@ -34,8 +34,7 @@ const chatOverviewView = (() => {
     if (!canPatch) {
       element.replaceChildren(template.content);
     } else {
-      const retained = new Set();
-      nextChildren.forEach((nextChild) => {
+      const children = nextChildren.map((nextChild) => {
         const key = childKey(nextChild);
         const currentChild = currentByKey.get(key);
         let child = currentChild?.outerHTML === nextChild.outerHTML ? currentChild : nextChild;
@@ -43,11 +42,18 @@ const chatOverviewView = (() => {
           updateMarkup(currentChild, nextChild.innerHTML);
           child = currentChild;
         }
-        retained.add(child);
-        element.append(child);
+        return child;
       });
+      const retained = new Set(children);
       currentChildren.forEach((child) => {
-        if (!retained.has(child) && child.isConnected) child.remove();
+        if (!retained.has(child)) child.remove();
+      });
+      // Moving even an unchanged node drops focus inside it. Remove obsolete
+      // siblings first, then leave children already in their final position alone.
+      children.forEach((child, index) => {
+        if (element.children[index] !== child) {
+          element.insertBefore(child, element.children[index] || null);
+        }
       });
     }
     renderedMarkup.set(element, markup);

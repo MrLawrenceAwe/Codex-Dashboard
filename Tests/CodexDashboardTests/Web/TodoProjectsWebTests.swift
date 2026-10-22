@@ -5,6 +5,57 @@ import XCTest
 
 @MainActor
 final class TodoProjectsWebTests: SerializedDashboardWebTestCase {
+    func testUnrelatedSidebarChangesRetainHiddenTodoProjectOptions() async throws {
+        let webView = try await DashboardWebTestHarness.todoWebView(
+            html: """
+            <!doctype html><html><head><meta charset="utf-8"></head><body>
+              <aside role="navigation"><button class="sidebar-item">New chat</button>
+                <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project-a"
+                  data-app-action-sidebar-project-label="Project A"></div>
+                <span id="unrelated-sidebar-count">0</span>
+              </aside><main>Conversation surface</main>
+            </body></html>
+            """,
+            baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
+            clearLocalStorage: true
+        )
+        _ = try await webView.evaluateAsyncJavaScript("""
+        (async () => {
+          window.__codexDashboard.openTodos();
+          const form = document.querySelector('[data-todo-form]');
+          form.querySelector('[data-todo-new-title]').value = 'Keep project choices stable';
+          form.requestSubmit();
+          await window.__waitForTodoSaves();
+          window.__codexDashboard.openChatOverview();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          window.__projectOptions = [...document.querySelectorAll(
+            '[data-todo-project] option, [data-todo-new-project] option, [data-todo-new-thread-picker] option, [data-todo-project-filter] option'
+          )];
+          document.getElementById('unrelated-sidebar-count').textContent = '1';
+          await new Promise(resolve => setTimeout(resolve, 0));
+          // Host rerenders may also write the same project label again.
+          document.querySelector('[data-app-action-sidebar-project-row]')
+            .setAttribute('data-app-action-sidebar-project-label', 'Project A');
+          await new Promise(resolve => setTimeout(resolve, 0));
+        })()
+        """)
+        let retained = try await webView.evaluateJavaScript("""
+        [window.__projectOptions.length > 0,
+         window.__projectOptions.every(option => option.isConnected),
+         !document.getElementById('codex-dashboard-todo-page').classList.contains('is-open')]
+        """) as? [Bool]
+        XCTAssertEqual(retained, [true, true, true])
+
+        _ = try await webView.evaluateJavaScript("""
+        document.querySelector('[data-app-action-sidebar-project-row]')
+          .setAttribute('data-app-action-sidebar-project-label', 'Renamed project');
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-project] option[value=\"project-a\"]').textContent === 'Renamed project'",
+            in: webView
+        )
+    }
+
     func testRemovedAssignedProjectRemainsVisibleUntilExplicitlyUnassigned() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: """

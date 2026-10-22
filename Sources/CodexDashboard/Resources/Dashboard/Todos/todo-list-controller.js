@@ -53,23 +53,39 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     addTodo,
   });
 
-  function refreshProjects() {
+  function refreshProjects({ force = false } = {}) {
     if (destroyed) return;
-    projects = codexUIContracts.projects();
+    const nextProjects = codexUIContracts.projects();
+    if (!force && projects.length === nextProjects.length
+      && projects.every((project, index) => {
+        const next = nextProjects[index];
+        return project.id === next.id && project.name === next.name && project.path === next.path;
+      })) return;
+    projects = nextProjects;
     formController.updateProjects(projects);
     todoListView.updateItemProjectOptions(projects, items);
     updateFilterOptions();
   }
 
+  function handleProjectMutations(records) {
+    const selector = '[data-app-action-sidebar-project-row]';
+    const containsProject = (node) => node instanceof Element
+      && (node.matches(selector) || Boolean(node.querySelector(selector)));
+    const projectsChanged = records.some((record) => record.type === 'attributes'
+      ? record.attributeName === 'data-app-action-sidebar-project-row' || record.target.matches(selector)
+      : [...record.addedNodes, ...record.removedNodes].some(containsProject));
+    if (projectsChanged) refreshProjects();
+  }
+
   function startProjectObserver() {
     const sidebar = codexHost.sidebar();
     if (sidebar === observedProjectSidebar) return;
-    if (!projectObserver) projectObserver = new MutationObserver(refreshProjects);
+    if (!projectObserver) projectObserver = new MutationObserver(handleProjectMutations);
     projectObserver.disconnect();
     observedProjectSidebar = sidebar;
     if (!sidebar) return;
     projectObserver.observe(sidebar, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
+      attributeFilter: ['data-app-action-sidebar-project-row', 'data-app-action-sidebar-project-id', 'data-app-action-sidebar-project-label'] });
   }
 
   function renderTags() {
@@ -305,7 +321,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     pageHost.append(page);
     todoListView.updateTopInset(page);
     renderTags();
-    refreshProjects();
+    refreshProjects({ force: true });
     startProjectObserver();
     pageState.applyVisibility();
     render();

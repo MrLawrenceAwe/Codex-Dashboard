@@ -78,6 +78,9 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.openChatOverview();
               window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
               window.__changedThreadElement = document.querySelector('[data-thread-id="changed"]');
+              window.__stableThreadButton = document.querySelector('[data-open-thread="stable"]');
+              window.__stableThreadButton.focus();
+              window.__stableThreadWasFocused = document.activeElement === window.__stableThreadButton;
               window.__codexDashboard.applyThreads((\(updatedPayload)).threads);
             })()
             """
@@ -93,11 +96,13 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               window.__stableThreadElement === document.querySelector('[data-thread-id="stable"]'),
               window.__changedThreadElement !== document.querySelector('[data-thread-id="changed"]'),
               document.querySelector('[data-thread-id="changed"] .dashboard-thread-heading').textContent,
+              window.__stableThreadWasFocused,
+              document.activeElement === window.__stableThreadButton,
             ]
             """
         ) as? [AnyHashable]
 
-        XCTAssertEqual(result, [true, true, "After"])
+        XCTAssertEqual(result, [true, true, "After", true, true])
     }
 
     func testOpenDashboardCoalescesSnapshotBurstToLatestTaskList() async throws {
