@@ -165,7 +165,9 @@ enum DashboardWebTestHarness {
             }
             try await Task.sleep(for: .milliseconds(20))
         }
-        throw DashboardError.invalidDevToolsResponse
+        throw NSError(domain: "DashboardWebTestLoading", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey:
+                        "WKWebView did not finish loading within 3 seconds. Expected loading to stop, progress to reach 1, document.readyState to be complete, and document.body to exist."])
     }
 
     static func waitForJavaScript(

@@ -30,6 +30,7 @@ enum ReviewLoopDocumentMigration {
         // Preserve existing saved Git checkpoints while moving to workspace revisions.
         if let value = loop.removeValue(forKey: "expectedCommit") { loop["expectedRevision"] = value }
         if loop["workspaceKind"] == nil, loop["checkoutRoot"] != nil { loop["workspaceKind"] = "git" }
+        if let root = loop.removeValue(forKey: "checkoutRoot") { loop["workspaceRoot"] = root }
         if let previousType = loop.removeValue(forKey: "focus") {
             loop["reviewType"] = previousType
         }
@@ -73,7 +74,7 @@ enum ReviewLoopDocumentMigration {
     private static func migrate(_ saved: [String: Any]) -> [String: Any] {
         var loop = migrateSettings(saved)
         // Earlier readers marked Stop finished before interruption succeeded.
-        // Preserve checkout ownership for those unfinished saved requests.
+        // Preserve workspace ownership for those unfinished saved requests.
         if loop["phase"] as? String == "stopped", let message = loop["message"] as? String,
            message == "Stopped loop. Stopping its running chat." ||
             message.hasPrefix("Stopped loop, but could not stop its chat.") {

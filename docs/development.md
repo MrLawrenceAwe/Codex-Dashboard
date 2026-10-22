@@ -195,6 +195,10 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**Recent and running**).
 
+Review-loop version 16 renames `checkoutRoot` to `workspaceRoot` for Git and ordinary-folder
+loops. Migration preserves the root and reservation alongside all saved settings and
+round history; current documents write only `workspaceRoot`.
+
 Review-loop version 15 separates optional `fixCommit` from `verifiedRevision`.
 Only committed fixes have a `fixCommit`; clean, withdrawn, and folder rounds do not.
 Migration preserves old fix commits and unchanged HEAD revisions from the former

@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testWorkspaceRootMigrationPreservesGitAndFolderReservationsAndHistory() throws {
+        for kind in [ReviewWorkspaceKind.git, .folder] {
+            var loop = ReviewLoop(id: UUID(), startActionID: "root-migration", project: project,
+                                  promptContext: .personal, maxRounds: 3, priorityLimit: .p2)
+            loop.workspaceKind = kind
+            loop.workspaceRoot = project.path
+            loop.phase = .paused
+            loop.branch = kind == .git ? "main" : nil
+            loop.expectedRevision = "saved-revision"
+            loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "saved-thread")]
+            var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+            saved["checkoutRoot"] = saved.removeValue(forKey: "workspaceRoot")
+            for version in (kind == .git ? 1 : 14)...15 {
+                let data = try JSONSerialization.data(withJSONObject: ["version": version, "loops": [saved]])
+                let migrated = try ReviewLoopDocumentMigration.decode(data)
+                XCTAssertEqual(migrated, [loop])
+                let rewritten = try JSONEncoder().encode(ReviewLoopsDocument(
+                    version: ReviewLoopsDocument.currentVersion, loops: migrated))
+                XCTAssertFalse(String(decoding: rewritten, as: UTF8.self).contains("checkoutRoot"))
+                XCTAssertEqual(try ReviewLoopDocumentMigration.decode(rewritten), [loop])
+                let store = ReviewTestStore()
+                store.loops = migrated
+                XCTAssertEqual(ReviewLoopCoordinator(store: store).loops, [loop])
+            }
+        }
+    }
+
     func testSavedModelSelectionMigratesToCurrentNames() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "saved", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 2)
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
@@ -61,7 +88,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
     func testVersionThirteenPreservesGitHistoryAndLeavesUnstartedFolderModeUndecided() throws {
         var loop = ReviewLoop(id: UUID(), startActionID: "old", project: project, promptContext: .general, maxRounds: 2)
         loop.workspaceKind = .git
-        loop.checkoutRoot = project.path
+        loop.workspaceRoot = project.path
         loop.branch = "main"
         loop.expectedRevision = "head"
         loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread",
@@ -69,6 +96,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
             result: ReviewRoundResult(outcome: .fixed, addressedFindingCount: 1, fixCommit: "fix", summary: "Saved", verifiedRevision: "head"))]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
         saved.removeValue(forKey: "workspaceKind")
+        saved["checkoutRoot"] = saved.removeValue(forKey: "workspaceRoot")
         saved["expectedCommit"] = saved.removeValue(forKey: "expectedRevision")
         var rounds = try XCTUnwrap(saved["rounds"] as? [[String: Any]])
         rounds[0]["baseCommit"] = rounds[0].removeValue(forKey: "baseRevision")
@@ -154,7 +182,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
                               promptContext: .personal, maxRounds: 3,
                               reviewType: .organisationAndNaming, muteTestPlayback: true)
         loop.phase = .paused
-        loop.checkoutRoot = project.path
+        loop.workspaceRoot = project.path
             loop.workspaceKind = .git
         loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread")]
         var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
@@ -176,7 +204,7 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
                                   promptContext: .personal, maxRounds: 3,
                                   liveTesting: true, muteTestPlayback: enabled)
             loop.phase = .paused
-            loop.checkoutRoot = project.path
+            loop.workspaceRoot = project.path
             loop.workspaceKind = .git
             loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread")]
             var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
@@ -214,14 +242,14 @@ final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
             var loop = ReviewLoop(id: UUID(), startActionID: "stop", project: project,
                                   promptContext: .general, maxRounds: 2)
             loop.phase = .stopped
-            loop.checkoutRoot = project.path
+            loop.workspaceRoot = project.path
             loop.workspaceKind = .git
             loop.message = message
             loop.rounds = [ReviewRound(number: 1, baseRevision: "base", threadID: "thread")]
             let data = try JSONEncoder().encode(ReviewLoopsDocument(version: 7, loops: [loop]))
             let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
             XCTAssertEqual(migrated.phase, expectedPhase)
-            XCTAssertEqual(migrated.checkoutRoot, project.path)
+            XCTAssertEqual(migrated.workspaceRoot, project.path)
             XCTAssertEqual(migrated.rounds, loop.rounds)
             XCTAssertEqual(migrated.message, message)
         }

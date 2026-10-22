@@ -3,6 +3,15 @@ const reviewPresentation = (() => {
     return reviewTypes.find(type => type.id === reviewType)?.label || reviewType || '';
   }
 
+  function promptContextLabel(context) {
+    switch (context?.kind) {
+      case 'general': return 'General project';
+      case 'personal': return 'Personal project';
+      case 'savedContext': return `Saved context: ${context.context}`;
+      default: return 'Project context not recorded';
+    }
+  }
+
   function roundStatus(round, pushToRemote, workspaceKind) {
     let label;
     switch (round.result?.outcome) {
@@ -61,5 +70,5 @@ const reviewPresentation = (() => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   }
 
-  return { reviewTypeLabel, roundStatus, roundStages, updatedAtLabel };
+  return { reviewTypeLabel, promptContextLabel, roundStatus, roundStages, updatedAtLabel };
 })();

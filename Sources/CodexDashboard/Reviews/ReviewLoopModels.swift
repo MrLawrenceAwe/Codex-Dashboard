@@ -176,7 +176,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var phase: ReviewLoopPhase = .waiting
     var pauseRequested = false
     var branch: String?
-    var checkoutRoot: String?
+    var workspaceRoot: String?
     var expectedRevision: String?
     var rounds: [ReviewRound] = []
     var message = "Waiting for the project to be idle."
@@ -189,7 +189,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 15
+    static let currentVersion = 16
     let version: Int
     let loops: [ReviewLoop]
 }

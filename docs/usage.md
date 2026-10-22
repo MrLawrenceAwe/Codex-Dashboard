@@ -142,7 +142,8 @@ remote push settings. Review models come from Codex's live
 model list. Select **Start review & fix** to begin the loop.
 
 Expand **Configured prompt preview** or **Up next** to inspect instructions without
-leaving the loop. **Loop settings** shows the saved configuration. Prompt sections
+leaving the loop. **Loop settings** shows the saved configuration, including project context and the
+playback mute setting for live testing, for current and historical loops. Prompt sections
 keep their expanded state during refresh.
 
 **Configured prompt preview** shows instructions generated from the current loop
@@ -158,7 +159,7 @@ turn for folder fixes. Excluded priorities remain visible but are not fixed. Fin
 before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
 reviews finish without a commit. A clean review is an assessment, not proof that
 all defects are absent. Multiple projects can run loops, with one active loop per
-project and checkout. Avoid other edits in that checkout while a loop runs.
+project and workspace. Avoid other edits in that workspace while a loop runs.
 
 For ordinary folders, the dashboard fingerprints file contents, names, permissions,
 and symlink destinations to detect changes during read-only reviews and between
@@ -230,10 +231,10 @@ uncommitted work, and changes after an all-withdrawn report still require attent
 Resume retries a blocked checkpoint without repeating the completed fix task.
 
 **Pause after round** finishes the current round. **Stop loop** prevents new work
-and interrupts its running turn. While **Stopping**, its checkout stays reserved;
+and interrupts its running turn. While **Stopping**, its workspace stays reserved;
 interruption failures remain visible and retry automatically, or use **Retry Stop**.
 If its chat was deleted, Stop confirms its absence in the local chat catalog
-and releases the checkout. Catalog failures retain the checkout for another retry.
+and releases the workspace. Catalog failures retain the workspace for another retry.
 After a Dashboard restart, running and waiting loops pause while stopping loops
 continue stopping. **Resume** reconciles known work first
 and never duplicates an unconfirmed launch. If a turn failed or was interrupted

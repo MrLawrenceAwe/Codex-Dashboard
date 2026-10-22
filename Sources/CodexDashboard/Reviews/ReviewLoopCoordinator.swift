@@ -14,7 +14,7 @@ final class ReviewLoopCoordinator {
     private var advancingIDs: Set<UUID> = []
     private var stoppingIDs: Set<UUID> = []
     private var resumeRequestedIDs: Set<UUID> = []
-    private var checkoutOwners: [String: UUID] = [:]
+    private var workspaceOwners: [String: UUID] = [:]
 
     var threadIDs: Set<String> {
         Set(loops.flatMap { $0.rounds.compactMap(\.threadID) })
@@ -40,7 +40,7 @@ final class ReviewLoopCoordinator {
                 }
             }
             for loop in loops where !loop.phase.isFinished {
-                if let root = loop.checkoutRoot { checkoutOwners[FileSystemPath.canonicalPath(root)] = loop.id }
+                if let root = loop.workspaceRoot { workspaceOwners[FileSystemPath.canonicalPath(root)] = loop.id }
             }
             try store.save(loops)
         } catch {
@@ -219,7 +219,7 @@ final class ReviewLoopCoordinator {
             chatMissing = true
         } catch {
             if var updated = matchingLoop(id), updated.phase == .stopping {
-                updated.message = "Stopping loop, but could not stop its chat. The checkout remains reserved; retry Stop or open its chat: \(error.localizedDescription)"
+                updated.message = "Stopping loop, but could not stop its chat. The workspace remains reserved; retry Stop or open its chat: \(error.localizedDescription)"
                 try persist(updated)
             }
             throw error
@@ -246,9 +246,9 @@ final class ReviewLoopCoordinator {
         await advanceRound(id: id, using: driver, threads: threads)
         advancingIDs.remove(id)
         // A stop requested during creation/submission must wait until its IDs
-        // are saved. Otherwise a late turn can start after the checkout is released.
+        // are saved. Otherwise a late turn can start after the workspace is released.
         do { try await stopRunningTask(for: id, using: driver) }
-        catch { /* The stopping loop retains its checkout and its retry message. */ }
+        catch { /* The stopping loop retains its workspace and its retry message. */ }
     }
 
     private func advanceRound(id: UUID, using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
@@ -278,13 +278,13 @@ final class ReviewLoopCoordinator {
         guard let current = activeLoop(matching: updated.id, phase: .waiting) else { return }
         updated = current
         let root = FileSystemPath.canonicalPath(workspace.root)
-        if let owner = checkoutOwners.first(where: { otherRoot, owner in
+        if let owner = workspaceOwners.first(where: { otherRoot, owner in
             owner != id && pathsOverlap(root, otherRoot) && matchingLoop(owner)?.phase.isFinished == false
         })?.value, let other = matchingLoop(owner) {
             throw ReviewLoopError("This project folder already has an active review loop for \(other.project.name). Stop that loop before starting another.")
         }
         // Reserve synchronously after inspection, before any launch can suspend.
-        checkoutOwners[root] = id
+        workspaceOwners[root] = id
         if hasOtherRunningTask(threads, root: workspace.root, excluding: nil) { return }
         guard workspace.git?.isClean != false else { throw ReviewLoopError("Commit or set aside existing changes before starting a review. The loop will not commit unrelated work.") }
         if workspace.kind == .folder, updated.pushToRemote {
@@ -303,7 +303,7 @@ final class ReviewLoopCoordinator {
             return
         }
         updated.workspaceKind = workspace.kind
-        updated.checkoutRoot = root
+        updated.workspaceRoot = root
         updated.branch = workspace.git?.branch
         updated.expectedRevision = workspace.revision
         let round = ReviewRound(number: updated.rounds.count + 1, baseRevision: workspace.revision)
@@ -344,7 +344,7 @@ final class ReviewLoopCoordinator {
         updated = current
         guard let currentRound = updated.rounds.last else { return }
         round = currentRound
-        guard FileSystemPath.canonicalPath(thread.cwd) == FileSystemPath.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different checkout.") }
+        guard FileSystemPath.canonicalPath(thread.cwd) == FileSystemPath.canonicalPath(updated.project.path) else { throw ReviewLoopError("The review chat moved to a different project folder.") }
         guard let reviewTurn = round.reviewTurnID.flatMap({ id in thread.turns.first { $0.id == id } }) ?? thread.turns.first,
               round.reviewTurnID == nil || round.reviewTurnID == reviewTurn.id,
               round.allowsFollowUpTurns || thread.turns.count <= (round.fixRequested ? 2 : 1) else {
@@ -357,7 +357,7 @@ final class ReviewLoopCoordinator {
                 guard verification.turnID != nil else {
                     throw ReviewLoopError("The verification launch was not acknowledged. Inspect the chat; it will not be sent twice.")
                 }
-                let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+                let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID)
                 try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: verification.sourceFixTurnID,
                                                 workspace: workspace, using: driver, threadID: threadID)
                 return
@@ -383,7 +383,7 @@ final class ReviewLoopCoordinator {
             try await submitFixTurn(loop: updated, round: round,
                                     using: driver, threads: threads, threadID: threadID)
         } else {
-            try await completeRound(thread: thread, loop: updated, round: round,
+            try await reconcileFixResult(thread: thread, loop: updated, round: round,
                                     using: driver, threads: threads, threadID: threadID)
         }
     }
@@ -399,7 +399,7 @@ final class ReviewLoopCoordinator {
         if try await waitForExtensionReload(reviewTurn, loop: updated, using: driver, threads: threads, threadID: threadID) { return }
         let report = try ReviewReportContract.review(reviewTurn.finalMessage, priorityLimit: updated.priorityLimit)
         guard report.outcome == .reviewed else { throw ReviewLoopError("Review needs attention: \(report.summary)") }
-        let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID, policy: .unchangedReview(baseRevision: round.baseRevision))
+        let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID, policy: .unchangedReview(baseRevision: round.baseRevision))
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         let findings = report.findings(upTo: updated.priorityLimit)
@@ -426,7 +426,7 @@ final class ReviewLoopCoordinator {
         guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
             throw ReviewLoopError("The review has no findings to fix.")
         }
-        let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+        let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard workspace.revision == round.baseRevision else { throw ReviewLoopError("The project changed after the review. Start a new review of the current files.") }
@@ -444,7 +444,7 @@ final class ReviewLoopCoordinator {
         try persist(updated)
     }
 
-    private func completeRound(
+    private func reconcileFixResult(
         thread: ReviewThreadState, loop: ReviewLoop, round: ReviewRound,
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
     ) async throws {
@@ -468,7 +468,7 @@ final class ReviewLoopCoordinator {
         guard result.outcome != .blocked else { throw ReviewLoopError("Fixes need attention: \(result.summary)") }
         try ReviewFixCheckpoint.validateFindings(fixReport, against: report, priorityLimit: updated.priorityLimit)
         if updated.workspaceKind == .folder {
-            let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+            let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID)
             if result.outcome == .withdrawn {
                 guard workspace.revision == round.baseRevision else {
                     throw ReviewLoopError("Files changed although all findings were withdrawn. Inspect the changes before resuming.")
@@ -478,7 +478,7 @@ final class ReviewLoopCoordinator {
                     throw ReviewLoopError("The fix report claims changes, but the folder files are unchanged.")
                 }
             }
-            try finishRound(loopID: updated.id, result: result, fixCommit: nil,
+            try finalizeRound(loopID: updated.id, result: result, fixCommit: nil,
                             workspace: workspace, fixTurnID: fixTurn.id)
             return
         }
@@ -491,7 +491,7 @@ final class ReviewLoopCoordinator {
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        let workspace = try await validateCheckout(using: driver, loop: updated, threads: threads, threadID: threadID)
+        let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID)
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         try await inspectGitProcess {
@@ -509,7 +509,7 @@ final class ReviewLoopCoordinator {
             loop: updated, round: round, result: result, reportedCommit: reportedCommit,
             sourceFixTurnID: fixTurn.id, workspace: workspace, using: driver, threadID: threadID
         ) else { return }
-        try finishRound(loopID: updated.id, result: result,
+        try finalizeRound(loopID: updated.id, result: result,
                         fixCommit: result.outcome == .fixed ? reportedCommit : nil,
                         workspace: workspace, fixTurnID: fixTurn.id)
     }
@@ -534,7 +534,7 @@ final class ReviewLoopCoordinator {
         return true
     }
 
-    private func finishRound(
+    private func finalizeRound(
         loopID: UUID, result: ReviewRoundResult, fixCommit: String?,
         workspace: ReviewWorkspaceState, fixTurnID: String
     ) throws {
@@ -571,7 +571,7 @@ final class ReviewLoopCoordinator {
         workspace: ReviewWorkspaceState, using driver: any ReviewLoopDriving,
         threads: [RendererThread], threadID: String
     ) async throws -> Bool {
-        let currentWorkspace = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID)
+        let currentWorkspace = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID)
         guard currentWorkspace == workspace else { return false }
         if let verification = round.fixVerification {
             guard let turnID = verification.turnID, let turn = thread.turns.last, turn.id == turnID else {
@@ -621,8 +621,8 @@ final class ReviewLoopCoordinator {
     ) async throws -> Bool {
         guard let instructions = try ReviewReportContract.extensionReloadRequest(turn.finalMessage) else { return false }
         guard let round = loop.rounds.last else { throw ReviewLoopError("Missing review round.") }
-        _ = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
-                                       policy: continuationCheckoutPolicy(for: round))
+        _ = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                       policy: continuationWorkspacePolicy(for: round))
         guard var updated = activeLoop(matching: loop.id, phase: .running) else { return true }
         updated.phase = .awaitingExtensionReload
         updated.message = instructions
@@ -634,8 +634,8 @@ final class ReviewLoopCoordinator {
         loop: ReviewLoop, round: ReviewRound,
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
     ) async throws {
-        let workspace = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
-                                              policy: continuationCheckoutPolicy(for: round))
+        let workspace = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                              policy: continuationWorkspacePolicy(for: round))
         try await submitContinuation(loop: loop, round: round, workspace: workspace,
                                      reason: .interrupted, using: driver, threadID: threadID)
     }
@@ -649,13 +649,13 @@ final class ReviewLoopCoordinator {
             throw ReviewLoopError("The chat changed while waiting for extension reload. Inspect its chat before resuming.")
         }
         if let verification = round.fixVerification {
-            let workspace = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID)
+            let workspace = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID)
             try await submitFixVerification(loop: loop, round: round, sourceFixTurnID: verification.sourceFixTurnID,
                                             workspace: workspace, using: driver, threadID: threadID)
             return
         }
-        let workspace = try await validateCheckout(using: driver, loop: loop, threads: threads, threadID: threadID,
-                                              policy: continuationCheckoutPolicy(for: round))
+        let workspace = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID,
+                                              policy: continuationWorkspacePolicy(for: round))
         try await submitContinuation(loop: loop, round: round, workspace: workspace,
                                      reason: .extensionReload, using: driver, threadID: threadID)
     }
@@ -691,29 +691,31 @@ final class ReviewLoopCoordinator {
         try persist(current)
     }
 
-    private enum CheckoutPolicy {
+    private enum WorkspacePolicy {
         case clean
         case unchangedReview(baseRevision: String)
         case unfinishedFix
     }
 
-    private func continuationCheckoutPolicy(for round: ReviewRound) -> CheckoutPolicy {
+    private func continuationWorkspacePolicy(for round: ReviewRound) -> WorkspacePolicy {
         if round.fixVerification != nil { return .clean }
         return round.fixRequested ? .unfinishedFix : .unchangedReview(baseRevision: round.baseRevision)
     }
 
-    private func validateCheckout(
+    private func validateWorkspace(
         using driver: any ReviewLoopDriving, loop: ReviewLoop,
-        threads: [RendererThread], threadID: String, policy: CheckoutPolicy = .clean
+        threads: [RendererThread], threadID: String, policy: WorkspacePolicy = .clean
     ) async throws -> ReviewWorkspaceState {
         let workspace = try await inspect { try await driver.workspace(at: loop.project.path) }
         guard !hasOtherRunningTask(threads, root: workspace.root, excluding: threadID) else {
-            throw ReviewLoopError("Another chat is running in this checkout. Inspect its changes before continuing.")
+            throw ReviewLoopError("Another chat is running in this workspace. Inspect its changes before continuing.")
         }
         guard workspace.kind == loop.workspaceKind,
               workspace.git == nil || workspace.git?.branch == loop.branch,
-              FileSystemPath.canonicalPath(workspace.root) == loop.checkoutRoot else {
-            throw ReviewLoopError("The checkout changed. Restore the original checkout and branch before continuing.")
+              FileSystemPath.canonicalPath(workspace.root) == loop.workspaceRoot else {
+            throw ReviewLoopError(workspace.kind == .git && loop.workspaceKind == .git
+                ? "The Git checkout changed. Restore the original checkout and branch before continuing."
+                : "The workspace changed. Restore the original project folder and review mode before continuing.")
         }
         switch policy {
         case .clean:

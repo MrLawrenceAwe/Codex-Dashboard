@@ -40,6 +40,18 @@ final class ReviewFolderLoopTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops[0].rounds[1].baseRevision, "changed-files")
     }
 
+    func testFolderRootChangeExplainsRecoveryWithoutGitInstructions() async throws {
+        let (coordinator, _, driver) = try folderLoop()
+        await coordinator.advance(using: driver, threads: [])
+        driver.workspaceRoot = project.path + "/moved"
+        driver.review(priorities: [])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .blocked)
+        XCTAssertTrue(coordinator.loops[0].message.contains("Restore the original project folder"))
+        XCTAssertFalse(coordinator.loops[0].message.contains("branch"))
+        XCTAssertFalse(coordinator.loops[0].message.contains("checkout"))
+    }
+
     func testReadOnlyFolderReviewRejectsFileChanges() async throws {
         let (coordinator, _, driver) = try folderLoop()
         await coordinator.advance(using: driver, threads: [])
