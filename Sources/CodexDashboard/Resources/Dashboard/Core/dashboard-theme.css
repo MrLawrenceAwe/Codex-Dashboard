@@ -8,5 +8,7 @@
   --dashboard-control-radius: 6px;
   --dashboard-row-radius: 8px;
   --dashboard-page-top: 40px;
+  --dashboard-control-height: 32px;
+  --dashboard-focus: var(--app-color-border-focus, var(--app-color-text-foreground, #ececec));
   font-family: inherit;
 }
