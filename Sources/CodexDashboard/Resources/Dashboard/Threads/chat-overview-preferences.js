@@ -25,16 +25,14 @@ const chatOverviewPreferences = (() => {
         }
         delete stored.collapsedProjects;
       }
-      const hadOldAllFilter = ['recent', 'home'].includes(stored.filterMode);
-      if (hadOldAllFilter) stored.filterMode = 'all';
-      if (legacy !== null || hasLegacyIndicatorPaths || hasLegacyCollapsedPaths || hadOldAllFilter) {
+      if (legacy !== null || hasLegacyIndicatorPaths || hasLegacyCollapsedPaths) {
         localStorage.setItem(preferencesKey, JSON.stringify(stored));
         if (legacy !== null) localStorage.removeItem(legacyPreferencesKey);
       }
     } catch (_) {}
     return {
-      filterMode: ['all', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'all',
+      filterMode: ['active', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'active',
       collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
         ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
       hiddenChangeIndicatorPaths: new Set(Array.isArray(stored.hiddenChangeIndicatorPaths)

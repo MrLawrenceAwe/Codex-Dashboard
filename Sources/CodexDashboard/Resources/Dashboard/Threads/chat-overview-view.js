@@ -140,8 +140,8 @@ const chatOverviewView = (() => {
     const loadMore = page.querySelector('[data-load-more]');
     if (loadMore) loadMore.hidden = !hasMore;
     const list = page.querySelector('[data-thread-list]');
-    list.classList.toggle('is-compact', filterMode === 'all');
-    list.classList.toggle('has-sections', filterMode === 'all' && state.runningCount > 0);
+    list.classList.toggle('is-compact', filterMode === 'active');
+    list.classList.toggle('has-sections', filterMode === 'active');
     if (!matchingThreads.length) {
       const emptyMessage = filterMode === 'unread'
         ? 'You’re all caught up'

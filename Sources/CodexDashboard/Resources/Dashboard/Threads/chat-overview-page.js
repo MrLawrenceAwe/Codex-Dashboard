@@ -16,7 +16,7 @@ const chatOverviewPage = (() => {
             <div class="dashboard-toolbar-group dashboard-filter-group">
               <span class="dashboard-control-label">Show</span>
               <div class="dashboard-filters" aria-label="Filter chats">
-                <button type="button" data-filter="all" class="is-active">Recent and running</button>
+                <button type="button" data-filter="active" class="is-active">Active</button>
                 <button type="button" data-filter="unread">Unread <span class="dashboard-filter-count" data-filter-count="unread">0</span></button>
                 <button type="button" data-filter="changedProjects" aria-label="Local changes"><span class="dashboard-filter-label">Local changes</span> <span class="dashboard-filter-count" data-filter-count="changedProjects" aria-label="Projects with uncommitted changes or unpushed commits">0</span></button>
               </div>

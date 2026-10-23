@@ -16,13 +16,13 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               const button = document.querySelector('[data-mark-all-read]');
-              document.querySelector('[data-filter="all"]').click();
-              const onAll = button.hidden;
+              document.querySelector('[data-filter="active"]').click();
+              const onActive = button.hidden;
               document.querySelector('[data-filter="unread"]').click();
               const onUnread = button.hidden;
               document.querySelector('[data-filter="changedProjects"]').click();
               const onChangedProjects = button.hidden;
-              return [onAll, onUnread, onChangedProjects];
+              return [onActive, onUnread, onChangedProjects];
             })()
             """
         ) as? [Bool]

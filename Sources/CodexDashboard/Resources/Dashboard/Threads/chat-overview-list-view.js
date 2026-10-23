@@ -102,7 +102,7 @@ const chatOverviewListView = (() => {
     isUnread,
     isCompletionTickVisible,
   }) {
-    if (filterMode === 'all') {
+    if (filterMode === 'active') {
       const renderRows = (items) => items.map((item) => renderThreadRow(item, {
         compact: true,
         showProject: true,
@@ -110,15 +110,14 @@ const chatOverviewListView = (() => {
         isCompletionTickVisible,
       })).join('');
       const running = displayedThreads.slice(0, leadingRunningThreadCount);
-      if (!running.length) return renderRows(displayedThreads);
       const recent = displayedThreads.slice(leadingRunningThreadCount);
-      return `<section class="dashboard-chat-section" data-dashboard-section="running" aria-label="Running chats">
-        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Running <span>${running.length}</span></h2>
-        ${renderRows(running)}
-      </section>${recent.length ? `<section class="dashboard-chat-section" data-dashboard-section="recent" aria-label="Recent chats">
-        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Recents</h2>
-        ${renderRows(recent)}
-      </section>` : ''}`;
+      return `<section class="dashboard-chat-section" data-dashboard-section="active" aria-label="Active chats">
+        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Active <span>${running.length}</span></h2>
+        ${running.length ? renderRows(running) : '<div class="dashboard-empty"><strong>No active chats</strong></div>'}
+      </section><section class="dashboard-chat-section" data-dashboard-section="recent" aria-label="Recent chats">
+        <h2 class="dashboard-chat-section-heading" data-dashboard-section-heading>Recent</h2>
+        ${recent.length ? renderRows(recent) : '<div class="dashboard-empty"><strong>No recent chats</strong></div>'}
+      </section>`;
     }
     if (filterMode === 'changedProjects') {
       const projects = groupThreadsByProject(displayedThreads);

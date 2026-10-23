@@ -204,7 +204,8 @@ presets; version 7 added `project` and `thread`. Older readers convert `projectT
 `projectBadge`, and the version 6 `chat` field. Failed migration writes leave the
 stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
-`hiddenChangeIndicatorPaths`, and the `recent`/`home` filters to `all` (**Recent and running**).
+`hiddenChangeIndicatorPaths`. Chat filters are `active` (the default overview),
+`unread`, and `changedProjects`; unrecognised saved filters use **Active**.
 
 Review-loop version 16 renames `checkoutRoot` to `workspaceRoot` for Git and ordinary-folder
 loops. Migration preserves the root and reservation alongside all saved settings and

@@ -34,7 +34,7 @@ extension ChatOverviewWebTests {
               const todoControls = () => document.querySelector(
                 '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
               ) === null;
-              const filters = ['all', 'unread', 'changedProjects'];
+              const filters = ['active', 'unread', 'changedProjects'];
               return filters.map((filter) => {
                 document.querySelector(`[data-filter="${filter}"]`).click();
                 return todoControls();
@@ -143,7 +143,7 @@ extension ChatOverviewWebTests {
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter="all"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="active"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="running"]') === null,
                 [...document.querySelectorAll('[data-dashboard-section]')]
                   .map((section) => [section.dataset.dashboardSection,
@@ -162,7 +162,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertEqual(values[4] as? Bool, true)
         let sections = try XCTUnwrap(values[5] as? [[Any]])
-        XCTAssertEqual(sections[0][0] as? String, "running")
+        XCTAssertEqual(sections[0][0] as? String, "active")
         XCTAssertEqual(sections[0][1] as? [String], ["project-a-running-one", "project-a-running-two", "project-b-running"])
         XCTAssertEqual(sections[1][0] as? String, "recent")
         XCTAssertEqual(sections[1][1] as? [String], ["project-a-idle"])
@@ -203,7 +203,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? Bool, true)
     }
 
-    func testAllTasksFilterIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
+    func testActiveOverviewIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -221,11 +221,14 @@ extension ChatOverviewWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="all"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="active"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="home"]') === null,
                 initialIDs,
                 document.querySelector('[data-filter-count="recent"]') === null,
                 document.querySelector('[data-thread-list] .dashboard-project-group') === null,
+                [...document.querySelectorAll('[data-dashboard-section]')].map(section => section.dataset.dashboardSection),
+                document.querySelector('[data-dashboard-section="active"] .dashboard-empty')?.textContent,
+                document.querySelector('[data-filter="recent"]') === null,
               ];
             })()
             """
@@ -237,6 +240,9 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[2] as? [String], ["newest", "middle", "oldest", "yesterday"])
         XCTAssertEqual(values[3] as? Bool, true)
         XCTAssertEqual(values[4] as? Bool, true)
+        XCTAssertEqual(values[5] as? [String], ["active", "recent"])
+        XCTAssertEqual(values[6] as? String, "No active chats")
+        XCTAssertEqual(values[7] as? Bool, true)
     }
 
 }

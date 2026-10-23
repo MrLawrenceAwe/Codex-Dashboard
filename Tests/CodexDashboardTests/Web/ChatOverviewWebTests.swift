@@ -205,7 +205,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               const restored = document.querySelector('[data-filter="unread"]').classList.contains('is-active');
-              document.querySelector('[data-filter="all"]').click();
+              document.querySelector('[data-filter="active"]').click();
               const saved = JSON.parse(localStorage.getItem('codex-dashboard.task-preferences'));
               const removedLegacy = localStorage.getItem('codex-dashboard.thread-preferences') === null;
               return JSON.stringify([restored, saved.filterMode, Object.hasOwn(saved, 'viewMode'), saved.collapsedProjectPaths[0], saved.hiddenChangeIndicatorPaths[0], document.querySelector('[data-view]') === null, removedLegacy]);
@@ -220,7 +220,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
         XCTAssertEqual(values[0] as? Bool, true)
-        XCTAssertEqual(values[1] as? String, "all")
+        XCTAssertEqual(values[1] as? String, "active")
         XCTAssertEqual(values[2] as? Bool, false)
         XCTAssertEqual(values[3] as? String, "/tmp/project")
         XCTAssertEqual(values[4] as? String, "/tmp/ignored-project")
@@ -228,8 +228,8 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[6] as? Bool, true)
     }
 
-    func testSavedAllTasksFiltersMigrateToCurrentValue() async throws {
-        for previousFilter in ["recent", "home"] {
+    func testUnknownSavedFiltersUseActiveOverview() async throws {
+        for previousFilter in ["all", "recent", "home"] {
             let webView = try await DashboardWebTestHarness.mountedWebView(
                 html: """
                 <!doctype html><html><body>
@@ -242,15 +242,15 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             )
             _ = try await webView.evaluateJavaScript("""
             window.__codexDashboard.destroy();
+            delete window.__codexDashboard;
             localStorage.setItem('codex-dashboard.task-preferences', JSON.stringify({ filterMode: '\(previousFilter)' }));
             """)
             let injection = try InjectionBundle.load()
             _ = try await webView.evaluateJavaScript(injection.mountExpression)
             let result = try await webView.evaluateJavaScript("""
-            [JSON.parse(localStorage.getItem('codex-dashboard.task-preferences')).filterMode,
-             document.querySelector('[data-filter="all"]').classList.contains('is-active')]
+            [document.querySelector('[data-filter="active"]').classList.contains('is-active')]
             """) as? [AnyHashable]
-            XCTAssertEqual(result, ["all", true])
+            XCTAssertEqual(result, [true])
         }
     }
 
