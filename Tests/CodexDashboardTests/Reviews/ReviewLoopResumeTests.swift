@@ -3,6 +3,71 @@ import XCTest
 
 @MainActor
 final class ReviewLoopResumeTests: ReviewLoopTestCase {
+    private func completeFirstRound(_ coordinator: ReviewLoopCoordinator, _ driver: ReviewTestDriver) async {
+        await coordinator.advance(using: driver, threads: [])
+        driver.review(priorities: [.p1])
+        await coordinator.advance(using: driver, threads: [])
+        await coordinator.advance(using: driver, threads: [])
+        driver.finish(findings: 1, commit: "fixed")
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .waiting)
+    }
+
+    func testCommittedChangesBetweenRoundsBecomeNextBaseline() async throws {
+        for phase in [ReviewLoopPhase.waiting, .paused, .blocked] {
+            let (coordinator, store, driver) = try make(limit: 2)
+            await completeFirstRound(coordinator, driver)
+            let completedRound = coordinator.loops[0].rounds[0]
+            driver.commit = "user-commit"
+            let continuing: ReviewLoopCoordinator
+            if phase == .waiting {
+                continuing = coordinator
+            } else {
+                // Include persisted loops blocked by the old between-round check.
+                store.loops[0].phase = phase
+                store.loops[0].message = "The project changed outside the review loop. Inspect the changes before starting a new loop."
+                continuing = ReviewLoopCoordinator(store: store)
+                try continuing.apply(action(.resume, for: continuing), projects: [project])
+            }
+            await continuing.advance(using: driver, threads: [])
+            XCTAssertEqual(continuing.loops[0].phase, .running, "\(phase)")
+            XCTAssertEqual(continuing.loops[0].expectedRevision, "user-commit")
+            XCTAssertEqual(continuing.loops[0].rounds.count, 2)
+            XCTAssertEqual(continuing.loops[0].rounds[1].baseRevision, "user-commit")
+            XCTAssertEqual(continuing.loops[0].rounds[0], completedRound)
+            XCTAssertEqual(driver.createdThreads.count, 2)
+            XCTAssertEqual(driver.prompts.count, 3)
+            XCTAssertTrue(driver.pushedCommits.isEmpty)
+            driver.review(priorities: [])
+            await continuing.advance(using: driver, threads: [])
+            XCTAssertEqual(continuing.loops[0].phase, .completed)
+            XCTAssertEqual(continuing.loops[0].completedRoundCount, 2)
+        }
+    }
+
+    func testBetweenRoundCommitStillRequiresCleanOriginalBranch() async throws {
+        let (coordinator, _, driver) = try make(limit: 2)
+        await completeFirstRound(coordinator, driver)
+        driver.commit = "user-commit"
+        driver.clean = false
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .blocked)
+        XCTAssertEqual(coordinator.loops[0].expectedRevision, "fixed")
+        XCTAssertEqual(driver.createdThreads.count, 1)
+        driver.clean = true
+        driver.branch = "other"
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .blocked)
+        XCTAssertEqual(coordinator.loops[0].expectedRevision, "fixed")
+        XCTAssertEqual(driver.createdThreads.count, 1)
+        driver.branch = "main"
+        try coordinator.apply(action(.resume, for: coordinator), projects: [project])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .running)
+        XCTAssertEqual(coordinator.loops[0].rounds[1].baseRevision, "user-commit")
+    }
+
     private func failLatest(_ driver: ReviewTestDriver, status: ReviewTurnStatus) {
         let latest = driver.thread.turns.last!
         driver.thread = ReviewThreadState(cwd: driver.thread.cwd, turns: driver.thread.turns.dropLast() + [

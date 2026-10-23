@@ -295,7 +295,12 @@ final class ReviewLoopCoordinator {
         }
         guard workspace.git?.branch.isEmpty != true else { throw ReviewLoopError("Check out a branch before starting a review loop.") }
         if let git = workspace.git, let branch = updated.branch, branch != git.branch { throw ReviewLoopError("The checkout changed branch. Start a new loop for the new branch.") }
-        if let head = updated.expectedRevision, head != workspace.revision { throw ReviewLoopError("The project changed outside the review loop. Inspect the changes before starting a new loop.") }
+        // A fresh Git review adopts committed work made after the previous round
+        // completed. In-flight rounds keep their original checkpoint in reconcile.
+        if let head = updated.expectedRevision, head != workspace.revision,
+           !(workspace.kind == .git && updated.rounds.last?.result?.outcome == .fixed) {
+            throw ReviewLoopError("The project changed outside the review loop. Inspect the changes before starting a new loop.")
+        }
         guard updated.completedRoundCount < updated.maxRounds else {
             updated.phase = .limitReached
             updated.message = "All configured review rounds completed."

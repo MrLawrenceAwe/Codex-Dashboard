@@ -230,6 +230,12 @@ to preserve the remote history. Rewritten history, branch or checkout changes,
 uncommitted work, and changes after an all-withdrawn report still require attention.
 Resume retries a blocked checkpoint without repeating the completed fix task.
 
+After a round completes, changes you commit on the same branch become the baseline
+for the next review. The checkout must be clean. If a loop was blocked between
+completed rounds because the project changed, select **Resume** to review the current
+commit in the next round. The completed round keeps its original fix and verified
+commit records. Changes during an unfinished round still require reconciliation.
+
 **Pause after round** finishes the current round. **Stop loop** prevents new work
 and interrupts its running turn. While **Stopping**, its workspace stays reserved;
 interruption failures remain visible and retry automatically, or use **Retry Stop**.
