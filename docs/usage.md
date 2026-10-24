@@ -132,7 +132,9 @@ Choose a local, single-folder project on **Review loops**, then a review type:
 **Bugs and issues**, **Performance**, **Bugs and performance**, **Structure**,
 **Structure and naming**, or **Content and quality**. Structure reviews cover code,
 UI copy, documentation, prompts, and configuration; the naming option adds naming
-review. Content reviews also cover documents, CVs, and presentations.
+review. Both offer **Keep UI copy unchanged**, off by default, to exclude visible
+wording and UI names from findings and fixes while allowing internal refactors.
+Content reviews also cover documents, CVs, and presentations.
 
 Choose separate review and fix models, optional supported reasoning efforts,
 Standard/Fast speed, and a round limit of 1–20 (default five). Bugs and performance
@@ -198,7 +200,8 @@ reload the named extension, then select **Extension reloaded — continue**. The
 same chat and round resume with unfinished fixes preserved. Final review and
 commit checks still run before the round can complete.
 
-The sidebar shows separate counts for running or waiting loops, an amber **!** for
+The sidebar shows separate counts for running or waiting loops, an amber pause icon
+for paused loops, an amber **!** for
 blocked loops or loops awaiting an extension reload, and a green **✓** for completed
 loops or loops that reached their round limit. Counts include only current loops;
 moving a finished loop to history removes it from the count. Stopped loops are

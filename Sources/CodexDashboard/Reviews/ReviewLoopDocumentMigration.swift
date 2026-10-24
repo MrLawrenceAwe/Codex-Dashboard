@@ -66,6 +66,7 @@ enum ReviewLoopDocumentMigration {
                 return round
             }
         }
+        loop["preserveUICopy"] = loop["preserveUICopy"] ?? false
         let previousMutePreference = loop.removeValue(forKey: "muteMedia")
         loop["muteTestPlayback"] = loop["muteTestPlayback"] ?? previousMutePreference ?? false
         return loop

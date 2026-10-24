@@ -15,6 +15,7 @@ enum ReviewType: String, Codable, CaseIterable, Sendable {
     case bugs, bugsAndPerformance, organisation, organisationAndNaming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
+    var supportsPreservingUICopy: Bool { self == .organisation || self == .organisationAndNaming }
     var supportsLiveTesting: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
     var supportsProjectContext: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
 
@@ -170,6 +171,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
     var priorityLimit: ReviewFinding.Priority? = nil
     var liveTesting = false
     var reloadExtensionBeforeTesting = false
+    var preserveUICopy = false
     var muteTestPlayback = false
     var pushToRemote = false
     var workspaceKind: ReviewWorkspaceKind? = nil
@@ -189,7 +191,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 16
+    static let currentVersion = 17
     let version: Int
     let loops: [ReviewLoop]
 }

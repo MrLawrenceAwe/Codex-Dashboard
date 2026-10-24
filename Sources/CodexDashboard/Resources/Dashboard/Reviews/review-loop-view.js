@@ -51,6 +51,7 @@ const reviewLoopView = (() => {
     const loops = currentLoops(snapshot, retainedLoopIDs);
     const statuses = [
       { kind: 'running', phases: ['waiting', 'running'], label: 'running or waiting' },
+      { kind: 'paused', phases: ['paused'], label: 'paused' },
       { kind: 'blocked', phases: ['blocked', 'awaitingExtensionReload'], label: 'blocked or awaiting extension reload' },
       { kind: 'done', phases: ['completed', 'limitReached'], label: 'done (completed or round limit reached)' },
     ];

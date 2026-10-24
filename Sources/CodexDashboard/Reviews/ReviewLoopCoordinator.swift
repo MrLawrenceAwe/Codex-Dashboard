@@ -95,6 +95,7 @@ final class ReviewLoopCoordinator {
             priorityLimit: reviewType.usesPriorities ? action.priorityLimit ?? .p2 : nil,
             liveTesting: liveTesting,
             reloadExtensionBeforeTesting: liveTesting && (action.reloadExtensionBeforeTesting ?? false),
+            preserveUICopy: reviewType.supportsPreservingUICopy && (action.preserveUICopy ?? false),
             muteTestPlayback: liveTesting && (action.muteTestPlayback ?? false),
             pushToRemote: action.pushToRemote ?? false
         )

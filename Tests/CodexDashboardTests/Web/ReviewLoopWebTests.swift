@@ -10,6 +10,63 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         as: UTF8.self
     )
 
+    func testPreserveUICopyVisibilitySubmissionAndReset() async throws {
+        let view = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-copy.test"))
+        let result = try await view.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON), projects:[{id:'p',name:'Example',path:'/tmp/example'}],loops:[]};
+          api.applyReviewPageSnapshot(snapshot); api.openReviews();
+          const copy = document.querySelector('[data-review-preserve-ui-copy]');
+          const type = document.querySelector('[data-review-type]');
+          const states = [copy.closest('label').hidden, !copy.checked];
+          for (const value of ['organisation','organisationAndNaming']) {
+            type.value = value; type.dispatchEvent(new Event('change'));
+            states.push(!copy.closest('label').hidden);
+          }
+          copy.checked = true;
+          api.applyReviewPageSnapshot(snapshot);
+          states.push(copy.checked);
+          document.querySelector('[data-review-model]').value = 'model-a';
+          document.querySelector('[data-fix-model]').value = 'model-a';
+          document.querySelector('[data-review-form]').requestSubmit();
+          const action = JSON.parse(api.pendingReviewAction());
+          states.push(action.preserveUICopy === true);
+          api.applyReviewPageSnapshot({...snapshot,acknowledgedActionID:action.id});
+          type.value = 'content'; type.dispatchEvent(new Event('change'));
+          states.push(copy.closest('label').hidden, !copy.checked);
+          document.querySelector('[data-review-form]').requestSubmit();
+          states.push(JSON.parse(api.pendingReviewAction()).preserveUICopy === false);
+          return states;
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, Array(repeating: true, count: 9))
+    }
+
+    func testSidebarPausedIconIsAmberAndTracksCountAndRemount() async throws {
+        let view = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-paused.test"))
+        let result = try await view.evaluateAsyncJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const marker = () => document.querySelector('[data-review-navigation-paused]');
+          const loop = id => ({id,project:{id,name:'Example',path:'/tmp/example'},phase:'paused',isFinished:false,completedRoundCount:0,maxRounds:3,rounds:[]});
+          const snapshot = {projects:[],loops:[loop('a'),loop('b')]};
+          const states = [marker().hidden];
+          api.applyReviewPageSnapshot(snapshot);
+          states.push(!marker().hidden, marker().textContent.trim() === '2', marker().getAttribute('aria-label') === '2 paused review loops',
+            !!marker().querySelector('svg'), getComputedStyle(marker()).color === 'rgb(201, 155, 84)');
+          document.getElementById('codex-dashboard-review-navigation').remove(); api.ensureMounted();
+          states.push(!marker().hidden, marker().textContent.trim() === '2');
+          snapshot.loops[0].phase = 'running'; api.applyReviewPageSnapshot(snapshot);
+          states.push(marker().title === '1 paused review loop', marker().textContent.trim() === '1');
+          snapshot.loops[1].phase = 'waiting'; api.applyReviewPageSnapshot(snapshot);
+          states.push(marker().hidden, getComputedStyle(marker()).display === 'none');
+          return states;
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, Array(repeating: true, count: 12))
+    }
+
     func testUnchangedReviewRefreshPreservesFocusedControlsAndFindings() async throws {
         let view = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-focus.test"))
         let result = try await view.evaluateAsyncJavaScript("""
@@ -700,7 +757,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           ];
           const project = {id:'p',name:'Example',path:'/tmp/example'};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes,projects:[project],models:[],
-            loops:[{id:'loop',project,reviewType:'organisationAndNaming',phase:'paused',isFinished:false,rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
+            loops:[{id:'loop',project,reviewType:'organisationAndNaming',phase:'paused',isFinished:false,completedRoundCount:0,maxRounds:3,rounds:[],completedRoundCount:0,maxRounds:5}],error:null});
           const select = document.querySelector('[data-review-type]');
           const labels = [...select.options].map(option => option.textContent);
           const namingHidesPriorities = document.querySelector('.review-priority').hidden;

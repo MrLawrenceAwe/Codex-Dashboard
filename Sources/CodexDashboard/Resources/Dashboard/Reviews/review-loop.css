@@ -4,6 +4,7 @@
 #codex-dashboard-review-navigation svg { width:16px; height:16px; }
 #codex-dashboard-review-navigation .review-nav-statuses { display:flex; flex-shrink:0; align-items:center; gap:6px; }
 #codex-dashboard-review-navigation .review-nav-marker { display:inline-flex; align-items:center; gap:3px; min-height:16px; font-size:10px; font-variant-numeric:tabular-nums; font-weight:650; line-height:1; }
+#codex-dashboard-review-navigation [data-review-navigation-paused] { color:#c99b54; }
 #codex-dashboard-review-navigation [data-review-navigation-blocked] { color:var(--app-color-text-warning, #c99b54); }
 #codex-dashboard-review-navigation [data-review-navigation-done] { color:var(--app-color-text-success, #65b98c); }
 #codex-dashboard-review-navigation .review-nav-marker[hidden] { display:none; }
@@ -176,8 +177,8 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 }
 
 .dashboard-review-loop [data-review-test-playback-setting] { margin-top:16px; }
-.dashboard-review-loop [data-review-test-playback-setting] label, .dashboard-review-loop .review-mute-test-playback { display:flex; flex-direction:row; align-items:center; gap:8px; width:fit-content; font-size:12px; }
-.dashboard-review-loop [data-review-test-playback-setting] input, .dashboard-review-loop [data-review-mute-test-playback] { appearance:auto; width:16px; min-height:16px; height:16px; margin:0; padding:0; }
+.dashboard-review-loop [data-review-test-playback-setting] label, .dashboard-review-loop .review-mute-test-playback, .dashboard-review-loop .review-preserve-ui-copy { display:flex; flex-direction:row; align-items:center; gap:8px; width:fit-content; font-size:12px; }
+.dashboard-review-loop [data-review-test-playback-setting] input, .dashboard-review-loop [data-review-mute-test-playback], .dashboard-review-loop [data-review-preserve-ui-copy] { appearance:auto; width:16px; min-height:16px; height:16px; margin:0; padding:0; }
 
 .dashboard-review-loop .review-feedback { margin-top:20px; }
 .dashboard-review-loop .review-feedback-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 12px; font-size:11px; }

@@ -3,6 +3,16 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testVersion16LoopsDefaultToAllowingUICopyChanges() throws {
+        let loop = ReviewLoop(id: UUID(), startActionID: "copy", project: project,
+                              promptContext: .general, maxRounds: 3, reviewType: .organisation)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "preserveUICopy")
+        let data = try JSONSerialization.data(withJSONObject: ["version": 16, "loops": [saved]])
+        let migrated = try XCTUnwrap(ReviewLoopDocumentMigration.decode(data).first)
+        XCTAssertFalse(migrated.preserveUICopy)
+    }
+
     func testWorkspaceRootMigrationPreservesGitAndFolderReservationsAndHistory() throws {
         for kind in [ReviewWorkspaceKind.git, .folder] {
             var loop = ReviewLoop(id: UUID(), startActionID: "root-migration", project: project,

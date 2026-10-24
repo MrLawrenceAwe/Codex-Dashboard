@@ -3,6 +3,20 @@ import XCTest
 
 @MainActor
 final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
+    func testPreserveUICopyIsSavedOnlyForStructureReviews() throws {
+        for reviewType in ReviewType.allCases {
+            let store = ReviewTestStore()
+            let coordinator = ReviewLoopCoordinator(store: store)
+            var start = startAction(id: reviewType.rawValue, kind: .start, projectID: project.id,
+                                    promptContext: .general, maxRounds: 3, loopID: nil)
+            start.reviewType = reviewType
+            start.preserveUICopy = true
+            try coordinator.apply(start, projects: [project])
+            let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
+            XCTAssertEqual(saved.preserveUICopy, reviewType.supportsPreservingUICopy)
+        }
+    }
+
     func testUpdateTimestampPersistsAndHistoryDeletionKeepsOtherTimestamps() throws {
         let (_, store, _) = try make()
         let startedAt = try XCTUnwrap(store.loops.first?.updatedAt)
@@ -938,6 +952,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
             let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
+                + (reviewType.supportsPreservingUICopy ? "\n\nAddress findings within the original review scope and constraints." : "")
             func taskParagraphs(_ prompt: String) -> String {
                 prompt.components(separatedBy: "\n\nScope: ").first!
             }

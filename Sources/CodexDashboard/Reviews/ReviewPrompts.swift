@@ -24,12 +24,17 @@ enum ReviewPrompts {
         return "\n\nFor findings discovered through code review, use live testing to verify bugs and their fixes only when necessary. Verify fixes for findings discovered through live testing using live testing. Connect DevTools, launch test UI, or reload extensions for verification only when live testing is needed."
     }
 
+    private static func preserveUICopyInstruction(for loop: ReviewLoop) -> String {
+        guard loop.reviewType.supportsPreservingUICopy && loop.preserveUICopy else { return "" }
+        return "\n\nKeep UI copy unchanged. Exclude user-visible wording and UI names from review findings and fixes, including labels, buttons, headings, messages, tooltips, placeholders, and translations. Internal code, symbol, file, and folder refactors may proceed, but must preserve all displayed text exactly. Apply this constraint throughout review, fixes, and verification."
+    }
+
     private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
         guard loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming else { return "" }
         let verification = verifyingFixes
             ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
             : "Statically inspect source, call sites, tests, docs, and manifests."
-        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task."
+        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task." + preserveUICopyInstruction(for: loop)
     }
 
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
@@ -136,7 +141,7 @@ enum ReviewPrompts {
             ? "Address \(findings) in this ordinary folder. Verify each finding first. Preserve unrelated files and edits. Mark invalid findings as withdrawn. Do not initialise Git, create commits, or push. Verify the changes and return the folder fix report."
             : task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
         if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
-            prompt += "\n\nAddress findings within the original review scope and constraints."
+            prompt += "\n\nAddress findings within the original review scope and constraints." + preserveUICopyInstruction(for: loop)
         }
         prompt += bugVerificationInstruction(for: loop, verifyingFixes: true)
         if loop.liveTesting && loop.reviewType == .performance {

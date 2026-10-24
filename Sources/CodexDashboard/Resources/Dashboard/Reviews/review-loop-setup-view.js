@@ -7,6 +7,7 @@ const reviewLoopSetupView = (() => {
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
+  const supportsPreservingUICopy = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsPreservingUICopy === true;
   const supportsLiveTesting = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsLiveTesting === true;
   const supportsProjectContext = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsProjectContext === true;
 
@@ -24,6 +25,7 @@ const reviewLoopSetupView = (() => {
         <fieldset class="review-limits"><legend>Review settings</legend>
         <label>Review type<select data-review-type aria-label="Review type" aria-describedby="review-type-help"></select></label>
         <p id="review-type-help" class="review-field-help" data-review-type-help></p>
+        <label class="review-preserve-ui-copy" hidden><input type="checkbox" data-review-preserve-ui-copy> Keep UI copy unchanged</label>
         <label class="review-priority">Finding priority<select data-review-priority aria-label="Review and fix priority limit">
           <option value="P0">Critical only · P0</option><option value="P1">High and critical · P0–P1</option>
           <option value="P2" selected>Medium and higher · P0–P2</option><option value="P3">All priorities · P0–P3</option>
@@ -75,6 +77,7 @@ const reviewLoopSetupView = (() => {
       fixSelection: selection('fix'),
       reviewType,
       liveTesting,
+      preserveUICopy: supportsPreservingUICopy(reviewType) && root.querySelector('[data-review-preserve-ui-copy]').checked,
       reloadExtensionBeforeTesting: liveTesting && value('[data-review-extension]') === 'true',
       muteTestPlayback: liveTesting && root.querySelector('[data-review-mute-test-playback]').checked,
       pushToRemote: projects.find(project => project.id === value('[data-review-project]'))?.workspaceKind !== 'folder' && value('[data-review-push]') === 'true',
@@ -99,6 +102,9 @@ const reviewLoopSetupView = (() => {
     root.querySelector('.review-push-help').hidden = folder;
     const reviewType = root.querySelector('[data-review-type]').value;
     root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === reviewType)?.scopeDescription || '';
+    const preserveUICopy = root.querySelector('.review-preserve-ui-copy');
+    preserveUICopy.hidden = !supportsPreservingUICopy(reviewType);
+    if (preserveUICopy.hidden) preserveUICopy.querySelector('input').checked = false;
     root.querySelector('.review-priority').hidden = !usesPriorities(reviewType);
     const liveTesting = root.querySelector('.review-live-testing');
     liveTesting.hidden = !supportsLiveTesting(reviewType);

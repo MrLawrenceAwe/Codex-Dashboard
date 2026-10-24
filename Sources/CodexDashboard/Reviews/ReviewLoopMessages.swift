@@ -13,6 +13,7 @@ struct ReviewLoopAction: Codable, Sendable {
     let loopID: UUID?
     var liveTesting: Bool? = nil
     var reloadExtensionBeforeTesting: Bool? = nil
+    var preserveUICopy: Bool? = nil
     var muteTestPlayback: Bool? = nil
     var pushToRemote: Bool? = nil
     var filePath: String? = nil
@@ -39,6 +40,7 @@ struct ReviewTypeOption: Codable, Sendable {
     let scopeDescription: String
     let usesPriorities: Bool
     let supportsProjectContext: Bool
+    let supportsPreservingUICopy: Bool
     let supportsLiveTesting: Bool
 
     init(_ reviewType: ReviewType) {
@@ -47,6 +49,7 @@ struct ReviewTypeOption: Codable, Sendable {
         scopeDescription = reviewType.scopeDescription
         usesPriorities = reviewType.usesPriorities
         supportsProjectContext = reviewType.supportsProjectContext
+        supportsPreservingUICopy = reviewType.supportsPreservingUICopy
         supportsLiveTesting = reviewType.supportsLiveTesting
     }
 }

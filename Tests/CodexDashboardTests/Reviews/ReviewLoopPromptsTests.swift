@@ -3,6 +3,31 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testPreserveUICopyAppliesToAllStructureTurnsOnlyWhenEnabled() {
+        for reviewType in ReviewType.allCases {
+            for enabled in [false, true] {
+                for workspaceKind in [ReviewWorkspaceKind.git, .folder] {
+                    let loop = ReviewLoop(id: UUID(), startActionID: "copy", project: project,
+                                          promptContext: .general, maxRounds: 3, reviewType: reviewType,
+                                          preserveUICopy: enabled, workspaceKind: workspaceKind)
+                    var round = ReviewRound(number: 1, baseRevision: "base")
+                    var prompts = [ReviewPrompts.reviewPrompt(for: loop),
+                                   ReviewPrompts.fixPrompt(for: loop, round: round),
+                                   ReviewPrompts.verifyFix(for: loop, round: round, targetRevision: "head")]
+                    for fixing in [false, true] {
+                        round.fixRequested = fixing
+                        prompts.append(ReviewPrompts.interruptedContinuation(for: loop, round: round))
+                        prompts.append(ReviewPrompts.extensionReloadContinuation(for: loop, round: round))
+                    }
+                    for prompt in prompts {
+                        XCTAssertEqual(prompt.contains("Keep UI copy unchanged."),
+                                       enabled && reviewType.supportsPreservingUICopy)
+                    }
+                }
+            }
+        }
+    }
+
     func testFixPromptDoesNotAskForTesting() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "test", project: ReviewProject(id: "p", name: "Project", path: "/tmp/project"), promptContext: .general, maxRounds: 5)
         let prompt = ReviewPrompts.fixPrompt(for: loop, round: ReviewRound(number: 1, baseRevision: "abc"))
