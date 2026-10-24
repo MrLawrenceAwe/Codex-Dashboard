@@ -441,6 +441,53 @@ const codexUIContracts = (() => {
     }
   }
 
+  // The commit dialog exposes stable command values, independent of UI language.
+  // Read its target rather than the chat checkout: the repository picker can
+  // select another repository, and remote hosts must never use local Git state.
+  function pushControls() {
+    for (const dialog of document.querySelectorAll('[role="dialog"]')) {
+      if (!isVisible(dialog)) continue;
+      const props = [...parentFibers(dialog)].map(fiber => fiber.memoizedProps)
+        .find(props => props?.open === true
+          && typeof props.enablePushActions === 'boolean'
+          && typeof props.onOpenChange === 'function'
+          && props.target && typeof props.target.root === 'string');
+      if (!props) {
+        // Recognize the command group even if its React target contract changed.
+        // This is a warning, never permission to alter an unidentified dialog.
+        if (dialog.querySelector('[cmdk-item][data-value="commit-and-push"]')) {
+          return { compatible: false, unsupported: true };
+        }
+        continue;
+      }
+      if (!props.enablePushActions) continue;
+      const roots = dialog.querySelectorAll('[cmdk-root]');
+      const root = roots.length === 1 ? roots[0] : null;
+      const items = root ? ['commit', 'commit-and-push', 'push'].map(value => {
+        const matches = root.querySelectorAll(`[cmdk-item][role="option"][data-value="${value}"]`);
+        return matches.length === 1 ? matches[0] : null;
+      }) : [];
+      return {
+        dialog, root, items,
+        compatible: Boolean(root && root.hasAttribute('data-codex-shortcut-capture')
+          && items.length === 3 && items.every(Boolean)
+          && props.target.root.startsWith('/') && typeof props.conversationId === 'string'),
+        threadID: props.conversationId,
+        path: props.target.root,
+        local: props.target.hostConfig?.id === 'local',
+      };
+    }
+    return null;
+  }
+
+  function pushControlHostAttribute(item, name) {
+    // React may change a disabled state to the same value we temporarily applied.
+    // Prefer its current rendered props when restoring, including that case.
+    const props = reactFiber(item)?.memoizedProps;
+    if (!props || !Object.hasOwn(props, name)) return undefined;
+    return props[name] == null ? null : String(props[name]);
+  }
+
   function gitActionsButton() {
     return [...document.querySelectorAll('button[aria-label], button[title]')].find((button) => (
       isVisible(button)
@@ -492,6 +539,8 @@ const codexUIContracts = (() => {
     intelligenceTrigger,
     modelPicker,
     probeModelPickerControls,
+    pushControls,
+    pushControlHostAttribute,
     gitActionsButton,
     gitActionsMenu,
     gitActionMenuItem,

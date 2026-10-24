@@ -109,6 +109,16 @@ struct RendererCompatibilityChecker {
             failureDetail: "The model-picker or reasoning controls used by saved prompt presets were not found.",
             in: target
         ))
+        let pushCheck = await inspect(
+            id: PushControlsBridge.checkID,
+            title: "Disable push without a remote",
+            expression: "window.__codexDashboard?.readPushControls?.().state === 'compatible'",
+            failureStatus: .warning,
+            compatibleDetail: "The commit controls support disabling push when there is no remote.",
+            failureDetail: "Push controls are unverified or changed. Open Commit or push to check them; automatic disabling requires supported controls.",
+            in: target
+        )
+        checks.append(pushCheck)
         return checks
     }
 

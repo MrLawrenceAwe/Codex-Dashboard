@@ -31,6 +31,7 @@ final class DashboardRenderer {
     private let promptLibrarySynchronizationInterval: TimeInterval
     private let now: () -> Date
 
+    private(set) var pushControlsCompatibilityCheck: CompatibilityCheck?
     private(set) var maintainsDashboard = true
     var reviewLoopThreadIDs: Set<String> { reviewLoopBridge?.threadIDs ?? [] }
 
@@ -221,6 +222,9 @@ final class DashboardRenderer {
             lastSnapshot = snapshot
         }
         try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
+        if let check = await PushControlsBridge(devTools: devTools).synchronize(in: targets) {
+            pushControlsCompatibilityCheck = check
+        }
         mountedTargetIDs = targetIDs
         lastHealthCheckByTargetID = lastHealthCheckByTargetID.filter { targetIDs.contains($0.key) }
     }
@@ -363,7 +367,12 @@ final class DashboardRenderer {
     }
 
     func compatibilityChecks() async -> [CompatibilityCheck] {
-        await compatibilityChecker.check()
+        var checks = await compatibilityChecker.check()
+        if let pushControlsCompatibilityCheck {
+            checks.removeAll { $0.id == PushControlsBridge.checkID }
+            checks.append(pushControlsCompatibilityCheck)
+        }
+        return checks
     }
 
     private func deliverThreads(
@@ -391,6 +400,7 @@ final class DashboardRenderer {
     }
 
     private func clearMountState() {
+        pushControlsCompatibilityCheck = nil
         mountedTargetIDs = []
         lastSnapshot = nil
         promptLibraryBridge?.reset()

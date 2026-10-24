@@ -203,6 +203,20 @@ extension AppCoordinatorTests {
         XCTAssertNil(coordinator.connectionError)
     }
 
+    func testPushControlWarningUpdatesDiagnosticsDuringNormalSynchronization() async {
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
+        let coordinator = makeAppCoordinator(observeFileChanges: false, runtimeFactory: { _ in runtime })
+        let warning = PushControlsBridge.check(status: .warning,
+            detail: "Push controls changed in Codex; automatic disabling is unavailable.")
+        runtime.pushControlsCompatibilityCheck = warning
+        await coordinator.synchronizeDashboard()
+        XCTAssertEqual(coordinator.compatibilityReport?.checks.first { $0.id == warning.id }, warning)
+        runtime.pushControlsCompatibilityCheck = PushControlsBridge.check(status: .compatible, detail: "Supported")
+        await coordinator.synchronizeDashboard()
+        XCTAssertEqual(coordinator.compatibilityReport?.checks.filter { $0.id == warning.id }.count, 1)
+        XCTAssertEqual(coordinator.compatibilityReport?.checks.first { $0.id == warning.id }?.status, .compatible)
+    }
+
     func testCompatibilityCheckPublishesCapabilityReport() async {
         let expected = CompatibilityCheck(
             id: "storage",

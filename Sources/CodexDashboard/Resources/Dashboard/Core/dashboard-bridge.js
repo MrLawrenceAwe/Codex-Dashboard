@@ -1,3 +1,4 @@
+const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
 const chatOverview = createChatOverview({ catalog: threadCatalog });
 const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject, findThread: threadCatalog.findThread });
@@ -19,6 +20,7 @@ const dashboardLifecycle = createDashboardLifecycle({
     dashboardPages.forEach(({ controller }) => controller.mountNavigation());
   },
   mountFeatures() {
+    pushControls.start();
     sidebarProjectHighlights.start();
     promptLibrary.mount();
     accountPopover.mount();
@@ -32,6 +34,7 @@ const dashboardLifecycle = createDashboardLifecycle({
   syncUsageLimitSidebarMarkers: chatOverview.syncUsageLimitSidebarMarkers,
   syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
+    pushControls.destroy();
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
     sidebarProjectHighlights.destroy();
@@ -48,6 +51,8 @@ function ensureDashboardMounted() {
 
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
+  readPushControls: pushControls.read,
+  applyPushRemote: pushControls.applyRemote,
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewPageSnapshot: reviewLoopPage.applySnapshot,

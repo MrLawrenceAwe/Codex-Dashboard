@@ -322,6 +322,7 @@ final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked
 
 @MainActor
 final class StubDashboardRuntime: DashboardRuntime {
+    var pushControlsCompatibilityCheck: CompatibilityCheck?
     let codexIsRunning: Bool
     let codexLaunchDate: Date? = nil
     let maintainsDashboard: Bool

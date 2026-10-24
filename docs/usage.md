@@ -275,6 +275,22 @@ uses creation order, regardless of the displayed last updated dates. **Delete al
 finished loops** removes every finished loop. Both bulk deletion actions include
 finished loops still shown under **Current loops**; unfinished loops are kept.
 
+## Disable push without a remote
+
+While a local **Commit or push** dialog is open, Dashboard checks the repository
+selected in that dialog. When it has no Git remote, **Commit and push** and **Push**
+are grayed out and blocked for mouse and keyboard input. **Commit** keeps its normal
+behaviour. Checks use local Git configuration and never contact a remote. The first
+check normally arrives within the active two-second dashboard refresh interval;
+changes to configured remotes are picked up while the dialog stays open.
+
+Remote-host dialogs are left to Codex. If Git cannot be read or the controls no
+longer match the supported structure, Dashboard leaves Codex's controls unchanged.
+The **Disable push without a remote** check appears in Diagnostics; changed controls
+produce **Push controls changed in Codex; automatic disabling is unavailable.**
+Only this feature stops applying changes. A supported dialog is checked again on
+its next refresh. Disabling Dashboard restores the original controls.
+
 ## Compatibility and diagnostics
 
 Codex updates can change the private contracts used by this unofficial integration.

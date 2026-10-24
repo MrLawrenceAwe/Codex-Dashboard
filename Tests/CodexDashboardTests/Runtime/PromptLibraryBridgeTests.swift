@@ -100,11 +100,11 @@ extension DashboardRendererTests {
 
         try await renderer.synchronize(snapshot, on: [target], forceRemount: true)
         XCTAssertEqual(try store.load()?.prompts.first?.preset?.model, "gpt-future")
-        let initialStringEvaluationCount = await devTools.stringExpressionCount()
+        let initialPromptLibraryReadCount = await devTools.promptLibraryReadCount()
 
         try await renderer.synchronize(snapshot, on: [target])
-        let unchangedStringEvaluationCount = await devTools.stringExpressionCount()
-        XCTAssertEqual(unchangedStringEvaluationCount, initialStringEvaluationCount)
+        let unchangedPromptLibraryReadCount = await devTools.promptLibraryReadCount()
+        XCTAssertEqual(unchangedPromptLibraryReadCount, initialPromptLibraryReadCount)
 
         let imported = PromptLibraryDocument(
             version: PromptLibrarySchema.currentVersion,

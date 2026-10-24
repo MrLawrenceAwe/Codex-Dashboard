@@ -111,6 +111,15 @@ separate dependencies. Both implementations use `ReviewGitCommand` for subproces
 `ReviewFixCheckpoint` validates finding accounting and commit ancestry; the review
 coordinator owns publication intent, verification scheduling, and final state writes.
 
+`PushControlsBridge` reads the open commit dialog's target through
+`Core/push-controls.js`, checks its local Git remotes, and returns a result tagged
+with the dialog/repository generation. Stale results are ignored. The renderer
+requires the commit dialog target props, local host identity, and the three cmdk
+command values; it never identifies actions by translated text. Mouse, keyboard,
+and cmdk selection are guarded, and owned attributes are restored on context
+changes or teardown. Runtime compatibility warnings flow into Diagnostics during
+normal synchronization, without rerunning unrelated interactive probes.
+
 ## Renderer contracts
 
 Internal Codex data uses `Thread`; UI copy uses **chat** and **to-do**. Chat overview

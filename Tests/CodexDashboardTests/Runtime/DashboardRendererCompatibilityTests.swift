@@ -56,7 +56,7 @@ extension DashboardRendererTests {
             checks.map(\.id),
             [
                 "renderer", "sidebar-host", "thread-navigation", "sidebar-unread", "sidebar-bulk-read",
-                "composer", "composer-controls", "profile-menu", "model-picker",
+                "composer", "composer-controls", "profile-menu", "model-picker", "disable-push-without-remote",
             ]
         )
         XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })

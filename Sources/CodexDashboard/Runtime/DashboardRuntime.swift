@@ -11,6 +11,7 @@ protocol DashboardRuntime: AnyObject {
     var codexLaunchDate: Date? { get }
     var maintainsDashboard: Bool { get }
     var reviewLoopThreadIDs: Set<String> { get }
+    var pushControlsCompatibilityCheck: CompatibilityCheck? { get }
 
     func rendererTargets() async -> [DevToolsTarget]
     func waitForReviewOperations() async
@@ -55,6 +56,7 @@ final class CodexDashboardRuntime: DashboardRuntime {
     var codexLaunchDate: Date? { codex.launchDate }
     var maintainsDashboard: Bool { renderer.maintainsDashboard }
     var reviewLoopThreadIDs: Set<String> { renderer.reviewLoopThreadIDs }
+    var pushControlsCompatibilityCheck: CompatibilityCheck? { renderer.pushControlsCompatibilityCheck }
 
     func rendererTargets() async -> [DevToolsTarget] {
         let launchDate = codex.launchDate

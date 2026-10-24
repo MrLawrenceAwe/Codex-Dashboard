@@ -163,6 +163,12 @@ extension AppCoordinator {
         try await runtime.synchronizeDashboard(
             with: dashboardSnapshotPayload(), on: targets, forceRemount: false
         )
+        if let check = runtime.pushControlsCompatibilityCheck {
+            var checks = compatibilityReport?.checks ?? []
+            checks.removeAll { $0.id == check.id }
+            checks.append(check)
+            updatePublished(\.compatibilityReport, to: CompatibilityReport(checks: checks))
+        }
     }
 
     private func refreshThreadDataWarning() {

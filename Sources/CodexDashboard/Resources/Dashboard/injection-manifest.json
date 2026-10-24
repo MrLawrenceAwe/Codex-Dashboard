@@ -7,6 +7,7 @@
     "Core/page-visibility-controller",
     "Core/codex-ui-contracts",
     "Core/codex-host",
+    "Core/push-controls",
     "Core/dashboard-navigation-button",
     "Composer/composer-presets",
     "Prompts/prompt-library-contract",
@@ -58,6 +59,7 @@
   ],
   "stylesheets": [
     "Core/dashboard-theme",
+    "Core/push-controls",
     "Threads/chat-overview",
     "Sidebar/project-highlights",
     "Sidebar/thread-todo-actions",
