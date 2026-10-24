@@ -76,7 +76,7 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 for fixRequested in [false, true] {
                     round.fixRequested = fixRequested
                     let continuation = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
-                    for prompt in [review, fix, continuation] {
+                    for prompt in [review, continuation] {
                         XCTAssertTrue(prompt.contains(reviewType.scopeDescription))
                         XCTAssertTrue(prompt.contains("No live or UI testing, Computer Use, or extension reloads"))
                         XCTAssertFalse(prompt.contains("# Extension reload required"))
@@ -86,7 +86,9 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 }
                 XCTAssertTrue(review.contains("Statically"))
                 XCTAssertFalse(review.contains("run relevant builds"))
-                XCTAssertTrue(fix.contains("automated checks without launching a browser or app UI"))
+                XCTAssertEqual(fix.components(separatedBy: "\n\n").last,
+                               "Address findings within the original review scope and constraints.")
+                XCTAssertFalse(fix.contains(reviewType.scopeDescription))
             }
         }
     }

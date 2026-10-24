@@ -29,7 +29,7 @@ enum ReviewPrompts {
         let verification = verifyingFixes
             ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
             : "Statically inspect source, call sites, tests, docs, and manifests."
-        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task, even under general extension-development instructions."
+        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task."
     }
 
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
@@ -135,7 +135,9 @@ enum ReviewPrompts {
         var prompt = loop.workspaceKind == .folder
             ? "Address \(findings) in this ordinary folder. Verify each finding first. Preserve unrelated files and edits. Mark invalid findings as withdrawn. Do not initialise Git, create commits, or push. Verify the changes and return the folder fix report."
             : task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
-        prompt += structureReviewInstruction(for: loop, verifyingFixes: true)
+        if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
+            prompt += "\n\nAddress findings within the original review scope and constraints."
+        }
         prompt += bugVerificationInstruction(for: loop, verifyingFixes: true)
         if loop.liveTesting && loop.reviewType == .performance {
             prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
