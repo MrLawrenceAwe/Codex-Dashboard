@@ -280,9 +280,11 @@ finished loops still shown under **Current loops**; unfinished loops are kept.
 While a local **Commit or push** dialog is open, Dashboard checks the repository
 selected in that dialog. When it has no Git remote, **Commit and push** and **Push**
 are grayed out and blocked for mouse and keyboard input. **Commit** keeps its normal
-behaviour. Checks use local Git configuration and never contact a remote. The first
-check normally arrives within the active two-second dashboard refresh interval;
-changes to configured remotes are picked up while the dialog stays open.
+behaviour. Checks use Codex's local Git metadata and never contact a remote. Opening the
+modal requests a check immediately, without waiting for Dashboard's refresh cycle.
+Results from the last five seconds are applied immediately on reopening and
+rechecked in the background. Changes to remotes are also picked up while the
+dialog stays open.
 
 Remote-host dialogs are left to Codex. If Git cannot be read or the controls no
 longer match the supported structure, Dashboard leaves Codex's controls unchanged.

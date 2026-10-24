@@ -448,7 +448,7 @@ const codexUIContracts = (() => {
     for (const dialog of document.querySelectorAll('[role="dialog"]')) {
       if (!isVisible(dialog)) continue;
       const props = [...parentFibers(dialog)].map(fiber => fiber.memoizedProps)
-        .find(props => props?.open === true
+        .find(props => typeof props?.open === 'boolean'
           && typeof props.enablePushActions === 'boolean'
           && typeof props.onOpenChange === 'function'
           && props.target && typeof props.target.root === 'string');
@@ -460,7 +460,7 @@ const codexUIContracts = (() => {
         }
         continue;
       }
-      if (!props.enablePushActions) continue;
+      if (!props.open || !props.enablePushActions) continue;
       const roots = dialog.querySelectorAll('[cmdk-root]');
       const root = roots.length === 1 ? roots[0] : null;
       const items = root ? ['commit', 'commit-and-push', 'push'].map(value => {
@@ -475,6 +475,7 @@ const codexUIContracts = (() => {
         threadID: props.conversationId,
         path: props.target.root,
         local: props.target.hostConfig?.id === 'local',
+        hostConfig: props.target.hostConfig,
       };
     }
     return null;

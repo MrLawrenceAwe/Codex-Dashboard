@@ -6,6 +6,80 @@ function createPushControls() {
   let generation = 0;
   let hasRemote = null;
   let lastState = 'waiting';
+  const remoteCache = new Map();
+  const remoteFreshness = 5000;
+  let unsubscribe;
+  let pendingRemote;
+  let lastRequestedGeneration;
+  let lastRequestedAt = 0;
+  let remoteFailure = false;
+
+  function cancelRemote() {
+    if (!pendingRemote) return;
+    clearTimeout(pendingRemote.timer);
+    const id = pendingRemote.id;
+    pendingRemote = undefined;
+    try {
+      Promise.resolve(window.electronBridge?.sendWorkerMessageFromView?.('git', {
+        type: 'worker-request-cancel', workerId: 'git', id,
+      })).catch(() => {});
+    } catch { /* A changed bridge must not prevent teardown or navigation. */ }
+  }
+
+  function finishRemote(id, value) {
+    if (id !== pendingRemote?.id) return;
+    const request = pendingRemote;
+    clearTimeout(request.timer);
+    pendingRemote = undefined;
+    // Replies are scoped to the dialog and selected repository, including a
+    // dialog closed and reopened before an earlier request completes.
+    if (request.generation !== generation || request.path !== context?.path) return;
+    hasRemote = value;
+    remoteFailure = value === null;
+    remoteCache.delete(request.path);
+    if (value !== null) {
+      remoteCache.set(request.path, { value, checkedAt: Date.now() });
+      if (remoteCache.size > 64) remoteCache.delete(remoteCache.keys().next().value);
+    }
+    sync();
+  }
+
+  function receiveRemote(message) {
+    if (!pendingRemote || message?.type !== 'worker-response' || message.workerId !== 'git'
+      || message.response?.id !== pendingRemote?.id) return;
+    const response = message.response;
+    const metadata = response.result?.type === 'ok' ? response.result.value : null;
+    let value = null;
+    if (response.method === 'git-context'
+      && ['complete', 'partial'].includes(metadata?.status) && Array.isArray(metadata.remotes)) {
+      if (metadata.remotes.length > 0) value = true;
+      else if (metadata.remotesOmitted === 0) value = false;
+    }
+    finishRemote(response.id, value);
+  }
+
+  function requestRemote() {
+    if (pendingRemote || (lastRequestedGeneration === generation
+      && Date.now() - lastRequestedAt < remoteFreshness)) return;
+    lastRequestedGeneration = generation;
+    lastRequestedAt = Date.now();
+    const id = `dashboard-push-${crypto.randomUUID()}`;
+    pendingRemote = { id, generation, path: context.path,
+      timer: setTimeout(() => finishRemote(id, null), 2000) };
+    if (!unsubscribe || typeof window.electronBridge?.sendWorkerMessageFromView !== 'function') {
+      finishRemote(id, null);
+      return;
+    }
+    try {
+      Promise.resolve(window.electronBridge.sendWorkerMessageFromView('git', {
+        type: 'worker-request', workerId: 'git', request: {
+          id, method: 'git-context', enqueuedAtMs: Date.now(),
+          params: { cwd: context.path, hostConfig: context.hostConfig,
+            operationSource: 'dashboard_push_controls' },
+        },
+      })).catch(() => finishRemote(id, null));
+    } catch { finishRemote(id, null); }
+  }
 
   function restore() {
     for (const [item, attributes] of changes) {
@@ -37,8 +111,11 @@ function createPushControls() {
     if (!usable || !context || next.dialog !== context.dialog
       || next.path !== context.path || next.threadID !== context.threadID) {
       restore();
+      cancelRemote();
       context = usable ? next : null;
-      hasRemote = null;
+      const cached = context && remoteCache.get(context.path);
+      hasRemote = cached && Date.now() - cached.checkedAt < remoteFreshness ? cached.value : null;
+      remoteFailure = false;
       generation += 1;
     } else {
       context = next;
@@ -49,12 +126,14 @@ function createPushControls() {
     }
     if (!context.compatible) {
       if (lastState !== 'incompatible') generation += 1;
+      cancelRemote();
       restore();
       hasRemote = null;
       lastState = 'incompatible';
       return;
     }
     lastState = 'compatible';
+    requestRemote();
     // Remove ownership of items replaced by Codex during a render.
     if ([...changes.keys()].some(item => !context.items.includes(item))) restore();
     if (hasRemote !== false) { restore(); return; }
@@ -69,18 +148,9 @@ function createPushControls() {
   function read() {
     sync();
     return {
-      state: lastState,
-      requestID: generation,
+      state: remoteFailure && context?.compatible ? 'remote-unavailable' : lastState,
       path: context?.compatible ? context.path : null,
     };
-  }
-
-  function applyRemote(requestID, value) {
-    sync();
-    if (!context?.compatible || requestID !== generation) return false;
-    hasRemote = typeof value === 'boolean' ? value : null;
-    sync();
-    return true;
   }
 
   function block(event) {
@@ -101,6 +171,10 @@ function createPushControls() {
 
   function start() {
     if (observer) return;
+    if (typeof window.electronBridge?.subscribeToWorkerMessages === 'function') {
+      try { unsubscribe = window.electronBridge.subscribeToWorkerMessages('git', receiveRemote); }
+      catch { unsubscribe = undefined; }
+    }
     observer = new MutationObserver(records => {
       const containsDialog = node => node instanceof Element && (
         node.matches('[role="dialog"]')
@@ -119,6 +193,10 @@ function createPushControls() {
   }
 
   function destroy() {
+    cancelRemote();
+    unsubscribe?.();
+    unsubscribe = undefined;
+    remoteCache.clear();
     observer?.disconnect();
     observer = undefined;
     blockedEvents.forEach(type => document.removeEventListener(type, block, true));
@@ -127,5 +205,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read, applyRemote };
+  return { start, destroy, read };
 }

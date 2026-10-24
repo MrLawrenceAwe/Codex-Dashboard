@@ -52,7 +52,6 @@ function ensureDashboardMounted() {
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
   readPushControls: pushControls.read,
-  applyPushRemote: pushControls.applyRemote,
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewPageSnapshot: reviewLoopPage.applySnapshot,
