@@ -545,6 +545,15 @@ extension ChatOverviewWebTests {
         }
     }
 
+    func testGitHandoffRetriesRetainedTriggerAfterChatBecomesReady() async throws {
+        for status in [ProjectGitStatus.uncommittedChanges, .unpushedCommits] {
+            let state = try await gitHandoffState(status: status, switchStage: "trigger-not-ready")
+            XCTAssertEqual(state[0] as? Bool, true)
+            XCTAssertEqual(state[1] as? String, status == .unpushedCommits ? "Push" : "Commit")
+            XCTAssertEqual(state[2] as? Bool, false)
+        }
+    }
+
     func testProjectGitActionSkipsNewerIdleChatInDifferentRepository() async throws {
         let state = try await gitHandoffState(status: .unpushedCommits, includeNestedChat: true)
         XCTAssertEqual(state[0] as? Bool, true)
@@ -599,8 +608,13 @@ extension ChatOverviewWebTests {
               const button = document.createElement('button');
               button.setAttribute('aria-label', 'Git actions');
               button.setAttribute('aria-controls', 'test-git-menu');
+              let triggerReady = switchStage !== 'trigger-not-ready';
               const openGitMenu = (event) => {
                 const trigger = event.currentTarget;
+                if (!triggerReady) {
+                  setTimeout(() => { triggerReady = true; }, 150);
+                  return;
+                }
                 if (switchStage === 'replace-trigger' && trigger === button) {
                   button.hidden = true;
                   const replacement = button.cloneNode(true);

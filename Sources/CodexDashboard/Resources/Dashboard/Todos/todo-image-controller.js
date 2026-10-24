@@ -1,5 +1,4 @@
 function createTodoImageController({ isDestroyed, getItems, updateItem }) {
-  const maximumBytes = 2 * 1024 * 1024;
   const readers = new Set();
   const pendingAttachments = new Map();
   let draft;
@@ -24,7 +23,6 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
 
   function validationError(file) {
     if (!todoStore.isAcceptedImageType(file?.type)) return 'Choose a JPEG, PNG, GIF, or WebP image.';
-    if (file.size > maximumBytes) return 'Images must be 2 MB or smaller.';
     return '';
   }
 

@@ -290,13 +290,13 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[7] as? Bool, true)
     }
 
-    func testTodoImagePasteShowsAnErrorForOversizedImages() async throws {
+    func testTodoImagePasteAcceptsImagesLargerThanTwoMegabytes() async throws {
         let webView = try await DashboardWebTestHarness.todoWebView(
             html: DashboardWebTestHarness.basicHostHTML,
             baseURL: URL(string: "https://\(UUID().uuidString).codex-dashboard.test"),
             clearLocalStorage: true
         )
-        let result = try await webView.evaluateAsyncJavaScript(
+        _ = try await webView.evaluateAsyncJavaScript(
             """
             (async () => {
               window.__codexDashboard.openTodos();
@@ -306,19 +306,35 @@ final class TodoImagesWebTests: SerializedDashboardWebTestCase {
               const paste = new Event('paste', { bubbles: true, cancelable: true });
               Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [] } });
               form.querySelector('[data-todo-new-title]').dispatchEvent(paste);
+            })()
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-todo-new-image-status]').textContent.includes('ready')",
+            in: webView
+        )
+        let result = try await webView.evaluateAsyncJavaScript(
+            """
+            (async () => {
+              const form = document.querySelector('[data-todo-form]');
               form.requestSubmit();
               await window.__waitForTodoSaves();
+              const stored = JSON.parse(localStorage.getItem('codex-dashboard.todos')).items[0];
               return [
-                document.querySelector('[data-todo-image-error]').textContent,
-                document.querySelectorAll('[data-todo-id]').length === 0,
+                document.querySelector('[data-todo-image-error]').hidden,
+                document.querySelectorAll('[data-todo-id]').length,
+                stored.image.name,
+                stored.image.size,
               ];
             })()
             """
         ) as? [Any]
 
         let values = try XCTUnwrap(result)
-        XCTAssertEqual(values[0] as? String, "Images must be 2 MB or smaller.")
-        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Int, 1)
+        XCTAssertEqual(values[2] as? String, "large.png")
+        XCTAssertEqual(values[3] as? Int, 2 * 1024 * 1024 + 1)
     }
 
     func testTodoImageDoesNotStoreItsDataURLInLocalStorage() async throws {

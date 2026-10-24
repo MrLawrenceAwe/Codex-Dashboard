@@ -127,10 +127,16 @@ const codexHost = {
       let gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
       if (gitActions === cancelled || navigationCancelled || !isSelected()) return cancelled;
       if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };
-      const attemptedTriggers = new WeakSet();
+      const triggerAttempts = new WeakMap();
       const openMenu = (trigger) => {
-        if (attemptedTriggers.has(trigger) || trigger.getAttribute('aria-expanded') === 'true') return;
-        attemptedTriggers.add(trigger);
+        if (trigger.getAttribute('aria-expanded') === 'true' || codexUIContracts.gitActionsMenu(trigger)) return;
+        // Navigation can expose a trigger before its chat is ready to handle
+        // input. React may retain that same element, so retry closed triggers
+        // within the existing timeout, allowing each attempt time to settle.
+        const now = performance.now();
+        const lastAttempt = triggerAttempts.get(trigger);
+        if (lastAttempt !== undefined && now - lastAttempt < 300) return;
+        triggerAttempts.set(trigger, now);
         trigger.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true, button: 0, pointerType: 'mouse',
         }));
