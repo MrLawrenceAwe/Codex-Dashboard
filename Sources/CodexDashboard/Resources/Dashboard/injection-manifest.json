@@ -14,6 +14,8 @@
     "Prompts/prompt-store",
     "Composer/composer-model-picker",
     "Composer/composer-adapter",
+    "Composer/sent-message-dictation-host",
+    "Composer/sent-message-dictation",
     "Prompts/prompt-reordering",
     "Prompts/prompt-library-button",
     "Prompts/prompt-library-dialog",

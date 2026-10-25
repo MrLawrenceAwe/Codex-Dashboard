@@ -1,3 +1,4 @@
+const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
 const chatOverview = createChatOverview({ catalog: threadCatalog });
@@ -20,6 +21,7 @@ const dashboardLifecycle = createDashboardLifecycle({
     dashboardPages.forEach(({ controller }) => controller.mountNavigation());
   },
   mountFeatures() {
+    sentMessageDictation.mount();
     pushControls.start();
     sidebarProjectHighlights.start();
     promptLibrary.mount();
@@ -34,6 +36,7 @@ const dashboardLifecycle = createDashboardLifecycle({
   syncUsageLimitSidebarMarkers: chatOverview.syncUsageLimitSidebarMarkers,
   syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
+    sentMessageDictation.destroy();
     pushControls.destroy();
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
@@ -51,6 +54,8 @@ function ensureDashboardMounted() {
 
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
+  editDictationStatus: sentMessageDictation.status,
+  probeEditDictation: sentMessageDictation.probe,
   readPushControls: pushControls.read,
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,

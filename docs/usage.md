@@ -36,6 +36,21 @@ chat even when Codex is already frontmost. Review-loop chats and chats started i
 dictation suppress automatic focus changes; suppressed events are not opened
 later. Existing questions at Dashboard startup do not trigger focus changes.
 
+## Dictation while editing a sent message
+
+Open a sent message with its pencil/Edit action. Place the cursor or select words,
+then choose **Dictate** beside that edit field. Choose **Stop dictation** to insert
+the final transcript, review it, and select the native **Send** button yourself.
+**Cancel dictation** discards the recording. Changing the text or leaving the
+editor cancels pending insertion. The separate new-message draft is not used.
+
+This feature reuses the host's built-in streaming dictation client and signed-in
+service, without an API key or another transcription engine. It uses the host
+renderer for microphone capture and existing audio processing. Recordings stop
+automatically after two minutes. Undo/Redo use the editor's normal history.
+The feature currently targets the English **Edit message** label. Host updates
+can change its private integration contracts; unavailable contracts show an error.
+
 ## Prompts and to-dos
 
 **Prompts**, beside the composer's Add button, opens the local library. Prompts can

@@ -29,7 +29,7 @@ const codexUIContracts = (() => {
   // Inspect speech controller props during startup/transcription, before the
   // dictation footer or realtime orb mounts. Avoid translated button labels.
   function hasActiveSpeechInput() {
-    if (document.querySelector('[data-dictation-view], [data-realtime-voice-orb]')) return true;
+    if (document.querySelector('[data-dictation-view], [data-realtime-voice-orb], [data-edit-dictation-state=starting], [data-edit-dictation-state=recording], [data-edit-dictation-state=transcribing]')) return true;
     const visited = new Set();
     for (const element of document.querySelectorAll('button, [data-composer-body]')) {
       for (const fiber of parentFibers(element)) {
