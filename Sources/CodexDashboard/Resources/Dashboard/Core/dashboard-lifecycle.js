@@ -32,6 +32,20 @@ function createDashboardLifecycle(hooks) {
       return;
     }
     const target = event.target instanceof Element ? event.target : null;
+    const button = target?.closest('button');
+    if (button && !button.disabled && event.button === 0
+      && button === codexHost.globalNewChatButton() && button !== codexHost.projectChatButton) {
+      // Codex can start navigation on pointerdown, before click. Block the
+      // entire activation sequence, then perform our action once on click.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.type === 'click') {
+        if (hooks.isOpen()) hooks.close();
+        codexHost.newChat();
+        scheduleRepair({ rebindHosts: true });
+      }
+      return;
+    }
     const page = target && hooks.pages.find(({ navigationID }) => target.closest(`#${navigationID}`));
     if (page) {
       event.preventDefault();

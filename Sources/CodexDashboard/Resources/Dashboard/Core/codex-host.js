@@ -1,4 +1,13 @@
 const codexHost = {
+  projectChatButton: null,
+
+  globalNewChatButton() {
+    return [...(codexUIContracts.navigation()?.querySelectorAll('button') || [])]
+      .find((button) => button.textContent.trim() === 'New chat'
+        && !codexUIContracts.sidebarProjects.containingRow(button)
+        && !button.closest(codexUIContracts.sidebarThreads.selector)) || null;
+  },
+
   sidebar() {
     return codexUIContracts.sidebar();
   },
@@ -35,7 +44,6 @@ const codexHost = {
   async newChat(projectID = null) {
     if (!projectID) {
       // Codex's projectless action explicitly clears the active project.
-      // The sidebar New chat button can retain the current project.
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'new-projectless-task' },
         source: null,
@@ -44,10 +52,16 @@ const codexHost = {
     }
     if (!codexUIContracts.selectProject(projectID)) return false;
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const button = [...(this.sidebar()?.querySelectorAll('button') || [])]
-      .find((candidate) => candidate.textContent.trim() === 'New chat');
+    const button = this.globalNewChatButton();
     if (!button || button.disabled) return false;
-    button.click();
+    // Project to-dos intentionally use the host action after selecting a project.
+    // Exempt only this synchronous click from the global-button redirect.
+    this.projectChatButton = button;
+    try {
+      button.click();
+    } finally {
+      this.projectChatButton = null;
+    }
     return true;
   },
 

@@ -5,6 +5,11 @@ Codex and Dashboard running: Dashboard refreshes activity and restores its contr
 after Codex reloads. Menu-bar actions open Chat overview, restart Codex, disable
 integration, check compatibility, and open Diagnostics. Launch at Login is optional.
 
+While Dashboard integration is enabled, the global **New chat** sidebar button
+starts a chat without a project. Use the new-chat action beside a project's name
+to start a chat in that project. Quick chat and keyboard shortcuts retain Codex's
+normal behaviour.
+
 ## Chat overview
 
 **Active** keeps running chats in the **Active** section, with **Recent** underneath
