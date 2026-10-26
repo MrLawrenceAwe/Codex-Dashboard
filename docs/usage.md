@@ -69,7 +69,7 @@ and clipboard text. Inserting a prompt fills the draft without sending it.
 Optional model settings select a model, reasoning effort, and Standard/Fast speed.
 Unavailable or locked settings stop prompt insertion. Saved model identifiers
 remain editable when Codex's model list changes. New prompt and to-do presets
-default to **GPT-6.1 Sol**. Use Diagnostics to import, export, or reveal the native
+default to **GPT-6.1 Terra**. Use Diagnostics to import, export, or reveal the native
 prompt-library file; rolling backups are kept beside it.
 Export saves queued prompt edits first. If the running Codex dashboard cannot be
 read, export reports an error and leaves any existing destination file intact.
