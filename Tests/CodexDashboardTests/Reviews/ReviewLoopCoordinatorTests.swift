@@ -954,7 +954,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
                 + (reviewType.supportsPreservingUICopy ? "\n\nAddress findings within the original review scope and constraints." : "")
             func taskParagraphs(_ prompt: String) -> String {
-                prompt.components(separatedBy: "\n\nScope: ").first!
+                prompt.components(separatedBy: "\n\nStatically inspect ").first!
             }
             XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt])
             driver.finish(findings: 1, commit: "fixed")

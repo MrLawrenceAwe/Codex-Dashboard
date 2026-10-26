@@ -34,7 +34,7 @@ enum ReviewPrompts {
         let verification = verifyingFixes
             ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
             : "Statically inspect source, call sites, tests, docs, and manifests."
-        return "\n\nScope: \(loop.reviewType.scopeDescription) \(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task." + preserveUICopyInstruction(for: loop)
+        return "\n\n\(verification) No live or UI testing, Computer Use, or extension reloads unless explicitly requested for this task." + preserveUICopyInstruction(for: loop)
     }
 
     private static func extensionReloadInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {

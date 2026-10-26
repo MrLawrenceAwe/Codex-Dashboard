@@ -102,7 +102,8 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                     round.fixRequested = fixRequested
                     let continuation = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
                     for prompt in [review, continuation] {
-                        XCTAssertTrue(prompt.contains(reviewType.scopeDescription))
+                        XCTAssertFalse(prompt.contains(reviewType.scopeDescription))
+                        XCTAssertFalse(prompt.contains("Scope:"))
                         XCTAssertTrue(prompt.contains("No live or UI testing, Computer Use, or extension reloads"))
                         XCTAssertFalse(prompt.contains("# Extension reload required"))
                         XCTAssertFalse(prompt.contains("chrome-devtools MCP server"))
