@@ -15,7 +15,7 @@ This is an independent personal project and is not affiliated with OpenAI.
 ## Features
 
 - **Chat monitoring:** recent activity, unread status, completion and question tracking, uncommitted files and unpushed Git commits.
-- **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, pause/resume/stop controls, and optional remote pushing.
+- **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, project queues, pause/resume/stop controls, and optional remote pushing.
 - **Edit dictation:** built-in OpenAI dictation at the cursor in a sent-message edit field, using the existing sign-in.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 

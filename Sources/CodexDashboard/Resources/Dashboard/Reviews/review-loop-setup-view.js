@@ -4,6 +4,9 @@ const reviewLoopSetupView = (() => {
   let reviewTypesSignature = '';
   let reviewTypes = [];
   let projects = [];
+  let loops = [];
+  let pending = null;
+  const needsQueue = projectID => loops.some(loop => !loop.isFinished && (loop.project.id === projectID || loop.project.path === projects.find(project => project.id === projectID)?.path));
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
@@ -72,6 +75,7 @@ const reviewLoopSetupView = (() => {
     const reviewType = value('[data-review-type]');
     const liveTesting = supportsLiveTesting(reviewType) && value('[data-review-live-testing]') === 'true';
     return {
+      kind: needsQueue(value('[data-review-project]')) ? 'queue' : 'start',
       projectID: value('[data-review-project]'),
       reviewSelection: selection('review'),
       fixSelection: selection('fix'),
@@ -91,6 +95,13 @@ const reviewLoopSetupView = (() => {
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
+    const queued = needsQueue(root.querySelector('[data-review-project]').value);
+    root.querySelector('[data-review-start]').innerHTML = ['start', 'queue'].includes(pending?.kind)
+      ? (pending.kind === 'queue' ? 'Queueing…' : 'Starting…')
+      : queued ? 'Queue review &amp; fix <span aria-hidden="true">→</span>' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
+    const availability = root.querySelector('[data-review-availability]');
+    availability.hidden = projects.length > 0 && !queued;
+    availability.textContent = queued ? 'Runs after earlier loops for this project finish or are stopped. Paused or blocked loops hold the queue.' : 'Choose a local, single-folder project in Codex to start.';
     const folder = projects.find(project => project.id === root.querySelector('[data-review-project]').value)?.workspaceKind === 'folder';
     const push = root.querySelector('[data-review-push]');
     if (folder) push.value = 'false';
@@ -136,7 +147,8 @@ const reviewLoopSetupView = (() => {
   function render(snapshot, pendingAction) {
     const root = panel();
     if (!root) return;
-    const { loops } = snapshot;
+    loops = snapshot.loops;
+    pending = pendingAction;
     projects = snapshot.projects;
     const models = snapshot.models || [];
     reviewTypes = snapshot.reviewTypes || [];
@@ -164,21 +176,16 @@ const reviewLoopSetupView = (() => {
     }
     const select = root.querySelector('[data-review-project]');
     const busyProjects = new Set(loops.filter(loop => !loop.isFinished).map(loop => loop.project.id));
-    const availableProjects = projects.filter(project => !busyProjects.has(project.id));
     const signature = JSON.stringify([projects, [...busyProjects]]);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}" ${busyProjects.has(project.id) ? 'disabled' : ''}>${escape(project.name)}${busyProjects.has(project.id) ? ' · Loop active' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
-      select.value = availableProjects.some(project => project.id === selected) ? selected : availableProjects[0]?.id || '';
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}${busyProjects.has(project.id) ? ' · Queue available' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
+      select.value = projects.some(project => project.id === selected) ? selected : projects[0]?.id || '';
       projectsSignature = signature;
     }
-    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !availableProjects.length; });
+    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
     for (const kind of ['review', 'fix']) root.querySelector(`[data-${kind}-effort]`).disabled ||= !root.querySelector(`[data-${kind}-model]`).value;
     renderReviewSettings();
-    root.querySelector('[data-review-start]').innerHTML = pendingAction?.kind === 'start' ? 'Starting…' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
-    const availability = root.querySelector('[data-review-availability]');
-    availability.hidden = availableProjects.length > 0;
-    availability.textContent = projects.length ? 'All projects have active loops. Finish or stop one to continue.' : 'Choose a local, single-folder project in Codex to start.';
   }
 
   function reset() {

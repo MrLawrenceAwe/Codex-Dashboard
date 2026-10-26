@@ -24,6 +24,7 @@ enum ReviewLoopPresentation {
         case .blocked: "Needs attention"
         case .awaitingExtensionReload: "Waiting for extension reload"
         case .paused: "Paused"
+        case .queued: "Queued"
         case .waiting: "Waiting to review"
         case .running:
             if round?.fixVerification != nil { "Reverifying fixes at current HEAD" }
@@ -78,7 +79,8 @@ enum ReviewLoopPresentation {
             return (nil, "Final round in progress; no further review scheduled.")
         }
         let note: String
-        if loop.phase == .paused { note = "After resume and project verification." }
+        if loop.phase == .queued { note = "After earlier loops for this project finish or are stopped, and the project is idle." }
+        else if loop.phase == .paused { note = "After resume and project verification." }
         else if loop.pauseRequested { note = "After this round pauses and you resume." }
         else if unfinished { note = loop.workspaceKind == .folder ? "After fixes are applied and verification passes. The next review uses the verified files." : "After fixes commit and verification passes. The next review uses the verified HEAD." }
         else { note = "After the project is idle and passes verification." }

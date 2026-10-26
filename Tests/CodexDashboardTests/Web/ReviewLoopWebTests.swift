@@ -348,6 +348,39 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, ["0 of 1", true, "resume", "blocked"])
     }
 
+    func testBusyProjectQueuesConfiguredLoopAndOffersCancellation() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const loop = {id:'active',project,phase:'paused',isFinished:false,completedRoundCount:0,maxRounds:2,rounds:[]};
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null};
+          api.applyReviewPageSnapshot(snapshot);
+          const button = document.querySelector('[data-review-start]');
+          const label = button.textContent.trim();
+          const projectEnabled = !document.querySelector('[data-review-project]').options[0].disabled;
+          for (const kind of ['review','fix']) {
+            const model = document.querySelector(`[data-${kind}-model]`);
+            model.value = model.options[1].value;
+            model.dispatchEvent(new Event('change'));
+          }
+          document.querySelector('[data-review-limit]').value = '4';
+          button.click();
+          const action = JSON.parse(api.pendingReviewAction());
+          const queued = {...loop,id:'queued',phase:'queued'};
+          api.applyReviewPageSnapshot({...snapshot,loops:[loop,queued],acknowledgedActionID:action.id});
+          const card = document.querySelector('[data-loop-id="queued"]');
+          const cancel = card.querySelector('[data-review-action="stop"]');
+          const controls = [cancel.textContent,!!card.querySelector('[data-review-action="pause"]')];
+          cancel.click();
+          const cancellation = JSON.parse(api.pendingReviewAction());
+          return [label,projectEnabled,action.kind,action.projectID,action.maxRounds,...controls,cancellation.kind,cancellation.loopID];
+        })()
+        """) as? [AnyHashable]
+        XCTAssertEqual(result, ["Queue review & fix →", true, "queue", "p", 4, "Cancel queued loop", false, "stop", "queued"])
+    }
+
     func testStoppingLoopKeepsProjectBusyAndOffersOnlyRetryStop() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateJavaScript("""
@@ -365,10 +398,10 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return [...values,JSON.parse(api.pendingReviewAction()).kind];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Retry Stop", false, false, true, "stop"])
+        XCTAssertEqual(result, ["Retry Stop", false, false, false, "stop"])
     }
 
-    func testConcurrentCardsTargetControlsAndExcludeBusyProjects() async throws {
+    func testConcurrentCardsTargetControlsAndAllowQueueingBusyProjects() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -384,7 +417,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return [...before,action.kind,action.loopID];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [2, "c", true, true, false, false, false, "stop", "a"])
+        XCTAssertEqual(result, [2, "a", false, false, false, false, false, "stop", "a"])
     }
 
     func testConcurrentCardsPreserveDetailsAndScopePendingStatus() async throws {

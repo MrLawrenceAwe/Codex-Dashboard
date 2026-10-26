@@ -123,7 +123,7 @@ const reviewLoopCardView = (() => {
     renderFeedback(root, loop);
     renderProgress(root, loop, progress);
     const controls = root.querySelector('[data-review-controls]');
-    updateMarkup(controls, loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
+    updateMarkup(controls, loop.phase === 'queued' ? '<button type="button" data-review-action="stop">Cancel queued loop</button>' : loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
       ? '<button type="button" data-review-action="resume">Extension reloaded — continue</button>'
       : ['paused', 'blocked'].includes(loop.phase)
       ? '<button type="button" data-review-action="resume">Resume</button>'

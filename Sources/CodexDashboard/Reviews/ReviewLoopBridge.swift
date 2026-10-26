@@ -142,7 +142,7 @@ final class ReviewLoopBridge {
     }
 
     private func validateSelections(in action: ReviewLoopAction) throws {
-        guard action.kind == .start else { return }
+        guard [.start, .queue].contains(action.kind) else { return }
         guard let reviewSelection = action.reviewSelection, let fixSelection = action.fixSelection else {
             throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
         }

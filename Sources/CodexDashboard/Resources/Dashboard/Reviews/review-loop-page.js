@@ -35,7 +35,7 @@ const reviewLoopPage = (() => {
     details.querySelector('form').addEventListener('submit', event => {
       event.preventDefault();
       if (!event.target.reportValidity()) return;
-      queueAction({ kind: 'start', ...reviewLoopSetupView.readSettings() });
+      queueAction(reviewLoopSetupView.readSettings());
     });
     details.querySelector('[data-review-live-testing]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     details.querySelector('[data-review-project]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());

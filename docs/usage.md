@@ -164,6 +164,13 @@ includes P0, P1, and P2. These types also offer **Live testing**, off by default
 remote push settings. Review models come from Codex's live
 model list. Select **Start review & fix** to begin the loop.
 
+For a project that already has a loop, select **Queue review & fix** to save another
+loop with its own settings. Queued loops run in creation order after earlier loops
+for that project finish or are stopped. Paused, blocked, or extension-reload-waiting
+loops hold the queue. Other projects can continue independently. Queues survive
+Dashboard restarts; resume the preceding loop if the restart paused it. Select
+**Cancel queued loop** on its card to remove it from the queue.
+
 Expand **Configured prompt preview** or **Up next** to inspect instructions without
 leaving the loop. **Loop settings** shows the saved configuration, including project context and the
 playback mute setting for live testing, for current and historical loops. Prompt sections
@@ -181,7 +188,7 @@ fingerprint before completing the round; it does not send a separate verificatio
 turn for folder fixes. Excluded priorities remain visible but are not fixed. Findings are verified
 before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
 reviews finish without a commit. A clean review is an assessment, not proof that
-all defects are absent. Multiple projects can run loops, with one active loop per
+all defects are absent. Multiple projects can run loops, with one executing loop per
 project and workspace. Avoid other edits in that workspace while a loop runs.
 
 For ordinary folders, the dashboard fingerprints file contents, names, permissions,

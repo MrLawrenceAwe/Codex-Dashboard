@@ -93,12 +93,12 @@ struct ReviewProject: Codable, Equatable, Sendable {
 }
 
 enum ReviewLoopPhase: String, Codable, Sendable {
-    case waiting, running, paused, completed, limitReached, stopping, stopped, blocked, awaitingExtensionReload
+    case queued, waiting, running, paused, completed, limitReached, stopping, stopped, blocked, awaitingExtensionReload
 
     var isFinished: Bool {
         switch self {
         case .completed, .limitReached, .stopped: true
-        case .waiting, .running, .paused, .stopping, .blocked, .awaitingExtensionReload: false
+        case .queued, .waiting, .running, .paused, .stopping, .blocked, .awaitingExtensionReload: false
         }
     }
 }
@@ -191,7 +191,7 @@ struct ReviewLoop: Codable, Equatable, Sendable {
 }
 
 struct ReviewLoopsDocument: Codable {
-    static let currentVersion = 17
+    static let currentVersion = 18
     let version: Int
     let loops: [ReviewLoop]
 }

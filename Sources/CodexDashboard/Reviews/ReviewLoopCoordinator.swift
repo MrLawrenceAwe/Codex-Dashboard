@@ -52,7 +52,7 @@ final class ReviewLoopCoordinator {
     func apply(_ action: ReviewLoopAction, projects: [ReviewProject]) throws {
         guard !storageFailed else { throw ReviewLoopError(error ?? "Review loop storage is unavailable.") }
         switch action.kind {
-        case .start:
+        case .start, .queue:
             guard try startLoop(action, projects: projects) else { return }
         case .setMuteTestPlayback:
             try setMuteTestPlayback(action)
@@ -76,13 +76,13 @@ final class ReviewLoopCoordinator {
               let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
             throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
         }
-        guard !loops.contains(where: { !$0.phase.isFinished && ($0.project.id == project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(project.path)) }) else {
-            throw ReviewLoopError("This project already has an active loop. Stop it before starting another.")
+        guard action.kind == .queue || !loops.contains(where: { !$0.phase.isFinished && sameProject($0.project, project) }) else {
+            throw ReviewLoopError("This project already has an active loop. Queue another loop or stop it before starting another.")
         }
         let reviewType = action.reviewType ?? .bugs
         let promptContext = reviewType.supportsProjectContext ? action.promptContext ?? .general : .general
         let liveTesting = reviewType.supportsLiveTesting && (action.liveTesting ?? false)
-        let loop = ReviewLoop(
+        var loop = ReviewLoop(
             id: UUID(),
             startActionID: action.id,
             project: project,
@@ -99,6 +99,10 @@ final class ReviewLoopCoordinator {
             muteTestPlayback: liveTesting && (action.muteTestPlayback ?? false),
             pushToRemote: action.pushToRemote ?? false
         )
+        if action.kind == .queue {
+            loop.phase = .queued
+            loop.message = "Queued. Starts after earlier loops for this project finish or are stopped."
+        }
         try persist(loop)
         return true
     }
@@ -123,10 +127,10 @@ final class ReviewLoopCoordinator {
         case .stop:
             stopLoop(&updated)
         case .pause:
-            guard updated.phase != .stopping else { return false }
+            guard updated.phase != .stopping, updated.phase != .queued else { return false }
             pauseLoop(&updated)
         case .resume:
-            guard updated.phase != .stopping else { return false }
+            guard updated.phase != .stopping, updated.phase != .queued else { return false }
             try resumeLoop(&updated)
         default:
             preconditionFailure("Expected a loop control action")
@@ -158,7 +162,7 @@ final class ReviewLoopCoordinator {
             loop.phase = .running
             loop.message = "Extension reload confirmed. Preparing to continue the same chat."
         case .blocked:
-            guard !loops.contains(where: { $0.id != loop.id && !$0.phase.isFinished &&
+            guard !loops.contains(where: { $0.id != loop.id && !$0.phase.isFinished && $0.phase != .queued &&
                 ($0.project.id == loop.project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(loop.project.path))
             }) else {
                 throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
@@ -232,6 +236,24 @@ final class ReviewLoopCoordinator {
     }
 
     func advance(using driver: any ReviewLoopDriving, threads: [RendererThread]) async {
+        guard !storageFailed else { return }
+        // Persist promotion before launching. Array order is the durable queue order.
+        do {
+            for index in loops.indices where loops[index].phase == .queued {
+                let candidate = loops[index]
+                let hasPredecessor = loops.enumerated().contains { offset, other in
+                    other.id != candidate.id && !other.phase.isFinished &&
+                    sameProject(other.project, candidate.project) &&
+                    (other.phase != .queued || offset < index)
+                }
+                if !hasPredecessor {
+                    var ready = candidate
+                    ready.phase = .waiting
+                    ready.message = "Waiting for the project to be idle."
+                    try persist(ready)
+                }
+            }
+        } catch { return }
         let ids = loops.filter { [.waiting, .running, .stopping].contains($0.phase) }.map(\.id)
         let tasks = ids.map { id in
             Task { @MainActor in
@@ -791,6 +813,10 @@ final class ReviewLoopCoordinator {
               phase.map({ loop.phase == $0 }) ?? [.waiting, .running].contains(loop.phase)
         else { return nil }
         return loop
+    }
+
+    private func sameProject(_ first: ReviewProject, _ second: ReviewProject) -> Bool {
+        first.id == second.id || FileSystemPath.canonicalPath(first.path) == FileSystemPath.canonicalPath(second.path)
     }
 
     private func pathsOverlap(_ first: String, _ second: String) -> Bool {

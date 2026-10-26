@@ -47,7 +47,7 @@ const reviewPresentation = (() => {
     } else {
       for (let index = 0; index < current; index++) states[index] = 'done';
       states[current] = ({ running: 'active', blocked: 'blocked', awaitingExtensionReload: 'blocked',
-        paused: 'paused', stopping: 'stopping', stopped: 'stopped', waiting: 'waiting' })[loop.phase] || 'incomplete';
+        paused: 'paused', stopping: 'stopping', stopped: 'stopped', queued: 'waiting', waiting: 'waiting' })[loop.phase] || 'incomplete';
     }
     const descriptions = { pending: 'Up next', done: 'Done', skipped: 'Not needed',
       active: 'In progress', blocked: 'Needs attention', paused: 'Paused', stopping: 'Stopping',
