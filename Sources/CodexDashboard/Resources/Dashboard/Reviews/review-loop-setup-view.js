@@ -56,7 +56,6 @@ const reviewLoopSetupView = (() => {
         <p class="review-field-help review-push-help">Requires an upstream, origin, or sole remote. Diverged history is merged, committed and verified before pushing. Push failures block the loop; resolve them, then Resume.</p>
         </fieldset>
         </details>
-        <p class="review-availability" data-review-availability role="status" hidden></p>
         <div data-review-error role="alert" hidden></div>
         <div class="review-form-footer">
           <button type="submit" data-review-start>Start review &amp; fix <span aria-hidden="true">→</span></button>
@@ -99,9 +98,6 @@ const reviewLoopSetupView = (() => {
     root.querySelector('[data-review-start]').innerHTML = ['start', 'queue'].includes(pending?.kind)
       ? (pending.kind === 'queue' ? 'Queueing…' : 'Starting…')
       : queued ? 'Queue review &amp; fix <span aria-hidden="true">→</span>' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
-    const availability = root.querySelector('[data-review-availability]');
-    availability.hidden = projects.length > 0 && !queued;
-    availability.textContent = queued ? 'Runs after earlier loops for this project finish or are stopped. Paused or blocked loops hold the queue.' : 'Choose a local, single-folder project in Codex to start.';
     const folder = projects.find(project => project.id === root.querySelector('[data-review-project]').value)?.workspaceKind === 'folder';
     const push = root.querySelector('[data-review-push]');
     if (folder) push.value = 'false';
