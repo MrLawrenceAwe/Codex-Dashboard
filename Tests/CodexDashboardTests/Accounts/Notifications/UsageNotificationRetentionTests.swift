@@ -53,7 +53,7 @@ final class UsageNotificationRetentionTests: XCTestCase {
         })
         let history = UsageNotificationHistory(userDefaults: defaults, channel: .desktop)
         history.saveObservations(for: [active, removed], usageByAccountID: snapshots)
-        let alerts = UsageNotificationPlanner.deliverableNotifications(for: [active, removed], usageByAccountID: snapshots, now: now)
+        let alerts = UsageNotificationPlanner.deadlineNotificationCandidates(for: [active, removed], usageByAccountID: snapshots, now: now)
         history.saveDeadlines(alerts, for: .known)
         history.saveDeadlines(alerts, for: .updates)
         for alert in alerts { history.recordDeadlineDelivery(alert) }

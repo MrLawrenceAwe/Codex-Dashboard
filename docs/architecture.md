@@ -23,8 +23,8 @@ The shared `AsyncPipeReader` closes on timeout or cancellation even if descendan
 retain pipe write ends; account app-server reads use it as well.
 
 `FileSignature` shares size/modification-time reads across catalog, unread-state,
-and filesystem monitoring. `JWTClaimsDecoder.decodeUnverifiedClaims` shares token
-payload decoding for account and unread identity lookup; it does not verify signatures.
+filesystem monitoring, and rollout-reader cache invalidation.
+`JWTClaimsDecoder.decodeUnverifiedClaims` shares token payload decoding for account and unread identity lookup; it does not verify signatures.
 
 ## Thread snapshots
 
@@ -155,7 +155,9 @@ cleanup share that contract. `ImmediateUsageNotificationID` similarly owns immed
 and retention dates, including the timestamp epoch for each event. Existing identifier
 strings remain unchanged because saved delivery history uses them to prevent duplicate alerts.
 
-`UsageNotificationPlanner` builds one pure plan per observation time.
+`UsageNotificationPlanner` builds one pure plan per observation time. Its
+`deadlineNotificationCandidates` include future reminders and past-due reminders
+needed to detect deadline corrections; the plan selects notifications for delivery.
 `UsageNotificationUpdateCoordinator` serializes updates. `DesktopUsageNotifier` and
 `NtfyUsageNotifier` deliver through separate channels and maintain independent
 `UsageNotificationHistory` records. Delivery on one channel never acknowledges the

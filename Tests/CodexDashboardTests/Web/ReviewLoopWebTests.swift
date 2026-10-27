@@ -448,7 +448,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return [preserved,action.loopID,scoped,a.top === b.top,b.left > a.left,document.querySelector('[data-review-overview]').textContent];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [true, "1", true, true, true, "2 active · 3 total"])
+        XCTAssertEqual(result, [true, "1", true, true, true, "2 unfinished · 3 total"])
         try await Task.sleep(for: .milliseconds(150))
         let image = try await webView.takeSnapshot(configuration: nil)
         if let data = image.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0) })?.representation(using: .png, properties: [:]) {

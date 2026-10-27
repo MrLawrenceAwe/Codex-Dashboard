@@ -41,7 +41,7 @@ enum UsageNotificationPlanner {
         sentUpdates: [String: Date],
         now: Date
     ) -> Plan {
-        let all = deliverableNotifications(for: accounts, usageByAccountID: usageByAccountID, now: now)
+        let all = deadlineNotificationCandidates(for: accounts, usageByAccountID: usageByAccountID, now: now)
         let updates = deadlineUpdateNotifications(
             from: all, previousDeadlines: previousDeadlines, sentUpdates: sentUpdates, now: now
         )
@@ -62,7 +62,7 @@ enum UsageNotificationPlanner {
         )
     }
 
-    static func deliverableNotifications(
+    static func deadlineNotificationCandidates(
         for accounts: [SavedAccount],
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
         now: Date = .now

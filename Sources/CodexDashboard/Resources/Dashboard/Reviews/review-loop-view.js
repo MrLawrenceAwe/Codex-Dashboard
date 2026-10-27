@@ -73,11 +73,11 @@ const reviewLoopView = (() => {
     if (!root) return;
     const { loops, error } = snapshot;
     reviewLoopSetupView.render(snapshot, pendingAction);
-    const activeCount = loops.filter(loop => !loop.isFinished).length;
+    const unfinishedCount = loops.filter(loop => !loop.isFinished).length;
     const current = currentLoops(snapshot, retainedLoopIDs);
     root.querySelector('[data-review-empty]').hidden = current.length > 0;
     root.querySelector('[data-review-active-count]').textContent = current.length;
-    root.querySelector('[data-review-overview]').textContent = loops.length ? `${activeCount} active · ${loops.length} total` : '';
+    root.querySelector('[data-review-overview]').textContent = loops.length ? `${unfinishedCount} unfinished · ${loops.length} total` : '';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';

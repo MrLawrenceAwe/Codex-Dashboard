@@ -227,8 +227,9 @@ reload the named extension, then select **Extension reloaded — continue**. The
 same chat and round resume with unfinished fixes preserved. Final review and
 commit checks still run before the round can complete.
 
-The sidebar shows separate counts for running or waiting loops, an amber pause icon
-for paused loops, an amber **!** for
+The review page overview counts unfinished loops, including queued, paused, blocked,
+and extension-reload-waiting loops. The sidebar shows separate counts for running
+or waiting loops, an amber pause icon for paused loops, an amber **!** for
 blocked loops or loops awaiting an extension reload, and a green **✓** for completed
 loops or loops that reached their round limit. Counts include only current loops;
 moving a finished loop to history removes it from the count. Stopped loops are

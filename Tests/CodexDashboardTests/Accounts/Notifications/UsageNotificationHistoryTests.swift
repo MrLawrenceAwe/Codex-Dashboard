@@ -73,7 +73,7 @@ final class UsageNotificationHistoryTests: XCTestCase {
         XCTAssertEqual(desktop.observations()[account.id], currentUsage)
         XCTAssertTrue(phone.observations().isEmpty, "Desktop success must not acknowledge phone delivery")
 
-        let alerts = UsageNotificationPlanner.deliverableNotifications(
+        let alerts = UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [account], usageByAccountID: snapshots, now: now
         ).filter { $0.notificationDate > now }
         phone.saveDeadlines(alerts, for: .updates)

@@ -3,8 +3,7 @@ import Foundation
 // Cached, bounded-memory reverse JSONL scanning shared by lifecycle and question readers.
 struct RolloutRecordReader<Record> {
     private struct CacheEntry {
-        let size: UInt64
-        let modifiedAt: Date
+        let signature: FileSignature
         let endsWithNewline: Bool
         let event: Record?
     }
@@ -25,34 +24,27 @@ struct RolloutRecordReader<Record> {
 
     mutating func latestRecordedEvent(at path: String) -> Record? {
         let fileURL = URL(fileURLWithPath: path)
-        guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-            let size = (attributes[.size] as? NSNumber)?.uint64Value,
-            let modifiedAt = attributes[.modificationDate] as? Date
-        else {
-            return nil
-        }
+        guard let signature = try? FileSignature.read(at: fileURL) else { return nil }
 
         let cached = cache[path]
         let event: Record?
         let endsWithNewline: Bool
-        if let cached, cached.size == size, cached.modifiedAt == modifiedAt {
+        if let cached, cached.signature == signature {
             event = cached.event
             endsWithNewline = cached.endsWithNewline
         } else if
             let cached,
-            cached.size < size,
+            cached.signature.size < signature.size,
             cached.endsWithNewline
         {
-            event = read(in: fileURL, lowerBound: cached.size) ?? cached.event
-            endsWithNewline = fileEndsWithNewline(fileURL, size: size)
+            event = read(in: fileURL, lowerBound: cached.signature.size) ?? cached.event
+            endsWithNewline = fileEndsWithNewline(fileURL, size: signature.size)
         } else {
             event = read(in: fileURL)
-            endsWithNewline = fileEndsWithNewline(fileURL, size: size)
+            endsWithNewline = fileEndsWithNewline(fileURL, size: signature.size)
         }
         cache[path] = CacheEntry(
-            size: size,
-            modifiedAt: modifiedAt,
+            signature: signature,
             endsWithNewline: endsWithNewline,
             event: event
         )

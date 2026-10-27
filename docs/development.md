@@ -110,6 +110,9 @@ merge/abort, push, and upstream configuration. `ReviewLoopDriver` receives these
 separate dependencies. Both implementations use `ReviewGitCommand` for subprocesses.
 `ReviewFixCheckpoint` validates finding accounting and commit ancestry; the review
 coordinator owns publication intent, verification scheduling, and final state writes.
+`ReviewLoopCoordinator+Controls.swift` groups settings validation, pause/resume/stop
+controls, and history deletion; the main coordinator file owns round execution
+and persistence.
 
 `Core/push-controls.js` reads the open commit dialog's target and requests
 `git-context` immediately through Codex's Git worker bridge. Requests never fetch

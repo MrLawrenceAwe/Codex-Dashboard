@@ -251,7 +251,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             fetchedAt: now
         )
         let notification = try XCTUnwrap(
-            UsageNotificationPlanner.deliverableNotifications(
+            UsageNotificationPlanner.deadlineNotificationCandidates(
                 for: [savedAccount],
                 usageByAccountID: [savedAccount.id: scheduledSnapshot],
                 now: now
@@ -290,7 +290,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ),
             fetchedAt: now
         )
-        let reminder = try XCTUnwrap(UsageNotificationPlanner.deliverableNotifications(
+        let reminder = try XCTUnwrap(UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [account], usageByAccountID: [account.id: current], now: now
         ).first { $0.kind == .weeklyReset })
         let refreshed = UsageNotificationPlanner.refreshedContent(for: reminder, using: current, now: now)
@@ -314,7 +314,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let savedAccount = account(named: "Personal")
         let scheduledReset = now.addingTimeInterval(48 * 60 * 60)
         let notification = try XCTUnwrap(
-            UsageNotificationPlanner.deliverableNotifications(
+            UsageNotificationPlanner.deadlineNotificationCandidates(
                 for: [savedAccount],
                 usageByAccountID: [
                     savedAccount.id: CodexAccountUsageSnapshot(
@@ -345,7 +345,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
     func testPlansOneDeadlineUpdateWhenTheWarningTimeHasPassed() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
-        let original = UsageNotificationPlanner.deliverableNotifications(
+        let original = UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
@@ -357,7 +357,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
             ],
             now: now
         )
-        let revised = UsageNotificationPlanner.deliverableNotifications(
+        let revised = UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
@@ -394,7 +394,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let reset = now.addingTimeInterval(30 * 60)
-        let notifications = UsageNotificationPlanner.deliverableNotifications(
+        let notifications = UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
@@ -421,7 +421,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let savedAccount = account(named: "Personal")
         let reset = now.addingTimeInterval(30 * 60)
-        let notifications = UsageNotificationPlanner.deliverableNotifications(
+        let notifications = UsageNotificationPlanner.deadlineNotificationCandidates(
             for: [savedAccount],
             usageByAccountID: [
                 savedAccount.id: snapshot(
@@ -737,7 +737,7 @@ final class UsageNotificationPlannerTests: XCTestCase {
         usageByAccountID: [UUID: CodexAccountUsageSnapshot],
         now: Date
     ) -> [ScheduledUsageNotification] {
-        UsageNotificationPlanner.deliverableNotifications(
+        UsageNotificationPlanner.deadlineNotificationCandidates(
             for: accounts, usageByAccountID: usageByAccountID, now: now
         ).filter { $0.notificationDate > now }
     }
