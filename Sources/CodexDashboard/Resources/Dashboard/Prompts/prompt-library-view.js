@@ -140,12 +140,12 @@ const promptLibraryView = (() => {
       <div class="dashboard-prompt-tools">
         <label class="dashboard-prompt-search"><span class="sr-only">Search prompts</span><input type="search" data-prompt-search placeholder="Search prompts…" value="${domUtils.escapeHTML(searchTerm)}" /></label>
       </div>
-      <div class="dashboard-prompt-list">
-        ${groups}
-      </div>
       <div class="dashboard-prompt-create-actions">
         <button type="button" class="dashboard-prompt-new dashboard-prompt-new-primary" data-prompt-new>+ New prompt</button>
         <button type="button" class="dashboard-prompt-new dashboard-prompt-new-secondary" data-prompt-new-section>+ New section</button>
+      </div>
+      <div class="dashboard-prompt-list">
+        ${groups}
       </div>`;
     const search = content.querySelector('[data-prompt-search]');
     search?.focus();
