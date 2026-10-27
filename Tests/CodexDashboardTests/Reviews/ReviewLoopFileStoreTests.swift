@@ -3,37 +3,49 @@ import XCTest
 
 @MainActor
 final class ReviewLoopFileStoreTests: ReviewLoopTestCase {
-    func testFileStoreRoundTripsAndDoesNotOverwriteCorruptData() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("loop.json")
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let store = ReviewLoopFileStore(url: url)
-        let (coordinator, _, _) = try make()
-        try store.save(coordinator.loops)
-        XCTAssertEqual(try store.load(), coordinator.loops)
-        let currentDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual(currentDocument["version"] as? Int, ReviewLoopsDocument.currentVersion)
-        XCTAssertNotNil(currentDocument["loops"] as? [[String: Any]])
-        var olderLoop = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(coordinator.loops.last))) as? [String: Any])
-        olderLoop.removeValue(forKey: "speed")
-        olderLoop.removeValue(forKey: "reviewType")
-        olderLoop.removeValue(forKey: "promptContext")
-        olderLoop["instructions"] = "(this is a project for personal use)"
-        try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertEqual(try store.load().first?.speed, .standard)
-        XCTAssertEqual(try store.load().first?.reviewType, .bugs)
-        XCTAssertEqual(try store.load().first?.promptContext, .personal)
-        olderLoop["instructions"] = "(saved custom context)"
-        try JSONSerialization.data(withJSONObject: olderLoop).write(to: url)
-        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
-        try JSONSerialization.data(withJSONObject: [olderLoop]).write(to: url)
-        XCTAssertEqual(try store.load().first?.promptContext, .savedContext("(saved custom context)"))
-        var futureDocument = currentDocument
-        futureDocument["version"] = ReviewLoopsDocument.currentVersion + 1
-        try JSONSerialization.data(withJSONObject: futureDocument).write(to: url)
-        XCTAssertThrowsError(try store.load())
-        try Data("broken".utf8).write(to: url)
-        let recovered = ReviewLoopCoordinator(store: store)
-        XCTAssertNotNil(recovered.error)
-        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "broken")
+    func testFileStoreRoundTripsCurrentDocument() throws {
+        try withTemporaryStore { store, url in
+            let (coordinator, _, _) = try make()
+            try store.save(coordinator.loops)
+            XCTAssertEqual(try store.load(), coordinator.loops)
+            let document = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            XCTAssertEqual(document["version"] as? Int, ReviewLoopsDocument.currentVersion)
+            XCTAssertNotNil(document["loops"] as? [[String: Any]])
+        }
+    }
+
+    func testFileStoreRejectsFutureVersionWithoutOverwritingIt() throws {
+        try withTemporaryStore { store, url in
+            let data = try JSONSerialization.data(withJSONObject: [
+                "version": ReviewLoopsDocument.currentVersion + 1, "loops": []
+            ])
+            try data.write(to: url)
+            XCTAssertThrowsError(try store.load())
+            XCTAssertEqual(try Data(contentsOf: url), data)
+        }
+    }
+
+    func testCoordinatorPreservesCorruptDocumentOnInitializationFailure() throws {
+        try withTemporaryStore { store, url in
+            try Data("broken".utf8).write(to: url)
+            let coordinator = ReviewLoopCoordinator(store: store)
+            XCTAssertNotNil(coordinator.error)
+            XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "broken")
+        }
+    }
+
+    func testInitializationSaveFailureIsReportedAsStorageInitializationFailure() {
+        let store = ReviewTestStore()
+        store.failSave = true
+        let coordinator = ReviewLoopCoordinator(store: store)
+        XCTAssertEqual(coordinator.error, "Review loop storage could not be initialized: disk full")
+    }
+
+    private func withTemporaryStore(_ operation: (ReviewLoopFileStore, URL) throws -> Void) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("loop.json")
+        try operation(ReviewLoopFileStore(url: url), url)
     }
 }

@@ -54,7 +54,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
         let assigned = roots.filter { $0.id == thread.projectID }
         let candidates = thread.projectID == nil ? roots : assigned
-        return candidates.filter { cwd == $0.path || cwd.hasPrefix($0.path + "/") }
+        return candidates.filter { FileSystemPath.contains(cwd, in: $0.path) }
             .max { $0.path.count < $1.path.count } ?? assigned.first
     }
 
@@ -165,7 +165,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             // Project membership can differ from the checkout (for example, a
             // CV chat working in Job Hunting). Label and scan the same folder.
             let matchingRoots = cachedProjectRoots.filter {
-                cwd == $0.path || cwd.hasPrefix($0.path + "/")
+                FileSystemPath.contains(cwd, in: $0.path)
             }
             let checkoutRoot = matchingRoots.max { $0.path.count < $1.path.count }
             let checkoutName = checkoutRoot.map { checkout in
@@ -208,7 +208,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             if let root {
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = checkoutRoot?.path
-                    ?? (cwd == root.path || cwd.hasPrefix(root.path + "/") ? root.path : cwd)
+                    ?? (FileSystemPath.contains(cwd, in: root.path) ? root.path : cwd)
                 if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
                     summary.sharesProjectRepository = repositoryRoot(cwd) == repository
                 }

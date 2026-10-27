@@ -134,7 +134,7 @@ final class ReviewLoopBridge {
         let candidate = FileSystemPath.canonicalURL(
             path.hasPrefix("/") ? path : root.appendingPathComponent(path).path
         )
-        guard candidate.path.hasPrefix(root.path + "/") else { return nil }
+        guard candidate.path != root.path, FileSystemPath.contains(candidate.path, in: root.path) else { return nil }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
               !isDirectory.boolValue else { return nil }

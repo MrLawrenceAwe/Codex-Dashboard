@@ -101,7 +101,7 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
             // here avoids resolving symlinks and allocating every ancestor for every
             // file event in a busy build tree.
             let normalizedPath = Self.standardizedPath(changedPath)
-            for root in observedRoots where Self.contains(normalizedPath, in: root.path) {
+            for root in observedRoots where FileSystemPath.contains(normalizedPath, in: root.path) {
                 affectedProjectPaths.formUnion(root.projectPaths)
             }
         }
@@ -112,10 +112,5 @@ final class RecursiveProjectChangeMonitor: @unchecked Sendable {
 
     private static func standardizedPath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.path
-    }
-
-    private static func contains(_ changedPath: String, in rootPath: String) -> Bool {
-        changedPath == rootPath
-            || (rootPath == "/" ? changedPath.hasPrefix("/") : changedPath.hasPrefix(rootPath + "/"))
     }
 }

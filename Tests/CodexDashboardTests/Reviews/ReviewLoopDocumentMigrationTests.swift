@@ -3,6 +3,37 @@ import XCTest
 
 @MainActor
 final class ReviewLoopDocumentMigrationTests: ReviewLoopTestCase {
+    func testUnversionedSingleLoopRestoresDefaultsAndPersonalContext() throws {
+        let saved = try legacyLoop(instructions: "(this is a project for personal use)")
+        let loop = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first)
+        XCTAssertEqual(loop.speed, .standard)
+        XCTAssertEqual(loop.reviewType, .bugs)
+        XCTAssertEqual(loop.promptContext, .personal)
+    }
+
+    func testUnversionedSingleLoopPreservesCustomContext() throws {
+        let saved = try legacyLoop(instructions: "(saved custom context)")
+        let loop = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: saved)).first)
+        XCTAssertEqual(loop.promptContext, .savedContext("(saved custom context)"))
+    }
+
+    func testUnversionedArrayPreservesCustomContext() throws {
+        let saved = try legacyLoop(instructions: "(saved custom context)")
+        let loop = try XCTUnwrap(ReviewLoopDocumentMigration.decode(JSONSerialization.data(withJSONObject: [saved])).first)
+        XCTAssertEqual(loop.promptContext, .savedContext("(saved custom context)"))
+    }
+
+    private func legacyLoop(instructions: String) throws -> [String: Any] {
+        let loop = ReviewLoop(id: UUID(), startActionID: "legacy", project: project,
+                              promptContext: .general, maxRounds: 5)
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(loop)) as? [String: Any])
+        saved.removeValue(forKey: "speed")
+        saved.removeValue(forKey: "reviewType")
+        saved.removeValue(forKey: "promptContext")
+        saved["instructions"] = instructions
+        return saved
+    }
+
     func testVersion16LoopsDefaultToAllowingUICopyChanges() throws {
         let loop = ReviewLoop(id: UUID(), startActionID: "copy", project: project,
                               promptContext: .general, maxRounds: 3, reviewType: .organisation)

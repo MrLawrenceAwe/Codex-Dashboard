@@ -74,7 +74,9 @@ monitors live in `App/Monitoring`; diagnostics views live in `App/Diagnostics`.
 `DesktopNotificationCenter.swift` owns the macOS notification adapter and its
 protocol; `DesktopUsageNotifier.swift` owns usage-alert scheduling and delivery.
 `Support/FileSystemPath.swift` defines canonical path identity for catalog grouping,
-review checkout checks, file links, and monitoring. Project event matching separately
+review checkout checks, file links, and monitoring. Shared containment and overlap
+checks compare normalized paths without filesystem access and handle the filesystem root.
+Project event matching separately
 retains lexical standardisation so it does not resolve symlinks for each event.
 `Support/GitMetadataLocator.swift` shares canonical ancestor discovery across catalog
 grouping, Git status, review checkpoints, and monitoring. Marker presence is separate

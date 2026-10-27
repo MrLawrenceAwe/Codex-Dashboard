@@ -329,5 +329,7 @@ identify failed checks; **Unavailable** means a check could not complete, while
 **Compatibility not checked** means no checks have run. Blocking drift prevents
 remounting. Diagnostics also shows versions, refresh state, loaded chats, renderer
 targets, and copyable details.
-**Disable dashboard integration** immediately removes all injected controls; a normal
-Codex restart also removes them. The signed Codex application bundle is never modified.
+**Disable dashboard integration** waits for current synchronization and review operations
+to finish, then removes the injected controls. Remote publication can delay removal.
+A normal Codex restart also removes the controls. The signed Codex application bundle
+is never modified.

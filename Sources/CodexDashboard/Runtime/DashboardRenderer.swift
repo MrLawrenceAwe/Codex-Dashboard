@@ -166,8 +166,8 @@ final class DashboardRenderer {
 
         let targetIDs = Set(targets.map(\.id))
         let snapshotChanged = snapshot != lastSnapshot || targetIDs != mountedTargetIDs
-        var mountedDashboard = false
-        var healthyTargets: [DevToolsTarget] = []
+        var didMountAnyTarget = false
+        var previouslyHealthyTargets: [DevToolsTarget] = []
 
         for target in targets {
             try Task.checkCancellation()
@@ -193,31 +193,31 @@ final class DashboardRenderer {
                     )
                 }
                 guard !Task.isCancelled, maintainsDashboard else { return }
-                mountedDashboard = true
+                didMountAnyTarget = true
                 lastHealthCheckByTargetID[target.id] = now()
             } else {
-                healthyTargets.append(target)
+                previouslyHealthyTargets.append(target)
             }
         }
 
         guard !Task.isCancelled, maintainsDashboard else { return }
-        if mountedDashboard || promptLibrarySynchronizationIsDue() {
+        if didMountAnyTarget || promptLibrarySynchronizationIsDue() {
             try await promptLibraryBridge?.synchronize(
                 targets: targets,
-                healthyTargets: healthyTargets,
-                mountedDashboard: mountedDashboard
+                previouslyHealthyTargets: previouslyHealthyTargets,
+                didMountAnyTarget: didMountAnyTarget
             )
             lastPromptLibrarySynchronization = now()
         }
         let threadsChanged = snapshot.threads != lastSnapshot?.threads
         let accountPopoverChanged = snapshot.accountPopover != lastSnapshot?.accountPopover
-        if mountedDashboard || threadsChanged {
+        if didMountAnyTarget || threadsChanged {
             try await deliverThreads(snapshot.threads, to: targets)
         }
-        if mountedDashboard || accountPopoverChanged {
+        if didMountAnyTarget || accountPopoverChanged {
             try await deliverAccountPopover(snapshot.accountPopover, to: targets)
         }
-        if mountedDashboard || snapshotChanged {
+        if didMountAnyTarget || snapshotChanged {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
@@ -359,8 +359,8 @@ final class DashboardRenderer {
         let targets = await targets(forceRefresh: true)
         try await promptLibraryBridge.synchronize(
             targets: targets,
-            healthyTargets: targets.filter { mountedTargetIDs.contains($0.id) },
-            mountedDashboard: false,
+            previouslyHealthyTargets: targets.filter { mountedTargetIDs.contains($0.id) },
+            didMountAnyTarget: false,
             requiresRendererRead: true
         )
         lastPromptLibrarySynchronization = now()

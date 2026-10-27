@@ -22,8 +22,8 @@ final class PromptLibraryBridge {
 
     func synchronize(
         targets: [DevToolsTarget],
-        healthyTargets: [DevToolsTarget],
-        mountedDashboard: Bool,
+        previouslyHealthyTargets: [DevToolsTarget],
+        didMountAnyTarget: Bool,
         requiresRendererRead: Bool = false
     ) async throws {
         guard let firstTarget = targets.first else {
@@ -71,7 +71,7 @@ final class PromptLibraryBridge {
 
         var storedLibrary = try store.load()
         let nativeLibraryChanged = storedLibrary != lastDeliveredLibrary
-        let sourceTarget = healthyTargets.first ?? (storedLibrary == nil ? firstTarget : nil)
+        let sourceTarget = previouslyHealthyTargets.first ?? (storedLibrary == nil ? firstTarget : nil)
         if !nativeLibraryIsAuthoritative,
            !seededNativeLibrary,
            !nativeLibraryChanged,
@@ -91,7 +91,7 @@ final class PromptLibraryBridge {
             try await discardPendingLibrary(on: targets)
         }
         guard let nativeLibrary = storedLibrary else { return }
-        guard nativeLibraryIsAuthoritative || (mountedDashboard && !seededNativeLibrary)
+        guard nativeLibraryIsAuthoritative || (didMountAnyTarget && !seededNativeLibrary)
             || nativeLibrary != lastDeliveredLibrary else { return }
 
         try await evaluateAcrossTargets(

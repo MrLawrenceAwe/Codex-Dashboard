@@ -44,7 +44,7 @@ final class ReviewLoopCoordinator {
             }
             try store.save(loops)
         } catch {
-            self.error = "Review loop storage could not be read: \(error.localizedDescription)"
+            self.error = "Review loop storage could not be initialized: \(error.localizedDescription)"
             storageFailed = true
         }
     }
@@ -160,7 +160,7 @@ final class ReviewLoopCoordinator {
         updated = current
         let root = FileSystemPath.canonicalPath(workspace.root)
         if let owner = workspaceOwners.first(where: { otherRoot, owner in
-            owner != id && pathsOverlap(root, otherRoot) && matchingLoop(owner)?.phase.isFinished == false
+            owner != id && FileSystemPath.overlaps(root, otherRoot) && matchingLoop(owner)?.phase.isFinished == false
         })?.value, let other = matchingLoop(owner) {
             throw ReviewLoopError("This project folder already has an active review loop for \(other.project.name). Stop that loop before starting another.")
         }
@@ -685,15 +685,11 @@ final class ReviewLoopCoordinator {
         }
     }
 
-    private func pathsOverlap(_ first: String, _ second: String) -> Bool {
-        first == second || first.hasPrefix(second + "/") || second.hasPrefix(first + "/")
-    }
-
     private func hasOtherRunningTask(_ threads: [RendererThread], root: String, excluding: String?) -> Bool {
         threads.contains { thread in
             let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
             let root = FileSystemPath.canonicalPath(root)
-            return thread.id != excluding && thread.runState == .running && pathsOverlap(cwd, root)
+            return thread.id != excluding && thread.runState == .running && FileSystemPath.overlaps(cwd, root)
         }
     }
 
