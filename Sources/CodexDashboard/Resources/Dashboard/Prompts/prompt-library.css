@@ -84,9 +84,6 @@
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:hover .dashboard-prompt-row-actions, #codex-dashboard-prompt-library-dialog .dashboard-prompt-row:focus-within .dashboard-prompt-row-actions { opacity: 1; pointer-events: auto; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions button { padding: 6px 7px; border: 0; border-radius: var(--dashboard-control-radius); background: transparent; color: var(--dashboard-dim); font-size: 10px; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-row-actions button:hover { background: var(--dashboard-surface-hover); color: var(--dashboard-text); }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-empty { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 6px; padding: 22px; color: var(--dashboard-muted); text-align: center; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-empty strong { color: var(--dashboard-text); font-size: 13px; font-weight: 570; }
-#codex-dashboard-prompt-library-dialog .dashboard-prompt-empty span { max-width: 330px; font-size: 11px; line-height: 1.45; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new { width: 100%; padding: 9px 11px; border-radius: 9px; font-size: 11px; cursor: pointer; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new-primary { border: 1px solid var(--dashboard-text); background: var(--dashboard-text); color: var(--dashboard-bg); -webkit-text-fill-color: var(--dashboard-bg); font-weight: 590; }
 #codex-dashboard-prompt-library-dialog .dashboard-prompt-new-primary:hover { filter: brightness(.94); }

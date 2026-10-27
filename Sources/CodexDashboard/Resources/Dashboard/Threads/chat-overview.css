@@ -214,7 +214,6 @@ aside [data-codex-sidebar-usage-limit] {
 
 @container dashboard-page (max-width: 760px) {
   #codex-dashboard-chat-overview-page .dashboard-header { align-items: flex-start; flex-direction: column; gap: 18px; }
-  #codex-dashboard-chat-overview-page .dashboard-account-area { width: 100%; justify-items: start; }
   #codex-dashboard-chat-overview-page .dashboard-project-path { display: none; }
 }
 

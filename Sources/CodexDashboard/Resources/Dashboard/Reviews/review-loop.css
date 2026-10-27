@@ -145,7 +145,6 @@ html.codex-review-open aside.app-shell-left-panel { z-index:2147483645; }
 .dashboard-review-loop [data-review-workspace-help] { grid-column:1 / -1; }
 .dashboard-review-loop .review-testing-options .review-limits { grid-template-columns:minmax(0, 1fr); gap:12px; }
 .dashboard-review-loop .review-testing-options .review-field-help { margin-top:-6px; }
-.dashboard-review-loop .review-availability { padding:12px; border-radius: var(--dashboard-row-radius); background:var(--review-tint); font-size:12px; }
 
 
 .dashboard-review-loop .review-history { grid-column:1 / -1; display:grid; gap:14px; min-width:0; padding-top:28px; border-top:1px solid var(--review-border); }
