@@ -4,9 +4,9 @@ const reviewLoopSetupView = (() => {
   let reviewTypesSignature = '';
   let reviewTypes = [];
   let projects = [];
-  let loops = [];
+  let models = [];
   let pending = null;
-  const needsQueue = projectID => loops.some(loop => !loop.isFinished && (loop.project.id === projectID || loop.project.path === projects.find(project => project.id === projectID)?.path));
+  const needsQueue = projectID => projects.find(project => project.id === projectID)?.requiresQueue === true;
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
   const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
@@ -101,7 +101,6 @@ const reviewLoopSetupView = (() => {
     const folder = projects.find(project => project.id === root.querySelector('[data-review-project]').value)?.workspaceKind === 'folder';
     const push = root.querySelector('[data-review-push]');
     if (folder) push.value = 'false';
-    push.disabled = folder || root.querySelector('[data-review-start]').disabled;
     push.querySelector('option[value="false"]').textContent = folder ? 'Save changes in folder' : 'Keep commits local';
     root.querySelector('[data-review-workspace-help]').textContent = folder
       ? 'Fixes are saved and verified in this folder.'
@@ -127,26 +126,40 @@ const reviewLoopSetupView = (() => {
     const context = root.querySelector('.review-project-context');
     context.hidden = !supportsProjectContext(reviewType);
     if (context.hidden) context.querySelector('select').value = '';
+    updateControlAvailability();
   }
 
-  function renderReasoningOptions(snapshot, pendingAction, kind = 'review') {
+  function updateControlAvailability() {
     const root = panel();
     if (!root) return;
-    const model = (snapshot.models || []).find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
+    const disabled = !!pending || !projects.length;
+    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]')
+      .forEach(element => { element.disabled = disabled; });
+    for (const kind of ['review', 'fix']) {
+      const modelID = root.querySelector(`[data-${kind}-model]`).value;
+      root.querySelector(`[data-${kind}-effort]`).disabled = disabled || !models.some(model => model.modelID === modelID);
+    }
+    const project = projects.find(project => project.id === root.querySelector('[data-review-project]').value);
+    root.querySelector('[data-review-push]').disabled = disabled || project?.workspaceKind === 'folder';
+  }
+
+  function renderReasoningOptions(kind = 'review') {
+    const root = panel();
+    if (!root) return;
+    const model = models.find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
     const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
     select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(composerPresets.reasoningLabel(value))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
-    select.disabled = !model || !!pendingAction;
+    updateControlAvailability();
   }
 
   function render(snapshot, pendingAction) {
     const root = panel();
     if (!root) return;
-    loops = snapshot.loops;
     pending = pendingAction;
     projects = snapshot.projects;
-    const models = snapshot.models || [];
+    models = snapshot.models || [];
     reviewTypes = snapshot.reviewTypes || [];
     const nextReviewTypesSignature = JSON.stringify(reviewTypes);
     if (nextReviewTypesSignature !== reviewTypesSignature) {
@@ -166,21 +179,18 @@ const reviewLoopSetupView = (() => {
           if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
           modelSelect.value = selected;
         }
-        renderReasoningOptions(snapshot, pendingAction, kind);
+        renderReasoningOptions(kind);
       }
       modelsSignature = nextModelsSignature;
     }
     const select = root.querySelector('[data-review-project]');
-    const busyProjects = new Set(loops.filter(loop => !loop.isFinished).map(loop => loop.project.id));
-    const signature = JSON.stringify([projects, [...busyProjects]]);
+    const signature = JSON.stringify(projects);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}${busyProjects.has(project.id) ? ' · Queue available' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}${needsQueue(project.id) ? ' · Queue available' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
       select.value = projects.some(project => project.id === selected) ? selected : projects[0]?.id || '';
       projectsSignature = signature;
     }
-    root.querySelectorAll('[data-review-form] input, [data-review-form] select, [data-review-start]').forEach(element => { element.disabled = !!pendingAction || !projects.length; });
-    for (const kind of ['review', 'fix']) root.querySelector(`[data-${kind}-effort]`).disabled ||= !root.querySelector(`[data-${kind}-model]`).value;
     renderReviewSettings();
   }
 

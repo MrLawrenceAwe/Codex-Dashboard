@@ -45,53 +45,18 @@ enum DashboardWebTestHarness {
                 "try { localStorage.clear(); true } catch (_) { false }"
             )
         }
-        let injection = try InjectionBundle.load()
-        let expression = trackTodoSaves ? try trackedTodoInjection(injection) : injection.mountExpression
-        _ = try await webView.evaluateJavaScript(expression)
+        let injection = trackTodoSaves
+            ? try InjectionBundle.load(bootstrap: todoBootstrap())
+            : try InjectionBundle.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
         return webView
     }
 
-    // Observe the real persistence promises without exposing a test API in production.
-    static func trackedTodoInjection(_ injection: InjectionBundle) throws -> String {
-        let trackedStore = try instrumentSource(injection.mountExpression, anchor: "function createTodoList({ threadReferencesForProject, findThread }) {", replacement: """
-        window.__todoStoreForTests = todoStore;
-        window.__todoImageStoreForTests = todoImageStore;
-        const pendingTodoSaves = new Set();
-        const saveTodoSnapshot = todoStore.save;
-        todoStore.save = (...args) => {
-          const save = saveTodoSnapshot(...args);
-          pendingTodoSaves.add(save);
-          void save.finally(() => pendingTodoSaves.delete(save));
-          return save;
-        };
-        window.__waitForTodoSaves = async () => {
-          while (pendingTodoSaves.size) await Promise.all([...pendingTodoSaves]);
-          await Promise.resolve();
-        };
-        function createTodoList({ threadReferencesForProject, findThread }) {
-        """)
-        let trackedCommits = try instrumentSource(trackedStore, anchor: "async function commitItems(nextItems, nextTags = availableTags) {", replacement: """
-        function commitItems(nextItems, nextTags = availableTags) {
-          const save = commitTodoItems(nextItems, nextTags);
-          pendingTodoSaves.add(save);
-          void save.finally(() => pendingTodoSaves.delete(save));
-          return save;
-        }
-        async function commitTodoItems(nextItems, nextTags) {
-        """)
-        return try instrumentSource(trackedCommits, anchor: "async function openTodoInNewThread(item) {", replacement: """
-        const pendingTodoTransfers = new Set();
-        window.__waitForTodoTransfers = async () => {
-          while (pendingTodoTransfers.size) await Promise.all([...pendingTodoTransfers]);
-        };
-        function openTodoInNewThread(item) {
-          const transfer = transferTodoToNewThread(item);
-          pendingTodoTransfers.add(transfer);
-          void transfer.finally(() => pendingTodoTransfers.delete(transfer));
-          return transfer;
-        }
-        async function transferTodoToNewThread(item) {
-        """)
+    static func todoBootstrap() throws -> String {
+        let url = try XCTUnwrap(Bundle.module.url(
+            forResource: "todo-bootstrap", withExtension: "js", subdirectory: "Fixtures"
+        ))
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     static func instrumentSource(_ source: String, anchor: String, replacement: String) throws -> String {

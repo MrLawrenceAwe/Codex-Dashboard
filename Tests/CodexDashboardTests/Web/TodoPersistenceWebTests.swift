@@ -373,7 +373,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
 
     func testNewerTodoDocumentShowsReadOnlyMessage() async throws {
         let view = try await webView()
-        let injection = try InjectionBundle.load()
+        let injection = try InjectionBundle.load(bootstrap: DashboardWebTestHarness.todoBootstrap())
         let result = try await view.evaluateJavaScript("""
         (() => {
           window.__codexDashboard.destroy();
@@ -384,7 +384,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? Bool
         XCTAssertEqual(result, true)
-        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(injection.mountExpression)
         let state = try await view.evaluateJavaScript("""
         (() => {
           window.__codexDashboard.openTodos();
@@ -610,8 +610,8 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         };
         true;
         """)
-        let injection = try InjectionBundle.load()
-        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
+        let injection = try InjectionBundle.load(bootstrap: DashboardWebTestHarness.todoBootstrap())
+        _ = try await view.evaluateJavaScript(injection.mountExpression)
         _ = try await view.evaluateJavaScript("""
         window.__codexDashboard.openTodos();
         window.__todoStoreForTests.save = () => new Promise(resolve => { window.__finishOldSave = resolve; });
@@ -625,7 +625,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
             "window.__projectObservers.length > 0 && window.__projectObservers.every(observer => !observer.isProjectObserverActive)"
         ) as? Bool
         XCTAssertEqual(disconnected, true)
-        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(injection.mountExpression)
         let result = try await view.evaluateAsyncJavaScript("""
         (async () => {
           window.__codexDashboard.openTodos();
@@ -642,7 +642,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
 
     func testTagDialogWorksAfterPageRepairAndDashboardReinjection() async throws {
         let view = try await webView()
-        let injection = try InjectionBundle.load()
+        let injection = try InjectionBundle.load(bootstrap: DashboardWebTestHarness.todoBootstrap())
         let repaired = try await view.evaluateAsyncJavaScript("""
         (async () => {
           window.__codexDashboard.openTodos();
@@ -669,7 +669,7 @@ final class TodoPersistenceWebTests: SerializedDashboardWebTestCase {
         """) as? Int
         XCTAssertEqual(removed, 0)
 
-        _ = try await view.evaluateJavaScript(try DashboardWebTestHarness.trackedTodoInjection(injection))
+        _ = try await view.evaluateJavaScript(injection.mountExpression)
         let reinjected = try await view.evaluateAsyncJavaScript("""
         (async () => {
           window.__codexDashboard.openTodos();

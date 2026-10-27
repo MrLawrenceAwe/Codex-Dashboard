@@ -11,7 +11,7 @@ extension ReviewLoopCoordinator {
               let fixSelection = action.fixSelection, !fixSelection.modelID.isEmpty else {
             throw ReviewLoopError("Choose a review model and a fix model before starting a loop.")
         }
-        guard action.kind == .queue || !loops.contains(where: { !$0.phase.isFinished && sameProject($0.project, project) }) else {
+        guard action.kind == .queue || !loops.contains(where: { !$0.phase.isFinished && $0.project.matches(project) }) else {
             throw ReviewLoopError("This project already has an active loop. Queue another loop or stop it before starting another.")
         }
         let reviewType = action.reviewType ?? .bugs
@@ -98,7 +98,7 @@ extension ReviewLoopCoordinator {
             loop.message = "Extension reload confirmed. Preparing to continue the same chat."
         case .blocked:
             guard !loops.contains(where: { $0.id != loop.id && !$0.phase.isFinished && $0.phase != .queued &&
-                ($0.project.id == loop.project.id || FileSystemPath.canonicalPath($0.project.path) == FileSystemPath.canonicalPath(loop.project.path))
+                $0.project.matches(loop.project)
             }) else {
                 throw ReviewLoopError("This project already has another active loop. Stop it before resuming this loop.")
             }

@@ -140,20 +140,8 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
               isDirectory.boolValue
         else { return .terminal(.unavailable) }
 
-        var candidate = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        while true {
-            if FileManager.default.fileExists(
-                atPath: candidate.appendingPathComponent(".git").path
-            ) {
-                return .repository
-            }
-            guard candidate.path != "/", !candidate.path.isEmpty else {
-                return .terminal(.notRepository)
-            }
-            let parent = candidate.deletingLastPathComponent()
-            guard parent.path != candidate.path else { return .terminal(.notRepository) }
-            candidate = parent
-        }
+        return GitMetadataLocator.markerURL(for: URL(fileURLWithPath: path)) == nil
+            ? .terminal(.notRepository) : .repository
     }
 
     // Uses local remote-tracking refs; refreshing the overview never contacts a remote.

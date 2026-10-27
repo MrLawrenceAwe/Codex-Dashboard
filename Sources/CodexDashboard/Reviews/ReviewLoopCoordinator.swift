@@ -101,7 +101,7 @@ final class ReviewLoopCoordinator {
                 let candidate = loops[index]
                 let hasPredecessor = loops.enumerated().contains { offset, other in
                     other.id != candidate.id && !other.phase.isFinished &&
-                    sameProject(other.project, candidate.project) &&
+                    other.project.matches(candidate.project) &&
                     (other.phase != .queued || offset < index)
                 }
                 if !hasPredecessor {
@@ -677,8 +677,12 @@ final class ReviewLoopCoordinator {
         return loop
     }
 
-    func sameProject(_ first: ReviewProject, _ second: ReviewProject) -> Bool {
-        first.id == second.id || FileSystemPath.canonicalPath(first.path) == FileSystemPath.canonicalPath(second.path)
+    func projectChoices(for projects: [ReviewProject]) -> [ReviewProjectChoice] {
+        projects.map { project in
+            ReviewProjectChoice(project, requiresQueue: loops.contains {
+                !$0.phase.isFinished && $0.project.matches(project)
+            })
+        }
     }
 
     private func pathsOverlap(_ first: String, _ second: String) -> Bool {

@@ -90,6 +90,10 @@ struct ReviewProject: Codable, Equatable, Sendable {
     let id: String
     let name: String
     let path: String
+
+    func matches(_ other: ReviewProject) -> Bool {
+        id == other.id || FileSystemPath.canonicalPath(path) == FileSystemPath.canonicalPath(other.path)
+    }
 }
 
 enum ReviewLoopPhase: String, Codable, Sendable {

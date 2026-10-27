@@ -82,11 +82,24 @@ final class ReviewLoopQueueTests: ReviewLoopTestCase {
         let alias = ReviewProject(id: "alias", name: "Alias", path: "/tmp/example/../example")
         try enqueue(coordinator, id: "alias-loop", project: alias)
         let other = ReviewProject(id: "other", name: "Other", path: "/tmp/other")
+        XCTAssertEqual(coordinator.projectChoices(for: [project, alias, other]).map(\.requiresQueue),
+                       [true, true, false])
+        XCTAssertThrowsError(try coordinator.apply(
+            startAction(id: "alias-start", kind: .start, projectID: alias.id,
+                        promptContext: .general, maxRounds: 2, loopID: nil), projects: [alias]))
         try enqueue(coordinator, id: "other-loop", project: other)
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createCalls, 2)
         XCTAssertEqual(coordinator.loops[1].phase, .queued)
         XCTAssertEqual(coordinator.loops[2].phase, .running)
+    }
+
+    func testProjectChoicesReleaseAliasesAfterTheLastLoopFinishes() async throws {
+        let (coordinator, _, _) = try make()
+        let alias = ReviewProject(id: "alias", name: "Alias", path: "/tmp/example/../example")
+        XCTAssertTrue(try XCTUnwrap(coordinator.projectChoices(for: [alias]).first).requiresQueue)
+        try cancel(coordinator, at: 0)
+        XCTAssertFalse(try XCTUnwrap(coordinator.projectChoices(for: [alias]).first).requiresQueue)
     }
 
     func testCompletedPredecessorReleasesQueueAndLaunchStillChecksWorkspace() async throws {

@@ -1,4 +1,4 @@
-function createTodoComposerActions({ isDestroyed, pageState, threadReferencesForProject, getItems }) {
+function createTodoComposerActions({ isDestroyed, pageState, threadReferencesForProject, getItems, runTransfer = operation => operation() }) {
   const activeComposer = () => codexUIContracts.composer(dashboardElements.elementIDs.promptDialog);
   let transferring = false;
 
@@ -51,7 +51,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
         if (!isDestroyed()) showTransferError('This chat is no longer available in the to-do’s project. Choose a chat again.');
         return;
       }
-      void pasteTodoInThread(currentItem, thread);
+      void runTransfer(() => pasteTodoInThread(currentItem, thread));
     };
     if (!select.disabled) select.focus();
   }
@@ -203,5 +203,5 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     }
   }
 
-  return { openTodoInNewThread, chooseTodoThread };
+  return { openTodoInNewThread: item => runTransfer(() => openTodoInNewThread(item)), chooseTodoThread };
 }

@@ -1,15 +1,13 @@
 import Foundation
 
 enum GitMetadataLocator {
-    static func metadataURL(for projectURL: URL) -> URL? {
-        var candidate = projectURL.standardizedFileURL
+    /// Finds the nearest marker, even when it is a damaged worktree pointer.
+    /// Callers decide whether they need marker presence or validated metadata.
+    static func markerURL(for projectURL: URL) -> URL? {
+        var candidate = FileSystemPath.canonicalURL(projectURL.path)
         while true {
             let gitURL = candidate.appendingPathComponent(".git")
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: gitURL.path, isDirectory: &isDirectory) {
-                if isDirectory.boolValue { return gitURL }
-                return linkedMetadataURL(from: gitURL)
-            }
+            if (try? FileManager.default.attributesOfItem(atPath: gitURL.path)) != nil { return gitURL }
             // Foundation versions differ in how deleting the root component is
             // represented. Stop before traversing above the filesystem root.
             guard candidate.path != "/", !candidate.path.isEmpty else { return nil }
@@ -17,6 +15,13 @@ enum GitMetadataLocator {
             guard parent.path != candidate.path else { return nil }
             candidate = parent
         }
+    }
+
+    static func metadataURL(for projectURL: URL) -> URL? {
+        guard let marker = markerURL(for: projectURL) else { return nil }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: marker.path, isDirectory: &isDirectory) else { return nil }
+        return isDirectory.boolValue ? marker : linkedMetadataURL(from: marker)
     }
 
     private static func linkedMetadataURL(from pointerURL: URL) -> URL? {

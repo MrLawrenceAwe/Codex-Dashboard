@@ -42,7 +42,7 @@ const reviewLoopPage = (() => {
     details.querySelector('[data-review-type]').addEventListener('change', () => reviewLoopSetupView.renderReviewSettings());
     for (const kind of ['review', 'fix']) {
       const model = details.querySelector(`[data-${kind}-model]`);
-      model.addEventListener('change', () => reviewLoopSetupView.renderReasoningOptions(snapshot, pendingAction, kind));
+      model.addEventListener('change', () => reviewLoopSetupView.renderReasoningOptions(kind));
       model.addEventListener('invalid', () => { details.querySelector('.review-execution-options').open = true; });
     }
     details.addEventListener('change', event => {

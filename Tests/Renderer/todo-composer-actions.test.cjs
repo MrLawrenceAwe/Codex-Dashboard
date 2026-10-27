@@ -7,7 +7,7 @@ const { test } = require('node:test');
 const source = fs.readFileSync(path.join(__dirname,
   '../../Sources/CodexDashboard/Resources/Dashboard/Todos/todo-composer-actions.js'), 'utf8');
 
-function harness({ missingEditor = false, presetFails = false, newChat = false } = {}) {
+function harness({ missingEditor = false, presetFails = false, newChat = false, runTransfer } = {}) {
   const item = { id: 'todo', title: 'Review release', project: { id: 'project' },
     preset: presetFails ? { model: 'example' } : null };
   const thread = { id: 'thread', title: 'Release' };
@@ -48,7 +48,7 @@ function harness({ missingEditor = false, presetFails = false, newChat = false }
   const create = vm.runInNewContext(`${source}\ncreateTodoComposerActions`, context);
   const actions = create({ isDestroyed: () => false,
     pageState: { open: () => opens++, close() {} },
-    threadReferencesForProject: () => [thread], getItems: () => [item] });
+    threadReferencesForProject: () => [thread], getItems: () => [item], runTransfer });
   return { item, notice, warnings, composer, get opens() { return opens; },
     async paste() {
       actions.chooseTodoThread(item, row);
@@ -59,6 +59,14 @@ function harness({ missingEditor = false, presetFails = false, newChat = false }
     openNewChat: () => actions.openTodoInNewThread(item),
   };
 }
+
+test('both transfer entry points use the supplied operation runner', async () => {
+  let transfers = 0;
+  const runTransfer = operation => { transfers++; return operation(); };
+  await harness({ newChat: true, runTransfer }).openNewChat();
+  await harness({ runTransfer }).paste();
+  assert.equal(transfers, 2);
+});
 
 for (const failure of [{ missingEditor: true }, { presetFails: true }]) {
   test(`existing-chat failure opens To-dos once: ${Object.keys(failure)[0]}`, async () => {

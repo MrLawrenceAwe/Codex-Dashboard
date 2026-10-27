@@ -10,17 +10,10 @@ enum FileSystemPath {
     }
 
     static func gitRepositoryRoot(_ path: String) -> String? {
-        var directory = canonicalURL(path)
+        let directory = canonicalURL(path)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory),
               isDirectory.boolValue else { return nil }
-        while true {
-            if FileManager.default.fileExists(atPath: directory.appendingPathComponent(".git").path) {
-                // A .git file identifies a worktree or submodule just as a directory does.
-                return directory.path
-            }
-            guard directory.path != "/" else { return nil }
-            directory.deleteLastPathComponent()
-        }
+        return GitMetadataLocator.markerURL(for: directory)?.deletingLastPathComponent().path
     }
 }

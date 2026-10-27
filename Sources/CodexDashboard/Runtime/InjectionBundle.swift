@@ -21,7 +21,10 @@ struct InjectionBundle: Sendable {
         """
     }
 
-    static func load(bundle: Bundle? = nil) throws -> InjectionBundle {
+    static func load(
+        bundle: Bundle? = nil,
+        bootstrap: String = "function createTodoDependencies() { return {}; }"
+    ) throws -> InjectionBundle {
         let resourceBundle = bundle ?? defaultResourceBundle
         let manifest = try loadManifest(from: resourceBundle)
         let script = try loadResources(
@@ -35,7 +38,7 @@ struct InjectionBundle: Sendable {
             from: resourceBundle
         )
         return try assemble(
-            script: script,
+            script: bootstrap + "\n" + script,
             stylesheet: stylesheet,
             schemaDeclaration: ComposerPresetSchema.javascriptDeclaration + "\n" + PromptLibrarySchema.javascriptDeclaration
         )

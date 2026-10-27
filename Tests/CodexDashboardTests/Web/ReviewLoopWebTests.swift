@@ -353,7 +353,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const project = {id:'p',name:'Example',path:'/tmp/example',requiresQueue:true};
           const loop = {id:'active',project,phase:'paused',isFinished:false,completedRoundCount:0,maxRounds:2,rounds:[]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null};
           api.applyReviewPageSnapshot(snapshot);
@@ -386,7 +386,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          const project = {id:'p',name:'Example',path:'/tmp/example'};
+          const project = {id:'p',name:'Example',path:'/tmp/example',requiresQueue:true};
           const loop = {id:'stopping',project,phase:'stopping',isFinished:false,completedRoundCount:0,maxRounds:2,rounds:[]};
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],models:\(Self.modelsJSON),loops:[loop],error:null});
           const stop = document.querySelector('[data-review-action="stop"]');
@@ -406,7 +406,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
-          const projects = [{id:'a',name:'A',path:'/tmp/a'},{id:'b',name:'B',path:'/tmp/b'},{id:'c',name:'C',path:'/tmp/c'}];
+          const projects = [{id:'a',name:'A',path:'/tmp/a',requiresQueue:true},{id:'b',name:'B',path:'/tmp/b',requiresQueue:true},{id:'c',name:'C',path:'/tmp/c'}];
           const loops = projects.slice(0,2).map((project,index) => ({id:project.id,project,phase:index ? 'paused' : 'running',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:project.name}));
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null});
           const cards = document.querySelectorAll('[data-review-activity]');

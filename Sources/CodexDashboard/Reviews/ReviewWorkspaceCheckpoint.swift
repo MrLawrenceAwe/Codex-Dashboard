@@ -7,20 +7,11 @@ protocol ReviewWorkspaceChecking: Sendable {
 }
 
 struct ReviewWorkspaceCheckpoint: ReviewWorkspaceChecking {
-    static func hasGitMetadata(at path: String) -> Bool {
-        var directory = FileSystemPath.canonicalURL(path)
-        while true {
-            if (try? FileManager.default.attributesOfItem(atPath: directory.appendingPathComponent(".git").path)) != nil { return true }
-            guard directory.path != "/", !directory.path.isEmpty else { return false }
-            directory.deleteLastPathComponent()
-        }
-    }
-
     func workspace(at path: String) async throws -> ReviewWorkspaceState {
         let probe = try await ReviewGitCommand.run(["rev-parse", "--is-inside-work-tree"], at: path)
         if probe.terminationStatus != 0 {
             // A damaged or inaccessible repository must not silently become a folder loop.
-            if Self.hasGitMetadata(at: path) {
+            if GitMetadataLocator.markerURL(for: URL(fileURLWithPath: path)) != nil {
                 throw ReviewLoopError("The Git repository could not be inspected: " + String(decoding: probe.standardError, as: UTF8.self))
             }
             return try await ReviewFolderCheckpoint.workspace(at: path)

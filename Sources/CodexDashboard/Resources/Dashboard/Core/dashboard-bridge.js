@@ -2,7 +2,11 @@ const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
 const chatOverview = createChatOverview({ catalog: threadCatalog });
-const todoList = createTodoList({ threadReferencesForProject: threadCatalog.threadReferencesForProject, findThread: threadCatalog.findThread });
+const todoList = createTodoList({
+  ...createTodoDependencies({ store: todoStore, imageStore: todoImageStore }),
+  threadReferencesForProject: threadCatalog.threadReferencesForProject,
+  findThread: threadCatalog.findThread,
+});
 const promptLibrary = createPromptLibrary({ findThread: threadCatalog.findThread });
 const dashboardPages = [
   { controller: chatOverview, pageID: dashboardElements.elementIDs.chatOverviewPage,

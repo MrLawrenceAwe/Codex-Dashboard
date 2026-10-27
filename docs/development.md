@@ -76,6 +76,9 @@ protocol; `DesktopUsageNotifier.swift` owns usage-alert scheduling and delivery.
 `Support/FileSystemPath.swift` defines canonical path identity for catalog grouping,
 review checkout checks, file links, and monitoring. Project event matching separately
 retains lexical standardisation so it does not resolve symlinks for each event.
+`Support/GitMetadataLocator.swift` shares canonical ancestor discovery across catalog
+grouping, Git status, review checkpoints, and monitoring. Marker presence is separate
+from pointer validation so damaged repositories cannot silently become folder reviews.
 
 Renderer resources are listed in `injection-manifest.json`:
 
@@ -158,6 +161,10 @@ Its `sidebarThreads` contract owns thread selectors, local ID decoding, title lo
 and mutation detection for lifecycle repair, to-do actions, and usage-limit indicators.
 `review-loop-setup-view.js` owns setup markup, rendering, and settings extraction;
 `review-loop-page.js` validates submissions and queues actions.
+Native `ReviewProject.matches` defines project identity for controls and queues.
+Each project choice includes `requiresQueue`; setup labels, annotations, and actions
+use that native decision, including canonical path aliases. Setup control availability
+is applied in one place after rendering, including model and folder restrictions.
 `review-presentation.js` supplies shared labels independently of setup rendering.
 The standalone renderer contract bundle includes `ComposerPresetSchema` so model-picker
 compatibility checks use the same reasoning-effort values as preset validation.
@@ -293,8 +300,11 @@ separate renderer checks below. For renderer presentation
 and composer-transfer checks without a browser or UI, run
 `node --test Tests/Renderer/*.test.cjs`. Web tests await to-do
 save completion; they do not assume persistence finishes during a DOM event.
-Persistence instrumentation requires each source anchor to match exactly once
-and fails on missing or duplicate anchors. Save waiters are required calls.
+The WebKit harness supplies the `todo-bootstrap.js` fixture through `InjectionBundle.load`.
+Its dependency factory injects the to-do store and save/transfer operation runners;
+the runners observe real completion promises without rewriting controller source.
+Save and transfer waiters are required calls. Other focused probes still use source
+instrumentation that rejects missing or duplicate anchors.
 
 ## Visual baselines
 

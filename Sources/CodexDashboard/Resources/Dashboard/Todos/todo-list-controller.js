@@ -1,6 +1,9 @@
-function createTodoList({ threadReferencesForProject, findThread }) {
-  let items = todoStore.load();
-  let availableTags = todoStore.loadTags(items);
+function createTodoList({
+  threadReferencesForProject, findThread, store = todoStore,
+  runSave = operation => operation(), runTransfer = operation => operation(),
+}) {
+  let items = store.load();
+  let availableTags = store.loadTags(items);
   let projects = [];
   let projectObserver;
   let observedProjectSidebar;
@@ -27,6 +30,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   const composerActions = createTodoComposerActions({
     isDestroyed: () => destroyed,
     pageState,
+    runTransfer,
     threadReferencesForProject,
     getItems: () => items,
   });
@@ -160,7 +164,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   }
 
   function refreshFromStorage() {
-    if (destroyed || pendingWrites || todoStore.writeProtectionReason()) return;
+    if (destroyed || pendingWrites || store.writeProtectionReason()) return;
     // Text edits commit on change (usually blur). Keep the editor and its
     // selection intact until then, retaining the baseline for the save's merge.
     if (hasActiveTextDraft()) {
@@ -168,7 +172,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
       return;
     }
     storageRefreshPending = false;
-    const loadedItems = todoStore.load();
+    const loadedItems = store.load();
     const imagesByID = new Map(items.filter((item) => item.image?.dataURL)
       .map((item) => [item.id, item.image]));
     items = loadedItems.map((item) => {
@@ -177,7 +181,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
         ? { ...item, image: { ...item.image, dataURL: image.dataURL } }
         : item;
     });
-    availableTags = todoStore.loadTags(items);
+    availableTags = store.loadTags(items);
     savedItems = items;
     savedTags = availableTags;
     renderTags();
@@ -186,14 +190,18 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   }
 
   function handleStorageChange(event) {
-    if (event.key === todoStore.storageKey || event.key === todoStore.tagsStorageKey) {
+    if (event.key === store.storageKey || event.key === store.tagsStorageKey) {
       refreshFromStorage();
     }
   }
 
   window.addEventListener('storage', handleStorageChange);
 
-  async function commitItems(nextItems, nextTags = availableTags) {
+  function commitItems(nextItems, nextTags = availableTags) {
+    return runSave(() => saveItems(nextItems, nextTags));
+  }
+
+  async function saveItems(nextItems, nextTags) {
     if (destroyed) return false;
     pendingWrites += 1;
     items = nextItems;
@@ -204,7 +212,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     // success so an undo remains a change; retain it on failure so later edits
     // retry all changes still present in the optimistic snapshot.
     const saving = commitQueue.then(async () => {
-      const saved = await todoStore.save(nextItems, nextTags, savedItems, savedTags);
+      const saved = await store.save(nextItems, nextTags, savedItems, savedTags);
       if (saved) {
         savedItems = nextItems;
         savedTags = nextTags;
@@ -218,7 +226,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     const notice = document.querySelector('[data-todo-storage-error]');
     if (notice) notice.hidden = saved;
     if (!pendingWrites) {
-      if (todoStore.writeProtectionReason()) {
+      if (store.writeProtectionReason()) {
         items = savedItems;
         availableTags = savedTags;
         renderTags();
@@ -229,7 +237,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
   }
 
   async function addTodo(draft) {
-    const item = todoStore.create(draft);
+    const item = store.create(draft);
     if (!item) return false;
     const saved = await commitItems([item, ...items]);
     if (saved && !destroyed) {
@@ -241,7 +249,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
 
   function updateItem(id, changes) {
     const nextItems = items.map((item) => item.id === id
-      ? todoStore.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
+      ? store.normalizeItem({ ...item, ...changes, updatedAt: Date.now() }) || item
       : item);
     return commitItems(nextItems);
   }
@@ -319,7 +327,7 @@ function createTodoList({ threadReferencesForProject, findThread }) {
     startProjectObserver();
     pageState.applyVisibility();
     render();
-    const writeProtectionReason = todoStore.writeProtectionReason();
+    const writeProtectionReason = store.writeProtectionReason();
     if (writeProtectionReason) {
       const notice = page.querySelector('[data-todo-storage-error]');
       notice.textContent = writeProtectionReason;

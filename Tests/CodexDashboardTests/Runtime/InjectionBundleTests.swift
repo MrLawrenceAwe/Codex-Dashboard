@@ -88,6 +88,21 @@ final class InjectionBundleTests: XCTestCase {
         XCTAssertTrue(updated.healthCheckExpression.contains(updated.version))
     }
 
+    func testBootstrapDependenciesAreIncludedInTheVersionedPayload() throws {
+        let standard = try InjectionBundle.load()
+        let bootstrap = "function createTodoDependencies() { return { store: observedStore }; }"
+        let observed = try InjectionBundle.load(bootstrap: bootstrap)
+        XCTAssertNotEqual(standard.version, observed.version)
+        XCTAssertTrue(observed.mountExpression.contains(bootstrap))
+    }
+
+    @MainActor
+    func testTodoObservationFixtureIsBundledForInjection() throws {
+        let bootstrap = try DashboardWebTestHarness.todoBootstrap()
+        let injection = try InjectionBundle.load(bootstrap: bootstrap)
+        XCTAssertTrue(injection.mountExpression.contains(bootstrap))
+    }
+
     func testManifestDefinesRendererContractResources() throws {
         let contract = try InjectionBundle.loadRendererContractSource()
 
