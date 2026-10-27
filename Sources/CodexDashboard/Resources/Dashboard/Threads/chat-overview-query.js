@@ -28,7 +28,7 @@ const chatOverviewQuery = (() => {
     visibleItemLimit,
   }) {
     const matchingThreads = threads.filter((thread) =>
-      filterMode === 'active'
+      filterMode === 'overview'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
           && allChangedProjectPaths.has(String(thread.projectGroupPath || '').trim())));
@@ -42,7 +42,7 @@ const chatOverviewQuery = (() => {
         hasMore: visibleItemLimit < projectPaths.length,
       };
     }
-    if (filterMode === 'active') {
+    if (filterMode === 'overview') {
       const runningThreads = matchingThreads.filter((thread) => thread.runState === 'running');
       const recentThreads = matchingThreads.filter((thread) => thread.runState !== 'running');
       return {

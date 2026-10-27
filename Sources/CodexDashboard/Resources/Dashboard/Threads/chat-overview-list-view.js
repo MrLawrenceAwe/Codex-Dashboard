@@ -102,7 +102,7 @@ const chatOverviewListView = (() => {
     isUnread,
     isCompletionTickVisible,
   }) {
-    if (filterMode === 'active') {
+    if (filterMode === 'overview') {
       const renderRows = (items) => items.map((item) => renderThreadRow(item, {
         compact: true,
         showProject: true,

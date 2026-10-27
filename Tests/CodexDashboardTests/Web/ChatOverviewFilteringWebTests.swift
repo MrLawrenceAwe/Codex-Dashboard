@@ -34,7 +34,7 @@ extension ChatOverviewWebTests {
               const todoControls = () => document.querySelector(
                 '[data-add-chat-to-todos], .dashboard-add-todo, .dashboard-project-chat-picker'
               ) === null;
-              const filters = ['active', 'unread', 'changedProjects'];
+              const filters = ['overview', 'unread', 'changedProjects'];
               return filters.map((filter) => {
                 document.querySelector(`[data-filter="${filter}"]`).click();
                 return todoControls();
@@ -81,7 +81,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? String, "thread-19")
     }
 
-    func testRecentsShowsRunningThreadsFirstWithoutDuplicatingThem() async throws {
+    func testOverviewShowsRunningThreadsFirstWithoutDuplicatingThem() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """
             <!doctype html>
@@ -143,7 +143,7 @@ extension ChatOverviewWebTests {
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                   .map((thread) => thread.dataset.threadId),
-                document.querySelector('[data-filter="active"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="overview"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="running"]') === null,
                 [...document.querySelectorAll('[data-dashboard-section]')]
                   .map((section) => [section.dataset.dashboardSection,
@@ -168,7 +168,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(sections[1][1] as? [String], ["project-a-idle"])
     }
 
-    func testRecentsKeepsOlderRunningTasksVisibleWhilePagingIdleTasks() async throws {
+    func testOverviewKeepsOlderRunningChatsVisibleWhilePagingIdleChats() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let threads = (0..<12).map { index in
             ThreadSummary.fixture(id: "idle-\(index)", recencyEpochMillis: Int64(100 - index))
@@ -203,7 +203,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? Bool, true)
     }
 
-    func testActiveOverviewIsDefaultAndKeepsTasksInStrictRecencyOrder() async throws {
+    func testOverviewIsDefaultAndKeepsRecentChatsInStrictRecencyOrder() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [
@@ -221,7 +221,7 @@ extension ChatOverviewWebTests {
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
                 .map((thread) => thread.dataset.threadId);
               return [
-                document.querySelector('[data-filter="active"]').classList.contains('is-active'),
+                document.querySelector('[data-filter="overview"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="home"]') === null,
                 initialIDs,
                 document.querySelector('[data-filter-count="recent"]') === null,

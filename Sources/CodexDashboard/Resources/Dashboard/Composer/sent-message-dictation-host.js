@@ -50,19 +50,3 @@ function sentMessageEditorController(element) {
   }
   return null;
 }
-
-function hasOtherSentMessageSpeechInput() {
-  if (document.querySelector('[data-dictation-view], [data-realtime-voice-orb]')) return true;
-  const visited = new Set();
-  for (const element of document.querySelectorAll('button')) {
-    const key = Object.keys(element).find(name => name.startsWith('__reactFiber$'));
-    for (let fiber = key && element[key]; fiber && !visited.has(fiber); fiber = fiber.return) {
-      visited.add(fiber);
-      const props = fiber.memoizedProps;
-      if (props?.isDictating || props?.isDictationStarting || props?.isTranscribing) return true;
-      const phase = props?.realtimeSession?.thread?.phase;
-      if (typeof phase === 'string' && phase !== 'inactive') return true;
-    }
-  }
-  return false;
-}

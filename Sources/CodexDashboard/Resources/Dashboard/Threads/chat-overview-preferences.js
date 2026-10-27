@@ -31,8 +31,8 @@ const chatOverviewPreferences = (() => {
       }
     } catch (_) {}
     return {
-      filterMode: ['active', 'unread', 'changedProjects'].includes(stored.filterMode)
-        ? stored.filterMode : 'active',
+      filterMode: ['overview', 'unread', 'changedProjects'].includes(stored.filterMode)
+        ? stored.filterMode : 'overview',
       collapsedProjectPaths: new Set(Array.isArray(stored.collapsedProjectPaths)
         ? stored.collapsedProjectPaths.filter((value) => typeof value === 'string') : []),
       hiddenChangeIndicatorPaths: new Set(Array.isArray(stored.hiddenChangeIndicatorPaths)

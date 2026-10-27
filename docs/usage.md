@@ -12,7 +12,7 @@ normal behaviour.
 
 ## Chat overview
 
-**Active** keeps running chats in the **Active** section, with **Recent** underneath
+**Overview** keeps running chats in the **Active** section, with **Recent** underneath
 on the same page. Recent stays clearly labelled when no chats are running.
 **Load more** adds ten recent chats at a time from the loaded history. Dashboard loads up to 500
 recent chats, plus required unread and active chats; older history remains available

@@ -1,7 +1,7 @@
 function createSentMessageDictation({
   loadHost = loadSentMessageDictationHost,
   editorController = sentMessageEditorController,
-  hasOtherSpeech = hasOtherSentMessageSpeechInput,
+  hasOtherSpeech = codexUIContracts.hasHostSpeechInput,
 } = {}) {
   const selector = '[contenteditable="true"][role="textbox"][aria-label="Edit message"]';
   const controls = new Map();
@@ -60,7 +60,6 @@ function createSentMessageDictation({
     clearTimeout(target.limit);
     clearTimeout(target.deadline);
     target.stream?.getTracks().forEach(track => track.stop());
-    target.audio?.close().catch(() => {});
     target.client?.close();
   }
   function cancel(reason = 'Dictation cancelled.') {
@@ -110,21 +109,21 @@ function createSentMessageDictation({
       insert(target, transcript);
       session = null;
       release(target);
-      lastResult = { state: 'inserted', characters: transcript.length, fixture: target.fixture };
+      lastResult = { state: 'inserted', characters: transcript.length };
       show(target.entry, 'idle', transcript.trim() ? 'Inserted. Review before sending.' : 'No speech detected.');
     } catch (error) { fail(target, error); }
   }
-  async function start(editor, fixture) {
+  async function start(editor) {
     if (session) throw new Error('Another edit dictation is active.');
     if (hasOtherSpeech()) throw new Error('Stop the existing voice or dictation session first.');
     const view = viewFor(editor);
     const entry = controls.get(editor);
     if (!entry) throw new Error('The edit field is not mounted.');
     const target = { editor, view, entry, route: location.href, document: view.state.doc,
-      selection: { from: view.state.selection.from, to: view.state.selection.to }, state: 'starting', fixture: Boolean(fixture) };
+      selection: { from: view.state.selection.from, to: view.state.selection.to }, state: 'starting' };
     session = target;
     show(entry, 'starting', 'Starting built-in dictation…');
-    lastResult = { state: 'starting', fixture: target.fixture };
+    lastResult = { state: 'starting' };
     try {
       cachedHost ||= await loadHost();
       if (!valid(target)) { if (session === target) cancel('The edit field changed.'); return; }
@@ -133,36 +132,14 @@ function createSentMessageDictation({
         onStopRequested: () => { void stop(); },
       });
       // Use final-only mode, avoiding partial text mutations in either editor.
-      if (fixture) {
-        target.audio = new AudioContext();
-        const bytes = Uint8Array.from(atob(fixture), character => character.charCodeAt(0));
-        const buffer = await target.audio.decodeAudioData(bytes.buffer);
-        if (!valid(target)) { release(target); return; }
-        const source = target.audio.createBufferSource();
-        source.buffer = buffer;
-        const destination = target.audio.createMediaStreamDestination();
-        source.connect(destination); // No connection to speakers; synthetic audio stays private.
-        target.stream = destination.stream;
-        await target.audio.resume();
-        await target.client.start(target.stream);
-        if (!valid(target)) { release(target); return; }
-        target.state = 'recording';
-        source.onended = () => {
-          if (session === target && !target.cancelled) target.limit = setTimeout(() => {
-            if (session === target) void stop();
-          }, 700);
-        };
-        source.start();
-      } else {
-        target.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
-        if (!valid(target)) { release(target); return; }
-        await target.client.start(target.stream);
-        if (!valid(target)) { release(target); return; }
-        target.state = 'recording';
-        target.limit = setTimeout(() => { void stop(); }, 120000);
-      }
-      show(entry, 'recording', fixture ? 'Testing the built-in service with bundled speech…' : 'Recording. Click Stop dictation when finished.');
-      lastResult = { state: 'recording', fixture: target.fixture };
+      target.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+      if (!valid(target)) { release(target); return; }
+      await target.client.start(target.stream);
+      if (!valid(target)) { release(target); return; }
+      target.state = 'recording';
+      target.limit = setTimeout(() => { void stop(); }, 120000);
+      show(entry, 'recording', 'Recording. Click Stop dictation when finished.');
+      lastResult = { state: 'recording' };
     } catch (error) { fail(target, error); }
   }
   function add(editor) {
@@ -254,12 +231,6 @@ function createSentMessageDictation({
       const host = await loadHost();
       const editor = [...controls.keys()][0];
       return { host: host.host, contract: host.contract, editors: controls.size, supportedEditor: Boolean(editor && editorController(editor)) };
-    },
-    async runFixture(base64) {
-      const editor = [...controls.keys()].find(element => element.getClientRects().length);
-      if (!editor) throw new Error('Open a sent message with the pencil/Edit button first.');
-      await start(editor, base64);
-      return this.status();
     },
     cancel,
   };

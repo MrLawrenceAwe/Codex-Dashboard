@@ -14,9 +14,16 @@ final class SentMessageDictationWebTests: SerializedDashboardWebTestCase {
         <textarea placeholder="Do anything">Separate draft</textarea></main></body></html>
         """, baseURL: URL(string: "https://dictation.codex-dashboard.test"))
         try await DashboardWebTestHarness.waitUntilLoaded(webView)
-        let injection = try InjectionBundle.load().mountExpression
-            .replacingOccurrences(of: "function createSentMessageDictation({", with: "window.__createDictation = createSentMessageDictation; function createSentMessageDictation({")
-            .replacingOccurrences(of: "if (!event.isTrusted) return;", with: "/* trusted input simulated only in WebKit test */")
+        let exposedFactory = try DashboardWebTestHarness.instrumentSource(
+            InjectionBundle.load().mountExpression,
+            anchor: "function createSentMessageDictation({",
+            replacement: "window.__createDictation = createSentMessageDictation; function createSentMessageDictation({"
+        )
+        let injection = try DashboardWebTestHarness.instrumentSource(
+            exposedFactory,
+            anchor: "if (!event.isTrusted) return;",
+            replacement: "/* trusted input simulated only in WebKit test */"
+        )
         _ = try await webView.evaluateJavaScript(injection)
         _ = try await webView.evaluateAsyncJavaScript("""
         (async () => {
