@@ -45,6 +45,8 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         let (coordinator, _, driver) = try make()
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note,
+                       "After the project is idle and workspace checks pass.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Reviewing")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
@@ -52,6 +54,8 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         driver.review(priorities: [.p1, .p2])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Preparing fixes")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note,
+                       "After workspace checks pass.")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Fix both findings and commit. Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.current?.text, driver.prompts.last)
@@ -61,6 +65,8 @@ final class ReviewLoopPresentationTests: ReviewLoopTestCase {
         driver.finish(findings: 2, commit: "fixed")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Paused")
+        XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.note,
+                       "After you resume and workspace checks pass.")
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming?.text, "Review project for bugs and issues." + reviewBoundary)
         try coordinator.apply(action(.stop, for: coordinator), projects: [project])
         XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)

@@ -72,7 +72,7 @@ enum ReviewLoopPresentation {
                 text: ReviewPrompts.fixPrompt(for: loop, round: round),
                 note: round.review == nil
                     ? "Only if findings are found. Wording follows the finding count."
-                    : "After the project passes verification."
+                    : "After workspace checks pass."
             ), noNextPrompt)
         }
         guard loop.completedRoundCount + (unfinished ? 1 : 0) < loop.maxRounds else {
@@ -80,10 +80,10 @@ enum ReviewLoopPresentation {
         }
         let note: String
         if loop.phase == .queued { note = "After earlier loops for this project finish or are stopped, and the project is idle." }
-        else if loop.phase == .paused { note = "After resume and project verification." }
+        else if loop.phase == .paused { note = "After you resume and workspace checks pass." }
         else if loop.pauseRequested { note = "After this round pauses and you resume." }
         else if unfinished { note = loop.workspaceKind == .folder ? "After fixes are applied and verification passes. The next review uses the verified files." : "After fixes commit and verification passes. The next review uses the verified HEAD." }
-        else { note = "After the project is idle and passes verification." }
+        else { note = "After the project is idle and workspace checks pass." }
         return (ReviewPromptPreview(
             title: "Review · round \(loop.rounds.count + 1)",
             text: ReviewPrompts.reviewPrompt(for: loop),

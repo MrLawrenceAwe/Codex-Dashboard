@@ -10,7 +10,6 @@ struct AccountPopoverSnapshot: Codable, Equatable, Sendable {
 
 struct AccountUsageBlockage: Codable, Equatable, Sendable {
     struct Window: Codable, Equatable, Sendable {
-        let label: String
         let resetsAtMilliseconds: Double?
     }
 

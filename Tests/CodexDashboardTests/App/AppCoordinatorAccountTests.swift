@@ -60,7 +60,7 @@ extension AppCoordinatorTests {
         let snapshot = try XCTUnwrap(runtime.lastAccountPopoverSnapshot)
         XCTAssertTrue(snapshot.accounts.isEmpty)
         XCTAssertNil(snapshot.activeAccountID)
-        XCTAssertEqual(snapshot.usageBlockage?.windows.map(\.label), ["5-hour"])
+        XCTAssertEqual(snapshot.usageBlockage?.windows.map(\.resetsAtMilliseconds), [nil])
         XCTAssertEqual(snapshot.usageBlockage?.isStale, false)
     }
 

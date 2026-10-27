@@ -15,7 +15,8 @@ enum ReviewType: String, Codable, CaseIterable, Sendable {
     case bugs, bugsAndPerformance, organisation, organisationAndNaming, performance, content
 
     var usesPriorities: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
-    var supportsPreservingUICopy: Bool { self == .organisation || self == .organisationAndNaming }
+    var isStructureReview: Bool { self == .organisation || self == .organisationAndNaming }
+    var supportsPreservingUICopy: Bool { isStructureReview }
     var supportsLiveTesting: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
     var supportsProjectContext: Bool { self == .bugs || self == .bugsAndPerformance || self == .performance }
 

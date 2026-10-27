@@ -30,7 +30,7 @@ enum ReviewPrompts {
     }
 
     private static func structureReviewInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
-        guard loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming else { return "" }
+        guard loop.reviewType.isStructureReview else { return "" }
         let verification = verifyingFixes
             ? "Inspect source, call sites, tests, docs, and manifests; run relevant builds, type checks, and automated checks without launching a browser or app UI."
             : "Statically inspect source, call sites, tests, docs, and manifests."
@@ -75,7 +75,7 @@ enum ReviewPrompts {
     }
 
     static func extensionReloadContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
-        if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
+        if loop.reviewType.isStructureReview {
             return (round.fixRequested
                 ? "Continue the unfinished fix task. Preserve existing changes and return the final fix report."
                 : "Continue the unfinished read-only review and return the final review report.")
@@ -140,7 +140,7 @@ enum ReviewPrompts {
         var prompt = loop.workspaceKind == .folder
             ? "Address \(findings) in this ordinary folder. Verify each finding first. Preserve unrelated files and edits. Mark invalid findings as withdrawn. Do not initialise Git, create commits, or push. Verify the changes and return the folder fix report."
             : task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
-        if loop.reviewType == .organisation || loop.reviewType == .organisationAndNaming {
+        if loop.reviewType.isStructureReview {
             prompt += "\n\nAddress findings within the original review scope and constraints." + preserveUICopyInstruction(for: loop)
         }
         prompt += bugVerificationInstruction(for: loop, verifyingFixes: true)

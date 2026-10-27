@@ -20,8 +20,8 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyAccountPopoverSnapshot({
                 accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
                 usageBlockage: { windows: [
-                  { label: '5-hour', resetsAtMilliseconds: Date.now() + 7200000 },
-                  { label: 'Weekly', resetsAtMilliseconds: Date.now() + 180000000 },
+                  { resetsAtMilliseconds: Date.now() + 7200000 },
+                  { resetsAtMilliseconds: Date.now() + 180000000 },
                 ], isStale: false },
               });
               const notice = document.querySelector('#codex-usage-blockage');
@@ -47,7 +47,7 @@ extension ChatOverviewWebTests {
         (() => {
           const snapshot = {
             accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
-            usageBlockage: { windows: [{ label: '5-hour', resetsAtMilliseconds: Date.now() + 7200000 }], isStale: false },
+            usageBlockage: { windows: [{ resetsAtMilliseconds: Date.now() + 7200000 }], isStale: false },
           };
           const apply = () => window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
           apply();
@@ -115,29 +115,29 @@ extension ChatOverviewWebTests {
             accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
             usageBlockage: windows ? { windows, isStale } : null,
           });
-          const windowFor = (label, offset) => ({ label, resetsAtMilliseconds: offset === null ? null : now + offset });
+          const windowFor = (offset) => ({ resetsAtMilliseconds: offset === null ? null : now + offset });
           const text = () => document.querySelector('#codex-usage-blockage').textContent;
-          apply([windowFor('5-hour', 7200000)]);
+          apply([windowFor(7200000)]);
           const fiveHour = text().includes('Available in 2h') && text().includes('Codex allowance depleted');
           const fontSize = parseFloat(getComputedStyle(document.querySelector('[data-reset-countdown]')).fontSize);
-          apply([windowFor('Weekly', 172800000)]);
+          apply([windowFor(172800000)]);
           const weekly = text().includes('Available in 2d') && text().includes('Reset:');
-          apply([windowFor('5-hour', 7200000), windowFor('Weekly', 172800000)]);
+          apply([windowFor(7200000), windowFor(172800000)]);
           const both = text().includes('Available in 2d') && text().includes('Codex allowance depleted');
-          apply([windowFor('5-hour', 172800000), windowFor('Weekly', 7200000)]);
+          apply([windowFor(172800000), windowFor(7200000)]);
           const laterFiveHour = text().includes('Available in 2d');
-          apply([windowFor('Weekly', null)]);
+          apply([windowFor(null)]);
           const unknown = text().includes('Reset time unavailable') && !text().includes('Available in');
-          apply([windowFor('5-hour', -1000)]);
+          apply([windowFor(-1000)]);
           const due = text().includes('awaiting usage update') && !text().includes('Available in');
-          apply([windowFor('Weekly', 172800000)], true);
+          apply([windowFor(172800000)], true);
           const stale = text().includes('Last known') && text().includes('Usage may be stale');
           const simplified = !document.querySelector('#codex-usage-blockage [data-reset-refresh]')
             && !document.querySelector('#codex-usage-blockage [data-reset-detail]')
             && !text().includes('Expected') && !text().includes('exhausted');
           apply(null);
           const recovered = !document.querySelector('#codex-usage-blockage');
-          apply([windowFor('Weekly', 172800000)]);
+          apply([windowFor(172800000)]);
           window.__codexDashboard.destroy();
           return [fiveHour, fontSize >= 24, weekly, both, laterFiveHour, unknown, due, stale,
             simplified, recovered,
@@ -156,7 +156,7 @@ extension ChatOverviewWebTests {
         try {
           window.__codexDashboard.applyAccountPopoverSnapshot({
             accounts: [], activeAccountID: null, statusMessage: null, isBusy: false,
-            usageBlockage: { windows: [{ label: '5-hour', resetsAtMilliseconds: now + 65000 }], isStale: false },
+            usageBlockage: { windows: [{ resetsAtMilliseconds: now + 65000 }], isStale: false },
           });
           const button = document.querySelector('#codex-usage-blockage [data-reset-toggle]');
           button.focus();

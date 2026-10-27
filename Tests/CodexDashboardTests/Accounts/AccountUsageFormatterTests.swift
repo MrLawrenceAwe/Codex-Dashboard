@@ -5,21 +5,22 @@ import XCTest
 final class AccountUsageFormatterTests: XCTestCase {
     func testBlockageIncludesOnlyExhaustedWindowsWithRawResetTimes() {
         let reset = Date(timeIntervalSince1970: 2_000_000_000)
-        for (fiveHour, weekly, labels) in [
-            (99, 50, [String]()), (100, 50, ["5-hour"]),
-            (25, 100, ["Weekly"]), (105, 100, ["5-hour", "Weekly"]),
-        ] {
+        let cases: [(Int, Int, [Double?])] = [
+            (99, 50, []), (100, 50, [2_000_000_000_000]),
+            (25, 100, [nil]), (105, 100, [2_000_000_000_000, nil]),
+        ]
+        for (fiveHour, weekly, expectedResetTimes) in cases {
             let snapshot = CodexAccountUsageSnapshot(usage: CodexAccountUsage(
                 fiveHour: CodexUsageWindow(usedPercent: fiveHour, resetsAt: reset),
                 weekly: CodexUsageWindow(usedPercent: weekly, resetsAt: nil)
             ), fetchedAt: reset)
             let blockage = AccountUsageFormatter.blockage(for: .available(snapshot))
-            XCTAssertEqual(blockage?.windows.map(\.label) ?? [], labels)
-            if !labels.isEmpty { XCTAssertEqual(blockage?.isStale, false) }
-            if labels.contains("5-hour") {
-                XCTAssertEqual(blockage?.windows.first?.resetsAtMilliseconds, 2_000_000_000_000)
+            XCTAssertEqual(blockage?.windows.map(\.resetsAtMilliseconds) ?? [], expectedResetTimes)
+            if expectedResetTimes.isEmpty {
+                XCTAssertNil(blockage)
+            } else {
+                XCTAssertEqual(blockage?.isStale, false)
             }
-            if labels.contains("Weekly") { XCTAssertNil(blockage?.windows.last?.resetsAtMilliseconds) }
         }
         XCTAssertNil(AccountUsageFormatter.blockage(for: .unavailable))
     }
