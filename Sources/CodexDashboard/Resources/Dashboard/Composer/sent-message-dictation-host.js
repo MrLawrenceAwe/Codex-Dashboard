@@ -2,22 +2,6 @@
 async function loadSentMessageDictationHost() {
   const isStreaming = value => typeof value === 'function'
     && ['start', 'finish', 'close', 'transcriptText'].every(name => typeof value.prototype?.[name] === 'function');
-  if (location.origin === 'https://chatgpt.com') {
-    const runtimePath = window.__reactRouterManifest?.entry?.imports?.[0];
-    if (!runtimePath || !runtimePath.startsWith('/cdn/assets/')) throw new Error('ChatGPT runtime is not available in this build.');
-    const runtime = await import(new URL(runtimePath, location.origin).href);
-    const requireHost = runtime.__webpack_require__;
-    if (!requireHost?.m) throw new Error('ChatGPT module loader changed.');
-    const entry = Object.entries(requireHost.m).find(([, factory]) => {
-      const source = Function.prototype.toString.call(factory);
-      return source.includes('Dictation requires an authenticated browser session.') && source.includes('transcript.final');
-    });
-    if (!entry) throw new Error('Built-in ChatGPT dictation is unavailable in this build.');
-    const exports = requireHost(entry[0]);
-    const Streaming = Object.values(exports).find(isStreaming);
-    if (!Streaming) throw new Error('Built-in dictation contract changed.');
-    return { Streaming, host: 'ChatGPT web', contract: entry[0] };
-  }
   if (location.protocol === 'app:') {
     let url = performance.getEntriesByType('resource').map(entry => entry.name)
       .find(name => /\/app-initial-[\w-]+\.js(?:\?|$)/.test(name));
@@ -35,7 +19,7 @@ async function loadSentMessageDictationHost() {
     if (!Streaming) throw new Error('Desktop dictation contract changed or is not initialized.');
     return { Streaming, host: 'Codex desktop', contract: new URL(url).pathname.split('/').pop() };
   }
-  throw new Error('Edit dictation supports ChatGPT web and the Codex desktop renderer.');
+  throw new Error('Edit dictation requires the Codex desktop renderer.');
 }
 
 function sentMessageEditorController(element) {

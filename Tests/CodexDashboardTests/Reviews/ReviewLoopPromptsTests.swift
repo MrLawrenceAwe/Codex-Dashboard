@@ -3,6 +3,55 @@ import XCTest
 
 @MainActor
 final class ReviewLoopPromptsTests: ReviewLoopTestCase {
+    func testTaskWordingForEveryReviewType() {
+        for reviewType in ReviewType.allCases {
+            let loop = ReviewLoop(id: UUID(), startActionID: "wording", project: project,
+                                  promptContext: .general, maxRounds: 3, reviewType: reviewType)
+            let expectedReview: String
+            let expectedFix: String
+            switch reviewType {
+            case .bugs:
+                expectedReview = "Review project for bugs and issues."
+                expectedFix = "Fix the finding and commit"
+            case .bugsAndPerformance:
+                expectedReview = "Review project for bugs, issues, performance and responsiveness."
+                expectedFix = "Fix the finding and commit"
+            case .organisation:
+                expectedReview = "Review code and content for simplification and organisation."
+                expectedFix = "Address the finding and commit"
+            case .organisationAndNaming:
+                expectedReview = "Review code and content for simplification, organisation, and unclear, verbose, over-abbreviated, or misleading names."
+                expectedFix = "Address the finding and commit"
+            case .content:
+                expectedReview = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose."
+                expectedFix = "Address the finding and commit"
+            case .performance:
+                expectedReview = "Review project for performance and responsiveness."
+                expectedFix = "Address the finding and commit"
+            }
+            var round = ReviewRound(number: 1, baseRevision: "base")
+            round.review = ReviewReport(outcome: .reviewed,
+                findings: [ReviewFinding(priority: nil, title: "Finding", body: "Evidence")], summary: "Findings")
+            XCTAssertEqual(ReviewPrompts.reviewPrompt(for: loop).components(separatedBy: "\n\n").first,
+                           expectedReview)
+            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round).components(separatedBy: "\n\n").first,
+                           expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+        }
+    }
+
+    func testBugFixTaskWordingForEachFindingCount() {
+        let loop = ReviewLoop(id: UUID(), startActionID: "wording", project: project,
+                              promptContext: .general, maxRounds: 3)
+        for (count, expected) in [(1, "Fix the finding and commit"), (2, "Fix both findings and commit"), (3, "Fix all findings and commit")] {
+            var round = ReviewRound(number: 1, baseRevision: "base")
+            round.review = ReviewReport(outcome: .reviewed, findings: (0..<count).map { index in
+                ReviewFinding(priority: nil, title: "Finding \(index)", body: "Evidence")
+            }, summary: "Findings")
+            XCTAssertEqual(ReviewPrompts.fixPrompt(for: loop, round: round),
+                           expected + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+        }
+    }
+
     func testPreserveUICopyAppliesToAllStructureTurnsOnlyWhenEnabled() {
         for reviewType in ReviewType.allCases {
             for enabled in [false, true] {

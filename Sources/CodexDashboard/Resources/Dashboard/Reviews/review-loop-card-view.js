@@ -172,10 +172,7 @@ const reviewLoopCardView = (() => {
         <div><dt>Findings addressed</dt><dd>${addressed}</dd></div>
         ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits</dt><dd>${commits}</dd></div>`}
       </dl>`;
-    if (feedback.dataset.markup !== markup) {
-      feedback.innerHTML = markup;
-      feedback.dataset.markup = markup;
-    }
+    updateMarkup(feedback, markup);
   }
   function renderProgress(root, loop, progress) {
     const live = root.querySelector('[data-review-live]');

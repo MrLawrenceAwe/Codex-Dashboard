@@ -17,75 +17,6 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         }
     }
 
-    func testUpdateTimestampPersistsAndHistoryDeletionKeepsOtherTimestamps() throws {
-        let (_, store, _) = try make()
-        let startedAt = try XCTUnwrap(store.loops.first?.updatedAt)
-        XCTAssertEqual(startedAt, Date.now.timeIntervalSince1970, accuracy: 2)
-        store.loops[0].phase = .paused
-        store.loops[0].updatedAt = 1
-        let restored = ReviewLoopCoordinator(store: store)
-        XCTAssertEqual(restored.loops[0].updatedAt, 1)
-        stop(restored)
-        let stopped = try XCTUnwrap(store.loops.first)
-        XCTAssertGreaterThan(try XCTUnwrap(stopped.updatedAt), startedAt - 1)
-        let decoded = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(stopped))
-        XCTAssertEqual(decoded.updatedAt, stopped.updatedAt)
-        let display = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
-            ReviewLoopDisplaySnapshot(loop: stopped))) as? [String: Any])
-        XCTAssertEqual(display["updatedAt"] as? Double, stopped.updatedAt)
-
-        try restored.apply(startAction(id: "second", kind: .start, projectID: project.id,
-                                       promptContext: .general, maxRounds: 2, loopID: nil), projects: [project])
-        let active = try XCTUnwrap(store.loops.last)
-        try restored.apply(ReviewLoopAction(id: "delete", kind: .delete, projectID: nil,
-                                           promptContext: nil, maxRounds: nil, loopID: stopped.id), projects: [project])
-        XCTAssertEqual(store.loops, [active])
-    }
-
-    func testDeletingPreviousReviewsPreservesActiveLoopsAndSelectedBoundary() throws {
-        let store = ReviewTestStore()
-        func loop(_ name: String, phase: ReviewLoopPhase) -> ReviewLoop {
-            var loop = ReviewLoop(id: UUID(), startActionID: name, project: project,
-                                  promptContext: .general, maxRounds: 2)
-            loop.phase = phase
-            return loop
-        }
-        let oldest = loop("oldest", phase: .completed)
-        let active = loop("active", phase: .paused)
-        let middle = loop("middle", phase: .stopped)
-        let newest = loop("newest", phase: .limitReached)
-        store.loops = [oldest, active, middle, newest]
-        let coordinator = ReviewLoopCoordinator(store: store)
-        func deletion(_ kind: ReviewLoopAction.Kind, id: UUID? = nil) -> ReviewLoopAction {
-            ReviewLoopAction(id: UUID().uuidString, kind: kind, projectID: nil,
-                             promptContext: nil, maxRounds: nil, loopID: id)
-        }
-
-        try coordinator.apply(deletion(.deleteOlder, id: middle.id), projects: [])
-        XCTAssertEqual(coordinator.loops.map(\.id), [active.id, middle.id, newest.id])
-        try coordinator.apply(deletion(.delete, id: newest.id), projects: [])
-        XCTAssertEqual(coordinator.loops.map(\.id), [active.id, middle.id])
-        try coordinator.apply(deletion(.deleteAll), projects: [])
-        XCTAssertEqual(coordinator.loops.map(\.id), [active.id])
-        XCTAssertEqual(store.loops.map(\.id), [active.id])
-        XCTAssertThrowsError(try coordinator.apply(deletion(.delete, id: active.id), projects: []))
-    }
-
-    func testFailedReviewDeletionKeepsSavedAndDisplayedHistory() throws {
-        let store = ReviewTestStore()
-        var finished = ReviewLoop(id: UUID(), startActionID: "old", project: project,
-                                  promptContext: .general, maxRounds: 1)
-        finished.phase = .completed
-        store.loops = [finished]
-        let coordinator = ReviewLoopCoordinator(store: store)
-        store.failSave = true
-        let action = ReviewLoopAction(id: "delete", kind: .deleteAll, projectID: nil,
-                                      promptContext: nil, maxRounds: nil, loopID: nil)
-        XCTAssertThrowsError(try coordinator.apply(action, projects: []))
-        XCTAssertEqual(coordinator.loops, [finished])
-        XCTAssertEqual(store.loops, [finished])
-    }
-
     func testStartRequiresBothModels() throws {
         let coordinator = ReviewLoopCoordinator(store: ReviewTestStore())
         var action = startAction(id: "start", kind: .start, projectID: project.id,
@@ -208,8 +139,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(driver.createdThreads.count, 1, "Do not launch in the same checkpoint observation")
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(driver.createdThreads, ["thread-1", "thread-2"])
-        XCTAssertEqual(driver.prompts[2], "Review project for bugs and issues." + reviewBoundary)
-        XCTAssertFalse(driver.prompts[2].contains("last round's findings"))
+        XCTAssertEqual(driver.prompts[2], ReviewPrompts.reviewPrompt(for: try XCTUnwrap(store.loops.last)))
         driver.review(priorities: [])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
@@ -288,19 +218,6 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops.last?.expectedRevision, fullCommit)
         XCTAssertEqual(coordinator.loops.last?.rounds.last?.result?.fixCommit, fullCommit)
         XCTAssertEqual(driver.prompts.count, 2)
-    }
-
-    func testStopDuringCommitResolutionDoesNotAdvance() async throws {
-        let (coordinator, _, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        driver.review(priorities: [.p2])
-        await coordinator.advance(using: driver, threads: [])
-        await coordinator.advance(using: driver, threads: [])
-        driver.finish(findings: 1, commit: "fixed")
-        driver.onResolveCommit = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertNil(coordinator.loops.last?.rounds.last?.result)
     }
 
     func testBlockedFixResumesAfterChatAnswerWithoutNewChatOrRound() async throws {
@@ -560,118 +477,6 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertTrue(driver.createdThreads.isEmpty)
     }
 
-    func testPauseFinishesCurrentRoundAndStopDoesNotLaunchMore() async throws {
-        let (coordinator, _, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        try coordinator.apply(action(.pause, for: coordinator), projects: [project])
-        XCTAssertEqual(coordinator.loops.last?.phase, .running)
-        driver.review(priorities: [.p2])
-        await coordinator.advance(using: driver, threads: [])
-        await coordinator.advance(using: driver, threads: [])
-        driver.finish(findings: 1, commit: "fixed")
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .paused)
-        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertEqual(driver.createdThreads.count, 1)
-    }
-
-    func testStopInterruptsRunningReviewAndFixTasks() async throws {
-        for fixing in [false, true] {
-            let (coordinator, store, driver) = try make()
-            await coordinator.advance(using: driver, threads: [])
-            if fixing {
-                driver.review(priorities: [.p1])
-                await coordinator.advance(using: driver, threads: [])
-                await coordinator.advance(using: driver, threads: [])
-            }
-            try coordinator.apply(action(.stop, for: coordinator), projects: [project])
-            try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
-            XCTAssertEqual(driver.interruptedTurns, [fixing ? "turn-2" : "turn-1"])
-            XCTAssertEqual(driver.thread.turns.last?.status, .interrupted)
-            XCTAssertEqual(store.loops.last?.message, "Stopped loop and its running chat.")
-            await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts.count, fixing ? 2 : 1)
-        }
-    }
-
-    func testStopWithoutRunningTaskDoesNotInterruptCompletedTurn() async throws {
-        let (coordinator, _, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        driver.review(priorities: [.p1])
-        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
-        try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
-        XCTAssertTrue(driver.interruptedTurns.isEmpty)
-        XCTAssertEqual(driver.thread.turns.last?.status, .completed)
-    }
-
-    func testInterruptFailureKeepsCheckoutReservedAndCanBeRetried() async throws {
-        let (coordinator, store, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        driver.failStopThread = true
-        try coordinator.apply(action(.stop, for: coordinator), projects: [project])
-        do {
-            try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
-            XCTFail("Expected interrupt failure")
-        } catch { }
-        XCTAssertEqual(store.loops.last?.phase, .stopping)
-        XCTAssertTrue(store.loops.last!.message.contains("could not stop its chat"))
-        driver.failStopThread = false
-        try await coordinator.stopRunningTask(for: coordinator.loops.last!.id, using: driver)
-        XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
-    }
-
-    func testStopDuringWorkspaceCheckPreventsReviewLaunch() async throws {
-        let (coordinator, _, driver) = try make()
-        driver.onWorkspace = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertTrue(driver.createdThreads.isEmpty)
-    }
-
-    func testStopDuringThreadCreationRecordsThreadWithoutSendingPrompt() async throws {
-        let (coordinator, store, driver) = try make()
-        driver.onCreateThread = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertEqual(store.loops[store.loops.count - 1].rounds.last?.threadID, "thread-1")
-        XCTAssertTrue(driver.prompts.isEmpty)
-    }
-
-    func testStopDuringPromptSubmissionRecordsTurnWithoutResumingLoop() async throws {
-        let (coordinator, store, driver) = try make()
-        driver.onStartTurn = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertEqual(store.loops[store.loops.count - 1].rounds.last?.reviewTurnID, "turn-1")
-        XCTAssertEqual(driver.interruptedTurns, ["turn-1"])
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(driver.prompts.count, 1)
-    }
-
-    func testStopDuringReviewReadDoesNotSubmitFix() async throws {
-        let (coordinator, _, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        driver.review(priorities: [.p1])
-        driver.onReadThread = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertEqual(driver.prompts.count, 1)
-    }
-
-    func testStopDuringFixSubmissionKeepsStoppedPhaseAndTurnID() async throws {
-        let (coordinator, store, driver) = try make()
-        await coordinator.advance(using: driver, threads: [])
-        driver.review(priorities: [.p1])
-        await coordinator.advance(using: driver, threads: [])
-        driver.onStartTurn = { self.stop(coordinator) }
-        await coordinator.advance(using: driver, threads: [])
-        XCTAssertEqual(coordinator.loops.last?.phase, .stopped)
-        XCTAssertEqual(store.loops[store.loops.count - 1].rounds.last?.fixTurnID, "turn-2")
-        XCTAssertEqual(driver.interruptedTurns, ["turn-2"])
-    }
-
     func testRoundLimitFinishesConfiguredWorkWithoutLaunchingAnotherTask() async throws {
         let (coordinator, _, driver) = try make(limit: 1)
         await coordinator.advance(using: driver, threads: [])
@@ -720,7 +525,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .completed)
     }
 
-    func testPriorityLimitAndExactFollowUpWording() async throws {
+    func testPriorityLimitControlsFixSubmissionForEachFindingCount() async throws {
         for limit in ReviewFinding.Priority.allCases {
             for count in 0...3 {
                 let store = ReviewTestStore()
@@ -738,8 +543,9 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
                     XCTAssertEqual(coordinator.loops.last?.phase, .completed)
                     XCTAssertEqual(driver.prompts.count, 1)
                 } else {
-                    let task = count == 1 ? "Fix the finding and commit" : count == 2 ? "Fix both findings and commit" : "Fix all findings and commit"
-                    XCTAssertEqual(driver.prompts.last, task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit.")
+                    let loop = try XCTUnwrap(store.loops.last)
+                    XCTAssertEqual(driver.prompts.count, 2)
+                    XCTAssertEqual(driver.prompts.last, ReviewPrompts.fixPrompt(for: loop, round: try XCTUnwrap(loop.rounds.last)))
                     XCTAssertEqual(driver.createdThreads.count, 1)
                 }
             }
@@ -838,23 +644,19 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             XCTAssertEqual(saved.reloadExtensionBeforeTesting, reviewType.supportsLiveTesting)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[0].contains("Use code review and live testing to find"), reviewType.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[0].contains("Use the globally configured chrome-devtools MCP server"), reviewType.supportsLiveTesting)
+            let expectedReview = ReviewPrompts.reviewPrompt(for: saved)
+            XCTAssertEqual(driver.prompts, [expectedReview])
             if reviewType.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            var withoutLiveTesting = saved
-            withoutLiveTesting.liveTesting = false
-            let baseFix = ReviewPrompts.fixPrompt(for: withoutLiveTesting, round: try XCTUnwrap(store.loops[0].rounds.last))
-            XCTAssertTrue(driver.prompts[1].hasPrefix(baseFix))
-            XCTAssertEqual(driver.prompts[1].contains("Verify fixes for findings discovered through live testing using live testing."), reviewType.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[1].contains("After changes, run any required build and reload the same extension before live verification."), reviewType.supportsLiveTesting)
+            let loop = try XCTUnwrap(store.loops.last)
+            let expectedFix = ReviewPrompts.fixPrompt(for: loop, round: try XCTUnwrap(loop.rounds.last))
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts[2].contains("Use code review and live testing to find"), reviewType.supportsLiveTesting)
-            XCTAssertEqual(driver.prompts[2].contains("Use the globally configured chrome-devtools MCP server"), reviewType.supportsLiveTesting)
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix, expectedReview])
         }
     }
 
@@ -907,9 +709,6 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         start.reloadExtensionBeforeTesting = true
         try coordinator.apply(start, projects: [project])
         XCTAssertFalse(try XCTUnwrap(store.loops.first).reloadExtensionBeforeTesting)
-        var loop = try XCTUnwrap(store.loops.first)
-        loop.reloadExtensionBeforeTesting = true
-        XCTAssertFalse(ReviewPrompts.reviewPrompt(for: loop).contains("Computer Use"))
     }
 
     func testReviewTypePersistsAndDrivesBothTurnsAndNextRound() async throws {
@@ -923,44 +722,20 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
             let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
             XCTAssertEqual(saved.reviewType, reviewType)
             XCTAssertEqual(saved.priorityLimit, reviewType.usesPriorities ? .p2 : nil)
-            let expectedReview: String
-            let expectedFix: String
-            switch reviewType {
-            case .bugs:
-                expectedReview = "Review project for bugs and issues."
-                expectedFix = "Fix the finding and commit"
-            case .bugsAndPerformance:
-                expectedReview = "Review project for bugs, issues, performance and responsiveness."
-                expectedFix = "Fix the finding and commit"
-            case .organisation:
-                expectedReview = "Review code and content for simplification and organisation."
-                expectedFix = "Address the finding and commit"
-            case .organisationAndNaming:
-                expectedReview = "Review code and content for simplification, organisation, and unclear, verbose, over-abbreviated, or misleading names."
-                expectedFix = "Address the finding and commit"
-            case .content:
-                expectedReview = "Review project for content accuracy, clarity, wording, consistency, completeness, presentation, and effectiveness for its intended purpose."
-                expectedFix = "Address the finding and commit"
-            case .performance:
-                expectedReview = "Review project for performance and responsiveness."
-                expectedFix = "Address the finding and commit"
-            }
+            let expectedReview = ReviewPrompts.reviewPrompt(for: saved)
             let driver = ReviewTestDriver()
             await coordinator.advance(using: driver, threads: [])
             if reviewType.usesPriorities { driver.review(priorities: [.p1]) }
             else { driver.reviewWithoutPriorities() }
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            let fullFixPrompt = expectedFix + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
-                + (reviewType.supportsPreservingUICopy ? "\n\nAddress findings within the original review scope and constraints." : "")
-            func taskParagraphs(_ prompt: String) -> String {
-                prompt.components(separatedBy: "\n\nStatically inspect ").first!
-            }
-            XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt])
+            let loop = try XCTUnwrap(store.loops.last)
+            let expectedFix = ReviewPrompts.fixPrompt(for: loop, round: try XCTUnwrap(loop.rounds.last))
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix])
             driver.finish(findings: 1, commit: "fixed")
             await coordinator.advance(using: driver, threads: [])
             await coordinator.advance(using: driver, threads: [])
-            XCTAssertEqual(driver.prompts.map(taskParagraphs), [expectedReview + reviewBoundary, fullFixPrompt, expectedReview + reviewBoundary])
+            XCTAssertEqual(driver.prompts, [expectedReview, expectedFix, expectedReview])
         }
     }
 }

@@ -287,12 +287,13 @@ storage keys remain unchanged to preserve saved filters and collapsed projects.
 
 ## Testing
 
-Review tests are split into coordinator, driver, workspace checkpoint, folder checkpoint,
-bridge, presentation, prompts, migration, and file-store suites, with doubles in
+Review tests are split into coordinator, driver, stopping, history, workspace checkpoint,
+folder checkpoint, bridge, presentation, prompts, migration, and file-store suites, with doubles in
 `Reviews/ReviewLoopTestSupport.swift`. Driver tests cover app-server requests and
 response decoding, including the shared `ReviewTurnStatus` enum; checkpoint tests
 cover filesystem and Git inspection, and prompt and migration tests stay in their
-respective suites.
+respective suites. Coordinator integration tests check prompt selection and submission
+timing against the prompt factory; literal wording expectations live in the prompt suite.
 Thread fixtures live in `Threads/ThreadSummaryFixtures.swift`.
 
 The installer runs `swift test` for the native and WebKit suite; CI also runs the
