@@ -172,7 +172,8 @@ The standalone renderer contract bundle includes `ComposerPresetSchema` so model
 compatibility checks use the same reasoning-effort values as preset validation.
 Reasoning order and labels come from the shared composer preset schema and
 presentation helpers. Chat rows and review model cards resolve display names and
-fall back to identifiers when no display name is known. Navigation counts describe running or waiting loops.
+fall back to identifiers when no display name is known. Review navigation markers and
+count rules are described in the [usage guide](usage.md#review-loops).
 
 `ReviewPageSnapshot` supplies the review page through `applyReviewPageSnapshot`;
 `ReviewLoopsDocument` defines the current saved document independently of migrations.
@@ -231,6 +232,17 @@ stored document intact. Preference loading converts `collapsedProjects` to
 `collapsedProjectPaths`, former ignored/muted paths to
 `hiddenChangeIndicatorPaths`. Chat filters are `overview` (the default),
 `unread`, and `changedProjects`; unrecognised saved filters use **Overview**.
+
+Review-loop version 18 is the current saved document format. It adds the `queued`
+phase; array order records queue creation order, and each queued loop retains its
+own settings. Upgrading earlier documents preserves their existing phases and order;
+it does not create queued loops. Queued loops survive restarts while running and
+waiting loops pause for reconciliation. See the [usage guide](usage.md#review-loops)
+for queue controls and scheduling.
+
+Review-loop version 17 adds `preserveUICopy` for structure reviews. Migration defaults
+the field to `false` when absent, preserving the earlier behaviour of allowing UI
+copy changes, and retains any saved value alongside the other settings and history.
 
 Review-loop version 16 renames `checkoutRoot` to `workspaceRoot` for Git and ordinary-folder
 loops. Migration preserves the root and reservation alongside all saved settings and
