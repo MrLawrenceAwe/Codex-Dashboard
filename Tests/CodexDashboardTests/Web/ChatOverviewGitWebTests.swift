@@ -32,6 +32,34 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? Int, 3)
     }
 
+    func testProjectWithoutRemoteShowsCommitActionAndUpdatesWhenRemoteIsAdded() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        let localPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "local", checkoutPath: "/tmp/local", projectGitStatus: .uncommittedChangesWithoutRemote),
+        ])
+        let remotePayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "local", checkoutPath: "/tmp/local", projectGitStatus: .uncommittedChanges),
+        ])
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyThreads((\(localPayload)).threads);
+          window.__codexDashboard.openChatOverview();
+          document.querySelector('[data-filter="changedProjects"]').click();
+          const button = document.querySelector('[data-project-git-action]');
+          const local = [button.textContent.trim(), button.title,
+            document.querySelector('.dashboard-git-changes').textContent.trim()];
+          window.__codexDashboard.applyThreads((\(remotePayload)).threads);
+          return local;
+        })()
+        """) as? [String]
+        XCTAssertEqual(result, ["Commit", "Open Codex’s Commit flow for this project", "Uncommitted"])
+        try await Task.sleep(for: .milliseconds(100))
+        let updatedLabel = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-project-git-action]').textContent.trim()"
+        ) as? String
+        XCTAssertEqual(updatedLabel, "Commit or push")
+    }
+
     func testUnpushedCommitsAppearInLocalChangesWithPushAction() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let payload = try DashboardWebTestHarness.snapshotPayload(for: [

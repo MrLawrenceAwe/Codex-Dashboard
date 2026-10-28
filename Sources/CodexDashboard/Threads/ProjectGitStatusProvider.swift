@@ -145,7 +145,7 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
     }
 
     // Uses local remote-tracking refs; refreshing the overview never contacts a remote.
-    private static func hasUnpushedCommits(at path: String, timeout: TimeInterval) async throws -> Bool {
+    private static func remoteStatus(at path: String, timeout: TimeInterval) async throws -> (hasRemote: Bool, hasUnpushedCommits: Bool) {
         func git(_ arguments: [String]) async throws -> SubprocessOutput {
             try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
                                      arguments: ["--no-optional-locks", "-C", path] + arguments,
@@ -153,9 +153,9 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
         }
         let remotes = try await git(["remote"])
         guard remotes.terminationStatus == 0 else { throw GitStatusError.unavailable }
-        guard !remotes.standardOutput.isEmpty else { return false }
+        guard !remotes.standardOutput.isEmpty else { return (false, false) }
         let head = try await git(["rev-parse", "--verify", "HEAD"])
-        guard head.terminationStatus == 0 else { return false } // New repository, no commits yet.
+        guard head.terminationStatus == 0 else { return (true, false) } // New repository, no commits yet.
         let upstream = try await git(["rev-parse", "--verify", "@{upstream}"])
         let range = upstream.terminationStatus == 0
             ? [String(decoding: upstream.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) + "..HEAD"]
@@ -164,7 +164,7 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
         guard commits.terminationStatus == 0,
               let count = Int(String(decoding: commits.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
         else { throw GitStatusError.unavailable }
-        return count > 0
+        return (true, count > 0)
     }
 
     private static func status(
@@ -199,9 +199,10 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
             )
             guard untracked.terminationStatus == 0 else { return .unavailable }
             let dirty = !tracked.standardOutput.isEmpty || !untracked.standardOutput.isEmpty
-            let pending = try await hasUnpushedCommits(at: path, timeout: timeout)
-            if pending { return dirty ? .uncommittedChangesAndUnpushedCommits : .unpushedCommits }
-            return dirty ? .uncommittedChanges : .clean
+            let remote = try await remoteStatus(at: path, timeout: timeout)
+            if remote.hasUnpushedCommits { return dirty ? .uncommittedChangesAndUnpushedCommits : .unpushedCommits }
+            guard dirty else { return .clean }
+            return remote.hasRemote ? .uncommittedChanges : .uncommittedChangesWithoutRemote
         } catch {
             return .unavailable
         }

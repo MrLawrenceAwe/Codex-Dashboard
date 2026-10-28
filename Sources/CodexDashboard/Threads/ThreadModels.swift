@@ -27,6 +27,7 @@ enum ProjectGitStatus: String, Codable, Equatable, Sendable {
     case unavailable
     case clean
     case uncommittedChanges
+    case uncommittedChangesWithoutRemote
     case unpushedCommits
     case uncommittedChangesAndUnpushedCommits
 }

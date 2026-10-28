@@ -31,7 +31,8 @@ there are uncommitted changes, or selects its Push action when only unpushed com
 remain. Chats in separate nested repositories cannot handle their parent project's
 Git actions. The handoff stops if you switch chats, including while the initial chat
 selection is pending. Git status uses local remote-tracking refs without fetching;
-repositories without a remote show only uncommitted changes.
+repositories without a remote show only uncommitted changes and label the action
+**Commit**.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
 finishes or it asks a structured question, including questions asked while work

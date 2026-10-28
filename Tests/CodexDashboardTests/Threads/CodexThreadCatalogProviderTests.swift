@@ -42,7 +42,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: Set(catalog.threads.compactMap(\.projectGroupPath)), policy: .refresh)
         XCTAssertEqual(statuses[advisor.path], .notRepository)
-        XCTAssertEqual(statuses[jobs.path], .uncommittedChanges)
+        XCTAssertEqual(statuses[jobs.path], .uncommittedChangesWithoutRemote)
     }
 
     func testGitActionEligibilityUsesRepositoryIdentityWithinProjectGroups() async throws {

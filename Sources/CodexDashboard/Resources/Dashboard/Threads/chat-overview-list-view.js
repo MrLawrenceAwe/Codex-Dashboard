@@ -67,10 +67,12 @@ const chatOverviewListView = (() => {
     if (!projectThreads.some(chatOverviewQuery.hasPendingGitChanges)) return '';
     const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
     const hasRepositoryThread = projectThreads.some((thread) => thread.sharesProjectRepository);
+    const actionLabel = projectThreads.some(thread => thread.projectGitStatus === 'uncommittedChangesWithoutRemote')
+      ? 'Commit' : 'Commit or push';
     const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'restore' : 'mute')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
-      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? 'Open Codex’s Commit or push flow for this project' : 'Commit or push requires an idle chat in this project’s repository'}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? 'Commit or push' : unavailableLabel}</span></button>`;
+      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? `Open Codex’s ${actionLabel} flow for this project` : `${actionLabel} requires an idle chat in this project’s repository`}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? actionLabel : unavailableLabel}</span></button>`;
   }
 
   function renderProjectIdentity(projectName, projectPath) {
@@ -88,7 +90,7 @@ const chatOverviewListView = (() => {
         ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'
         : '';
     }
-    const dirty = projectThreads.some(thread => ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
+    const dirty = projectThreads.some(thread => ['uncommittedChanges', 'uncommittedChangesWithoutRemote', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
     const unpushed = projectThreads.some(thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
     const label = dirty && unpushed ? 'Uncommitted · Unpushed' : unpushed ? 'Unpushed' : 'Uncommitted';
     return `<span class="dashboard-git-changes" title="${label}">${dashboardIcons.render('gitChanges')}<span>${label}</span></span>`;
