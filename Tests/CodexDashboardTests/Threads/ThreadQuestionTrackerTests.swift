@@ -3,6 +3,19 @@ import XCTest
 @testable import CodexDashboard
 
 final class ThreadQuestionTrackerTests: XCTestCase {
+    func testScheduledQuestionsAreConsumedWithoutDisplacingOrdinaryQuestions() {
+        let date = Date()
+        var tracker = ThreadQuestionTracker()
+        XCTAssertNil(tracker.observeQuestions(in: [], observedAt: date))
+        var scheduled = thread("scheduled", question: "background", at: date.addingTimeInterval(2))
+        scheduled.threadSource = "automation"
+        XCTAssertNil(tracker.observeQuestions(in: [scheduled], observedAt: date.addingTimeInterval(3)))
+        let ordinary = thread("ordinary", question: "interactive", at: date.addingTimeInterval(4))
+        scheduled.latestQuestionEvent = ThreadQuestionEvent(id: "another", timestamp: date.addingTimeInterval(5))
+        XCTAssertEqual(tracker.observeQuestions(in: [scheduled, ordinary], observedAt: date.addingTimeInterval(6)), "ordinary")
+        XCTAssertNil(tracker.observeQuestions(in: [scheduled, ordinary], observedAt: date.addingTimeInterval(7)))
+    }
+
     private func thread(_ id: String, question: String?, at date: Date) -> ThreadSummary {
         var thread = ThreadSummary.fixture(id: id)
         thread.latestQuestionEvent = ThreadQuestionEvent(id: question, timestamp: date)

@@ -5,6 +5,35 @@ import XCTest
 
 @MainActor
 extension AppCoordinatorTests {
+    func testScheduledCompletionDoesNotForegroundAndDoesNotHideOrdinaryCompletion() async {
+        let date = Date()
+        let foregrounder = RecordingCodexForegrounder()
+        let runtime = StubDashboardRuntime()
+        let coordinator = makeAppCoordinator(observeFileChanges: false, codexForegrounder: foregrounder, runtimeFactory: { _ in runtime })
+        var scheduled = ThreadSummary.fixture(id: "scheduled")
+        scheduled.threadSource = "automation"
+        var ordinary = ThreadSummary.fixture(id: "ordinary")
+        _ = coordinator.observeThreadActivity(in: [scheduled, ordinary])
+        scheduled = .fixture(id: "scheduled", latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: date.addingTimeInterval(2)))
+        scheduled.threadSource = "automation"
+        let onlyScheduled = coordinator.observeThreadActivity(in: [scheduled, ordinary])
+        XCTAssertTrue(onlyScheduled.completion.hasCompletion)
+        XCTAssertNil(onlyScheduled.completion.threadIDToOpen)
+        await coordinator.handleThreadActivity(onlyScheduled)
+        XCTAssertEqual(foregrounder.callCount, 0)
+        XCTAssertTrue(runtime.openedThreadIDs.isEmpty)
+
+        ordinary = .fixture(id: "ordinary", latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: date.addingTimeInterval(3)))
+        scheduled = .fixture(id: "scheduled", latestLifecycleEvent: ThreadLifecycleEvent(kind: .completed, timestamp: date.addingTimeInterval(4)))
+        scheduled.threadSource = "automation"
+        let mixed = coordinator.observeThreadActivity(in: [scheduled, ordinary])
+        XCTAssertEqual(mixed.completion.threadIDToOpen, "ordinary")
+        await coordinator.handleThreadActivity(mixed)
+        XCTAssertEqual(foregrounder.callCount, 1)
+        XCTAssertEqual(runtime.openedThreadIDs, ["ordinary"])
+        XCTAssertNil(coordinator.observeThreadActivity(in: [scheduled, ordinary]).completion.threadIDToOpen)
+    }
+
     func testPreflightRefreshConsumesCompletionWithoutOpeningChatOrRefreshingUsage() async throws {
         let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
         let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))

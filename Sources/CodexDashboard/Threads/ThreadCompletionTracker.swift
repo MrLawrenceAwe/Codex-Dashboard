@@ -33,7 +33,10 @@ struct ThreadCompletionTracker {
             else { return nil }
             return (threadID, event)
         }
-        let newestEligible = completions.filter { !excludedThreadIDs.contains($0.threadID) }.max { left, right in
+        let scheduledThreadIDs = Set(threads.filter(\.isScheduledAutomation).map(\.id))
+        let newestEligible = completions.filter {
+            !excludedThreadIDs.contains($0.threadID) && !scheduledThreadIDs.contains($0.threadID)
+        }.max { left, right in
             if left.event.timestamp == right.event.timestamp { return left.threadID < right.threadID }
             return left.event.timestamp < right.event.timestamp
         }?.threadID

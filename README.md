@@ -1,5 +1,10 @@
 # Codex Dashboard
 
+Scheduled automation chats never automatically bring Codex forward on completion
+or when they ask a question. They remain available to open manually. Dashboard uses
+Codex's recorded `thread_source = automation` metadata, so ordinary chats keep their
+existing automatic-opening preferences.
+
 [![CI](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MrLawrenceAwe/Codex-Dashboard/actions/workflows/ci.yml)
 
 A native macOS menu-bar utility that brings chat activity, unfinished work and project changes into one dashboard inside Codex.

@@ -28,13 +28,14 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     static let defaultLoadedThreadLimit = 500
     static let requiredColumnNames: Set<String> = [
         "id", "name", "title", "preview", "cwd", "created_at", "is_pinned",
-        "model", "rollout_path", "archived", "recency_at_ms", "project_id",
+        "model", "rollout_path", "archived", "recency_at_ms", "project_id", "thread_source",
     ]
 
     private struct StoredThread: Decodable, Equatable, Sendable {
         let id: String
         let title: String
         let preview: String
+        let threadSource: String?
         let projectID: String?
         let checkoutPath: String
         let pinnedValue: Int
@@ -109,6 +110,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         SELECT id,
                COALESCE(NULLIF(name,''), NULLIF(title,''), NULLIF(preview,''), 'Untitled thread') AS title,
                preview,
+               thread_source AS threadSource,
                project_id AS projectID,
                cwd AS checkoutPath,
                is_pinned AS pinnedValue,
@@ -204,6 +206,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 projectGitStatus: .notRepository
             )
             summary.latestQuestionEvent = rolloutQuestionReader.latestRecordedEvent(at: thread.rolloutPath)
+            summary.threadSource = thread.threadSource
             summary.projectID = root?.id
             if let root {
                 // Worktree chats can be assigned to a project outside its saved root.

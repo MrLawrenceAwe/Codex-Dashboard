@@ -3,6 +3,17 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testReadsAutomationOriginFromMetadataRatherThanTitle() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, "UPDATE threads SET thread_source = 'automation', title = 'Ordinary title' WHERE id = 'running'; UPDATE threads SET title = 'Automation: Indeed feed suggestions' WHERE id = 'idle';"], timeout: 3)
+        XCTAssertEqual(result.terminationStatus, 0)
+        let catalog = try await CodexThreadCatalogProvider(stateDatabaseURL: url)
+            .loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.isScheduledAutomation, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "idle" }?.isScheduledAutomation, false)
+    }
+
     func testCrossProjectCheckoutUsesActualFolderForGitGroupName() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let workspace = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)

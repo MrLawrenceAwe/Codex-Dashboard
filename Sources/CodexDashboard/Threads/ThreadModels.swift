@@ -49,6 +49,9 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var projectGroupPath: String? = nil
     var sharesProjectRepository = false
     var projectGitStatus: ProjectGitStatus
+    var threadSource: String? = nil
+
+    var isScheduledAutomation: Bool { threadSource == "automation" }
 
     var originatesFromChromeExtension: Bool {
         preview.contains("# Chrome tabs:\n- The user has the Chrome extension side panel open.")
