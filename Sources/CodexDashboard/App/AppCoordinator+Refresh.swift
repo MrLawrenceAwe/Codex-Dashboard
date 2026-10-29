@@ -127,26 +127,25 @@ extension AppCoordinator {
             Task { await self.refreshAccountUsage() }
         }
         if automaticallyOpenQuestionChats, let threadID = activity.questionThreadIDToOpen {
-            guard !keyboardActivityDetector.hasRecentKeyboardActivity,
-                  await dashboardRuntime?.hasActiveSpeechInput() != true,
-                  !Task.isCancelled,
-                  !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
-            codexForegrounder.foregroundCodex()
-            await dashboardRuntime?.openThread(threadID)
+            await automaticallyOpenThreadIfInputIsIdle(threadID)
             return
         }
         if let completedThreadID = activity.completion.threadIDToOpen {
             let completedThread = threads.first { $0.id == completedThreadID }
             if automaticallyOpenCompletedChats,
-               completedThread?.originatesFromChromeExtension != true,
-               !keyboardActivityDetector.hasRecentKeyboardActivity {
-                guard await dashboardRuntime?.hasActiveSpeechInput() != true,
-                      !Task.isCancelled,
-                      !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
-                codexForegrounder.foregroundCodex()
-                await dashboardRuntime?.openThread(completedThreadID)
+               completedThread?.originatesFromChromeExtension != true {
+                await automaticallyOpenThreadIfInputIsIdle(completedThreadID)
             }
         }
+    }
+
+    private func automaticallyOpenThreadIfInputIsIdle(_ threadID: String) async {
+        guard !keyboardActivityDetector.hasRecentKeyboardActivity,
+              await dashboardRuntime?.hasActiveSpeechInput() != true,
+              !Task.isCancelled,
+              !keyboardActivityDetector.hasRecentKeyboardActivity else { return }
+        codexForegrounder.foregroundCodex()
+        await dashboardRuntime?.openThread(threadID)
     }
 
     func publishSnapshotIfMaintained() async {

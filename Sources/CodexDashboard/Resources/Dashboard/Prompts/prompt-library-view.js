@@ -25,14 +25,14 @@ const promptLibraryView = (() => {
       : undefined;
     const sectionNames = [...promptStore.sections]
       .sort((left, right) => left.localeCompare(right));
-    const promptScope = promptStore.normalizeScope(prompt?.scope);
+    const promptScope = promptLibraryContract.normalizeScope(prompt?.scope);
     const selectedScope = prompt
       ? promptScope.type
       : (composerProject ? 'project' : 'global');
     content.innerHTML = `
       <form class="dashboard-prompt-form" data-prompt-form>
         <label>Name<input name="name" autocomplete="off" maxlength="80" placeholder="e.g. Review this code" value="${domUtils.escapeHTML(prompt?.name || '')}" required /></label>
-        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${domUtils.escapeHTML(promptLibraryContract.defaultSection)}" value="${domUtils.escapeHTML(promptStore.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${domUtils.escapeHTML(section)}"></option>`).join('')}</datalist></label>
+        <label>Section<input name="section" autocomplete="off" maxlength="80" list="dashboard-prompt-sections" placeholder="${domUtils.escapeHTML(promptLibraryContract.defaultSection)}" value="${domUtils.escapeHTML(promptLibraryContract.normalizeSection(prompt?.section))}" /><datalist id="dashboard-prompt-sections">${sectionNames.map((section) => `<option value="${domUtils.escapeHTML(section)}"></option>`).join('')}</datalist></label>
         <label>Available in<select name="scope"><option value="global"${selectedScope === 'global' ? ' selected' : ''}>All projects</option>${composerProject ? `<option value="project"${selectedScope === 'project' ? ' selected' : ''}>This project · ${domUtils.escapeHTML(composerProject.name)}</option>` : ''}</select></label>
         <label class="dashboard-prompt-preset-toggle"><input type="checkbox" name="hasPreset"${prompt?.preset ? ' checked' : ''} />Save model settings</label>
         <fieldset class="dashboard-prompt-preset-fields" data-prompt-preset-fields${prompt?.preset ? '' : ' disabled'}>
@@ -103,7 +103,7 @@ const promptLibraryView = (() => {
         promptStore.sections.forEach((section) => groupedPrompts.set(section, []));
       }
       group.prompts.forEach((prompt) => {
-        const section = promptStore.normalizeSection(prompt.section);
+        const section = promptLibraryContract.normalizeSection(prompt.section);
         if (!groupedPrompts.has(section)) groupedPrompts.set(section, []);
         groupedPrompts.get(section).push(prompt);
       });

@@ -11,7 +11,7 @@ const reviewLoopView = (() => {
     details.dataset.reviewLoop = '';
     details.innerHTML = `
       <header class="review-page-header">
-        <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('restore')}</div>
+        <div class="review-title-icon" aria-hidden="true">${dashboardIcons.render('rotateCounterclockwise')}</div>
         <h1>Review loops</h1><span class="review-overview" data-review-overview></span>
       </header>
       <section class="review-monitor" aria-labelledby="review-active-title">

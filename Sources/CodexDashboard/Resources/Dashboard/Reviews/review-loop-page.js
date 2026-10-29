@@ -14,7 +14,7 @@ const reviewLoopPage = (() => {
       id: dashboardElements.elementIDs.reviewNavButton,
       afterID: dashboardElements.elementIDs.todoNavButton,
       label: 'Review loops',
-      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('restore')}</span><span>Review loops</span></span><span class="review-nav-statuses">
+      markup: `<span class="review-nav-copy"><span class="review-nav-icon">${dashboardIcons.render('rotateCounterclockwise')}</span><span>Review loops</span></span><span class="review-nav-statuses">
         <span class="review-nav-spinner" data-review-navigation-running role="status" hidden><span data-review-navigation-running-count aria-hidden="true">0</span></span>
         <span class="review-nav-marker" data-review-navigation-paused role="status" hidden><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><span data-review-navigation-paused-count aria-hidden="true">0</span></span>
         <span class="review-nav-marker" data-review-navigation-blocked role="status" hidden><span aria-hidden="true">!</span><span data-review-navigation-blocked-count aria-hidden="true">0</span></span>

@@ -7,7 +7,6 @@ const promptStore = (() => {
 
   const {
     normalizePrompts,
-    normalizeScope,
     normalizeSection,
     normalizeSections,
   } = promptLibraryContract;
@@ -146,9 +145,6 @@ const promptStore = (() => {
         ? storedCollapsedSections.filter((item) => typeof item === 'string')
         : [],
     ),
-
-    normalizeSection,
-    normalizeScope,
 
     resolveSection(section) {
       const normalizedSection = normalizeSection(section);

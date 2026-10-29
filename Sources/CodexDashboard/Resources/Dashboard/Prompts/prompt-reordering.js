@@ -19,7 +19,7 @@ const promptReordering = (() => {
   }
 
   function isInGroup(prompt, section, scopeKey) {
-    return promptStore.normalizeSection(prompt.section) === section
+    return promptLibraryContract.normalizeSection(prompt.section) === section
       && promptLibraryContract.scopeKey(prompt.scope) === scopeKey;
   }
 
@@ -27,7 +27,7 @@ const promptReordering = (() => {
     const index = promptStore.prompts.findIndex((prompt) => prompt.id === promptID);
     const prompt = promptStore.prompts[index];
     if (!prompt) return false;
-    const section = promptStore.normalizeSection(prompt.section);
+    const section = promptLibraryContract.normalizeSection(prompt.section);
     const scopeKey = promptLibraryContract.scopeKey(prompt.scope);
     const groupIndexes = promptStore.prompts.flatMap((item, itemIndex) => (
       isInGroup(item, section, scopeKey) ? [itemIndex] : []
@@ -47,7 +47,7 @@ const promptReordering = (() => {
     if (destination.row?.dataset.promptRowId === draggedPromptID) return false;
 
     const remainingPrompts = promptStore.prompts.filter((prompt) => prompt.id !== draggedPromptID);
-    const movedPrompt = { ...movingPrompt, section: promptStore.normalizeSection(destination.section) };
+    const movedPrompt = { ...movingPrompt, section: promptLibraryContract.normalizeSection(destination.section) };
     const targetPromptID = destination.row?.dataset.promptRowId;
     let insertionIndex;
     if (targetPromptID) {

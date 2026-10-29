@@ -45,7 +45,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
         size: file.size,
       });
       if (!image) {
-        setError('Codex could not read that image.');
+        setError('Could not read that image. Try copying it again.');
         onError();
         return;
       }
@@ -53,7 +53,7 @@ function createTodoImageController({ isDestroyed, getItems, updateItem }) {
     });
     reader.addEventListener('error', () => {
       if (isDestroyed()) return;
-      setError('Codex could not read that image.');
+      setError('Could not read that image. Try copying it again.');
       onError();
     });
     reader.readAsDataURL(file);
