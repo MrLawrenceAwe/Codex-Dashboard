@@ -84,11 +84,6 @@ const reviewLoopCardView = (() => {
     </div></li>`;
   }
 
-  function phaseLabel(loop) {
-    if (loop.phase === 'awaitingExtensionReload') return 'Waiting for extension reload';
-    return loop.phase === 'limitReached' ? 'Round limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
-  }
-
   function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs) {
     const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
     for (const [index, loop] of loops.entries()) {
@@ -104,12 +99,9 @@ const reviewLoopCardView = (() => {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
-    badge.textContent = phaseLabel(loop);
+    badge.textContent = reviewPresentation.phaseLabel(loop);
     badge.dataset.phase = loop.phase;
-    const modelLabel = (label, selection) => `<span>${label}: ${selection ? `${escape(models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID)}${selection.reasoningEffort ? ` · ${escape(composerPresets.reasoningLabel(selection.reasoningEffort))}` : ''}` : 'Not recorded'}</span>`;
-    const reviewTypeLabel = reviewPresentation.reviewTypeLabel(loop.reviewType, reviewTypes);
-    root.querySelector('[data-review-scope-label]').textContent = [reviewTypeLabel, loop.priorityLimit ? `P0${loop.priorityLimit === 'P0' ? '' : `–${loop.priorityLimit}`}` : ''].filter(Boolean).join(' · ');
-    updateMarkup(root.querySelector('[data-review-context]'), `<span>${escape(reviewTypeLabel)}</span><span>${escape(reviewPresentation.promptContextLabel(loop.promptContext))}</span>${loop.priorityLimit ? `<span>${loop.priorityLimit === 'P0' ? 'P0' : `P0–${escape(loop.priorityLimit)}`}</span>` : ''}${loop.preserveUICopy ? '<span>UI copy unchanged</span>' : ''}${loop.liveTesting ? `<span>Live testing enabled</span><span>Mute test playback: ${loop.muteTestPlayback ? 'On' : 'Off'}</span>` : ''}${loop.reloadExtensionBeforeTesting ? '<span>Extension reload enabled</span>' : ''}<span>${loop.speed === 'fast' ? 'Fast' : 'Standard'}</span><span>${loop.workspaceKind === 'folder' ? 'Save and verify folder changes' : loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local'}</span>${modelLabel('Review', loop.reviewSelection)}${modelLabel('Fix', loop.fixSelection)}`);
+    renderSettings(root, loop, models, reviewTypes);
     root.querySelector('[data-review-status]').textContent = pendingAction?.loopID === loop.id
       ? ({ pause: 'Requesting pause…', resume: 'Resuming loop…', stop: 'Stopping loop…' }[pendingAction.kind] || 'Saving…')
       : loop.message || '';
@@ -122,17 +114,36 @@ const reviewLoopCardView = (() => {
     root.dataset.phase = loop.phase;
     renderFeedback(root, loop);
     renderProgress(root, loop, progress);
+    renderControls(root, loop, pendingAction, retained);
+    renderPlaybackSetting(root, loop, pendingAction);
+    renderRounds(root, loop);
+  }
+
+  function renderSettings(root, loop, models, reviewTypes) {
+    const scope = [reviewPresentation.reviewTypeLabel(loop.reviewType, reviewTypes),
+      reviewPresentation.priorityLabel(loop.priorityLimit)].filter(Boolean).join(' · ');
+    root.querySelector('[data-review-scope-label]').textContent = scope;
+    const markup = reviewPresentation.settingsLabels(loop, models, reviewTypes)
+      .map(label => `<span>${escape(label)}</span>`).join('');
+    updateMarkup(root.querySelector('[data-review-context]'), markup);
+  }
+
+  function renderControls(root, loop, pendingAction, retained) {
     const controls = root.querySelector('[data-review-controls]');
-    updateMarkup(controls, loop.phase === 'queued' ? '<button type="button" data-review-action="stop">Cancel queued loop</button>' : loop.phase === 'stopping' ? '<button type="button" data-review-action="stop">Retry Stop</button>' : loop.isFinished ? (retained ? `<button type="button" data-review-clear="${escape(loop.id)}">Move to history</button>` : '') : `${loop.phase === 'awaitingExtensionReload'
-      ? '<button type="button" data-review-action="resume">Extension reloaded — continue</button>'
-      : ['paused', 'blocked'].includes(loop.phase)
-      ? '<button type="button" data-review-action="resume">Resume</button>'
-      : `<button type="button" data-review-action="pause" ${loop.pauseRequested ? 'disabled' : ''}>${loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause'}</button>`}
-      <button type="button" data-review-action="stop">Stop loop</button>`);
-    controls.querySelectorAll('button').forEach(button => { button.dataset.reviewLoopID = loop.id; });
-    controls.querySelectorAll('button').forEach(button => {
-      button.disabled = !!pendingAction || (button.dataset.reviewAction === 'pause' && !!loop.pauseRequested);
+    const choices = reviewPresentation.controls(loop, retained);
+    const markup = choices.map(control => {
+      const attribute = control.action ? `data-review-action="${escape(control.action)}"`
+        : `data-review-clear="${escape(control.clear)}"`;
+      return `<button type="button" ${attribute}${control.disabled ? ' disabled' : ''}>${escape(control.label)}</button>`;
+    }).join('');
+    updateMarkup(controls, markup);
+    controls.querySelectorAll('button').forEach((button, index) => {
+      button.dataset.reviewLoopID = loop.id;
+      button.disabled = !!pendingAction || !!choices[index].disabled;
     });
+  }
+
+  function renderPlaybackSetting(root, loop, pendingAction) {
     const playbackSetting = root.querySelector('[data-review-test-playback-setting]');
     playbackSetting.hidden = loop.isFinished || loop.phase === 'stopping' || !loop.liveTesting;
     if (!playbackSetting.hidden) {
@@ -142,6 +153,9 @@ const reviewLoopCardView = (() => {
       input.checked = !!loop.muteTestPlayback;
       input.disabled = !!pendingAction;
     }
+  }
+
+  function renderRounds(root, loop) {
     const rounds = root.querySelector('[data-review-rounds]');
     const signature = JSON.stringify([loop.id, loop.rounds, loop.phase, loop.isFinished, loop.pushToRemote, loop.workspaceKind]);
     if (renderedRounds.get(rounds) !== signature) {
@@ -156,21 +170,19 @@ const reviewLoopCardView = (() => {
   function renderFeedback(root, loop) {
     const stages = reviewPresentation.roundStages(loop);
     const icons = { done: '✓', skipped: '–', blocked: '!', paused: 'Ⅱ', stopped: '■', stopping: '■' };
-    const latest = loop.rounds.at(-1);
-    const addressed = loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0);
-    const commits = new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.fixCommit).map(round => round.result.fixCommit)).size;
+    const metrics = reviewPresentation.metrics(loop);
     const feedback = root.querySelector('[data-review-feedback]');
     const markup = `
-      <div class="review-feedback-heading"><strong>${latest ? `Round ${latest.number}` : 'First round'}</strong></div>
-      <ol class="review-stage-track" aria-label="${latest ? `Round ${latest.number}` : 'First round'} progress">${stages.map((stage, index) => `
+      <div class="review-feedback-heading"><strong>${metrics.roundLabel}</strong></div>
+      <ol class="review-stage-track" aria-label="${metrics.roundLabel} progress">${stages.map((stage, index) => `
         <li data-stage="${stage.state}" ${stage.state === 'active' ? 'aria-current="step"' : ''}>
           <span class="review-stage-icon" aria-hidden="true">${icons[stage.state] || index + 1}</span>
           <strong>${stage.label}</strong><span class="review-stage-description">${stage.description}</span>
         </li>`).join('')}</ol>
       <dl class="review-metrics">
-        <div><dt>Findings this round</dt><dd>${latest?.review ? latest.review.findings.length : '—'}</dd></div>
-        <div><dt>Findings addressed</dt><dd>${addressed}</dd></div>
-        ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits</dt><dd>${commits}</dd></div>`}
+        <div><dt>Findings this round</dt><dd>${metrics.findings}</dd></div>
+        <div><dt>Findings addressed</dt><dd>${metrics.addressed}</dd></div>
+        ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits</dt><dd>${metrics.commits}</dd></div>`}
       </dl>`;
     updateMarkup(feedback, markup);
   }
@@ -197,5 +209,5 @@ const reviewLoopCardView = (() => {
     nextMessage.hidden = !!progress.upcoming;
     nextMessage.textContent = progress.nextMessage;
   }
-  return { renderCards, phaseLabel };
+  return { renderCards };
 })();

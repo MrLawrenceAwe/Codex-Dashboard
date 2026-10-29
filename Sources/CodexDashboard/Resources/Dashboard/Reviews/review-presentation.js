@@ -63,6 +63,61 @@ const reviewPresentation = (() => {
     });
   }
 
+  function phaseLabel(loop) {
+    if (loop.phase === 'awaitingExtensionReload') return 'Waiting for extension reload';
+    return loop.phase === 'limitReached' ? 'Round limit reached' : loop.phase.charAt(0).toUpperCase() + loop.phase.slice(1);
+  }
+
+  function priorityLabel(priority) {
+    return priority ? (priority === 'P0' ? 'P0' : `P0–${priority}`) : '';
+  }
+
+  function modelSelectionLabel(label, selection, models) {
+    if (!selection) return `${label}: Not recorded`;
+    const name = models.find(model => model.modelID === selection.modelID)?.displayName || selection.modelID;
+    const effort = selection.reasoningEffort ? ` · ${composerPresets.reasoningLabel(selection.reasoningEffort)}` : '';
+    return `${label}: ${name}${effort}`;
+  }
+
+  function settingsLabels(loop, models, reviewTypes) {
+    return [
+      reviewTypeLabel(loop.reviewType, reviewTypes),
+      promptContextLabel(loop.promptContext),
+      ...(loop.priorityLimit ? [priorityLabel(loop.priorityLimit)] : []),
+      ...(loop.preserveUICopy ? ['UI copy unchanged'] : []),
+      ...(loop.liveTesting ? ['Live testing enabled', `Mute test playback: ${loop.muteTestPlayback ? 'On' : 'Off'}`] : []),
+      ...(loop.reloadExtensionBeforeTesting ? ['Extension reload enabled'] : []),
+      loop.speed === 'fast' ? 'Fast' : 'Standard',
+      loop.workspaceKind === 'folder' ? 'Save and verify folder changes'
+        : loop.pushToRemote ? 'Push fixes to remote' : 'Keep commits local',
+      modelSelectionLabel('Review', loop.reviewSelection, models),
+      modelSelectionLabel('Fix', loop.fixSelection, models),
+    ];
+  }
+
+  function controls(loop, retained) {
+    const stop = { action: 'stop', label: 'Stop loop' };
+    if (loop.phase === 'queued') return [{ action: 'stop', label: 'Cancel queued loop' }];
+    if (loop.phase === 'stopping') return [{ action: 'stop', label: 'Retry Stop' }];
+    if (loop.isFinished) return retained ? [{ clear: loop.id, label: 'Move to history' }] : [];
+    if (loop.phase === 'awaitingExtensionReload') {
+      return [{ action: 'resume', label: 'Extension reloaded — continue' }, stop];
+    }
+    if (['paused', 'blocked'].includes(loop.phase)) return [{ action: 'resume', label: 'Resume' }, stop];
+    return [{ action: 'pause', disabled: !!loop.pauseRequested,
+      label: loop.pauseRequested ? 'Pausing after round…' : loop.phase === 'running' ? 'Pause after round' : 'Pause' }, stop];
+  }
+
+  function metrics(loop) {
+    const latest = loop.rounds.at(-1);
+    return {
+      roundLabel: latest ? `Round ${latest.number}` : 'First round',
+      findings: latest?.review ? latest.review.findings.length : '—',
+      addressed: loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0),
+      commits: new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.fixCommit).map(round => round.result.fixCommit)).size,
+    };
+  }
+
   function updatedAtLabel(timestamp) {
     if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return 'Not recorded';
     const date = new Date(timestamp * 1000);
@@ -70,5 +125,5 @@ const reviewPresentation = (() => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   }
 
-  return { reviewTypeLabel, promptContextLabel, roundStatus, roundStages, updatedAtLabel };
+  return { reviewTypeLabel, promptContextLabel, roundStatus, roundStages, phaseLabel, priorityLabel, settingsLabels, controls, metrics, updatedAtLabel };
 })();

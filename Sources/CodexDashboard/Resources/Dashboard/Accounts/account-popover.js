@@ -9,71 +9,67 @@ const accountPopover = (() => {
   let outsidePointerHandler;
   let outsidePointerTimer;
   let escapeHandler;
-  let retainPanelUntilActionCompletes = false;
-  let actionProgress = null;
-  let queuedActionTimer;
-  let queuedActionDeadline = 0;
-  let queuedAction = null;
-  let actionAcknowledged = false;
+  let pendingAction = null;
+
+  function actionProgress() {
+    if (!pendingAction) return null;
+    if (pendingAction.acknowledged) return 'Request received. Checking Codex state…';
+    return pendingAction.request.kind === 'restartForSignIn'
+      ? 'Sign-in request queued…'
+      : 'Account request queued…';
+  }
+
+  function clearPendingAction() {
+    if (pendingAction) clearTimeout(pendingAction.timer);
+    pendingAction = null;
+  }
+
   function expireQueuedAction() {
-    if (!queuedAction || actionAcknowledged) return;
-    queuedAction = null;
-    queuedActionDeadline = 0;
-    retainPanelUntilActionCompletes = false;
-    actionProgress = null;
+    if (!pendingAction || pendingAction.acknowledged) return;
+    clearPendingAction();
     snapshot = { ...snapshot, statusMessage: 'Account request could not reach the dashboard. Please try again.' };
     renderPanel();
     usageResetNotice.applySnapshot(snapshot.usageBlockage);
   }
 
   function queue(kind, accountID = null) {
-    if (snapshot.isBusy || actionProgress || queuedAction) return;
-    // Codex closes its profile menu for clicks inside our separate overlay,
-    // removing the trigger along with it. Keep the account panel mounted until
-    // native code publishes the action's resulting snapshot so failures (for
-    // example, an account switch blocked by an active task) remain visible.
-    retainPanelUntilActionCompletes = true;
-    actionAcknowledged = false;
-    queuedAction = { requestID: `${requestPrefix}-${++requestSequence}`, kind, accountID };
-    queuedActionDeadline = Date.now() + 15000;
-    queuedActionTimer = setTimeout(expireQueuedAction, 15000);
-    actionProgress = kind === 'restartForSignIn'
-      ? 'Sign-in request queued…'
-      : 'Account request queued…';
+    if (snapshot.isBusy || pendingAction) return;
+    // Retain the panel while this request is pending, even if Codex removes
+    // the profile-menu trigger. Only native completion or expiry releases it.
+    pendingAction = {
+      request: { requestID: `${requestPrefix}-${++requestSequence}`, kind, accountID },
+      acknowledged: false,
+      deadline: Date.now() + 15000,
+      timer: setTimeout(expireQueuedAction, 15000),
+    };
     renderPanel();
     usageResetNotice.applySnapshot(snapshot.usageBlockage);
   }
 
   function readQueuedAction() {
-    if (queuedAction && !actionAcknowledged && Date.now() >= queuedActionDeadline) expireQueuedAction();
-    return JSON.stringify(queuedAction);
+    if (pendingAction && !pendingAction.acknowledged && Date.now() >= pendingAction.deadline) expireQueuedAction();
+    return JSON.stringify(pendingAction?.request || null);
   }
 
   function acknowledgeAction(requestID) {
-    if (queuedAction?.requestID !== requestID) return false;
-    if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
-    queuedActionTimer = undefined;
-    actionAcknowledged = true;
-    actionProgress = 'Request received. Checking Codex state…';
+    if (pendingAction?.request.requestID !== requestID) return false;
+    clearTimeout(pendingAction.timer);
+    pendingAction.timer = undefined;
+    pendingAction.acknowledged = true;
     renderPanel();
     return true;
   }
 
   function completeAction(requestID, next) {
-    if (queuedAction?.requestID !== requestID) return false;
-    if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
-    queuedActionTimer = undefined;
-    queuedAction = null;
-    actionAcknowledged = false;
-    retainPanelUntilActionCompletes = false;
-    actionProgress = null;
+    if (pendingAction?.request.requestID !== requestID) return false;
+    clearPendingAction();
     applySnapshot(next);
     renderPanel();
     return true;
   }
 
   function accountMarkup(account) {
-    const disabled = snapshot.isBusy || actionProgress || queuedAction || account.isRefreshing ? ' disabled' : '';
+    const disabled = snapshot.isBusy || pendingAction || account.isRefreshing ? ' disabled' : '';
     const initial = domUtils.escapeHTML(account.name.trim().slice(0, 1).toUpperCase() || '?');
     const usage = account.usageRows.map(usageMarkup).join('');
     return `<section class="codex-accounts-card" data-account-id="${account.id}">
@@ -112,12 +108,13 @@ const accountPopover = (() => {
   function renderPanel() {
     const panel = document.getElementById(panelID);
     if (!panel) return;
-    const disabled = snapshot.isBusy || actionProgress || queuedAction ? ' disabled' : '';
+    const disabled = snapshot.isBusy || pendingAction ? ' disabled' : '';
+    const progress = actionProgress();
     panel.innerHTML = `<header><strong>Accounts</strong><button data-account-close aria-label="Close accounts">×</button></header>
       <div class="codex-accounts-list">${snapshot.accounts.length
         ? snapshot.accounts.map(accountMarkup).join('')
         : '<div class="codex-accounts-empty">No saved accounts yet.</div>'}</div>
-      ${actionProgress || snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(actionProgress || snapshot.statusMessage)}</div>` : ''}
+      ${progress || snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(progress || snapshot.statusMessage)}</div>` : ''}
       <footer>
         <button data-account-global="saveCurrentAccount"${disabled}><span>✓</span>Save current account</button>
         <button data-account-global="restartForSignIn"${disabled}><span>＋</span>Add another account</button>
@@ -252,7 +249,7 @@ const accountPopover = (() => {
       ))
     ));
     if (triggerWasRemoved) {
-      if (!retainPanelUntilActionCompletes) closePanel();
+      if (!pendingAction) closePanel();
     }
     const shouldMountTrigger = !document.querySelector(`[${triggerAttribute}]`) && records.some((record) => (
       (record.type === 'attributes' ? [record.target] : [...record.addedNodes]).some((node) => {
@@ -275,17 +272,13 @@ const accountPopover = (() => {
     const candidate = next || snapshot;
     const candidateFingerprint = JSON.stringify(candidate);
     const changed = candidateFingerprint !== snapshotFingerprint;
-    const hadActionProgress = actionProgress !== null;
+    const hasPendingAction = pendingAction !== null;
     snapshot = candidate;
     snapshotFingerprint = candidateFingerprint;
     // Background snapshots must not complete a request. Only completeAction
     // releases it after native handling, including a blocked restart or failure.
-    if (!queuedAction && !snapshot.isBusy) {
-      retainPanelUntilActionCompletes = false;
-      actionProgress = null;
-    }
     mountTrigger();
-    if (changed || hadActionProgress) renderPanel();
+    if (changed || hasPendingAction) renderPanel();
     usageResetNotice.applySnapshot(snapshot.usageBlockage);
     return true;
   }
@@ -313,11 +306,7 @@ const accountPopover = (() => {
 
   function unmount() {
     usageResetNotice.destroy();
-    if (queuedActionTimer !== undefined) clearTimeout(queuedActionTimer);
-    queuedActionTimer = undefined;
-    queuedAction = null;
-    actionProgress = null;
-    retainPanelUntilActionCompletes = false;
+    clearPendingAction();
     observer?.disconnect();
     observer = undefined;
     document.querySelector(`[${triggerAttribute}]`)?.remove();

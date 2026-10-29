@@ -95,6 +95,14 @@ Renderer resources are listed in `injection-manifest.json`:
 | `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
 | `Reviews` | Review page controls, setup, cards, history, and app-server requests |
 
+The account popover keeps its request, acknowledgement, deadline, and timer in one
+pending-action record. Progress text, panel retention, and control availability
+derive from that record; background snapshots do not complete requests.
+`Reviews/review-presentation.js` owns review-card labels, settings descriptions,
+control choices, and metrics. `review-loop-card-view.js` applies those values through
+separate settings, controls, playback, and round-history renderers, retaining cached
+markup so unchanged controls keep their DOM elements.
+
 Shared page title sizes, corner radii, control height, focus color, and default top spacing live in
 `Core/dashboard-theme.css`, loaded before feature styles. Injected surfaces inherit
 the host font. Derive fallback surface and secondary text colors from the host
