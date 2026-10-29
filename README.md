@@ -38,8 +38,9 @@ Run:
 ```
 
 This runs the native and WebKit test suite (`swift test`), builds and signs
-`Codex Dashboard.app`, then atomically installs it in `$HOME/Applications`, preserving
-the previous bundle until the replacement is verified. Use `./install.sh --relaunch`
+`Codex Dashboard.app`, then stages and verifies a replacement in `$HOME/Applications`.
+It restores the previous bundle if replacement or installed-bundle verification fails.
+Use `./install.sh --relaunch`
 to open the new build, or `--skip-tests` during local iteration. `--no-launch` is the
 default and is also accepted explicitly. The separate renderer checks run with
 `node --test Tests/Renderer/*.test.cjs`; see [testing details](docs/development.md#testing).

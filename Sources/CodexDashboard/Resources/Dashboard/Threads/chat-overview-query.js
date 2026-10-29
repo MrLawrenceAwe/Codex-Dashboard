@@ -1,5 +1,8 @@
 const chatOverviewQuery = (() => {
-  const hasPendingGitChanges = thread => !!thread.projectGroupPath && ['uncommittedChanges', 'uncommittedChangesWithoutRemote', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
+  const hasUncommittedChanges = thread => ['uncommittedChanges', 'uncommittedChangesWithoutRemote', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
+  const hasUnpushedCommits = thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
+  const hasPendingGitChanges = thread => !!thread.projectGroupPath
+    && (hasUncommittedChanges(thread) || hasUnpushedCommits(thread));
   const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.sharesProjectRepository;
 
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
@@ -60,5 +63,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasPendingGitChanges, canOpenProjectGitActions };
+  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, canOpenProjectGitActions };
 })();

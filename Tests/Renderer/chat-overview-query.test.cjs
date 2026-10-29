@@ -33,3 +33,34 @@ test('Overview is the default and retains other saved preferences from the forme
     assert.deepEqual(Array.from(loaded.hiddenChangeIndicatorPaths), ['/hidden']);
   }
 });
+
+test('Local changes counts, filtering, and labels agree for every Git status', () => {
+  const view = vm.runInNewContext(`${resource('chat-overview-list-view.js')}\nchatOverviewListView`, {
+    chatOverviewQuery: query,
+    domUtils: { escapeHTML: String },
+    dashboardIcons: { render: () => '' },
+  });
+  for (const [projectGitStatus, expectedLabel] of [
+    ['notRepository', null],
+    ['unavailable', null],
+    ['clean', null],
+    ['uncommittedChanges', 'Uncommitted'],
+    ['uncommittedChangesWithoutRemote', 'Uncommitted'],
+    ['unpushedCommits', 'Unpushed'],
+    ['uncommittedChangesAndUnpushedCommits', 'Uncommitted · Unpushed'],
+  ]) {
+    const thread = { id: 'chat', projectName: 'Project', projectGroupPath: '/project', projectGitStatus };
+    const state = query.summarizeActivity([thread], () => false, new Set());
+    const selection = query.selectThreads({ threads: [thread], ...state,
+      filterMode: 'changedProjects', visibleItemLimit: 10 });
+    assert.equal(state.allChangedProjectPaths.size, expectedLabel ? 1 : 0, projectGitStatus);
+    assert.equal(state.indicatedChangedProjectPaths.size, expectedLabel ? 1 : 0, projectGitStatus);
+    assert.equal(selection.displayedThreads.length, expectedLabel ? 1 : 0, projectGitStatus);
+    const markup = view.renderThreadList(selection.displayedThreads, {
+      filterMode: 'changedProjects', hiddenChangeIndicatorPaths: new Set(),
+    });
+    assert.equal(markup.includes('class="dashboard-git-changes"'), expectedLabel !== null, projectGitStatus);
+    if (expectedLabel) assert.ok(markup.includes(`<span>${expectedLabel}</span>`), projectGitStatus);
+    assert.equal(query.hasPendingGitChanges({ ...thread, projectGroupPath: null }), false, projectGitStatus);
+  }
+});

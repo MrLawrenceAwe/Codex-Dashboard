@@ -191,8 +191,9 @@ Unchanged review controls and round details retain their DOM elements and keyboa
 turn/item pages. It loads reports for the first and latest turns and the saved checkpoint
 turn IDs, retaining the original fix report during subsequent verification. Review and
 fix turns use their separate saved model selections;
-permission settings are not overridden. Priority filtering preserves the complete
-report but submits only qualifying findings with original numbers when necessary.
+permission settings are not overridden. Review instructions request only findings
+within the priority limit. Saved reports retain all findings returned; fix submission
+filters any excluded priorities while preserving original finding numbers.
 Live testing adds instructions only when enabled; otherwise no test result is required
 by the loop contract. Exact prompt wording lives in `ReviewPrompts`, not duplicated here.
 

@@ -5,7 +5,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-extension ChatOverviewWebTests {
+final class UsageResetCountdownWebTests: SerializedDashboardWebTestCase {
     func testUsageResetNoticeFitsNarrowAndWideLightAndDarkWindows() async throws {
         for (width, background, theme) in [(360, "#171817", "dark"), (900, "#f5f5f3", "light")] {
             let webView = try await DashboardWebTestHarness.mountedWebView(html: """

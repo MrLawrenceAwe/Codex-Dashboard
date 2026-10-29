@@ -90,9 +90,9 @@ const chatOverviewListView = (() => {
         ? '<span class="dashboard-project-indicators-hidden" title="Change indicators are hidden for this project">Indicators hidden</span>'
         : '';
     }
-    const dirty = projectThreads.some(thread => ['uncommittedChanges', 'uncommittedChangesWithoutRemote', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
-    const unpushed = projectThreads.some(thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus));
-    const label = dirty && unpushed ? 'Uncommitted · Unpushed' : unpushed ? 'Unpushed' : 'Uncommitted';
+    const hasUncommittedChanges = projectThreads.some(chatOverviewQuery.hasUncommittedChanges);
+    const hasUnpushedCommits = projectThreads.some(chatOverviewQuery.hasUnpushedCommits);
+    const label = hasUncommittedChanges && hasUnpushedCommits ? 'Uncommitted · Unpushed' : hasUnpushedCommits ? 'Unpushed' : 'Uncommitted';
     return `<span class="dashboard-git-changes" title="${label}">${dashboardIcons.render('gitChanges')}<span>${label}</span></span>`;
   }
 

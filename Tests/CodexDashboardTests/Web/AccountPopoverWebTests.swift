@@ -1,0 +1,504 @@
+import Foundation
+import XCTest
+
+@testable import CodexDashboard
+
+@MainActor
+final class AccountPopoverWebTests: SerializedDashboardWebTestCase {
+    func testLostPollResponseKeepsRequestUntilExplicitCompletion() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const api = window.__codexDashboard;
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          window.confirm = () => true;
+          document.querySelector('[data-account-global="restartForSignIn"]').click();
+          const lostResponse = api.readQueuedAccountPopoverAction();
+          const retry = api.readQueuedAccountPopoverAction();
+          const action = JSON.parse(retry);
+          const beforeAcknowledgement = document.querySelector('.codex-accounts-status').textContent;
+          api.acknowledgeAccountPopoverAction(action.requestID);
+          api.applyAccountPopoverSnapshot({accounts: [], activeAccountID: null, statusMessage: null, isBusy: false});
+          const retainedAfterUnrelatedSnapshot = api.readQueuedAccountPopoverAction() === retry;
+          api.completeAccountPopoverAction(action.requestID, {
+            accounts: [], activeAccountID: null, statusMessage: 'Wait for active chats to finish.', isBusy: false,
+          });
+          return [lostResponse === retry, !beforeAcknowledgement.includes('Request received'),
+            retainedAfterUnrelatedSnapshot, api.readQueuedAccountPopoverAction(),
+            document.querySelector('.codex-accounts-status').textContent,
+            document.querySelector('[data-account-global="restartForSignIn"]').disabled];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? String, "null")
+        XCTAssertEqual(values[4] as? String, "Wait for active chats to finish.")
+        XCTAssertEqual(values[5] as? Bool, false)
+    }
+
+    func testSaveQueuesBeforeHostDismissesProfileMenuOnPointerPress() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div id="profile-menu" role="menu">
+            <button><span>Settings</span></button><button>Log out</button>
+          </div>
+        </body></html>
+        """)
+        let result = try await webView.callAsyncJavaScript("""
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        // Host capture handlers run before the overlay can stop propagation.
+        document.addEventListener('pointerdown', () => {
+          document.querySelector('#profile-menu')?.remove();
+        }, { capture: true, once: true });
+        const button = document.querySelector('[data-account-global="saveCurrentAccount"]');
+        button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const retained = Boolean(document.querySelector('#codex-accounts-panel'));
+        if (button.isConnected) button.click();
+        const first = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        button.click();
+        const second = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        window.__codexDashboard.completeAccountPopoverAction(first.requestID, {
+          accounts: [], activeAccountID: null, isBusy: false,
+          statusMessage: 'Saved Mum securely in Keychain.',
+        });
+        return [retained, first?.kind ?? null, second,
+          document.querySelector('.codex-accounts-status')?.textContent ?? null];
+        """, contentWorld: .page) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? String, "saveCurrentAccount")
+        XCTAssertEqual((values[2] as? [String: Any])?["kind"] as? String, "saveCurrentAccount")
+        XCTAssertEqual(values[3] as? String, "Saved Mum securely in Keychain.")
+    }
+
+    func testAccountsMountInCodexProfilePopoverAndQueueNativeActions() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <aside role="navigation"><button>New chat</button></aside>
+          <main>Conversation surface</main>
+          <div role="menu" id="profile-menu">
+            <div class="menu-items">
+              <div role="menuitem"><span>Usage remaining</span></div>
+              <div role="menuitem"><span>Settings</span><kbd>⌘,</kbd></div>
+              <div role="menuitem"><span>Log out</span></div>
+            </div>
+          </div>
+        </body></html>
+        """)
+
+        let state = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = {
+            accounts: [{
+              id: '00000000-0000-0000-0000-000000000001',
+              name: 'Lawrence',
+              isActive: false,
+              usageRows: [{ label: '5-hour', value: '88% remaining' },
+                { label: null, value: 'Status: waiting for refresh' }],
+              isRefreshing: false,
+              errorMessage: null,
+            }],
+            activeAccountID: null,
+            statusMessage: null,
+            isBusy: false,
+          };
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          const trigger = document.querySelector('[data-codex-accounts-trigger]');
+          trigger.click();
+          const panel = document.querySelector('#codex-accounts-panel');
+          const initialCard = panel.querySelector('.codex-accounts-card');
+          if (panel.querySelectorAll('.codex-accounts-usage').length !== 1
+              || panel.querySelector('.codex-accounts-usage-note').textContent !== 'Status: waiting for refresh') {
+            throw new Error('Usage notes must not be parsed as labelled values');
+          }
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          const retainedUnchangedCard = initialCard === panel.querySelector('.codex-accounts-card');
+          return [
+            trigger.textContent.trim(),
+            panel.textContent.includes('Lawrence'),
+            panel.textContent.includes('5-hour:') && panel.textContent.includes('88% remaining'),
+            retainedUnchangedCard,
+          ];
+        })()
+        """) as? [Any]
+
+        let values = try XCTUnwrap(state)
+        XCTAssertEqual(values[0] as? String, "Accounts›")
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? Bool, true)
+        _ = try await webView.evaluateJavaScript(
+            "document.querySelector('[data-account-action=\"refreshUsage\"]').click()"
+        )
+        let serializedAction = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.readQueuedAccountPopoverAction()"
+        ) as? String
+        let actionData = try XCTUnwrap(serializedAction?.data(using: String.Encoding.utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
+        XCTAssertEqual(action["kind"] as? String, "refreshUsage")
+        XCTAssertEqual(action["accountID"] as? String, "00000000-0000-0000-0000-000000000001")
+    }
+
+    func testAccountsPopoverMatchesTheRenderedHostSurface() async throws {
+        for (hostBackground, expectedPanelClass) in [("rgb(25, 25, 25)", false), ("rgb(250, 250, 250)", true)] {
+            let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+            <!doctype html><html><head><meta charset="utf-8"><style>
+              [role=menu] { background: \(hostBackground); }
+            </style></head><body>
+              <div role="menu"><button>Settings</button><button>Log out</button></div>
+            </body></html>
+            """)
+
+            let isLight = try await webView.evaluateJavaScript("""
+            (() => {
+              document.querySelector('[data-codex-accounts-trigger]').click();
+              return document.querySelector('#codex-accounts-panel').classList.contains('is-light');
+            })()
+            """) as? Bool
+
+            XCTAssertEqual(isLight, expectedPanelClass, "Host background: \(hostBackground)")
+        }
+    }
+
+    func testAccountsMountImmediatelyForDeeplyWrappedButtonMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation surface</main></body></html>
+        """)
+
+        let mounted = try await webView.callAsyncJavaScript("""
+        const portal = document.createElement('div');
+        let parent = portal;
+        for (let depth = 0; depth < 8; depth++) {
+          const wrapper = document.createElement('div');
+          parent.append(wrapper);
+          parent = wrapper;
+        }
+        parent.innerHTML = '<div><button><span>Settings</span></button><button>Log out</button></div>';
+        document.body.append(portal);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return Boolean(document.querySelector('[data-codex-accounts-trigger]'));
+        """, contentWorld: .page) as? Bool
+
+        XCTAssertEqual(mounted, true)
+    }
+
+    func testAccountsMountWhenExistingProfileMenuBecomesVisible() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <div id="profile-menu" hidden>
+            <button><span>Settings</span></button><button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let mounted = try await webView.callAsyncJavaScript("""
+        document.querySelector('#profile-menu').hidden = false;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return Boolean(document.querySelector('[data-codex-accounts-trigger]'));
+        """, contentWorld: .page) as? Bool
+
+        XCTAssertEqual(mounted, true)
+    }
+
+    func testAccountsMountOnEveryOpeningAfterWholePortalIsRemoved() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation surface</main></body></html>
+        """)
+
+        let results = try await webView.callAsyncJavaScript("""
+        const results = [];
+        for (let opening = 0; opening < 3; opening++) {
+          const portal = document.createElement('div');
+          portal.innerHTML = '<div><div role="menu"><button><span>Settings</span></button><button>Log out</button></div></div>';
+          document.body.append(portal);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          const trigger = portal.querySelector('[data-codex-accounts-trigger]');
+          results.push(Boolean(trigger));
+          trigger?.click();
+          portal.remove();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          results.push(document.querySelector('#codex-accounts-panel') === null);
+        }
+        return results;
+        """, contentWorld: .page) as? [Bool]
+
+        XCTAssertEqual(results, Array(repeating: true, count: 6))
+    }
+
+    func testClosedProfileMenuExposesPersistentCompatibilityContract() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <button aria-label="Open profile menu" aria-haspopup="menu">Lawrence</button>
+        </body></html>
+        """)
+        let contractSource = try InjectionBundle.loadRendererContractSource()
+
+        let compatible = try await webView.evaluateJavaScript("""
+        (() => {
+          \(contractSource)
+          return Boolean(codexUIContracts.profileMenuTrigger());
+        })()
+        """) as? Bool
+
+        XCTAssertEqual(compatible, true)
+    }
+
+    func testAccountsPanelStaysWithinANarrowWindow() async throws {
+        let webView = DashboardWebTestHarness.makeWebView()
+        webView.frame = NSRect(x: 0, y: 0, width: 320, height: 600)
+        webView.loadHTMLString("""
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <div role="menu">
+            <div role="menuitem"><span>Show pet</span></div>
+            <div role="menuitem"><span>Settings</span></div>
+            <div role="menuitem"><span>Log out</span></div>
+          </div>
+        </body></html>
+        """, baseURL: nil)
+        try await DashboardWebTestHarness.waitUntilLoaded(webView)
+        let injection = try InjectionBundle.load()
+        _ = try await webView.evaluateJavaScript(injection.mountExpression)
+
+        let values = try await webView.evaluateJavaScript("""
+        (() => {
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const rect = document.querySelector('#codex-accounts-panel').getBoundingClientRect();
+          return [rect.left, rect.right, innerWidth];
+        })()
+        """) as? [Double]
+
+        let bounds = try XCTUnwrap(values)
+        XCTAssertGreaterThanOrEqual(bounds[0], 12)
+        XCTAssertLessThanOrEqual(bounds[1], bounds[2] - 12)
+    }
+
+    func testRefreshingUsageKeepsAccountPanelOpenWhenCodexClosesProfileMenu() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><head><meta charset="utf-8"></head><body>
+          <div role="menu" id="profile-menu">
+            <div role="menuitem"><span>Show pet</span></div>
+            <div role="menuitem"><span>Settings</span></div>
+            <div role="menuitem"><span>Log out</span></div>
+          </div>
+        </body></html>
+        """)
+
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyAccountPopoverSnapshot({
+            accounts: [{
+              id: '00000000-0000-0000-0000-000000000001', name: 'Lawrence',
+              isActive: false, usageRows: [], isRefreshing: false, errorMessage: null,
+            }],
+            activeAccountID: null, statusMessage: null, isBusy: false,
+          });
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          document.querySelector('[data-account-action="refreshUsage"]').click();
+          document.querySelector('#profile-menu').remove();
+        })()
+        """)
+        try await Task.sleep(for: .milliseconds(50))
+        let panelIsOpen = try await webView.evaluateJavaScript(
+            "document.querySelector('#codex-accounts-panel') !== null"
+        ) as? Bool
+
+        XCTAssertEqual(panelIsOpen, true)
+    }
+
+    func testBlockedSwitchKeepsAccountPanelOpenToShowFailure() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div id="profile-portal">
+            <div role="menu">
+              <button><span>Settings</span></button>
+              <button>Log out</button>
+            </div>
+          </div>
+        </body></html>
+        """)
+
+        let result = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Personal', isActive: false, usageRows: [],
+            isRefreshing: false, errorMessage: null,
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        document.querySelector('[data-account-action="switchAccount"]').click();
+        document.querySelector('#profile-portal').remove();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const retainedWhilePending = Boolean(document.querySelector('#codex-accounts-panel'));
+        const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+        window.__codexDashboard.completeAccountPopoverAction(action.requestID, {
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Personal', isActive: false, usageRows: [],
+            isRefreshing: false, errorMessage: null,
+          }],
+          activeAccountID: null,
+          statusMessage: 'Finish or cancel active Codex chats before changing accounts.',
+          isBusy: false,
+        });
+        const panel = document.querySelector('#codex-accounts-panel');
+        return [retainedWhilePending, Boolean(panel), panel?.textContent ?? ''];
+        """, contentWorld: .page) as? [Any]
+
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? Bool, true)
+        XCTAssertTrue((values[2] as? String)?.contains("Finish or cancel active Codex chats") == true)
+    }
+
+    func testExpiredAccountExplainsSignedOutRestartAndCredentialRecovery() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div role="menu">
+            <button><span>Settings</span></button>
+            <button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let recoveryCopy = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Expired', isActive: false, usageRows: [],
+            isRefreshing: false, requiresSignIn: true,
+            errorMessage: 'Sign-in expired.',
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        window.confirm = () => true;
+        const button = document.querySelector('[data-account-action="restartForSignIn"]');
+        const text = button.textContent;
+        const instructions = button.closest('.codex-accounts-card').textContent;
+        button.click();
+        return [text, instructions];
+        """, contentWorld: .page) as? [String]
+        let serializedAction = try await webView.evaluateJavaScript(
+            "window.__codexDashboard.readQueuedAccountPopoverAction()"
+        ) as? String
+        let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
+
+        XCTAssertEqual(recoveryCopy?.first, "Restart to sign in…")
+        XCTAssertTrue(recoveryCopy?.last?.contains("Codex will restart signed out. Sign in to this account, then choose Save current account.") == true)
+        XCTAssertEqual(action["kind"] as? String, "restartForSignIn")
+        XCTAssertTrue(action["accountID"] is NSNull)
+    }
+
+    func testAccountActionSurvivesHostProfileMenuPointerDismissal() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body>
+          <main>Conversation surface</main>
+          <div role="menu">
+            <button><span>Settings</span></button>
+            <button>Log out</button>
+          </div>
+        </body></html>
+        """)
+
+        let serializedAction = try await webView.callAsyncJavaScript("""
+        window.__codexDashboard.applyAccountPopoverSnapshot({
+          accounts: [{
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Expired', isActive: false, usageRows: [],
+            isRefreshing: false, requiresSignIn: true,
+            errorMessage: 'Sign-in expired.',
+          }],
+          activeAccountID: null, statusMessage: null, isBusy: false,
+        });
+        document.querySelector('[data-codex-accounts-trigger]').click();
+        document.addEventListener('pointerdown', () => {
+          document.querySelector('#codex-accounts-panel')?.remove();
+        });
+        window.confirm = () => true;
+        const button = document.querySelector('[data-account-action="restartForSignIn"]');
+        button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        if (button.isConnected) button.click();
+        return window.__codexDashboard.readQueuedAccountPopoverAction();
+        """, contentWorld: .page) as? String
+        let actionData = try XCTUnwrap(serializedAction?.data(using: .utf8))
+        let action = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: actionData) as? [String: Any]
+        )
+
+        XCTAssertEqual(action["kind"] as? String, "restartForSignIn")
+    }
+
+    func testIdenticalSnapshotClearsCompletedAccountProgress() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          document.querySelector('[data-account-global="saveCurrentAccount"]').click();
+          const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+          window.__codexDashboard.completeAccountPopoverAction(action.requestID, snapshot);
+          return [document.querySelector('.codex-accounts-status') === null,
+                  document.querySelector('[data-account-global="saveCurrentAccount"]').disabled];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, false])
+    }
+
+    func testQueuedAccountRequestExpiresAndAllowsRetryWithoutExecutingLate() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button><span>Settings</span></button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false };
+          window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const originalNow = Date.now;
+          let now = originalNow();
+          Date.now = () => now;
+          try {
+            document.querySelector('[data-account-global="saveCurrentAccount"]').click();
+            window.__codexDashboard.applyAccountPopoverSnapshot(snapshot);
+            const stillQueued = document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
+            now += 15001;
+            const expiredAction = window.__codexDashboard.readQueuedAccountPopoverAction();
+            const enabled = !document.querySelector('[data-account-global="saveCurrentAccount"]').disabled;
+            const message = document.querySelector('.codex-accounts-status').textContent;
+            document.querySelector('[data-account-global="saveCurrentAccount"]').click();
+            const retried = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction()).kind;
+            return [stillQueued, expiredAction, enabled, message, retried];
+          } finally { Date.now = originalNow; }
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, true)
+        XCTAssertEqual(values[1] as? String, "null")
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertTrue((values[3] as? String)?.contains("Please try again") == true)
+        XCTAssertEqual(values[4] as? String, "saveCurrentAccount")
+    }
+}
