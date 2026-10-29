@@ -124,7 +124,7 @@ const promptLibraryView = (() => {
               <span class="dashboard-prompt-section-count">${sectionPrompts.length}</span>
             </button>
             <div class="dashboard-prompt-section-actions">
-              ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section across all projects" title="Renames this section across all projects">Rename across projects</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section across all projects" title="Moves this section’s prompts to General across all projects">Delete across projects</button>` : ''}
+              ${canManageSection ? `<button type="button" data-prompt-section-rename="${domUtils.escapeHTML(section)}" aria-label="Rename ${domUtils.escapeHTML(section)} section across all projects" title="Renames this section across all projects">Rename across projects</button><button type="button" data-prompt-section-delete="${domUtils.escapeHTML(section)}" aria-label="Delete ${domUtils.escapeHTML(section)} section across all projects" title="Moves this section’s prompts to ${domUtils.escapeHTML(promptLibraryContract.defaultSection)} across all projects">Delete across projects</button>` : ''}
             </div>
             <div class="dashboard-prompt-section-body" id="${sectionBodyID}"${collapsed ? ' hidden' : ''}>${renderPromptRows(sectionPrompts)}</div>
           </section>`;
