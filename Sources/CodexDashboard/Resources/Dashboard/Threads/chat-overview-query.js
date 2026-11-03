@@ -5,6 +5,14 @@ const chatOverviewQuery = (() => {
     && (hasUncommittedChanges(thread) || hasUnpushedCommits(thread));
   const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.sharesProjectRepository;
 
+  function projectGitActionThread(threads, projectPath) {
+    const candidates = threads.filter(thread => canOpenProjectGitActions(thread)
+      && String(thread.projectGroupPath || '').trim() === projectPath);
+    // Projectless automation runs can share the folder but open under Recents.
+    // Use an assigned project chat when available, keeping recency within each group.
+    return candidates.find(thread => thread.projectID) || candidates[0];
+  }
+
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
     const indicatedChangedProjectPaths = new Set();
@@ -63,5 +71,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, canOpenProjectGitActions };
+  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, canOpenProjectGitActions, projectGitActionThread };
 })();

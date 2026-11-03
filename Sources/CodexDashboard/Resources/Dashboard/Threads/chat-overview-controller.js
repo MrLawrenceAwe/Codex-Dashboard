@@ -116,9 +116,7 @@ function createChatOverview({ catalog }) {
 
   async function openGitActionsForProject(projectPath) {
     projectGitActionError = '';
-    const thread = currentThreads().find(
-      (item) => chatOverviewQuery.canOpenProjectGitActions(item) && String(item.projectGroupPath || '').trim() === projectPath,
-    );
+    const thread = chatOverviewQuery.projectGitActionThread(currentThreads(), projectPath);
     if (!thread) {
       projectGitActionError = 'No idle chat is available in this project’s repository.';
       renderChatOverview();

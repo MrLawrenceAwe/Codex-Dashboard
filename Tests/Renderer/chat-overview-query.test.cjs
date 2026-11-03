@@ -8,6 +8,22 @@ const resource = name => fs.readFileSync(path.join(__dirname,
   '../../Sources/CodexDashboard/Resources/Dashboard/Threads', name), 'utf8');
 const query = vm.runInNewContext(`${resource('chat-overview-query.js')}\nchatOverviewQuery`);
 
+test('Git actions prefer a project chat over newer projectless automation runs', () => {
+  const projectGroupPath = '/Users/example/Job Search Companion';
+  const thread = (id, overrides = {}) => ({ id, projectGroupPath, runState: 'idle',
+    sharesProjectRepository: true, projectID: 'project', ...overrides });
+  const automation = thread('automation', { projectID: null });
+  const assigned = thread('project-chat');
+  const candidates = [automation,
+    thread('running', { runState: 'running' }),
+    thread('nested', { sharesProjectRepository: false }),
+    thread('other-project', { projectGroupPath: '/other' }),
+    assigned, thread('older-project-chat')];
+  assert.equal(query.projectGitActionThread(candidates, projectGroupPath), assigned);
+  assert.equal(query.projectGitActionThread([automation], projectGroupPath), automation);
+  assert.equal(query.projectGitActionThread(candidates.slice(1, 4), projectGroupPath), undefined);
+});
+
 test('Overview includes running chats before paged recent history without duplicates', () => {
   const threads = [
     { id: 'newer-idle', runState: 'idle' },

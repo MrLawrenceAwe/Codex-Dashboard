@@ -590,6 +590,14 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(state[5] as? String, "target")
     }
 
+    func testProjectGitActionPrefersAssignedChatOverNewerProjectlessAutomation() async throws {
+        let state = try await gitHandoffState(status: .unpushedCommits, includeProjectlessChat: true)
+        XCTAssertEqual(state[0] as? Bool, true)
+        XCTAssertEqual(state[1] as? String, "Push")
+        XCTAssertEqual(state[4] as? String, "target")
+        XCTAssertEqual(state[5] as? String, "target")
+    }
+
     func testProjectGitActionDisabledWithoutIdleChatInMatchingRepository() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/project/nested",
@@ -616,7 +624,7 @@ extension ChatOverviewWebTests {
         }
     }
 
-    private func gitHandoffState(status: ProjectGitStatus, switchStage: String = "", includeNestedChat: Bool = false) async throws -> [Any] {
+    private func gitHandoffState(status: ProjectGitStatus, switchStage: String = "", includeNestedChat: Bool = false, includeProjectlessChat: Bool = false) async throws -> [Any] {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><head><meta charset="utf-8"></head><body>
           <aside role="navigation">
@@ -700,6 +708,13 @@ extension ChatOverviewWebTests {
         _ = try await webView.evaluateJavaScript("window.__codexDashboard?.destroy?.()")
         _ = try await webView.evaluateJavaScript(instrumented)
         var threads = [ThreadSummary.fixture(id: "target", checkoutPath: "/tmp/target", projectGitStatus: status)]
+        if includeProjectlessChat {
+            var automation = ThreadSummary.fixture(id: "automation", title: "Indeed feed suggestions",
+                checkoutPath: "/tmp/target", recencyEpochMillis: 10, projectGitStatus: status)
+            automation.projectID = nil
+            automation.threadSource = "automation"
+            threads.insert(automation, at: 0)
+        }
         if includeNestedChat {
             var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/target/nested",
                 recencyEpochMillis: 10, projectGitStatus: status, sharesProjectRepository: false)
