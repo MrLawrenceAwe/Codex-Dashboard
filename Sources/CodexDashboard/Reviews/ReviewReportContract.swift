@@ -78,7 +78,7 @@ enum ReviewReportContract {
         guard text?.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("# Extension reload required") == true else { return nil }
         let parts = try sections(text)
         guard parts.count == 2, lines(parts[0]) == ["# Extension reload required"] else { throw invalid() }
-        return try content(parts[1], prefix: "Summary\n")
+        return try summaryBody(parts[1])
     }
 
     static func review(_ text: String?, priorityLimit: ReviewFinding.Priority?) throws -> ReviewReport {
@@ -88,10 +88,7 @@ enum ReviewReportContract {
               let outcome = ["# Review complete": ReviewReport.Outcome.reviewed, "# Review blocked": .blocked][header[0]] else {
             throw invalid("Expected only '# Review complete' or '# Review blocked' before '## Summary'. The dashboard counts finding sections automatically; omit the findings total.")
         }
-        guard sections[1] == "Summary" || sections[1].hasPrefix("Summary\n") else {
-            throw invalid("The first section must be '## Summary'.")
-        }
-        let summary = try content(sections[1], prefix: "Summary\n")
+        let summary = try summaryBody(sections[1])
         let findings = try sections.dropFirst(2).enumerated().map { index, section -> ReviewFinding in
             guard let newline = section.firstIndex(of: "\n") else {
                 throw invalid("Finding \(index + 1) needs a title and a description.")
@@ -156,7 +153,7 @@ enum ReviewReportContract {
               (outcome == .blocked && commit == "none") else { throw invalid() }
         return FixReport(result: ReviewRoundResult(outcome: outcome, addressedFindingCount: addressedCount,
                                                    fixCommit: outcome == .fixed && !folder ? commit : nil,
-                                                   summary: try content(sections[1], prefix: "Summary\n")),
+                                                   summary: try summaryBody(sections[1])),
                          withdrawn: withdrawn)
     }
 
@@ -186,13 +183,13 @@ enum ReviewReportContract {
         return Int(value)
     }
 
-    private static func content(_ text: String, prefix: String) throws -> String {
-        guard text != prefix.trimmingCharacters(in: .whitespacesAndNewlines) else {
-            throw invalid("The '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section is empty.")
+    private static func summaryBody(_ section: String) throws -> String {
+        let lines = section.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+        guard lines.first == "Summary" else {
+            throw invalid("The first section must be '## Summary'.")
         }
-        guard text.hasPrefix(prefix) else { throw invalid("Expected a '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section.") }
-        let body = text.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else { throw invalid("The '## \(prefix.trimmingCharacters(in: .whitespacesAndNewlines))' section is empty.") }
+        let body = lines.dropFirst().first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !body.isEmpty else { throw invalid("The '## Summary' section is empty.") }
         return body
     }
 

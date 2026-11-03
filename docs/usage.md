@@ -188,8 +188,8 @@ saved and verified within the fix task. Dashboard checks the fix report and fold
 fingerprint before completing the round; it does not send a separate verification
 turn for folder fixes. The priority limit restricts which findings the review is
 asked to report. Saved reports retain any excluded findings already present, but
-those findings are not submitted for fixing. Findings are verified
-before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
+those findings are excluded from fixes and later verification decisions. Findings
+are verified before fixes; invalid findings are withdrawn. All-withdrawn and no-qualifying-finding
 reviews finish without a commit. A clean review is an assessment, not proof that
 all defects are absent. Multiple projects can run loops, with one executing loop per
 project and workspace. Avoid other edits in that workspace while a loop runs.

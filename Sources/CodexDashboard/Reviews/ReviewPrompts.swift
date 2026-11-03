@@ -14,13 +14,18 @@ enum ReviewPrompts {
 
         Original findings:
         \(findings)
-        """ + structureReviewInstruction(for: loop, verifyingFixes: true)
-            + bugVerificationInstruction(for: loop, verifyingFixes: true)
+        """ + fixVerificationInstruction(for: loop)
             + extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
     }
 
-    private static func bugVerificationInstruction(for loop: ReviewLoop, verifyingFixes: Bool = false) -> String {
-        guard verifyingFixes && loop.liveTesting && (loop.reviewType == .bugs || loop.reviewType == .bugsAndPerformance) else { return "" }
+    private static func fixVerificationInstruction(for loop: ReviewLoop) -> String {
+        if loop.reviewType.isStructureReview {
+            return structureReviewInstruction(for: loop, verifyingFixes: true)
+        }
+        guard loop.liveTesting && loop.reviewType.supportsLiveTesting else { return "" }
+        if loop.reviewType == .performance {
+            return "\n\nVerify fixes for findings discovered through live testing using live testing."
+        }
         return "\n\nFor findings discovered through code review, use live testing to verify bugs and their fixes only when necessary. Verify fixes for findings discovered through live testing using live testing. Connect DevTools, launch test UI, or reload extensions for verification only when live testing is needed."
     }
 
@@ -68,8 +73,8 @@ enum ReviewPrompts {
         let continuation = loop.workspaceKind == .folder && round.fixRequested
             ? "Continue the unfinished fix and verification task. Preserve existing changes, finish addressing accepted findings, and return the final folder fix report. Do not initialise Git, commit, or push."
             : task
-        return continuation + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
-            + bugVerificationInstruction(for: loop, verifyingFixes: round.fixRequested)
+        return continuation
+            + (round.fixRequested ? fixVerificationInstruction(for: loop) : structureReviewInstruction(for: loop))
             + extensionReloadInstruction(for: loop, verifyingFixes: round.fixRequested)
             + testPlaybackInstruction(for: loop)
     }
@@ -79,13 +84,13 @@ enum ReviewPrompts {
             return (round.fixRequested
                 ? "Continue the unfinished fix task. Preserve existing changes and return the final fix report."
                 : "Continue the unfinished read-only review and return the final review report.")
-                + structureReviewInstruction(for: loop, verifyingFixes: round.fixRequested)
+                + (round.fixRequested ? fixVerificationInstruction(for: loop) : structureReviewInstruction(for: loop))
         }
         return "The user confirmed that the browser extension has been manually reloaded. Continue the unfinished "
             + (round.fixRequested ? "fix and verification task. Preserve existing changes, finish verification, and return the final fix report." : "read-only review and return the final review report.")
             + " If another manual reload is needed, return the extension reload request again."
             + "\n\n" + ReviewReportContract.extensionReloadInstructions
-            + bugVerificationInstruction(for: loop, verifyingFixes: round.fixRequested)
+            + (round.fixRequested ? fixVerificationInstruction(for: loop) : "")
             + testPlaybackInstruction(for: loop)
     }
 
@@ -141,12 +146,9 @@ enum ReviewPrompts {
             ? "Address \(findings) in this ordinary folder. Verify each finding first. Preserve unrelated files and edits. Mark invalid findings as withdrawn. Do not initialise Git, create commits, or push. Verify the changes and return the folder fix report."
             : task + ". Verify each finding first. Mark invalid findings as withdrawn; if all are invalid, make no commit."
         if loop.reviewType.isStructureReview {
-            prompt += "\n\nAddress findings within the original review scope and constraints." + preserveUICopyInstruction(for: loop)
+            prompt += "\n\nAddress findings within the original review scope and constraints."
         }
-        prompt += bugVerificationInstruction(for: loop, verifyingFixes: true)
-        if loop.liveTesting && loop.reviewType == .performance {
-            prompt += "\n\nVerify fixes for findings discovered through live testing using live testing."
-        }
+        prompt += fixVerificationInstruction(for: loop)
         prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
         let scope = accepted.map { number, finding in

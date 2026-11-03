@@ -468,9 +468,10 @@ final class ReviewLoopCoordinator {
             if try await waitForExtensionReload(turn, loop: loop, using: driver, threads: threads, threadID: threadID) { return false }
             if verification.targetRevision == workspace.revision {
                 let report = try ReviewReportContract.review(turn.finalMessage, priorityLimit: loop.priorityLimit)
-                guard report.outcome == .reviewed, report.findings.isEmpty else {
+                let findings = report.numberedFindings(upTo: loop.priorityLimit)
+                guard report.outcome == .reviewed, findings.isEmpty else {
                     throw ReviewLoopError("Fix verification needs attention at the current revision: \(report.summary) "
-                        + report.findings.map { "\($0.title): \($0.body)" }.joined(separator: "\n"))
+                        + findings.map { "\($0.finding.title): \($0.finding.body)" }.joined(separator: "\n"))
                 }
                 return true
             }

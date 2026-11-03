@@ -119,20 +119,21 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                                liveTesting && (reviewType == .performance || reviewType == .bugsAndPerformance))
                 XCTAssertFalse(review.contains("only when necessary"))
                 let conditional = liveTesting && (reviewType == .bugs || reviewType == .bugsAndPerformance)
+                let verifiesLiveFindings = liveTesting && reviewType.supportsLiveTesting
+                let liveVerification = "Verify fixes for findings discovered through live testing using live testing."
                 for fixRequested in [false, true] {
                     round.fixRequested = fixRequested
                     for prompt in [ReviewPrompts.interruptedContinuation(for: loop, round: round),
                                    ReviewPrompts.extensionReloadContinuation(for: loop, round: round)] {
                         XCTAssertEqual(prompt.contains("only when necessary"), conditional && fixRequested)
+                        XCTAssertEqual(prompt.contains(liveVerification), verifiesLiveFindings && fixRequested)
                     }
                 }
                 for prompt in [ReviewPrompts.fixPrompt(for: loop, round: round),
                                ReviewPrompts.verifyFix(for: loop, round: round, targetRevision: "head")] {
                     XCTAssertEqual(prompt.contains("only when necessary"), conditional)
                     XCTAssertEqual(prompt.contains("Follow these extension reload instructions only when live verification is needed."), conditional)
-                    if conditional {
-                        XCTAssertTrue(prompt.contains("Verify fixes for findings discovered through live testing using live testing."))
-                    }
+                    XCTAssertEqual(prompt.contains(liveVerification), verifiesLiveFindings)
                 }
             }
         }
@@ -161,8 +162,8 @@ final class ReviewLoopPromptsTests: ReviewLoopTestCase {
                 }
                 XCTAssertTrue(review.contains("Statically"))
                 XCTAssertFalse(review.contains("run relevant builds"))
-                XCTAssertEqual(fix.components(separatedBy: "\n\n").last,
-                               "Address findings within the original review scope and constraints.")
+                XCTAssertTrue(fix.contains("run relevant builds"))
+                XCTAssertTrue(fix.contains("No live or UI testing, Computer Use, or extension reloads"))
                 XCTAssertFalse(fix.contains(reviewType.scopeDescription))
             }
         }

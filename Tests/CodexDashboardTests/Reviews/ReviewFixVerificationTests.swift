@@ -61,6 +61,15 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         }
     }
 
+    func testVerificationIgnoresFindingsBelowTheLoopPriorityLimit() async throws {
+        let (coordinator, _, driver) = try await verifying()
+        XCTAssertEqual(coordinator.loops[0].priorityLimit, .p2)
+        driver.review(priorities: [.p3])
+        await coordinator.advance(using: driver, threads: [])
+        XCTAssertEqual(coordinator.loops[0].phase, .limitReached)
+        XCTAssertEqual(driver.pushedCommits, ["fixed"])
+    }
+
     func testRegressionBlockedAndCorrectedVerificationNeedsExplicitResume() async throws {
         let (coordinator, _, driver) = try await verifying()
         driver.review(priorities: [.p1])
