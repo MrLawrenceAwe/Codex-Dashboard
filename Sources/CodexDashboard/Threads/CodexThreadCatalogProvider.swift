@@ -207,7 +207,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             )
             summary.latestQuestionEvent = rolloutQuestionReader.latestRecordedEvent(at: thread.rolloutPath)
             summary.threadSource = thread.threadSource
-            summary.projectID = root?.id
+            // Folder grouping also includes projectless automation chats. Keep
+            // actual membership so Git handoffs can prefer a project's own chat.
+            summary.projectID = root == nil ? nil : thread.projectID
             if let root {
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = checkoutRoot?.path

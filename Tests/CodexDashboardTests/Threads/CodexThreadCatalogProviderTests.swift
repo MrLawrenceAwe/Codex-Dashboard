@@ -3,6 +3,36 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testProjectlessAutomationKeepsNilMembershipBesideAssignedRepositoryChat() async throws {
+        let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
+        let project = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: project) }
+        let git = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["init", project.path], timeout: 3)
+        XCTAssertEqual(git.terminationStatus, 0)
+        let path = "'" + project.path.replacingOccurrences(of: "'", with: "''") + "'"
+        let setup = """
+        DELETE FROM project_roots;
+        DELETE FROM projects;
+        INSERT INTO projects (id, name) VALUES ('companion', 'Job Search Companion');
+        INSERT INTO project_roots (project_id, path) VALUES ('companion', \(path));
+        UPDATE threads SET cwd = \(path), project_id = NULL;
+        UPDATE threads SET thread_source = 'automation' WHERE id = 'running';
+        UPDATE threads SET project_id = 'companion' WHERE id = 'updated';
+        """
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, setup], timeout: 3)
+        XCTAssertEqual(result.terminationStatus, 0)
+        let catalog = try await CodexThreadCatalogProvider(stateDatabaseURL: url)
+            .loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
+        let automation = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
+        let assigned = try XCTUnwrap(catalog.threads.first { $0.id == "updated" })
+        XCTAssertEqual(automation.projectGroupPath, assigned.projectGroupPath)
+        XCTAssertTrue(automation.sharesProjectRepository && assigned.sharesProjectRepository)
+        XCTAssertNil(RendererThread(automation).projectID)
+        XCTAssertEqual(RendererThread(assigned).projectID, "companion")
+    }
+
     func testReadsAutomationOriginFromMetadataRatherThanTitle() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
@@ -133,7 +163,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let initial = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
         let grouped = initial.threads.filter { ["running", "updated"].contains($0.id) }
         XCTAssertEqual(grouped.map(\.projectName), ["Mail Verify", "Mail Verify"])
-        XCTAssertEqual(Set(grouped.compactMap(\.projectID)), ["mail"])
+        XCTAssertTrue(grouped.allSatisfy { $0.projectID == nil }, "Folder grouping must not assign projectless chats to a project")
         XCTAssertEqual(Set(grouped.compactMap(\.projectGroupPath)), [project.resolvingSymlinksInPath().path])
         XCTAssertEqual(initial.threads.first { $0.id == "running" }?.checkoutPath, alias.path, "Keep the original chat checkout for review-loop isolation")
         XCTAssertNil(initial.threads.first { $0.id == "idle" }?.projectGroupPath)
