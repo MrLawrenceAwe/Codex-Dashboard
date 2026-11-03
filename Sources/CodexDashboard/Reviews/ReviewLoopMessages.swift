@@ -86,15 +86,13 @@ struct ReviewLoopDisplaySnapshot: Encodable, Sendable {
 struct ReviewProjectChoice: Encodable, Sendable {
     let id: String
     let name: String
-    let path: String
     let workspaceKind: ReviewWorkspaceKind
     let requiresQueue: Bool
 
     init(_ project: ReviewProject, requiresQueue: Bool) {
         id = project.id
         name = project.name
-        path = project.path
-        workspaceKind = GitMetadataLocator.markerURL(for: URL(fileURLWithPath: path)) == nil ? .folder : .git
+        workspaceKind = GitMetadataLocator.markerURL(for: URL(fileURLWithPath: project.path)) == nil ? .folder : .git
         self.requiresQueue = requiresQueue
     }
 }

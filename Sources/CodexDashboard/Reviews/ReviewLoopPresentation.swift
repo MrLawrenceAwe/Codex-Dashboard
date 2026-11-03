@@ -59,8 +59,14 @@ enum ReviewLoopPresentation {
         let noNextPrompt = "No further prompts scheduled."
         if loop.phase.isFinished || loop.phase == .stopping { return (nil, noNextPrompt) }
         if loop.phase == .awaitingExtensionReload, let round {
+            let prompt: String
+            if let verification = round.fixVerification {
+                prompt = ReviewPrompts.verifyFix(for: loop, round: round, targetRevision: verification.targetRevision)
+            } else {
+                prompt = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
+            }
             return (ReviewPromptPreview(title: "Continue · round \(round.number)",
-                                        text: ReviewPrompts.extensionReloadContinuation(for: loop, round: round),
+                                        text: prompt,
                                         note: "Reload the extension manually, then select Extension reloaded — continue."), "")
         }
         if loop.phase == .blocked {

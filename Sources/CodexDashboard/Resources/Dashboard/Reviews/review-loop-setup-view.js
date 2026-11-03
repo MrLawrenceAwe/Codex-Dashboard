@@ -143,14 +143,18 @@ const reviewLoopSetupView = (() => {
     root.querySelector('[data-review-push]').disabled = disabled || root.querySelector('.review-remote-push').hidden;
   }
 
-  function renderReasoningOptions(kind = 'review') {
-    const root = panel();
-    if (!root) return;
+  function renderReasoningOptions(root, kind) {
     const model = models.find(item => item.modelID === root.querySelector(`[data-${kind}-model]`).value);
     const select = root.querySelector(`[data-${kind}-effort]`);
     const selected = select.value;
     select.innerHTML = '<option value="">Model default</option>' + (model?.supportedReasoningEfforts || []).map(value => `<option value="${escape(value)}">${escape(composerPresets.reasoningLabel(value))}</option>`).join('');
     if (model?.supportedReasoningEfforts.includes(selected)) select.value = selected;
+  }
+
+  function updateReasoningOptions(kind) {
+    const root = panel();
+    if (!root) return;
+    renderReasoningOptions(root, kind);
     updateControlAvailability();
   }
 
@@ -179,7 +183,7 @@ const reviewLoopSetupView = (() => {
           if (!models.some(model => model.modelID === selected)) modelSelect.add(new Option(`Unavailable · ${selected}`, selected));
           modelSelect.value = selected;
         }
-        renderReasoningOptions(kind);
+        renderReasoningOptions(root, kind);
       }
       modelsSignature = nextModelsSignature;
     }
@@ -200,5 +204,5 @@ const reviewLoopSetupView = (() => {
     reviewTypesSignature = '';
   }
 
-  return { formMarkup, render, renderReasoningOptions, renderReviewSettings, reset, readSettings };
+  return { formMarkup, render, updateReasoningOptions, renderReviewSettings, reset, readSettings };
 })();

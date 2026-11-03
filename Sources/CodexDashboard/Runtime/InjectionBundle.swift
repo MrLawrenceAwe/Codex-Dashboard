@@ -5,7 +5,7 @@ struct InjectionBundle: Sendable {
     private struct ResourceManifest: Decodable {
         let scripts: [String]
         let stylesheets: [String]
-        let contracts: [String: [String]]
+        let rendererContract: [String]
     }
 
     let version: String
@@ -70,20 +70,14 @@ struct InjectionBundle: Sendable {
     }
 
     static func loadRendererContractSource(bundle: Bundle? = nil) throws -> String {
-        ComposerPresetSchema.javascriptDeclaration + "\n" + (try loadContract(named: "renderer", bundle: bundle))
-    }
-
-    private static func loadContract(named name: String, bundle: Bundle?) throws -> String {
         let resourceBundle = bundle ?? defaultResourceBundle
         let manifest = try loadManifest(from: resourceBundle)
-        guard let resources = manifest.contracts[name] else {
-            throw DashboardError.missingResources
-        }
-        return try loadResources(
-            named: resources,
+        let source = try loadResources(
+            named: manifest.rendererContract,
             withExtension: "js",
             from: resourceBundle
         )
+        return ComposerPresetSchema.javascriptDeclaration + "\n" + source
     }
 
     private static func loadManifest(from bundle: Bundle) throws -> ResourceManifest {

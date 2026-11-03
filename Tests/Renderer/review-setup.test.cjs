@@ -51,7 +51,7 @@ function setup() {
     Option: function (textContent, value) { Object.assign(this, { textContent, value }); },
   });
   const snapshot = {
-    projects: [{ id: 'alias', name: 'Alias', path: '/tmp/alias', requiresQueue: true, workspaceKind: 'git' }],
+    projects: [{ id: 'alias', name: 'Alias', requiresQueue: true, workspaceKind: 'git' }],
     models: [{ modelID: 'available', displayName: 'Available', supportedReasoningEfforts: ['high'] }],
     reviewTypes: [{ id: 'bugs', usesPriorities: true, supportsLiveTesting: true, supportsProjectContext: true }],
   };
@@ -77,7 +77,7 @@ test('model removal and repeated snapshots keep reasoning controls disabled', ()
   const model = get('[data-review-model]');
   const effort = get('[data-review-effort]');
   model.value = 'available';
-  view.renderReasoningOptions();
+  view.updateReasoningOptions('review');
   assert.equal(effort.disabled, false);
   effort.value = 'high';
   snapshot.models = [];
@@ -103,7 +103,7 @@ test('folder and pending restrictions survive model changes and acknowledgement'
   assert.equal(get('[data-review-push]').value, 'false');
   assert.equal(view.readSettings().pushToRemote, false);
   get('[data-review-model]').value = 'available';
-  view.renderReasoningOptions();
+  view.updateReasoningOptions('review');
   assert.equal(get('[data-review-push]').disabled, true);
   view.render(snapshot, { kind: 'queue' });
   assert.equal(get('[data-review-effort]').disabled, true);

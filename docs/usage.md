@@ -174,13 +174,11 @@ Dashboard restarts; resume the preceding loop if the restart paused it. Select
 **Cancel queued loop** on its card to remove it from the queue.
 
 Expand **Configured prompt preview** or **Up next** to inspect instructions without
-leaving the loop. **Loop settings** shows the saved configuration, including project context and the
-playback mute setting for live testing, for current and historical loops. Prompt sections
-keep their expanded state during refresh.
-
-**Configured prompt preview** shows instructions generated from the current loop
-settings. It does not record the exact prompt submitted to a chat; setting changes
-apply to subsequent prompts.
+leaving the loop. The preview is generated from current settings, and setting
+changes apply to subsequent prompts. **Loop settings** shows the saved
+configuration, including project context and playback mute for live testing, for
+current and historical loops. Prompt sections keep their expanded state during
+refresh.
 
 Each round starts a read-only review in a new chat. Git projects use the current
 branch and checkout. Ordinary folders work without Git. Dashboard validates the
@@ -200,10 +198,9 @@ For ordinary folders, the dashboard fingerprints file contents, names, permissio
 and symlink destinations to detect changes during read-only reviews and between
 rounds. Hidden files are included; Finder's `.DS_Store` is ignored. Symlinks are not
 traversed. Folder loops never initialise Git or create commits, and remote push is
-disabled. Fingerprints identify changes; they are not backups or an undo history.
-Avoid other edits while the loop runs: fingerprints detect changes but do not
-establish that a fix works. A paused loop that failed because its
-folder had no Git repository can now be resumed.
+disabled. Fingerprints only identify file state. The fix task verifies that the
+changes work. A paused loop that failed because its folder had no Git repository
+can now be resumed.
 
 With **Live testing** enabled, bug reviews use both code review and live testing
 to find bugs and issues. For findings discovered through code review, live testing

@@ -70,11 +70,9 @@
     "Accounts/account-popover",
     "Reviews/review-loop"
   ],
-  "contracts": {
-    "renderer": [
-      "Core/dashboard-elements",
-      "Core/dom-utils",
-      "Core/codex-ui-contracts"
-    ]
-  }
+  "rendererContract": [
+    "Core/dashboard-elements",
+    "Core/dom-utils",
+    "Core/codex-ui-contracts"
+  ]
 }

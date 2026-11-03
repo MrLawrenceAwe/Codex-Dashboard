@@ -144,14 +144,12 @@ enum ReviewReportContract {
         if withdrawnValue == "none" {
             withdrawn = []
         } else {
-            let numbers = withdrawnValue.components(separatedBy: ", ")
-            guard !numbers.isEmpty,
-                  numbers.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy({ (48...57).contains($0) }) }),
-                  numbers.allSatisfy({ Int($0).map({ $0 > 0 }) == true }) else { throw invalid() }
-            withdrawn = numbers.compactMap(Int.init)
+            withdrawn = try withdrawnValue.components(separatedBy: ", ").map { number in
+                guard let value = decimalInteger(number[...]), value > 0 else { throw invalid() }
+                return value
+            }
         }
-        guard !withdrawnValue.isEmpty,
-              Set(withdrawn).count == withdrawn.count,
+        guard Set(withdrawn).count == withdrawn.count,
               !commit.isEmpty, !commit.contains("`"),
               (outcome == .fixed && addressedCount > 0 && (folder || commit != "none")) ||
               (outcome == .withdrawn && addressedCount == 0 && !withdrawn.isEmpty && commit == "none") ||
@@ -180,7 +178,10 @@ enum ReviewReportContract {
 
     private static func count(_ text: String, prefix: String) -> Int? {
         guard text.hasPrefix(prefix) else { return nil }
-        let value = text.dropFirst(prefix.count)
+        return decimalInteger(text.dropFirst(prefix.count))
+    }
+
+    private static func decimalInteger(_ value: Substring) -> Int? {
         guard !value.isEmpty, value.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
         return Int(value)
     }

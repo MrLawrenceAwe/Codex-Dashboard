@@ -26,7 +26,7 @@ final class InjectionBundleTests: XCTestCase {
                     XCTAssertTrue(error.localizedDescription.contains(path))
                     XCTAssertTrue(error.localizedDescription.contains(reason))
                     if contents.hasPrefix("{") {
-                        XCTAssertTrue(reason.contains("contracts"), "Keep the missing field in the diagnosis")
+                        XCTAssertTrue(reason.contains("rendererContract"), "Keep the missing field in the diagnosis")
                     }
                 }
             }
