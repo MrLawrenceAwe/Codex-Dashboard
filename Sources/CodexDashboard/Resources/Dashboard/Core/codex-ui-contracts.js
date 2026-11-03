@@ -202,15 +202,17 @@ const codexUIContracts = (() => {
       || activeComposerThreadID() === threadID;
   }
 
-  function activeComposerThreadID() {
-    const activeComposer = composer();
-    let host = activeComposer?.parentElement;
-    while (host && host !== document.body) {
+  function* activeComposerAncestorProps() {
+    for (let host = composer()?.parentElement; host && host !== document.body; host = host.parentElement) {
       for (const fiber of parentFibers(host)) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (typeof props?.conversationId === 'string') return props.conversationId;
+        yield fiber.memoizedProps || fiber.pendingProps;
       }
-      host = host.parentElement;
+    }
+  }
+
+  function activeComposerThreadID() {
+    for (const props of activeComposerAncestorProps()) {
+      if (typeof props?.conversationId === 'string') return props.conversationId;
     }
     return null;
   }
@@ -222,39 +224,21 @@ const codexUIContracts = (() => {
     return sidebarThreads.localID(row);
   }
 
-  function activeComposerHasNoProject() {
-    const activeComposer = composer();
-    let host = activeComposer?.parentElement;
-    while (host && host !== document.body) {
-      for (const fiber of parentFibers(host)) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (props && Object.hasOwn(props, 'selectedProject')) return props.selectedProject === null;
-      }
-      host = host.parentElement;
+  function activeComposerExplicitlyHasNoProject() {
+    for (const props of activeComposerAncestorProps()) {
+      if (props && Object.hasOwn(props, 'selectedProject')) return props.selectedProject === null;
     }
     return false;
   }
 
   function activeComposerProjectID() {
-    const activeComposer = composer();
-    let host = activeComposer?.parentElement;
-    let projectID;
-    while (host && host !== document.body && !projectID) {
-      for (const fiber of parentFibers(host)) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        const selectedProject = props?.selectedProject;
-        if (
-          selectedProject?.type === 'local'
-            && typeof selectedProject.projectId === 'string'
-            && selectedProject.projectId.trim()
-        ) {
-          projectID = selectedProject.projectId.trim();
-          break;
-        }
+    for (const props of activeComposerAncestorProps()) {
+      const project = props?.selectedProject;
+      if (project?.type === 'local' && typeof project.projectId === 'string' && project.projectId.trim()) {
+        return project.projectId.trim();
       }
-      host = host.parentElement;
     }
-    return projectID || null;
+    return null;
   }
 
   function activeComposerProject() {
@@ -405,7 +389,7 @@ const codexUIContracts = (() => {
     return null;
   }
 
-  function intelligenceTrigger(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
+  function modelPickerTrigger(promptDialogID = 'codex-dashboard-prompt-library-dialog') {
     const activeComposer = composer(promptDialogID);
     let container = activeComposer?.parentElement;
     while (container && container !== document.body) {
@@ -422,7 +406,7 @@ const codexUIContracts = (() => {
   }
 
   async function probeModelPickerControls(timeout = 1200) {
-    const trigger = intelligenceTrigger();
+    const trigger = modelPickerTrigger();
     if (!trigger) return false;
     const waitFor = (value) => domUtils.waitFor(value, { timeout, interval: 25 });
     const wasExpanded = trigger.getAttribute('aria-expanded') === 'true';
@@ -536,7 +520,7 @@ const codexUIContracts = (() => {
     isThreadSelected,
     activeComposerThreadID,
     selectedThreadID,
-    activeComposerHasNoProject,
+    activeComposerExplicitlyHasNoProject,
     activeComposerProjectID,
     activeComposerProject,
     threadUnreadStates,
@@ -544,7 +528,7 @@ const codexUIContracts = (() => {
     composer,
     composerAddButton,
     composerEditorView,
-    intelligenceTrigger,
+    modelPickerTrigger,
     modelPicker,
     probeModelPickerControls,
     pushControls,

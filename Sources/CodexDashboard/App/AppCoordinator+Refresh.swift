@@ -130,12 +130,8 @@ extension AppCoordinator {
             await automaticallyOpenThreadIfInputIsIdle(threadID)
             return
         }
-        if let completedThreadID = activity.completion.threadIDToOpen {
-            let completedThread = threads.first { $0.id == completedThreadID }
-            if automaticallyOpenCompletedChats,
-               completedThread?.originatesFromChromeExtension != true {
-                await automaticallyOpenThreadIfInputIsIdle(completedThreadID)
-            }
+        if automaticallyOpenCompletedChats, let threadID = activity.completion.threadIDToOpen {
+            await automaticallyOpenThreadIfInputIsIdle(threadID)
         }
     }
 

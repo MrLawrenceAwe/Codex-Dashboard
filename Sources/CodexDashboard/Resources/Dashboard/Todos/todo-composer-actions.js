@@ -69,7 +69,7 @@ function createTodoComposerActions({ isDestroyed, pageState, threadReferencesFor
     const isDestination = () => !isDestroyed()
       && (!threadID || codexUIContracts.activeComposerThreadID() === threadID)
       && (newProjectID === undefined || (!codexUIContracts.activeComposerThreadID()
-        && (newProjectID === null ? codexUIContracts.activeComposerHasNoProject()
+        && (newProjectID === null ? codexUIContracts.activeComposerExplicitlyHasNoProject()
           : codexUIContracts.activeComposerProjectID() === newProjectID)));
     const destinationComposer = () => isDestination() ? activeComposer() : null;
     if (isDestroyed()) return false;

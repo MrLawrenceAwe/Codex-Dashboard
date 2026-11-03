@@ -38,9 +38,10 @@ By default, Dashboard brings Codex forward and opens a chat when its response
 finishes or it asks a structured question, including questions asked while work
 continues. The menu bar has separate **Open completed chats automatically** and
 **Open chats with questions automatically** toggles. Both can open the relevant
-chat even when Codex is already frontmost. Review-loop chats and chats started in the ChatGPT Chrome extension are excluded. Typing, voice chat, and
-dictation suppress automatic focus changes; suppressed events are not opened
-later. Existing questions at Dashboard startup do not trigger focus changes.
+chat even when Codex is already frontmost. Review-loop chats, scheduled automation
+chats, and chats started in the ChatGPT Chrome extension are excluded. Typing, voice
+chat, and dictation suppress automatic focus changes. Suppressed events and questions
+already present at startup do not trigger later focus changes.
 
 ## Dictation while editing a sent message
 
@@ -182,8 +183,9 @@ settings. It does not record the exact prompt submitted to a chat; setting chang
 apply to subsequent prompts.
 
 Each round starts a read-only review in a new chat. Git projects use the current
-branch and checkout; ordinary folders work without Git. Qualifying findings trigger
-a separate fix follow-up in that chat. Git fixes are committed; folder fixes are
+branch and checkout. Ordinary folders work without Git. Dashboard validates the
+review report and automatically starts a separate fix turn in that chat when
+qualifying findings remain. Git fixes are committed; folder fixes are
 saved and verified within the fix task. Dashboard checks the fix report and folder
 fingerprint before completing the round; it does not send a separate verification
 turn for folder fixes. The priority limit restricts which findings the review is

@@ -7,10 +7,8 @@ enum ReviewFixCheckpoint {
         against review: ReviewReport,
         priorityLimit: ReviewFinding.Priority?
     ) throws {
-        let findings = review.findings(upTo: priorityLimit)
-        let acceptedNumbers = Set(review.findings.enumerated().compactMap { index, finding in
-            findings.contains(finding) ? index + 1 : nil
-        })
+        let findings = review.numberedFindings(upTo: priorityLimit)
+        let acceptedNumbers = Set(findings.map(\.number))
         let accountedCount = fixReport.result.addressedFindingCount + fixReport.withdrawn.count
         guard accountedCount == findings.count,
               fixReport.withdrawn.allSatisfy({ acceptedNumbers.contains($0) }) else {

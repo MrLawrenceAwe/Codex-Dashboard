@@ -146,9 +146,13 @@ struct ReviewReport: Codable, Equatable, Sendable {
     let outcome: Outcome
     let findings: [ReviewFinding]
     let summary: String
-    func findings(upTo limit: ReviewFinding.Priority?) -> [ReviewFinding] {
-        guard let limit else { return findings }
-        return findings.filter { $0.priority.map { $0.rank <= limit.rank } ?? false }
+    func numberedFindings(upTo limit: ReviewFinding.Priority?) -> [(number: Int, finding: ReviewFinding)] {
+        findings.enumerated().compactMap { index, finding in
+            if let limit {
+                guard let priority = finding.priority, priority.rank <= limit.rank else { return nil }
+            }
+            return (index + 1, finding)
+        }
     }
 }
 

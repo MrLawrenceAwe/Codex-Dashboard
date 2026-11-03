@@ -23,8 +23,8 @@ function setup() {
     }
     get innerHTML() { return this.markup; }
     add(option) { this.options.push(option); }
-    querySelector(selector) {
-      return selector.startsWith('option') ? this.options.find(option => option.value === 'false') : this.input;
+    querySelector() {
+      return this.input;
     }
   }
   const controls = new Map();
@@ -39,7 +39,6 @@ function setup() {
     ['.review-mute-test-playback', '[data-review-mute-test-playback]'],
     ['.review-project-context', '[data-review-prompt-context]'],
   ]) get(label).input = get(field);
-  get('[data-review-push]').innerHTML = '<option value="false">Keep commits local</option>';
   get('[data-review-limit]').value = '5';
   const root = {
     querySelector: get,
@@ -96,8 +95,13 @@ test('model removal and repeated snapshots keep reasoning controls disabled', ()
 
 test('folder and pending restrictions survive model changes and acknowledgement', () => {
   const { view, get, snapshot } = setup();
+  view.render(snapshot, null);
+  get('[data-review-push]').value = 'true';
   snapshot.projects[0].workspaceKind = 'folder';
   view.render(snapshot, null);
+  assert.equal(get('.review-remote-push').hidden, true);
+  assert.equal(get('[data-review-push]').value, 'false');
+  assert.equal(view.readSettings().pushToRemote, false);
   get('[data-review-model]').value = 'available';
   view.renderReasoningOptions();
   assert.equal(get('[data-review-push]').disabled, true);
@@ -106,6 +110,10 @@ test('folder and pending restrictions survive model changes and acknowledgement'
   view.render(snapshot, null);
   assert.equal(get('[data-review-effort]').disabled, false);
   assert.equal(get('[data-review-push]').disabled, true);
+  snapshot.projects[0].workspaceKind = 'git';
+  view.render(snapshot, null);
+  assert.equal(get('.review-remote-push').hidden, false);
+  assert.equal(get('[data-review-push]').disabled, false);
   snapshot.projects = [];
   view.render(snapshot, null);
   assert.equal(get('[data-review-start]').disabled, true);

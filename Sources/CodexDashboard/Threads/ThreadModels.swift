@@ -53,6 +53,8 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
 
     var isScheduledAutomation: Bool { threadSource == "automation" }
 
+    var allowsAutomaticOpening: Bool { !isScheduledAutomation && !originatesFromChromeExtension }
+
     var originatesFromChromeExtension: Bool {
         preview.contains("# Chrome tabs:\n- The user has the Chrome extension side panel open.")
     }

@@ -25,21 +25,21 @@ struct ThreadCompletionTracker {
             return Result(hasCompletion: false, threadIDToOpen: nil)
         }
 
-        let completions = latestEvents.compactMap { threadID, event -> (threadID: String, event: ThreadLifecycleEvent)? in
+        let completions = threads.compactMap { thread -> (thread: ThreadSummary, timestamp: Date)? in
             guard
+                let event = thread.latestLifecycleEvent,
                 event.kind == .completed,
-                previousEvents[threadID] != event,
-                previousEvents[threadID] != nil || event.timestamp > previousDate
+                previousEvents[thread.id] != event,
+                previousEvents[thread.id] != nil || event.timestamp > previousDate
             else { return nil }
-            return (threadID, event)
+            return (thread, event.timestamp)
         }
-        let scheduledThreadIDs = Set(threads.filter(\.isScheduledAutomation).map(\.id))
         let newestEligible = completions.filter {
-            !excludedThreadIDs.contains($0.threadID) && !scheduledThreadIDs.contains($0.threadID)
+            !excludedThreadIDs.contains($0.thread.id) && $0.thread.allowsAutomaticOpening
         }.max { left, right in
-            if left.event.timestamp == right.event.timestamp { return left.threadID < right.threadID }
-            return left.event.timestamp < right.event.timestamp
-        }?.threadID
+            if left.timestamp == right.timestamp { return left.thread.id < right.thread.id }
+            return left.timestamp < right.timestamp
+        }?.thread.id
         return Result(hasCompletion: !completions.isEmpty, threadIDToOpen: newestEligible)
     }
 }

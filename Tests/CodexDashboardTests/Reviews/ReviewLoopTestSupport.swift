@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 class ReviewLoopTestCase: XCTestCase {
-    let reviewBoundary = "\n\nRead-only review; fixes follow after acceptance."
+    let reviewBoundary = "\n\nRead-only review. Dashboard validates the report and automatically starts a fix turn if qualifying findings remain."
     let project = ReviewProject(id: "project", name: "Example", path: "/tmp/example")
 
     func startAction(id: String, kind: ReviewLoopAction.Kind, projectID: String?,

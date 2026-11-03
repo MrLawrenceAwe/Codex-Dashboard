@@ -6,13 +6,8 @@ const reviewLoopSetupView = (() => {
   let projects = [];
   let models = [];
   let pending = null;
-  const needsQueue = projectID => projects.find(project => project.id === projectID)?.requiresQueue === true;
   const escape = domUtils.escapeHTML;
   const panel = () => document.querySelector('[data-review-loop]');
-  const usesPriorities = reviewType => reviewTypes.find(type => type.id === reviewType)?.usesPriorities === true;
-  const supportsPreservingUICopy = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsPreservingUICopy === true;
-  const supportsLiveTesting = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsLiveTesting === true;
-  const supportsProjectContext = reviewType => reviewTypes.find(type => type.id === reviewType)?.supportsProjectContext === true;
 
   function formMarkup() {
     return `
@@ -71,22 +66,25 @@ const reviewLoopSetupView = (() => {
       const modelID = value(`[data-${kind}-model]`);
       return modelID ? { modelID, reasoningEffort: value(`[data-${kind}-effort]`) || null } : null;
     };
-    const reviewType = value('[data-review-type]');
-    const liveTesting = supportsLiveTesting(reviewType) && value('[data-review-live-testing]') === 'true';
+    const projectID = value('[data-review-project]');
+    const project = projects.find(project => project.id === projectID);
+    const reviewTypeID = value('[data-review-type]');
+    const reviewType = reviewTypes.find(type => type.id === reviewTypeID);
+    const liveTesting = reviewType?.supportsLiveTesting === true && value('[data-review-live-testing]') === 'true';
     return {
-      kind: needsQueue(value('[data-review-project]')) ? 'queue' : 'start',
-      projectID: value('[data-review-project]'),
+      kind: project?.requiresQueue ? 'queue' : 'start',
+      projectID,
       reviewSelection: selection('review'),
       fixSelection: selection('fix'),
-      reviewType,
+      reviewType: reviewTypeID,
       liveTesting,
-      preserveUICopy: supportsPreservingUICopy(reviewType) && root.querySelector('[data-review-preserve-ui-copy]').checked,
+      preserveUICopy: reviewType?.supportsPreservingUICopy === true && root.querySelector('[data-review-preserve-ui-copy]').checked,
       reloadExtensionBeforeTesting: liveTesting && value('[data-review-extension]') === 'true',
       muteTestPlayback: liveTesting && root.querySelector('[data-review-mute-test-playback]').checked,
-      pushToRemote: projects.find(project => project.id === value('[data-review-project]'))?.workspaceKind !== 'folder' && value('[data-review-push]') === 'true',
+      pushToRemote: project?.workspaceKind !== 'folder' && value('[data-review-push]') === 'true',
       speed: value('[data-review-speed]'),
-      promptContext: { kind: supportsProjectContext(reviewType) ? value('[data-review-prompt-context]') || 'general' : 'general' },
-      priorityLimit: usesPriorities(reviewType) ? value('[data-review-priority]') : null,
+      promptContext: { kind: reviewType?.supportsProjectContext ? value('[data-review-prompt-context]') || 'general' : 'general' },
+      priorityLimit: reviewType?.usesPriorities ? value('[data-review-priority]') : null,
       maxRounds: Number(value('[data-review-limit]')),
     };
   }
@@ -94,26 +92,29 @@ const reviewLoopSetupView = (() => {
   function renderReviewSettings() {
     const root = panel();
     if (!root) return;
-    const queued = needsQueue(root.querySelector('[data-review-project]').value);
+    const projectID = root.querySelector('[data-review-project]').value;
+    const project = projects.find(project => project.id === projectID);
+    const queued = project?.requiresQueue;
     root.querySelector('[data-review-start]').innerHTML = ['start', 'queue'].includes(pending?.kind)
       ? (pending.kind === 'queue' ? 'Queueing…' : 'Starting…')
       : queued ? 'Queue review &amp; fix <span aria-hidden="true">→</span>' : 'Start review &amp; fix <span aria-hidden="true">→</span>';
-    const folder = projects.find(project => project.id === root.querySelector('[data-review-project]').value)?.workspaceKind === 'folder';
+    const folder = project?.workspaceKind === 'folder';
     const push = root.querySelector('[data-review-push]');
     if (folder) push.value = 'false';
-    push.querySelector('option[value="false"]').textContent = folder ? 'Save changes in folder' : 'Keep commits local';
+    root.querySelector('.review-remote-push').hidden = folder;
     root.querySelector('[data-review-workspace-help]').textContent = folder
       ? 'Fixes are saved and verified in this folder.'
       : 'Fixes are committed locally. Remote push is optional.';
     root.querySelector('.review-push-help').hidden = folder;
-    const reviewType = root.querySelector('[data-review-type]').value;
-    root.querySelector('[data-review-type-help]').textContent = reviewTypes.find(type => type.id === reviewType)?.scopeDescription || '';
+    const reviewTypeID = root.querySelector('[data-review-type]').value;
+    const reviewType = reviewTypes.find(type => type.id === reviewTypeID);
+    root.querySelector('[data-review-type-help]').textContent = reviewType?.scopeDescription || '';
     const preserveUICopy = root.querySelector('.review-preserve-ui-copy');
-    preserveUICopy.hidden = !supportsPreservingUICopy(reviewType);
+    preserveUICopy.hidden = !reviewType?.supportsPreservingUICopy;
     if (preserveUICopy.hidden) preserveUICopy.querySelector('input').checked = false;
-    root.querySelector('.review-priority').hidden = !usesPriorities(reviewType);
+    root.querySelector('.review-priority').hidden = !reviewType?.usesPriorities;
     const liveTesting = root.querySelector('.review-live-testing');
-    liveTesting.hidden = !supportsLiveTesting(reviewType);
+    liveTesting.hidden = !reviewType?.supportsLiveTesting;
     root.querySelector('.review-live-testing-help').hidden = liveTesting.hidden;
     if (liveTesting.hidden) liveTesting.querySelector('select').value = 'false';
     const extension = root.querySelector('.review-extension');
@@ -124,7 +125,7 @@ const reviewLoopSetupView = (() => {
     muteTestPlayback.hidden = extension.hidden;
     if (muteTestPlayback.hidden) muteTestPlayback.querySelector('input').checked = false;
     const context = root.querySelector('.review-project-context');
-    context.hidden = !supportsProjectContext(reviewType);
+    context.hidden = !reviewType?.supportsProjectContext;
     if (context.hidden) context.querySelector('select').value = '';
     updateControlAvailability();
   }
@@ -139,8 +140,7 @@ const reviewLoopSetupView = (() => {
       const modelID = root.querySelector(`[data-${kind}-model]`).value;
       root.querySelector(`[data-${kind}-effort]`).disabled = disabled || !models.some(model => model.modelID === modelID);
     }
-    const project = projects.find(project => project.id === root.querySelector('[data-review-project]').value);
-    root.querySelector('[data-review-push]').disabled = disabled || project?.workspaceKind === 'folder';
+    root.querySelector('[data-review-push]').disabled = disabled || root.querySelector('.review-remote-push').hidden;
   }
 
   function renderReasoningOptions(kind = 'review') {
@@ -187,7 +187,7 @@ const reviewLoopSetupView = (() => {
     const signature = JSON.stringify(projects);
     if (signature !== projectsSignature) {
       const selected = select.value;
-      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}${needsQueue(project.id) ? ' · Queue available' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
+      select.innerHTML = projects.length ? projects.map(project => `<option value="${escape(project.id)}">${escape(project.name)}${project.requiresQueue ? ' · Queue available' : ''}</option>`).join('') : '<option value="">No eligible projects</option>';
       select.value = projects.some(project => project.id === selected) ? selected : projects[0]?.id || '';
       projectsSignature = signature;
     }

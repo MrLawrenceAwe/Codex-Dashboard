@@ -2,8 +2,8 @@ import Foundation
 
 enum ReviewPrompts {
     static func verifyFix(for loop: ReviewLoop, round: ReviewRound, targetRevision: String) -> String {
-        let findings = round.review?.findings(upTo: loop.priorityLimit).enumerated().map { index, finding in
-            "Finding \(index + 1): \(finding.title)\n\(finding.body)"
+        let findings = round.review?.numberedFindings(upTo: loop.priorityLimit).map { number, finding in
+            "Finding \(number): \(finding.title)\n\(finding.body)"
         }.joined(separator: "\n\n") ?? ""
         return """
         Reverify the original findings at current HEAD `\(targetRevision)`. The branch advanced after the fix report; Git ancestry alone does not establish that the fixes still work.
@@ -64,7 +64,7 @@ enum ReviewPrompts {
     static func interruptedContinuation(for loop: ReviewLoop, round: ReviewRound) -> String {
         let task = round.fixRequested
             ? "Continue the unfinished fix and verification task from where you stopped. Inspect and preserve existing changes and any commit already made; do not repeat completed work. Finish addressing the accepted findings, then return the final fix report with the resulting commit."
-            : "Continue the unfinished read-only review from where you stopped, then return the final review report. Leave the checkout unchanged; fixes follow after acceptance."
+            : "Continue the unfinished read-only review from where you stopped, then return the final review report. Leave the workspace unchanged. Dashboard validates the report and automatically starts a fix turn if qualifying findings remain."
         let continuation = loop.workspaceKind == .folder && round.fixRequested
             ? "Continue the unfinished fix and verification task. Preserve existing changes, finish addressing accepted findings, and return the final folder fix report. Do not initialise Git, commit, or push."
             : task
@@ -119,11 +119,11 @@ enum ReviewPrompts {
         let folderInstruction = loop.workspaceKind == .folder
             ? "\n\nThis is an ordinary folder. Review its actual files and content, including documents when relevant. Stay within the project folder and do not follow symlinks outside it. Leave files unchanged. Do not initialise Git, commit, or push."
             : ""
-        return task + "\n\nRead-only review; fixes follow after acceptance." + folderInstruction + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + testPlaybackInstruction(for: loop)
+        return task + "\n\nRead-only review. Dashboard validates the report and automatically starts a fix turn if qualifying findings remain." + folderInstruction + structureReviewInstruction(for: loop) + liveTesting + extensionReloadInstruction(for: loop) + testPlaybackInstruction(for: loop)
     }
 
     static func fixPrompt(for loop: ReviewLoop, round: ReviewRound) -> String {
-        let accepted = round.review?.findings(upTo: loop.priorityLimit) ?? []
+        let accepted = round.review?.numberedFindings(upTo: loop.priorityLimit) ?? []
         let findings: String
         switch accepted.count {
         case 1: findings = "the finding"
@@ -149,10 +149,9 @@ enum ReviewPrompts {
         }
         prompt += extensionReloadInstruction(for: loop, verifyingFixes: true) + testPlaybackInstruction(for: loop)
         guard let review = round.review, accepted.count != review.findings.count else { return prompt }
-        let scope = review.findings.enumerated().compactMap { index, finding -> String? in
-            guard accepted.contains(finding) else { return nil }
+        let scope = accepted.map { number, finding in
             let priority = finding.priority.map { "[\($0.rawValue)] " } ?? ""
-            return "- Finding \(index + 1): \(priority)\(finding.title)"
+            return "- Finding \(number): \(priority)\(finding.title)"
         }.joined(separator: "\n")
         return prompt
             + "\n\nAddress only these findings from the review. Use their original numbers for withdrawn findings:\n\n" + scope

@@ -34,6 +34,26 @@ extension AppCoordinatorTests {
         XCTAssertNil(coordinator.observeThreadActivity(in: [scheduled, ordinary]).completion.threadIDToOpen)
     }
 
+    func testChromeExtensionCompletionDoesNotHideEarlierOrdinaryCompletion() {
+        let now = Date()
+        let ordinary = ThreadSummary.fixture(id: "ordinary")
+        let chromePreview = "# Chrome tabs:\n- The user has the Chrome extension side panel open."
+        let chrome = ThreadSummary.fixture(id: "chrome", preview: chromePreview)
+        var tracker = ThreadCompletionTracker()
+        _ = tracker.observeCompletions(in: [ordinary, chrome], observedAt: now)
+
+        let completedOrdinary = ThreadSummary.fixture(
+            id: ordinary.id, latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(1))
+        )
+        let completedChrome = ThreadSummary.fixture(
+            id: chrome.id, preview: chromePreview,
+            latestLifecycleEvent: .init(kind: .completed, timestamp: now.addingTimeInterval(2))
+        )
+        let result = tracker.observeCompletions(in: [completedOrdinary, completedChrome])
+        XCTAssertTrue(result.hasCompletion)
+        XCTAssertEqual(result.threadIDToOpen, ordinary.id)
+    }
+
     func testPreflightRefreshConsumesCompletionWithoutOpeningChatOrRefreshingUsage() async throws {
         let started = ThreadLifecycleEvent(kind: .started, timestamp: Date().addingTimeInterval(-2))
         let completed = ThreadLifecycleEvent(kind: .completed, timestamp: Date().addingTimeInterval(-1))

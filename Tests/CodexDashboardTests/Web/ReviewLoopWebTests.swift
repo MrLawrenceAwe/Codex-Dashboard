@@ -107,7 +107,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [true, true, true, true, true, true])
     }
 
-    func testFolderSetupDisablesPushAndCardShowsVerificationWithoutCommitMetrics() async throws {
+    func testFolderSetupHidesPushAndCardShowsVerificationWithoutCommitMetrics() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
@@ -120,15 +120,15 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const push = document.querySelector('[data-review-push]');
           push.value = 'true';
           project.value = 'folder'; project.dispatchEvent(new Event('change'));
-          const folderDisabled = push.disabled && push.value === 'false';
+          const folderPushHidden = push.closest('label').hidden && push.disabled && push.value === 'false';
           const help = document.querySelector('[data-review-workspace-help]').textContent;
           project.value = 'git'; project.dispatchEvent(new Event('change'));
-          const gitEnabled = !push.disabled;
+          const gitEnabled = !push.closest('label').hidden && !push.disabled;
           const loop = {id:'loop',project:folder,workspaceKind:'folder',phase:'running',isFinished:false,completedRoundCount:0,maxRounds:2,
             rounds:[{number:1,baseRevision:'base',fixRequested:true}]};
           api.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON), models: \(Self.modelsJSON),projects:[git,folder],loops:[loop]});
           const card = document.querySelector('[data-loop-id="loop"]');
-          return [folderDisabled,gitEnabled,help.includes('saved and verified in this folder'),
+          return [folderPushHidden,gitEnabled,help.includes('saved and verified in this folder'),
             card.textContent.includes('Fix & verify'),!card.textContent.includes('Fix commits'),
             card.textContent.includes('Save and verify folder changes')];
         })()

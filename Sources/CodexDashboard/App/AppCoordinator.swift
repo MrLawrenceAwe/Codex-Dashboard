@@ -336,12 +336,13 @@ final class AppCoordinator: ObservableObject {
     }
 
     func observeThreadActivity(in threads: [ThreadSummary]) -> ThreadActivityObservation {
+        let reviewLoopThreadIDs = dashboardRuntime?.reviewLoopThreadIDs ?? []
         let completion = threadCompletionTracker.observeCompletions(
             in: threads,
-            excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
+            excluding: reviewLoopThreadIDs
         )
         let questionThreadIDToOpen = threadQuestionTracker.observeQuestions(
-            in: threads, excluding: dashboardRuntime?.reviewLoopThreadIDs ?? []
+            in: threads, excluding: reviewLoopThreadIDs
         )
         return ThreadActivityObservation(completion: completion, questionThreadIDToOpen: questionThreadIDToOpen)
     }

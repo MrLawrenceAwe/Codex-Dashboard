@@ -17,8 +17,8 @@ const composerModelPicker = (() => {
   const picker = () => [...document.querySelectorAll('[data-model-picker-view]')]
     .find(isAvailable);
 
-  function intelligenceTrigger() {
-    return codexUIContracts.intelligenceTrigger(dashboardElements.elementIDs.promptDialog);
+  function modelPickerTrigger() {
+    return codexUIContracts.modelPickerTrigger(dashboardElements.elementIDs.promptDialog);
   }
 
   async function openIntelligenceMenu(isCurrent) {
@@ -26,16 +26,16 @@ const composerModelPicker = (() => {
     const visibleMenu = picker;
     let openMenu = visibleMenu();
     if (openMenu) return openMenu;
-    let trigger = intelligenceTrigger();
+    let trigger = modelPickerTrigger();
     if (!trigger) return null;
     if (trigger.getAttribute('aria-expanded') === 'true') {
       openMenu = await waitFor(visibleMenu, isCurrent, 400);
       if (openMenu) return openMenu;
       if (!isCurrent()) return null;
       document.body.click();
-      await waitFor(() => intelligenceTrigger()?.getAttribute('aria-expanded') !== 'true', isCurrent, 300);
+      await waitFor(() => modelPickerTrigger()?.getAttribute('aria-expanded') !== 'true', isCurrent, 300);
       if (!isCurrent()) return null;
-      trigger = intelligenceTrigger();
+      trigger = modelPickerTrigger();
       if (!trigger) return null;
     }
     trigger.dispatchEvent(new PointerEvent('pointerdown', {
@@ -91,7 +91,7 @@ const composerModelPicker = (() => {
     if (!order.includes(target)) return false;
     for (let step = 0; step < order.length; step += 1) {
       if (!isCurrent()) return false;
-      const current = intelligenceTrigger()?.dataset.selectedReasoningEffort;
+      const current = modelPickerTrigger()?.dataset.selectedReasoningEffort;
       if (current === target) return true;
       if (!order.includes(current)) return false;
       const menu = await openCompactMenu(isCurrent);
@@ -100,11 +100,11 @@ const composerModelPicker = (() => {
       if (!isAvailable(slider)) return false;
       const key = order.indexOf(current) < order.indexOf(target) ? 'ArrowRight' : 'ArrowLeft';
       slider.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-      if (!await waitFor(() => intelligenceTrigger()?.dataset.selectedReasoningEffort !== current, isCurrent)) {
+      if (!await waitFor(() => modelPickerTrigger()?.dataset.selectedReasoningEffort !== current, isCurrent)) {
         return false;
       }
     }
-    return intelligenceTrigger()?.dataset.selectedReasoningEffort === target;
+    return modelPickerTrigger()?.dataset.selectedReasoningEffort === target;
   }
 
   async function selectSpeed(speed, isCurrent) {

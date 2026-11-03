@@ -288,7 +288,7 @@ final class ReviewLoopCoordinator {
         let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID, policy: .unchangedReview(baseRevision: round.baseRevision))
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
-        let findings = report.findings(upTo: updated.priorityLimit)
+        let findings = report.numberedFindings(upTo: updated.priorityLimit)
         round.reviewTurnID = reviewTurn.id
         round.review = report
         if findings.isEmpty {
@@ -309,7 +309,7 @@ final class ReviewLoopCoordinator {
     ) async throws {
         var updated = loop
         var round = round
-        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
+        guard let report = round.review, !report.numberedFindings(upTo: updated.priorityLimit).isEmpty else {
             throw ReviewLoopError("The review has no findings to fix.")
         }
         let workspace = try await validateWorkspace(using: driver, loop: updated, threads: threads, threadID: threadID)
@@ -335,7 +335,7 @@ final class ReviewLoopCoordinator {
         using driver: any ReviewLoopDriving, threads: [RendererThread], threadID: String
     ) async throws {
         var updated = loop
-        guard let report = round.review, !report.findings(upTo: updated.priorityLimit).isEmpty else {
+        guard let report = round.review, !report.numberedFindings(upTo: updated.priorityLimit).isEmpty else {
             throw ReviewLoopError("The review has no findings to fix.")
         }
         let sourceFixTurn = round.fixVerification.flatMap { verification in

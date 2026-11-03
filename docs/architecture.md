@@ -29,8 +29,10 @@ filesystem monitoring, and rollout-reader cache invalidation.
 ## Thread snapshots
 
 `CodexThreadCatalogProvider` reads `state_5.sqlite` and orders chats by indexed
-recency. The recent-history limit is 500; required unread chats and currently active
-chats can extend that catalog. `RolloutActivityReader` reads explicit lifecycle
+recency. Its `thread_source = automation` metadata identifies scheduled automation
+chats for automatic-opening exclusions. The recent-history limit is 500. Required
+unread chats and currently active chats can extend that catalog.
+`RolloutActivityReader` reads explicit lifecycle
 events and reconciles them against the current Codex launch so interrupted work
 does not stay running indefinitely. `RolloutQuestionReader` observes structured async
 question items and blocking question calls, with replies and interruptions clearing
