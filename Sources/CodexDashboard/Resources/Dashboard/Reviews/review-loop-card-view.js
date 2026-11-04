@@ -180,9 +180,9 @@ const reviewLoopCardView = (() => {
           <strong>${stage.label}</strong><span class="review-stage-description">${stage.description}</span>
         </li>`).join('')}</ol>
       <dl class="review-metrics">
-        <div><dt>Findings this round</dt><dd>${metrics.findings}</dd></div>
-        <div><dt>Findings addressed</dt><dd>${metrics.addressed}</dd></div>
-        ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits</dt><dd>${metrics.commits}</dd></div>`}
+        <div><dt>Findings this round</dt><dd>${metrics.roundFindingCount}</dd></div>
+        <div><dt>Findings addressed in loop</dt><dd>${metrics.loopAddressedFindingCount}</dd></div>
+        ${loop.workspaceKind === 'folder' ? '' : `<div><dt>Fix commits in loop</dt><dd>${metrics.loopFixCommitCount}</dd></div>`}
       </dl>`;
     updateMarkup(feedback, markup);
   }

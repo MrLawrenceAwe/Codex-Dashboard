@@ -83,7 +83,34 @@ test('metrics count addressed findings only in fixed rounds and deduplicate fix 
     { number: 4, review: { findings: [{}, {}] }, result: { outcome: 'withdrawn' } },
   ] });
   assert.deepEqual(JSON.parse(JSON.stringify(metrics)),
-    { roundLabel: 'Round 4', findings: 2, addressed: 3, commits: 1 });
+    { roundLabel: 'Round 4', roundFindingCount: 2, loopAddressedFindingCount: 3, loopFixCommitCount: 1 });
+});
+
+test('a clean final round labels cumulative findings and commits as loop totals', () => {
+  const cardSource = fs.readFileSync(path.join(__dirname,
+    '../../Sources/CodexDashboard/Resources/Dashboard/Reviews/review-loop-card-view.js'), 'utf8');
+  const anchor = 'return { renderCards };';
+  assert.equal(cardSource.split(anchor).length, 2);
+  const view = vm.runInNewContext(`${cardSource.replace(anchor, 'return { renderFeedback };')}\nreviewLoopCardView`, {
+    reviewPresentation: presentation,
+    domUtils: { escapeHTML: value => value },
+  });
+  const feedback = {};
+  const loop = { phase: 'completed', workspaceKind: 'git', rounds: [
+    { number: 1, result: { outcome: 'fixed', addressedFindingCount: 2, fixCommit: 'fixed' } },
+    { number: 2, review: { findings: [] }, result: { outcome: 'clean' } },
+  ] };
+  view.renderFeedback({ querySelector: () => feedback }, loop);
+  const metrics = [...feedback.innerHTML.matchAll(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/g)]
+    .map(([, label, count]) => [label, count]);
+  assert.deepEqual(metrics, [
+    ['Findings this round', '0'],
+    ['Findings addressed in loop', '2'],
+    ['Fix commits in loop', '1'],
+  ]);
+  loop.workspaceKind = 'folder';
+  view.renderFeedback({ querySelector: () => feedback }, loop);
+  assert.doesNotMatch(feedback.innerHTML, /Fix commits in loop/);
 });
 
 test('pending control requests update availability without replacing cached buttons', () => {

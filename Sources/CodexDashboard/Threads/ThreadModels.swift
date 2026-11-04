@@ -47,7 +47,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var latestQuestionEvent: ThreadQuestionEvent? = nil
     var projectID: String? = nil
     var projectGroupPath: String? = nil
-    var sharesProjectRepository = false
+    var sharesGroupRepository = false
     var projectGitStatus: ProjectGitStatus
     var threadSource: String? = nil
 
@@ -79,7 +79,7 @@ struct RendererThread: Codable, Equatable, Sendable {
     let latestLifecycleEventKind: ThreadLifecycleEventKind?
     let projectID: String?
     let projectGroupPath: String?
-    let sharesProjectRepository: Bool
+    let sharesGroupRepository: Bool
     let projectGitStatus: ProjectGitStatus
 
     init(_ thread: ThreadSummary) {
@@ -96,7 +96,7 @@ struct RendererThread: Codable, Equatable, Sendable {
         latestLifecycleEventKind = thread.latestLifecycleEvent?.kind
         projectID = thread.projectID
         projectGroupPath = thread.projectGroupPath
-        sharesProjectRepository = thread.sharesProjectRepository
+        sharesGroupRepository = thread.sharesGroupRepository
         projectGitStatus = thread.projectGitStatus
     }
 }

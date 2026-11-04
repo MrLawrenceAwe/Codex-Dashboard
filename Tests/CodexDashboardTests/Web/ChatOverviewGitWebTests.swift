@@ -22,7 +22,7 @@ extension ChatOverviewWebTests {
             [...document.querySelectorAll('[data-dashboard-git-project]')].map(row => row.dataset.dashboardGitProject)];
           document.querySelector('[data-filter="unread"]').click();
           return [...changed, [...document.querySelectorAll('[data-dashboard-project-group]')].map(row => row.dataset.dashboardProjectGroup),
-            document.querySelectorAll('[data-thread-id]').length];
+            document.querySelectorAll('[data-open-thread]').length];
         })()
         """) as? [Any]
         let values = try XCTUnwrap(result)
@@ -601,7 +601,7 @@ extension ChatOverviewWebTests {
     func testProjectGitActionDisabledWithoutIdleChatInMatchingRepository() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/project/nested",
-            projectGitStatus: .unpushedCommits, sharesProjectRepository: false)
+            projectGitStatus: .unpushedCommits, sharesGroupRepository: false)
         nested.projectGroupPath = "/tmp/project"
         for includeRunningRoot in [false, true] {
             var threads = [nested]
@@ -717,7 +717,7 @@ extension ChatOverviewWebTests {
         }
         if includeNestedChat {
             var nested = ThreadSummary.fixture(id: "nested", checkoutPath: "/tmp/target/nested",
-                recencyEpochMillis: 10, projectGitStatus: status, sharesProjectRepository: false)
+                recencyEpochMillis: 10, projectGitStatus: status, sharesGroupRepository: false)
             nested.projectGroupPath = "/tmp/target"
             threads.insert(nested, at: 0)
         }

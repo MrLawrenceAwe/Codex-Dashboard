@@ -30,8 +30,10 @@ filesystem monitoring, and rollout-reader cache invalidation.
 
 `CodexThreadCatalogProvider` reads `state_5.sqlite` and orders chats by indexed
 recency. Its `thread_source = automation` metadata identifies scheduled automation
-chats for automatic-opening exclusions. The recent-history limit is 500. Required
-unread chats and currently active chats can extend that catalog.
+chats for automatic-opening exclusions. The recent-history baseline is the 500 most
+recent non-archived chats with previews. Required unread chats and chats whose indexed
+recency is at or after the current Codex launch extend that catalog, including idle
+chats with previews. Empty-preview chats are retained only while running.
 `RolloutActivityReader` reads explicit lifecycle
 events and reconciles them against the current Codex launch so interrupted work
 does not stay running indefinitely. `RolloutQuestionReader` observes structured async
@@ -213,8 +215,10 @@ parent/child folders as well as identical roots.
 
 For Git projects, `ReviewWorkspaceCheckpoint` validates Git state through argument-based subprocesses.
 A review must leave a clean checkout and unchanged HEAD. Fix completion requires the
-original branch, clean tree, a reported commit matching HEAD, and ancestry from the
-round's base commit. `ReviewGitPublisher.reconcileAndPublishFix` fetches the
+original branch, a clean tree, and a reported fix commit descended from the round's
+base commit. HEAD can match that fix commit. If HEAD has advanced to a descendant,
+completion requires a read-only verification of the current HEAD, including advances
+outside remote reconciliation. `ReviewGitPublisher.reconcileAndPublishFix` fetches the
 destination and returns either `published` or `verificationRequired` with the merged
 checkout. Remote reconciliation can
 create a local merge commit; publication waits for read-only verification of that

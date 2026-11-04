@@ -3,6 +3,10 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    private func sqlStringLiteral(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "''") + "'"
+    }
+
     func testProjectlessAutomationKeepsNilMembershipBesideAssignedRepositoryChat() async throws {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let project = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
@@ -10,7 +14,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let git = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
             arguments: ["init", project.path], timeout: 3)
         XCTAssertEqual(git.terminationStatus, 0)
-        let path = "'" + project.path.replacingOccurrences(of: "'", with: "''") + "'"
+        let path = sqlStringLiteral(project.path)
         let setup = """
         DELETE FROM project_roots;
         DELETE FROM projects;
@@ -28,7 +32,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let automation = try XCTUnwrap(catalog.threads.first { $0.id == "running" })
         let assigned = try XCTUnwrap(catalog.threads.first { $0.id == "updated" })
         XCTAssertEqual(automation.projectGroupPath, assigned.projectGroupPath)
-        XCTAssertTrue(automation.sharesProjectRepository && assigned.sharesProjectRepository)
+        XCTAssertTrue(automation.sharesGroupRepository && assigned.sharesGroupRepository)
         XCTAssertNil(RendererThread(automation).projectID)
         XCTAssertEqual(RendererThread(assigned).projectID, "companion")
     }
@@ -58,16 +62,15 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             arguments: ["init", jobs.path], timeout: 3)
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("application".utf8).write(to: jobs.appendingPathComponent("notes.txt"))
-        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
         let setup = """
         DELETE FROM project_roots;
         DELETE FROM projects;
         INSERT INTO projects (id, name) VALUES ('advisor', 'CV Fit Advisor'), ('jobs', 'Job Hunting');
-        INSERT INTO project_roots (project_id, path) VALUES ('advisor', \(sql(advisor.path))), ('advisor', \(sql(jobs.path))), ('jobs', \(sql(jobs.path)));
+        INSERT INTO project_roots (project_id, path) VALUES ('advisor', \(sqlStringLiteral(advisor.path))), ('advisor', \(sqlStringLiteral(jobs.path))), ('jobs', \(sqlStringLiteral(jobs.path)));
         UPDATE threads SET project_id = 'advisor';
-        UPDATE threads SET cwd = \(sql(advisor.path)) WHERE id = 'running';
-        UPDATE threads SET cwd = \(sql(nested.path)) WHERE id = 'updated';
-        UPDATE threads SET cwd = \(sql(jobs.path)), project_id = 'jobs' WHERE id = 'idle';
+        UPDATE threads SET cwd = \(sqlStringLiteral(advisor.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sqlStringLiteral(nested.path)) WHERE id = 'updated';
+        UPDATE threads SET cwd = \(sqlStringLiteral(jobs.path)), project_id = 'jobs' WHERE id = 'idle';
         """
         let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [url.path, setup], timeout: 3)
@@ -78,7 +81,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(crossProject.projectID, "advisor", "Preserve actual chat membership")
         XCTAssertEqual(crossProject.projectName, "Job Hunting")
         XCTAssertEqual(crossProject.projectGroupPath, jobs.path)
-        XCTAssertTrue(crossProject.sharesProjectRepository)
+        XCTAssertTrue(crossProject.sharesGroupRepository)
         XCTAssertEqual(catalog.threads.first { $0.id == "idle" }?.projectName, crossProject.projectName)
         let statuses = await ProjectGitStatusProvider().loadStatuses(
             for: Set(catalog.threads.compactMap(\.projectGroupPath)), policy: .refresh)
@@ -103,16 +106,15 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             XCTAssertEqual(result.terminationStatus, 0)
         }
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
-        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
         let setup = """
         DELETE FROM project_roots;
         DELETE FROM projects;
         INSERT INTO projects (id, name) VALUES ('project', 'Project');
-        INSERT INTO project_roots (project_id, path) VALUES ('project', \(sql(project.path)));
+        INSERT INTO project_roots (project_id, path) VALUES ('project', \(sqlStringLiteral(project.path)));
         UPDATE threads SET project_id = 'project';
-        UPDATE threads SET cwd = \(sql(alias.path)) WHERE id = 'running';
-        UPDATE threads SET cwd = \(sql(subfolder.path)) WHERE id = 'updated';
-        UPDATE threads SET cwd = \(sql(nested.path)) WHERE id = 'idle';
+        UPDATE threads SET cwd = \(sqlStringLiteral(alias.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sqlStringLiteral(subfolder.path)) WHERE id = 'updated';
+        UPDATE threads SET cwd = \(sqlStringLiteral(nested.path)) WHERE id = 'idle';
         """
         let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [url.path, setup], timeout: 3)
@@ -120,21 +122,21 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let provider = CodexThreadCatalogProvider(stateDatabaseURL: url)
         let catalog = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
         XCTAssertEqual(Set(catalog.threads.compactMap(\.projectGroupPath)), [project.path])
-        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.sharesProjectRepository, true)
-        XCTAssertEqual(catalog.threads.first { $0.id == "updated" }?.sharesProjectRepository, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "running" }?.sharesGroupRepository, true)
+        XCTAssertEqual(catalog.threads.first { $0.id == "updated" }?.sharesGroupRepository, true)
         let nestedThread = try XCTUnwrap(catalog.threads.first { $0.id == "idle" })
-        XCTAssertFalse(nestedThread.sharesProjectRepository)
-        XCTAssertFalse(RendererThread(nestedThread).sharesProjectRepository)
+        XCTAssertFalse(nestedThread.sharesGroupRepository)
+        XCTAssertFalse(RendererThread(nestedThread).sharesGroupRepository)
 
         // Repository boundaries can change without a Codex database write.
         try FileManager.default.removeItem(at: nested.appendingPathComponent(".git"))
         let refreshed = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
-        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.sharesProjectRepository, true)
+        XCTAssertEqual(refreshed.threads.first { $0.id == "idle" }?.sharesGroupRepository, true)
 
         // Submodules and linked worktrees use a .git file and remain separate checkouts.
         try Data("gitdir: ../.git/modules/nested\n".utf8).write(to: nested.appendingPathComponent(".git"))
         let linked = try await provider.loadCatalog(codexLaunchDate: nil, requiredThreadIDs: [])
-        XCTAssertEqual(linked.threads.first { $0.id == "idle" }?.sharesProjectRepository, false)
+        XCTAssertEqual(linked.threads.first { $0.id == "idle" }?.sharesGroupRepository, false)
         XCTAssertNil(FileSystemPath.gitRepositoryRoot(workspace.appendingPathComponent("missing").path))
     }
 
@@ -147,14 +149,13 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let alias = workspace.appendingPathComponent("Yahoo-Code-Fill")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: project)
-        func sql(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
         let setup = """
         DELETE FROM project_roots;
         DELETE FROM projects;
         INSERT INTO projects (id, name) VALUES ('mail', 'Mail Verify');
-        INSERT INTO project_roots (project_id, path) VALUES ('mail', \(sql(alias.path)));
-        UPDATE threads SET cwd = \(sql(alias.path)) WHERE id = 'running';
-        UPDATE threads SET cwd = \(sql(project.path)) WHERE id = 'updated';
+        INSERT INTO project_roots (project_id, path) VALUES ('mail', \(sqlStringLiteral(alias.path)));
+        UPDATE threads SET cwd = \(sqlStringLiteral(alias.path)) WHERE id = 'running';
+        UPDATE threads SET cwd = \(sqlStringLiteral(project.path)) WHERE id = 'updated';
         """
         let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [url.path, setup], timeout: 3)

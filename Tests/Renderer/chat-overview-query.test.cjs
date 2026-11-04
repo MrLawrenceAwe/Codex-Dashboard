@@ -11,12 +11,12 @@ const query = vm.runInNewContext(`${resource('chat-overview-query.js')}\nchatOve
 test('Git actions prefer a project chat over newer projectless automation runs', () => {
   const projectGroupPath = '/Users/example/Job Search Companion';
   const thread = (id, overrides = {}) => ({ id, projectGroupPath, runState: 'idle',
-    sharesProjectRepository: true, projectID: 'project', ...overrides });
+    sharesGroupRepository: true, projectID: 'project', ...overrides });
   const automation = thread('automation', { projectID: null });
   const assigned = thread('project-chat');
   const candidates = [automation,
     thread('running', { runState: 'running' }),
-    thread('nested', { sharesProjectRepository: false }),
+    thread('nested', { sharesGroupRepository: false }),
     thread('other-project', { projectGroupPath: '/other' }),
     assigned, thread('older-project-chat')];
   assert.equal(query.projectGitActionThread(candidates, projectGroupPath), assigned);

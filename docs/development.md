@@ -148,8 +148,9 @@ operations, including the renderer’s `openChatOverview` entry point, use
 `RendererThread` exposes `projectID` for saved-project identity,
 `checkoutPath` for the original directory,
 `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
-uncommitted changes and unpushed commits. `sharesProjectRepository` describes
-repository membership; Git action readiness also requires an idle chat.
+uncommitted changes and unpushed commits. `sharesGroupRepository` indicates that the
+chat's checkout and its dashboard group resolve to the same repository. Saved project
+assignment is independent of this grouping. Git action readiness also requires an idle chat.
 Preview fixtures include the same fields.
 
 Sidebar entries mount after the outer New chat action row, outside Quick chat and

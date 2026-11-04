@@ -48,7 +48,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
-              window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
+              window.__stableThreadElement = document.querySelector('[data-open-thread="stable"]');
               window.__codexDashboard.applyThreads((\(payload)).threads);
             })()
             """
@@ -56,7 +56,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
 
         try await Task.sleep(for: .milliseconds(50))
         let retained = try await webView.evaluateJavaScript(
-            "window.__stableThreadElement === document.querySelector('[data-thread-id=\"stable\"]')"
+            "window.__stableThreadElement === document.querySelector('[data-open-thread=\"stable\"]')"
         ) as? Bool
         XCTAssertEqual(retained, true)
     }
@@ -76,8 +76,8 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applyThreads((\(initialPayload)).threads);
               window.__codexDashboard.openChatOverview();
-              window.__stableThreadElement = document.querySelector('[data-thread-id="stable"]');
-              window.__changedThreadElement = document.querySelector('[data-thread-id="changed"]');
+              window.__stableThreadElement = document.querySelector('[data-open-thread="stable"]');
+              window.__changedThreadElement = document.querySelector('[data-open-thread="changed"]');
               window.__stableThreadButton = document.querySelector('[data-open-thread="stable"]');
               window.__stableThreadButton.focus();
               window.__stableThreadWasFocused = document.activeElement === window.__stableThreadButton;
@@ -87,15 +87,15 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         )
 
         try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-thread-id=\"changed\"] .dashboard-thread-heading').textContent === 'After'",
+            "document.querySelector('[data-open-thread=\"changed\"] .dashboard-thread-heading').textContent === 'After'",
             in: webView
         )
         let result = try await webView.evaluateJavaScript(
             """
             [
-              window.__stableThreadElement === document.querySelector('[data-thread-id="stable"]'),
-              window.__changedThreadElement !== document.querySelector('[data-thread-id="changed"]'),
-              document.querySelector('[data-thread-id="changed"] .dashboard-thread-heading').textContent,
+              window.__stableThreadElement === document.querySelector('[data-open-thread="stable"]'),
+              window.__changedThreadElement !== document.querySelector('[data-open-thread="changed"]'),
+              document.querySelector('[data-open-thread="changed"] .dashboard-thread-heading').textContent,
               window.__stableThreadWasFocused,
               document.activeElement === window.__stableThreadButton,
             ]
@@ -130,7 +130,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
         )
 
         try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-thread-id=\"latest\"]') !== null",
+            "document.querySelector('[data-open-thread=\"latest\"]') !== null",
             in: webView
         )
         let renderCount = try await webView.evaluateJavaScript(
@@ -376,7 +376,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
-              const row = document.querySelector('[data-thread-id="completed"]');
+              const row = document.querySelector('[data-open-thread="completed"]');
               return [
                 Boolean(row.querySelector('.dashboard-completed-status')),
                 Boolean(row.querySelector('.dashboard-open-affordance')),
@@ -405,7 +405,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             (() => {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
-              const row = document.querySelector('[data-thread-id="usage-halted"]');
+              const row = document.querySelector('[data-open-thread="usage-halted"]');
               const marker = row.querySelector('.dashboard-usage-limit-status');
               return [
                 marker?.textContent.trim(),
@@ -568,7 +568,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
               const completed = (\(unreadPayload)).threads[0];
               window.__codexDashboard.applyThreads([completed]);
               window.__codexDashboard.openChatOverview();
-              const row = () => document.querySelector('[data-thread-id="completed"]');
+              const row = () => document.querySelector('[data-open-thread="completed"]');
               return Boolean(row().querySelector('.dashboard-completed-status'));
             })()
             """
@@ -584,12 +584,12 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "Boolean(document.querySelector('[data-thread-id=\"completed\"] .dashboard-completed-status'))",
+            "Boolean(document.querySelector('[data-open-thread=\"completed\"] .dashboard-completed-status'))",
             in: webView
         )
         let afterReadResult = try await webView.evaluateJavaScript(
             """
-            Boolean(document.querySelector('[data-thread-id="completed"] .dashboard-completed-status'))
+            Boolean(document.querySelector('[data-open-thread="completed"] .dashboard-completed-status'))
             """
         ) as? Bool
         XCTAssertEqual(afterReadResult, true)
@@ -608,13 +608,13 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
         )
         try await DashboardWebTestHarness.waitForJavaScript(
-            "Boolean(document.querySelector('[data-thread-id=\"completed\"] .dashboard-open-affordance'))",
+            "Boolean(document.querySelector('[data-open-thread=\"completed\"] .dashboard-open-affordance'))",
             in: webView
         )
         let expiryResult = try await webView.evaluateJavaScript(
             """
             (() => {
-              const row = document.querySelector('[data-thread-id="completed"]');
+              const row = document.querySelector('[data-open-thread="completed"]');
               const result = [
                 Boolean(row.querySelector('.dashboard-completed-status')),
                 Boolean(row.querySelector('.dashboard-open-affordance')),

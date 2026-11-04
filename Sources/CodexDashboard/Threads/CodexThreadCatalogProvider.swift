@@ -51,14 +51,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         let path: String
     }
 
-    private func registeredRoot(for thread: StoredThread, in roots: [ProjectRoot]) -> ProjectRoot? {
-        let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
-        let assigned = roots.filter { $0.id == thread.projectID }
-        let candidates = thread.projectID == nil ? roots : assigned
-        return candidates.filter { FileSystemPath.contains(cwd, in: $0.path) }
-            .max { $0.path.count < $1.path.count } ?? assigned.first
-    }
-
     private struct DatabaseSignature: Equatable {
         let database: FileSignature
         let writeAheadLog: FileSignature?
@@ -162,7 +154,6 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         // Any loaded task can be resumed or hit a usage limit without a database
         // write. The reader checks file signatures and only parses changed rollouts.
         let candidates: [ThreadSummary] = threads.map { thread in
-            let root = registeredRoot(for: thread, in: cachedProjectRoots)
             let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
             // Project membership can differ from the checkout (for example, a
             // CV chat working in Job Hunting). Label and scan the same folder.
@@ -170,6 +161,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 FileSystemPath.contains(cwd, in: $0.path)
             }
             let checkoutRoot = matchingRoots.max { $0.path.count < $1.path.count }
+            let assignedRoot = matchingRoots.filter { $0.id == thread.projectID }
+                .max { $0.path.count < $1.path.count }
+                ?? cachedProjectRoots.first { $0.id == thread.projectID }
+            let groupRoot = thread.projectID == nil ? checkoutRoot : assignedRoot
             let checkoutName = checkoutRoot.map { checkout in
                 let names = Set(matchingRoots.filter { $0.path == checkout.path }.map(\.name))
                 // Duplicate registrations can give the same folder different
@@ -196,7 +191,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                projectName: checkoutName ?? root?.name ?? "Other chats",
+                projectName: checkoutName ?? assignedRoot?.name ?? "Other chats",
                 checkoutPath: thread.checkoutPath,
                 recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
@@ -209,13 +204,13 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             summary.threadSource = thread.threadSource
             // Folder grouping also includes projectless automation chats. Keep
             // actual membership so Git handoffs can prefer a project's own chat.
-            summary.projectID = root == nil ? nil : thread.projectID
-            if let root {
+            summary.projectID = assignedRoot?.id
+            if let groupRoot {
                 // Worktree chats can be assigned to a project outside its saved root.
                 summary.projectGroupPath = checkoutRoot?.path
-                    ?? (FileSystemPath.contains(cwd, in: root.path) ? root.path : cwd)
+                    ?? (FileSystemPath.contains(cwd, in: groupRoot.path) ? groupRoot.path : cwd)
                 if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
-                    summary.sharesProjectRepository = repositoryRoot(cwd) == repository
+                    summary.sharesGroupRepository = repositoryRoot(cwd) == repository
                 }
             }
             return summary

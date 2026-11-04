@@ -296,7 +296,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               document.querySelector('[data-filter="unread"]').click();
-              return document.querySelector('[data-thread-id="unread-thread"]').getAttribute('aria-label');
+              return document.querySelector('[data-open-thread="unread-thread"]').getAttribute('aria-label');
             })()
             """
         ) as? String

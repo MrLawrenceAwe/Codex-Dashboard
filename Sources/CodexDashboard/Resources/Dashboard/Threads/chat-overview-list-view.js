@@ -26,7 +26,7 @@ const chatOverviewListView = (() => {
           ? `<span class="dashboard-completed-status" role="status" aria-label="Completed" title="Completed">${dashboardIcons.render('completed')}</span>`
           : `<span class="dashboard-open-affordance" aria-hidden="true">${dashboardIcons.render('arrow')}</span>`;
     return `<div class="dashboard-thread-row${compact ? ' is-compact' : ''}" data-dashboard-thread-row="${domUtils.escapeHTML(thread.id)}">
-      <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${domUtils.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-thread-id="${domUtils.escapeHTML(thread.id)}" data-open-thread="${domUtils.escapeHTML(thread.id)}" aria-label="${domUtils.escapeHTML(openLabel)}">
+      <button type="button" class="dashboard-thread${compact ? ' is-compact' : ''}" data-run-state="${domUtils.escapeHTML(thread.runState)}" data-unread="${String(isUnread)}" data-open-thread="${domUtils.escapeHTML(thread.id)}" aria-label="${domUtils.escapeHTML(openLabel)}">
         <span class="dashboard-thread-copy">
           <span class="dashboard-thread-title-row">
             ${isUnread ? '<span class="dashboard-unread-dot" role="status" aria-label="Unread response" title="Unread response"></span>' : ''}
@@ -66,7 +66,7 @@ const chatOverviewListView = (() => {
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
     if (!projectThreads.some(chatOverviewQuery.hasPendingGitChanges)) return '';
     const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
-    const hasRepositoryThread = projectThreads.some((thread) => thread.sharesProjectRepository);
+    const hasRepositoryThread = projectThreads.some((thread) => thread.sharesGroupRepository);
     const actionLabel = projectThreads.some(thread => thread.projectGitStatus === 'uncommittedChangesWithoutRemote')
       ? 'Commit' : 'Commit or push';
     const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';

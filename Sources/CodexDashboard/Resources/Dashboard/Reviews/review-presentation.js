@@ -112,9 +112,9 @@ const reviewPresentation = (() => {
     const latest = loop.rounds.at(-1);
     return {
       roundLabel: latest ? `Round ${latest.number}` : 'First round',
-      findings: latest?.review ? latest.review.findings.length : '—',
-      addressed: loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0),
-      commits: new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.fixCommit).map(round => round.result.fixCommit)).size,
+      roundFindingCount: latest?.review ? latest.review.findings.length : '—',
+      loopAddressedFindingCount: loop.rounds.reduce((total, round) => total + (round.result?.outcome === 'fixed' ? round.result.addressedFindingCount || 0 : 0), 0),
+      loopFixCommitCount: new Set(loop.rounds.filter(round => round.result?.outcome === 'fixed' && round.result.fixCommit).map(round => round.result.fixCommit)).size,
     };
   }
 

@@ -14,9 +14,10 @@ normal behaviour.
 
 **Overview** keeps running chats in the **Active** section, with **Recent** underneath
 on the same page. Recent stays clearly labelled when no chats are running.
-**Load more** adds ten recent chats at a time from the loaded history. Dashboard loads up to 500
-recent chats, plus required unread and active chats; older history remains available
-in Codex. **Unread** groups unread chats by project; **Mark all as read** uses
+**Load more** adds ten recent chats at a time from the loaded history. Dashboard loads the
+500 most recent chats as a baseline, plus required unread chats and chats with activity
+since the current Codex launch, including those now idle. Older history remains
+available in Codex. **Unread** groups unread chats by project; **Mark all as read** uses
 Codex's read-state action. **Local changes** shows projects with uncommitted changes
 or unpushed commits, with separate labels for each.
 
