@@ -32,7 +32,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[3] as? Int, 3)
     }
 
-    func testProjectWithoutRemoteShowsCommitActionAndUpdatesWhenRemoteIsAdded() async throws {
+    func testProjectWithUncommittedChangesShowsCommitWithOrWithoutRemote() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let localPayload = try DashboardWebTestHarness.snapshotPayload(for: [
             .fixture(id: "local", checkoutPath: "/tmp/local", projectGitStatus: .uncommittedChangesWithoutRemote),
@@ -57,7 +57,7 @@ extension ChatOverviewWebTests {
         let updatedLabel = try await webView.evaluateJavaScript(
             "document.querySelector('[data-project-git-action]').textContent.trim()"
         ) as? String
-        XCTAssertEqual(updatedLabel, "Commit or push")
+        XCTAssertEqual(updatedLabel, "Commit")
     }
 
     func testUnpushedCommitsAppearInLocalChangesWithPushAction() async throws {
@@ -408,7 +408,7 @@ extension ChatOverviewWebTests {
 
         let counts = try XCTUnwrap(buttonCounts)
         XCTAssertEqual(counts[0] as? Int, 1)
-        XCTAssertEqual(counts[1] as? String, "Commit or push")
+        XCTAssertEqual(counts[1] as? String, "Commit")
         let values = try XCTUnwrap(handoff)
         XCTAssertEqual(values[0] as? String, "local:off-sidebar-idle-thread")
         XCTAssertEqual(values[1] as? String, "1")
@@ -726,9 +726,9 @@ extension ChatOverviewWebTests {
         (() => {
           const host = window.__gitHostForTests;
           const original = host.openProjectGitAction;
-          host.openProjectGitAction = async function(thread) {
+          host.openProjectGitAction = async function(thread, action) {
             window.__gitHandoffThreadID = thread.id;
-            const result = await original.call(this, thread);
+            const result = await original.call(this, thread, action);
             window.__gitHandoffResult = result;
             return result;
           };

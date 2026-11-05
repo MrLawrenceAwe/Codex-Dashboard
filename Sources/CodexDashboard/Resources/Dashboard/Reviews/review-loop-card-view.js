@@ -205,9 +205,9 @@ const reviewLoopCardView = (() => {
       note.textContent = prompt?.note || '';
       note.hidden = !prompt?.note;
     }
-    const nextMessage = root.querySelector('[data-review-next-message]');
-    nextMessage.hidden = !!progress.upcoming;
-    nextMessage.textContent = progress.nextMessage;
+    const unavailableMessage = root.querySelector('[data-review-next-message]');
+    unavailableMessage.hidden = !progress.upcomingPromptUnavailableMessage;
+    unavailableMessage.textContent = progress.upcomingPromptUnavailableMessage || '';
   }
   return { renderCards };
 })();

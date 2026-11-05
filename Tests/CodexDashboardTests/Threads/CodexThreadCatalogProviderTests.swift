@@ -168,6 +168,15 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         XCTAssertEqual(Set(grouped.compactMap(\.projectGroupPath)), [project.resolvingSymlinksInPath().path])
         XCTAssertEqual(initial.threads.first { $0.id == "running" }?.checkoutPath, alias.path, "Keep the original chat checkout for review-loop isolation")
         XCTAssertNil(initial.threads.first { $0.id == "idle" }?.projectGroupPath)
+        let orphaning = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [url.path, "UPDATE threads SET project_id = 'removed' WHERE id = 'running';"], timeout: 3)
+        XCTAssertEqual(orphaning.terminationStatus, 0)
+        let withOrphan = try await provider.loadCatalog(codexLaunchDate: .distantPast, requiredThreadIDs: [])
+        let orphan = try XCTUnwrap(withOrphan.threads.first { $0.id == "running" })
+        XCTAssertNil(orphan.projectID)
+        XCTAssertNil(orphan.projectGroupPath)
+        XCTAssertEqual(orphan.projectName, "Other chats")
+        XCTAssertEqual(withOrphan.threads.first { $0.id == "updated" }?.projectName, "Mail Verify")
         let removal = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
             arguments: [url.path, "DELETE FROM projects; DELETE FROM project_roots;"], timeout: 3)
         XCTAssertEqual(removal.terminationStatus, 0)

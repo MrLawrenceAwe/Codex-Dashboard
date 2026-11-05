@@ -387,26 +387,28 @@ final class ReviewLoopCoordinator {
         }
         if workspace.revision != reportedCommit || round.fixVerification != nil {
             guard try await verifyAdvancedCheckout(thread: thread, loop: updated, round: round, sourceFixTurnID: fixTurn.id,
-                                                  workspace: workspace, using: driver, threads: threads, threadID: threadID) else { return }
+                                                  workspace: workspace, using: driver, threads: threads, threadID: threadID) == .readyToFinalize else { return }
         }
         guard let current = activeLoop(matching: updated.id, phase: .running) else { return }
         updated = current
         guard try await publishFixIfNeeded(
             loop: updated, round: round, result: result, reportedCommit: reportedCommit,
             sourceFixTurnID: fixTurn.id, workspace: workspace, using: driver, threadID: threadID
-        ) else { return }
+        ) == .readyToFinalize else { return }
         try finalizeRound(loopID: updated.id, result: result,
                         fixCommit: result.outcome == .fixed ? reportedCommit : nil,
                         workspace: workspace, fixTurnID: fixTurn.id)
     }
+
+    private enum RoundCompletionReadiness { case readyToFinalize, reconcileAgain }
 
     /// Persists publication intent and schedules verification if reconciliation advances HEAD.
     private func publishFixIfNeeded(
         loop: ReviewLoop, round: ReviewRound, result: ReviewRoundResult, reportedCommit: String,
         sourceFixTurnID: String, workspace: ReviewWorkspaceState,
         using driver: any ReviewLoopDriving, threadID: String
-    ) async throws -> Bool {
-        guard workspace.kind == .git, result.outcome == .fixed, loop.pushToRemote else { return true }
+    ) async throws -> RoundCompletionReadiness {
+        guard workspace.kind == .git, result.outcome == .fixed, loop.pushToRemote else { return .readyToFinalize }
         var updated = loop
         updated.message = "Fixes committed. Reconciling remote changes and publishing the verified fixes."
         try persist(updated)
@@ -415,9 +417,9 @@ final class ReviewLoopCoordinator {
         if case .verificationRequired(let workspace) = publication {
             try await submitFixVerification(loop: updated, round: round, sourceFixTurnID: sourceFixTurnID,
                                             workspace: workspace, using: driver, threadID: threadID)
-            return false
+            return .reconcileAgain
         }
-        return true
+        return .readyToFinalize
     }
 
     private func finalizeRound(
@@ -456,16 +458,16 @@ final class ReviewLoopCoordinator {
         thread: ReviewThreadState, loop: ReviewLoop, round: ReviewRound, sourceFixTurnID: String,
         workspace: ReviewWorkspaceState, using driver: any ReviewLoopDriving,
         threads: [RendererThread], threadID: String
-    ) async throws -> Bool {
+    ) async throws -> RoundCompletionReadiness {
         let currentWorkspace = try await validateWorkspace(using: driver, loop: loop, threads: threads, threadID: threadID)
-        guard currentWorkspace == workspace else { return false }
+        guard currentWorkspace == workspace else { return .reconcileAgain }
         if let verification = round.fixVerification {
             guard let turnID = verification.turnID, let turn = thread.turns.last, turn.id == turnID else {
                 throw ReviewLoopError("The fix verification turn was not acknowledged or the chat changed. Inspect its chat before resuming; it will not be sent twice.")
             }
-            if turn.status == .inProgress { return false }
+            if turn.status == .inProgress { return .reconcileAgain }
             try requireCompleted(turn)
-            if try await waitForExtensionReload(turn, loop: loop, using: driver, threads: threads, threadID: threadID) { return false }
+            if try await waitForExtensionReload(turn, loop: loop, using: driver, threads: threads, threadID: threadID) { return .reconcileAgain }
             if verification.targetRevision == workspace.revision {
                 let report = try ReviewReportContract.review(turn.finalMessage, priorityLimit: loop.priorityLimit)
                 let findings = report.numberedFindings(upTo: loop.priorityLimit)
@@ -473,12 +475,12 @@ final class ReviewLoopCoordinator {
                     throw ReviewLoopError("Fix verification needs attention at the current revision: \(report.summary) "
                         + findings.map { "\($0.finding.title): \($0.finding.body)" }.joined(separator: "\n"))
                 }
-                return true
+                return .readyToFinalize
             }
         }
         try await submitFixVerification(loop: loop, round: round, sourceFixTurnID: sourceFixTurnID,
                                         workspace: workspace, using: driver, threadID: threadID)
-        return false
+        return .reconcileAgain
     }
 
     private func submitFixVerification(

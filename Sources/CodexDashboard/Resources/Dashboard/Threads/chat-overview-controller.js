@@ -123,7 +123,7 @@ function createChatOverview({ catalog }) {
       return;
     }
     closeChatOverview();
-    const result = await codexHost.openProjectGitAction(thread);
+    const result = await codexHost.openProjectGitAction(thread, chatOverviewQuery.projectGitAction(thread));
     if (result.opened || result.cancelled) return;
     projectGitActionError = result.reason;
     dashboardNavigation.openPage(chatOverview);

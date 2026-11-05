@@ -48,7 +48,7 @@ const reviewLoopSetupView = (() => {
         <p id="review-extension-help" class="review-field-help review-extension-help">Reload before testing and after fixes that need live verification. Failed reloads wait for you.</p>
         <label class="review-mute-test-playback"><input type="checkbox" data-review-mute-test-playback> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
-        <p class="review-field-help review-push-help">Requires an upstream, origin, or sole remote. Diverged history is merged, committed and verified before pushing. Push failures block the loop; resolve them, then Resume.</p>
+        <p class="review-field-help review-push-help">Requires an upstream, origin, or sole remote. Dashboard checks for remote changes and verifies the fixes again if it needs to merge. If push fails, resolve the issue and select Resume.</p>
         </fieldset>
         </details>
         <div data-review-error role="alert" hidden></div>
@@ -117,12 +117,13 @@ const reviewLoopSetupView = (() => {
     liveTesting.hidden = !reviewType?.supportsLiveTesting;
     root.querySelector('.review-live-testing-help').hidden = liveTesting.hidden;
     if (liveTesting.hidden) liveTesting.querySelector('select').value = 'false';
+    const liveTestingEnabled = !liveTesting.hidden && liveTesting.querySelector('select').value === 'true';
     const extension = root.querySelector('.review-extension');
-    extension.hidden = liveTesting.hidden || liveTesting.querySelector('select').value !== 'true';
+    extension.hidden = !liveTestingEnabled;
     root.querySelector('.review-extension-help').hidden = extension.hidden;
     if (extension.hidden) extension.querySelector('select').value = 'false';
     const muteTestPlayback = root.querySelector('.review-mute-test-playback');
-    muteTestPlayback.hidden = extension.hidden;
+    muteTestPlayback.hidden = !liveTestingEnabled;
     if (muteTestPlayback.hidden) muteTestPlayback.querySelector('input').checked = false;
     const context = root.querySelector('.review-project-context');
     context.hidden = !reviewType?.supportsProjectContext;

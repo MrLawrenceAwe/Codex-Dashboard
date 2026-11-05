@@ -100,7 +100,7 @@ const codexHost = {
     }));
   },
 
-  async openProjectGitAction(thread) {
+  async openProjectGitAction(thread, action) {
     const waitFor = (value, timeout = 5000) => domUtils.waitFor(value, { timeout });
     const initialThreadID = codexUIContracts.selectedThreadID();
     const isSelected = () => codexUIContracts.selectedThreadID() === thread.id;
@@ -137,7 +137,6 @@ const codexHost = {
       if (!selected) return { opened: false, reason: 'Codex did not select the project chat.' };
 
       const waitForSelected = (value) => waitFor(() => navigationCancelled || !isSelected() ? cancelled : value());
-      const action = thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
       let gitActions = await waitForSelected(() => codexUIContracts.gitActionsButton());
       if (gitActions === cancelled || navigationCancelled || !isSelected()) return cancelled;
       if (!gitActions) return { opened: false, reason: 'Codex did not show Git actions for the project chat.' };

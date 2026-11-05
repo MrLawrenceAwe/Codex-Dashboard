@@ -65,7 +65,7 @@ test('Local changes counts, filtering, and labels agree for every Git status', (
     ['unpushedCommits', 'Unpushed'],
     ['uncommittedChangesAndUnpushedCommits', 'Uncommitted · Unpushed'],
   ]) {
-    const thread = { id: 'chat', projectName: 'Project', projectGroupPath: '/project', projectGitStatus };
+    const thread = { id: 'chat', projectName: 'Project', projectGroupPath: '/project', projectGitStatus, runState: 'idle', sharesGroupRepository: true };
     const state = query.summarizeActivity([thread], () => false, new Set());
     const selection = query.selectThreads({ threads: [thread], ...state,
       filterMode: 'changedProjects', visibleItemLimit: 10 });
@@ -76,7 +76,12 @@ test('Local changes counts, filtering, and labels agree for every Git status', (
       filterMode: 'changedProjects', hiddenChangeIndicatorPaths: new Set(),
     });
     assert.equal(markup.includes('class="dashboard-git-changes"'), expectedLabel !== null, projectGitStatus);
-    if (expectedLabel) assert.ok(markup.includes(`<span>${expectedLabel}</span>`), projectGitStatus);
+    if (expectedLabel) {
+      assert.ok(markup.includes(`<span>${expectedLabel}</span>`), projectGitStatus);
+      const action = projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
+      assert.equal(query.projectGitAction(thread), action);
+      assert.match(markup, new RegExp(`title="Open Codex’s ${action} flow for this project"><span>${action}</span>`));
+    }
     assert.equal(query.hasPendingGitChanges({ ...thread, projectGroupPath: null }), false, projectGitStatus);
   }
 });

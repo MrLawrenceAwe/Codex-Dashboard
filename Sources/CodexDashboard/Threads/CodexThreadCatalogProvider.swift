@@ -165,6 +165,10 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 .max { $0.path.count < $1.path.count }
                 ?? cachedProjectRoots.first { $0.id == thread.projectID }
             let groupRoot = thread.projectID == nil ? checkoutRoot : assignedRoot
+            // Worktree chats can be assigned to a project outside its saved root.
+            let groupPath = groupRoot.map { root in
+                checkoutRoot?.path ?? (FileSystemPath.contains(cwd, in: root.path) ? root.path : cwd)
+            }
             let checkoutName = checkoutRoot.map { checkout in
                 let names = Set(matchingRoots.filter { $0.path == checkout.path }.map(\.name))
                 // Duplicate registrations can give the same folder different
@@ -191,7 +195,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 id: thread.id,
                 title: thread.title,
                 preview: thread.preview,
-                projectName: checkoutName ?? assignedRoot?.name ?? "Other chats",
+                projectName: groupRoot.map { checkoutName ?? $0.name } ?? "Other chats",
                 checkoutPath: thread.checkoutPath,
                 recencyEpochMillis: thread.recencyAtMilliseconds,
                 isPinned: thread.pinnedValue != 0,
@@ -205,13 +209,9 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             // Folder grouping also includes projectless automation chats. Keep
             // actual membership so Git handoffs can prefer a project's own chat.
             summary.projectID = assignedRoot?.id
-            if let groupRoot {
-                // Worktree chats can be assigned to a project outside its saved root.
-                summary.projectGroupPath = checkoutRoot?.path
-                    ?? (FileSystemPath.contains(cwd, in: groupRoot.path) ? groupRoot.path : cwd)
-                if let groupPath = summary.projectGroupPath, let repository = repositoryRoot(groupPath) {
-                    summary.sharesGroupRepository = repositoryRoot(cwd) == repository
-                }
+            summary.projectGroupPath = groupPath
+            if let groupPath, let repository = repositoryRoot(groupPath) {
+                summary.sharesGroupRepository = repositoryRoot(cwd) == repository
             }
             return summary
         }

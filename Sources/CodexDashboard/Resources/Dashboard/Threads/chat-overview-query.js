@@ -5,6 +5,8 @@ const chatOverviewQuery = (() => {
     && (hasUncommittedChanges(thread) || hasUnpushedCommits(thread));
   const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.sharesGroupRepository;
 
+  const projectGitAction = thread => thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
+
   function projectGitActionThread(threads, projectPath) {
     const candidates = threads.filter(thread => canOpenProjectGitActions(thread)
       && String(thread.projectGroupPath || '').trim() === projectPath);
@@ -71,5 +73,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, canOpenProjectGitActions, projectGitActionThread };
+  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, projectGitAction, projectGitActionThread };
 })();

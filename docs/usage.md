@@ -26,24 +26,24 @@ Projects use Codex's saved names and roots. Removed projects' chats appear under
 colours or **No highlight**. Projects remain individually collapsible.
 
 **Hide change indicators** hides a project's indicators until restored. Hidden
-projects remain under **Indicators hidden** in Local changes. **Commit or push**
-opens Codex's native Commit flow through an idle chat in the same repository when
-there are uncommitted changes, or selects its Push action when only unpushed commits
-remain. Project-assigned chats are preferred over projectless runs in Recents.
+projects remain under **Indicators hidden** in Local changes. **Commit** opens
+Codex’s native Commit flow when there are uncommitted changes. **Push** selects
+Codex’s Push action when only unpushed commits remain. Both use an idle chat in
+the same repository.
+Project-assigned chats are preferred over projectless runs in Recents.
 Chats in separate nested repositories cannot handle their parent project's
 Git actions. The handoff stops if you switch chats, including while the initial chat
 selection is pending. Git status uses local remote-tracking refs without fetching;
-repositories without a remote show only uncommitted changes and label the action
-**Commit**.
+repositories without a remote show only uncommitted changes.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
 finishes or it asks a structured question, including questions asked while work
 continues. The menu bar has separate **Open completed chats automatically** and
 **Open chats with questions automatically** toggles. Both can open the relevant
 chat even when Codex is already frontmost. Review-loop chats, scheduled automation
-chats, and chats started in the ChatGPT Chrome extension are excluded. Typing, voice
-chat, and dictation suppress automatic focus changes. Suppressed events and questions
-already present at startup do not trigger later focus changes.
+chats, and chats whose preview contains the Chrome side-panel marker are excluded.
+Typing, voice chat, and dictation suppress automatic focus changes. Suppressed
+events and questions already present at startup do not trigger later focus changes.
 
 ## Dictation while editing a sent message
 

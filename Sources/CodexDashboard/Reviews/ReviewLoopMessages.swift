@@ -64,7 +64,7 @@ struct ReviewLoopProgress: Codable, Sendable {
     let step: String
     let current: ReviewPromptPreview?
     let upcoming: ReviewPromptPreview?
-    let nextMessage: String
+    let upcomingPromptUnavailableMessage: String?
     let threadID: String?
 }
 

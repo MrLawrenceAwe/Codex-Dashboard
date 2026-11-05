@@ -64,15 +64,15 @@ const chatOverviewListView = (() => {
   }
 
   function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
-    if (!projectThreads.some(chatOverviewQuery.hasPendingGitChanges)) return '';
-    const hasIdleThread = projectThreads.some(chatOverviewQuery.canOpenProjectGitActions);
+    const changedThread = projectThreads.find(chatOverviewQuery.hasPendingGitChanges);
+    if (!changedThread) return '';
+    const actionThread = chatOverviewQuery.projectGitActionThread(projectThreads, projectPath);
     const hasRepositoryThread = projectThreads.some((thread) => thread.sharesGroupRepository);
-    const actionLabel = projectThreads.some(thread => thread.projectGitStatus === 'uncommittedChangesWithoutRemote')
-      ? 'Commit' : 'Commit or push';
+    const actionLabel = chatOverviewQuery.projectGitAction(actionThread ?? changedThread);
     const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'rotateCounterclockwise' : 'eyeOff')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
-      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${hasIdleThread ? `Open Codex’s ${actionLabel} flow for this project` : `${actionLabel} requires an idle chat in this project’s repository`}"${hasIdleThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${hasIdleThread ? actionLabel : unavailableLabel}</span></button>`;
+      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${actionThread ? `Open Codex’s ${actionLabel} flow for this project` : `${actionLabel} requires an idle chat in this project’s repository`}"${actionThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${actionThread ? actionLabel : unavailableLabel}</span></button>`;
   }
 
   function renderProjectIdentity(projectName, projectPath) {
