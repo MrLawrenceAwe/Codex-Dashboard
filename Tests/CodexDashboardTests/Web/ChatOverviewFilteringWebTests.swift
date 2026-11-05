@@ -69,7 +69,7 @@ extension ChatOverviewWebTests {
                 initialCount,
                 loadMoreVisible,
                 expandedCount,
-                document.querySelector('[data-thread-list] .dashboard-thread-row:last-child .dashboard-thread')?.dataset.threadId,
+                document.querySelector('[data-thread-list] .dashboard-thread-row:last-child .dashboard-thread')?.dataset.openThread,
               ];
             })()
             """
@@ -142,12 +142,12 @@ extension ChatOverviewWebTests {
                 document.querySelector('[data-navigation-running-count]').textContent,
                 document.querySelector('[data-navigation-running]').getAttribute('aria-label'),
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                  .map((thread) => thread.dataset.threadId),
+                  .map((thread) => thread.dataset.openThread),
                 document.querySelector('[data-filter="overview"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="running"]') === null,
                 [...document.querySelectorAll('[data-dashboard-section]')]
                   .map((section) => [section.dataset.dashboardSection,
-                    [...section.querySelectorAll('.dashboard-thread')].map((thread) => thread.dataset.threadId)]),
+                    [...section.querySelectorAll('.dashboard-thread')].map((thread) => thread.dataset.openThread)]),
               ];
             })()
             """
@@ -181,11 +181,11 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                .map((thread) => thread.dataset.threadId);
+                .map((thread) => thread.dataset.openThread);
               const canLoadMore = !document.querySelector('[data-load-more]').hidden;
               document.querySelector('[data-load-more]').click();
               const expandedIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                .map((thread) => thread.dataset.threadId);
+                .map((thread) => thread.dataset.openThread);
               return [initialIDs, canLoadMore, expandedIDs,
                 document.querySelector('[data-load-more]').hidden];
             })()
@@ -219,7 +219,7 @@ extension ChatOverviewWebTests {
               window.__codexDashboard.applyThreads((\(payload)).threads);
               window.__codexDashboard.openChatOverview();
               const initialIDs = [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                .map((thread) => thread.dataset.threadId);
+                .map((thread) => thread.dataset.openThread);
               return [
                 document.querySelector('[data-filter="overview"]').classList.contains('is-active'),
                 document.querySelector('[data-filter="home"]') === null,

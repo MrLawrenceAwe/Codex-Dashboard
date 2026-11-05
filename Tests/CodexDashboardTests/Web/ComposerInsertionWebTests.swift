@@ -144,7 +144,7 @@ final class ComposerInsertionWebTests: SerializedDashboardWebTestCase {
           const fixture = window.__transferFixture;
           fixture.props.conversationId = 'destination';
           const trigger = document.createElement('button');
-          trigger.dataset.codexIntelligenceTrigger = 'true';
+          trigger.dataset.composerNavigationTarget = 'reasoning';
           trigger.setAttribute('aria-expanded', 'false');
           trigger.addEventListener('click', () => {
             trigger.setAttribute('aria-expanded', 'true');

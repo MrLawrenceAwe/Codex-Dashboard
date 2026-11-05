@@ -15,7 +15,7 @@ final class ModelPickerCompatibilityWebTests: SerializedDashboardWebTestCase {
               \(contractSource)
               const shell = document.querySelector('.composer-shell');
               const trigger = document.createElement('button');
-              trigger.dataset.codexIntelligenceTrigger = 'true';
+              trigger.dataset.composerNavigationTarget = 'reasoning';
               trigger.dataset.selectedReasoningEffort = 'medium';
               trigger.setAttribute('aria-expanded', 'false');
               trigger.addEventListener('click', () => {
@@ -31,8 +31,8 @@ final class ModelPickerCompatibilityWebTests: SerializedDashboardWebTestCase {
                 document.body.append(menu);
               });
               shell.append(trigger);
-              document.body.addEventListener('click', (event) => {
-                if (event.target === document.body) {
+              document.body.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
                   trigger.setAttribute('aria-expanded', 'false');
                   document.querySelector('[data-model-picker-view]')?.remove();
                 }

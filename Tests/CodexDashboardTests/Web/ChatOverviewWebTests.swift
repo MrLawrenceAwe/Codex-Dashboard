@@ -165,7 +165,7 @@ final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
             """
             (() => {
               window.__codexDashboard.openChatOverview();
-              return document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId;
+              return document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.openThread;
             })()
             """
         ) as? String

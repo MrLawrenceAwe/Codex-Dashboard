@@ -119,7 +119,7 @@ extension ChatOverviewWebTests {
               document.querySelector('[data-filter="changedProjects"]').click();
               return [
                 [...document.querySelectorAll('[data-thread-list] .dashboard-thread')]
-                  .map((thread) => thread.dataset.threadId),
+                  .map((thread) => thread.dataset.openThread),
                 document.querySelectorAll('[data-thread-list] .dashboard-git-project').length,
                 document.querySelectorAll('[data-thread-list] [data-project-git-action]').length,
                 document.querySelector('[data-filter-count="changedProjects"]').textContent,

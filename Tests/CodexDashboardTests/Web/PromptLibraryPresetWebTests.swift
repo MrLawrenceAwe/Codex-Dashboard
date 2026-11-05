@@ -76,7 +76,7 @@ extension PromptLibraryWebTests {
             void (async () => {
               const shell = document.querySelector('.composer-shell');
               const trigger = document.createElement('button');
-              trigger.dataset.codexIntelligenceTrigger = 'true';
+              trigger.dataset.composerNavigationTarget = 'reasoning';
               trigger.setAttribute('aria-expanded', 'false');
               trigger.dataset.selectedReasoningEffort = 'medium';
               trigger.textContent = 'Current model';
@@ -374,7 +374,7 @@ extension PromptLibraryWebTests {
             """
             void (async () => {
               const trigger = document.createElement('button');
-              trigger.dataset.codexIntelligenceTrigger = 'true';
+              trigger.dataset.composerNavigationTarget = 'reasoning';
               trigger.setAttribute('aria-expanded', 'false');
               trigger.textContent = 'Current model';
               document.querySelector('.composer-shell').append(trigger);

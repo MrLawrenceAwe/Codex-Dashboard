@@ -18,7 +18,7 @@ test('model-picker compatibility uses the supplied reasoning schema', async () =
     COMPOSER_PRESET_SCHEMA: { reasoningEfforts: ['future-effort'] },
     domUtils: { isVisible: () => true, waitFor: async value => value() },
     document: {
-      querySelectorAll: selector => selector === '[data-codex-intelligence-trigger]'
+      querySelectorAll: selector => selector === '[data-composer-navigation-target="reasoning"]'
         ? [trigger] : selector === '[data-model-picker-view]' ? [picker] : [],
     },
   });

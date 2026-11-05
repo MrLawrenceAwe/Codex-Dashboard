@@ -268,7 +268,7 @@ extension ChatOverviewWebTests {
               document.querySelector('[data-filter="unread"]').click();
               return [
                 document.querySelector('[data-filter-count="unread"]').textContent,
-                document.querySelector('[data-thread-list] .dashboard-thread')?.dataset.threadId,
+                document.querySelector('[data-thread-list] [data-open-thread]')?.dataset.openThread,
               ];
             })()
             """

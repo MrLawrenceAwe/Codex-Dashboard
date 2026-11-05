@@ -280,7 +280,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
               return [
                 Boolean(document.getElementById('codex-dashboard-chat-overview-navigation')),
                 visibleThreads.length,
-                visibleThreads[0].dataset.threadId,
+                visibleThreads[0].dataset.openThread,
                 document.documentElement.classList.contains('codex-dashboard-open'),
                 window.__openedThreadID,
               ];

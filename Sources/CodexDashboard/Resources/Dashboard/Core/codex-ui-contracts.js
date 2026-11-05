@@ -393,12 +393,12 @@ const codexUIContracts = (() => {
     const activeComposer = composer(promptDialogID);
     let container = activeComposer?.parentElement;
     while (container && container !== document.body) {
-      const trigger = [...container.querySelectorAll('[data-codex-intelligence-trigger]')]
+      const trigger = [...container.querySelectorAll('[data-composer-navigation-target="reasoning"]')]
         .find(isVisible);
       if (trigger) return trigger;
       container = container.parentElement;
     }
-    return [...document.querySelectorAll('[data-codex-intelligence-trigger]')].find(isVisible) || null;
+    return [...document.querySelectorAll('[data-composer-navigation-target="reasoning"]')].find(isVisible) || null;
   }
 
   function modelPicker() {
@@ -426,7 +426,10 @@ const codexUIContracts = (() => {
         && Boolean(picker.querySelector('[data-reasoning-slider]'));
     } finally {
       if (!wasExpanded && trigger.getAttribute('aria-expanded') === 'true') {
-        document.body.click();
+        modelPicker()?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape', code: 'Escape', bubbles: true,
+        }));
+        await waitFor(() => trigger.getAttribute('aria-expanded') !== 'true');
       }
     }
   }
