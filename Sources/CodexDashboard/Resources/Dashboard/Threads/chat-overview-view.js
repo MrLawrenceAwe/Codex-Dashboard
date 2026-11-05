@@ -152,6 +152,7 @@ const chatOverviewView = (() => {
     updateMarkup(
       list,
       chatOverviewListView.renderThreadList(displayedThreads, {
+        threads,
         filterMode,
         leadingRunningThreadCount,
         collapsedProjectPaths,

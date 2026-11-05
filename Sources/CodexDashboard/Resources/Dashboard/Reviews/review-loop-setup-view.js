@@ -44,8 +44,8 @@ const reviewLoopSetupView = (() => {
         <fieldset class="review-limits"><legend class="review-visually-hidden">Testing and publishing settings</legend>
         <label class="review-live-testing">Live testing<select data-review-live-testing aria-label="Live testing" aria-describedby="review-live-testing-help"><option value="false" selected>Off</option><option value="true">On</option></select></label>
         <p id="review-live-testing-help" class="review-field-help review-live-testing-help">Test the running app during review.</p>
-        <label class="review-extension">Reload browser extension<select data-review-extension aria-label="Reload browser extension before testing" aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
-        <p id="review-extension-help" class="review-field-help review-extension-help">Reload before testing and after fixes that need live verification. Failed reloads wait for you.</p>
+        <label class="review-extension">Reload browser extension<select data-review-extension aria-describedby="review-extension-help"><option value="false" selected>No</option><option value="true">Yes</option></select></label>
+        <p id="review-extension-help" class="review-field-help review-extension-help">Reload before live testing and after fixes that need live verification. If a reload fails, the loop waits for you to reload it.</p>
         <label class="review-mute-test-playback"><input type="checkbox" data-review-mute-test-playback> Mute test playback</label>
         <label class="review-remote-push">Remote push<select data-review-push aria-label="Push review fixes to remote"><option value="false" selected>Keep commits local</option><option value="true">Push after each fix round</option></select></label>
         <p class="review-field-help review-push-help">Requires an upstream, origin, or sole remote. Dashboard checks for remote changes and verifies the fixes again if it needs to merge. If push fails, resolve the issue and select Resume.</p>

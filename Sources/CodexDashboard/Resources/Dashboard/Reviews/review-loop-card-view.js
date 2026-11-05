@@ -196,8 +196,8 @@ const reviewLoopCardView = (() => {
     task.hidden = !progress.threadID;
     if (progress.threadID) task.dataset.reviewThread = progress.threadID;
     else delete task.dataset.reviewThread;
-    for (const kind of ['current', 'upcoming']) {
-      const prompt = progress[kind];
+    const prompts = { current: progress.current, upcoming: progress.upcoming?.prompt?.preview };
+    for (const [kind, prompt] of Object.entries(prompts)) {
       root.querySelector(`[data-review-${kind}-prompt]`).hidden = !prompt;
       root.querySelector(`[data-review-${kind}-title]`).textContent = prompt?.title || '';
       root.querySelector(`[data-review-${kind}-text]`).textContent = prompt?.text || '';
@@ -206,8 +206,9 @@ const reviewLoopCardView = (() => {
       note.hidden = !prompt?.note;
     }
     const unavailableMessage = root.querySelector('[data-review-next-message]');
-    unavailableMessage.hidden = !progress.upcomingPromptUnavailableMessage;
-    unavailableMessage.textContent = progress.upcomingPromptUnavailableMessage || '';
+    const message = progress.upcoming?.unavailable?.message;
+    unavailableMessage.hidden = !message;
+    unavailableMessage.textContent = message || '';
   }
   return { renderCards };
 })();

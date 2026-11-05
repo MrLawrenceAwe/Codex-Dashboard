@@ -53,7 +53,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try FileManager.default.removeItem(at: changedFileURL)
         let clean = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
-        XCTAssertEqual(changed[projectURL.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(changed[projectURL.path], .uncommittedChanges)
         XCTAssertEqual(clean[projectURL.path], .clean)
     }
 
@@ -165,7 +165,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
             for: [projectURL.path], policy: .useCached
         )
 
-        XCTAssertEqual(statuses[projectURL.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(statuses[projectURL.path], .uncommittedChanges)
     }
 
     func testIgnoresTrackedAndUntrackedMacOSMetadata() async throws {
@@ -193,10 +193,10 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         let meaningfulChange = await provider.loadStatuses(for: [projectURL.path], policy: .refresh)
 
         XCTAssertEqual(metadataOnly[projectURL.path], .clean)
-        XCTAssertEqual(meaningfulChange[projectURL.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(meaningfulChange[projectURL.path], .uncommittedChanges)
     }
 
-    func testRemoteChangesUpdateUncommittedStatusOnRefresh() async throws {
+    func testUncommittedStatusIsIndependentOfRemoteConfiguration() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-remote-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -212,7 +212,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try Data("pending".utf8).write(to: directory.appendingPathComponent("notes.txt"))
         let provider = ProjectGitStatusProvider()
         let local = await provider.loadStatuses(for: [directory.path], policy: .refresh)
-        XCTAssertEqual(local[directory.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(local[directory.path], .uncommittedChanges)
 
         try await git(["remote", "add", "origin", directory.appendingPathComponent("unused.git").path])
         let withRemote = await provider.loadStatuses(for: [directory.path], policy: .refresh)
@@ -220,7 +220,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
 
         try await git(["remote", "remove", "origin"])
         let withoutRemote = await provider.loadStatuses(for: [directory.path], policy: .refresh)
-        XCTAssertEqual(withoutRemote[directory.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(withoutRemote[directory.path], .uncommittedChanges)
     }
 
     func testReportsUnavailablePath() async {
@@ -284,7 +284,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try Data("feature change\n".utf8).write(to: firstProjectURL.appendingPathComponent("feature.txt"))
         let uncachedProvider = ProjectGitStatusProvider(cacheLifetime: 0)
         let refreshed = await uncachedProvider.loadStatuses(for: paths, policy: .useCached)
-        XCTAssertEqual(refreshed[firstProjectURL.path], .uncommittedChangesWithoutRemote)
+        XCTAssertEqual(refreshed[firstProjectURL.path], .uncommittedChanges)
         XCTAssertEqual(refreshed[secondProjectURL.path], .clean)
     }
 

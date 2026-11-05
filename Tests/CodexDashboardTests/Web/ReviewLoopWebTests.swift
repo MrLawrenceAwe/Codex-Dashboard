@@ -1107,8 +1107,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             message:'All configured review rounds completed.',
             rounds:[{number:1,result:{outcome:'fixed',fixCommit:'1234567890',summary:'Fixed issue'}}]};
           window.__codexDashboard.applyReviewPageSnapshot({reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null,
-            progress:{[loop.id]:{step:'Round limit reached',current:null,upcoming:null,
-              upcomingPromptUnavailableMessage:'No further prompts scheduled.',threadID:null}}});
+            progress:{[loop.id]:{step:'Round limit reached',current:null,upcoming:{unavailable:{message:'No further prompts scheduled.'}},threadID:null}}});
           window.__codexDashboard.openReviews();
           const badge = document.querySelector('[data-review-badge]');
           const limitColor = getComputedStyle(badge).color;
@@ -1136,7 +1135,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             loops:[{id:'live',project,phase:'running',isFinished:false,priorityLimit:'P2',completedRoundCount:0,maxRounds:5,rounds:[],message:'Reviewing'}],
             progress:{live:{step:'Reviewing',threadID:'task-1',
               current:{title:'Review · round 1',text:'Review <code> & files',note:''},
-              upcoming:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}};
+              upcoming:{prompt:{preview:{title:'Fix & commit',text:'Address all and commit',note:'Only if issues are found.'}}}}}};
           api.applyReviewPageSnapshot(snapshot);
           const current = document.querySelector('[data-review-current-prompt]');
           const upcoming = document.querySelector('[data-review-upcoming-prompt]');
@@ -1151,8 +1150,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             document.querySelector('[data-review-current-task]').dataset.reviewThread];
           snapshot.loops[0].phase = 'completed';
           snapshot.loops[0].isFinished = true;
-          snapshot.progress.live.upcoming = null;
-          snapshot.progress.live.upcomingPromptUnavailableMessage = 'No further prompts scheduled.';
+          snapshot.progress.live.upcoming = {unavailable:{message:'No further prompts scheduled.'}};
           api.applyReviewPageSnapshot(snapshot);
           return [...active,document.querySelector('[data-review-upcoming-prompt]').hidden,
             document.querySelector('[data-review-next-message]').textContent];

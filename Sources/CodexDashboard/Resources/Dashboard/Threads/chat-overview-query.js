@@ -1,18 +1,22 @@
 const chatOverviewQuery = (() => {
-  const hasUncommittedChanges = thread => ['uncommittedChanges', 'uncommittedChangesWithoutRemote', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
+  const hasUncommittedChanges = thread => ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
   const hasUnpushedCommits = thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
   const hasPendingGitChanges = thread => !!thread.projectGroupPath
     && (hasUncommittedChanges(thread) || hasUnpushedCommits(thread));
   const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.sharesGroupRepository;
 
-  const projectGitAction = thread => thread.projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
-
-  function projectGitActionThread(threads, projectPath) {
-    const candidates = threads.filter(thread => canOpenProjectGitActions(thread)
-      && String(thread.projectGroupPath || '').trim() === projectPath);
+  function projectGitAction(threads, projectPath) {
+    const projectThreads = threads.filter(thread => String(thread.projectGroupPath || '').trim() === projectPath);
+    const changedThread = projectThreads.find(hasPendingGitChanges);
+    if (!changedThread) return;
+    const candidates = projectThreads.filter(canOpenProjectGitActions);
     // Projectless automation runs can share the folder but open under Recents.
     // Use an assigned project chat when available, keeping recency within each group.
-    return candidates.find(thread => thread.projectID) || candidates[0];
+    const thread = candidates.find(thread => thread.projectID) ?? candidates[0];
+    const label = (thread ?? changedThread).projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
+    const unavailableLabel = projectThreads.some(thread => thread.sharesGroupRepository)
+      ? 'Chat running' : 'No repository chat';
+    return { thread, label, unavailableLabel };
   }
 
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
@@ -73,5 +77,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, projectGitAction, projectGitActionThread };
+  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, projectGitAction };
 })();

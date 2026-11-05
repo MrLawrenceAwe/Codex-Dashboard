@@ -60,11 +60,15 @@ struct ReviewPromptPreview: Codable, Sendable {
     let note: String
 }
 
+enum UpcomingReviewPrompt: Codable, Sendable {
+    case prompt(preview: ReviewPromptPreview)
+    case unavailable(message: String)
+}
+
 struct ReviewLoopProgress: Codable, Sendable {
     let step: String
     let current: ReviewPromptPreview?
-    let upcoming: ReviewPromptPreview?
-    let upcomingPromptUnavailableMessage: String?
+    let upcoming: UpcomingReviewPrompt
     let threadID: String?
 }
 

@@ -63,16 +63,13 @@ const chatOverviewListView = (() => {
     return [...groups.values()];
   }
 
-  function renderProjectActions(projectPath, projectThreads, indicatorsHidden) {
-    const changedThread = projectThreads.find(chatOverviewQuery.hasPendingGitChanges);
-    if (!changedThread) return '';
-    const actionThread = chatOverviewQuery.projectGitActionThread(projectThreads, projectPath);
-    const hasRepositoryThread = projectThreads.some((thread) => thread.sharesGroupRepository);
-    const actionLabel = chatOverviewQuery.projectGitAction(actionThread ?? changedThread);
-    const unavailableLabel = hasRepositoryThread ? 'Chat running' : 'No repository chat';
+  function renderProjectActions(projectPath, threads, indicatorsHidden) {
+    const action = chatOverviewQuery.projectGitAction(threads, projectPath);
+    if (!action) return '';
+    const { thread, label, unavailableLabel } = action;
     return `
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'rotateCounterclockwise' : 'eyeOff')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
-      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${actionThread ? `Open Codex’s ${actionLabel} flow for this project` : `${actionLabel} requires an idle chat in this project’s repository`}"${actionThread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${actionThread ? actionLabel : unavailableLabel}</span></button>`;
+      <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${thread ? `Open Codex’s ${label} flow for this project` : `${label} requires an idle chat in this project’s repository`}"${thread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${thread ? label : unavailableLabel}</span></button>`;
   }
 
   function renderProjectIdentity(projectName, projectPath) {
@@ -97,6 +94,7 @@ const chatOverviewListView = (() => {
   }
 
   function renderThreadList(displayedThreads, {
+    threads,
     filterMode,
     leadingRunningThreadCount = 0,
     collapsedProjectPaths,
@@ -131,7 +129,7 @@ const chatOverviewListView = (() => {
             ${renderChangeStatus(projectThreads, hiddenChangeIndicatorPaths.has(projectPath), false)}
           </div>
           <span class="dashboard-project-summary">
-            ${renderProjectActions(projectPath, projectThreads, hiddenChangeIndicatorPaths.has(projectPath))}
+            ${renderProjectActions(projectPath, threads, hiddenChangeIndicatorPaths.has(projectPath))}
           </span>
         </article>`;
       };
@@ -164,7 +162,7 @@ const chatOverviewListView = (() => {
           </button>
           <span class="dashboard-project-summary">
             <span class="dashboard-project-count">${projectThreads.length} ${projectThreads.length === 1 ? 'chat' : 'chats'}</span>
-            ${renderProjectActions(projectPath, projectThreads, indicatorsHidden)}
+            ${renderProjectActions(projectPath, threads, indicatorsHidden)}
           </span>
         </header>
         <div class="dashboard-project-list" id="${projectListID}"${isCollapsed ? ' hidden' : ''}>${projectThreads.map((item) => renderThreadRow(item, { isUnread: isUnread(item), isCompletionTickVisible })).join('')}</div>

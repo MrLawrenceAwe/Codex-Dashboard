@@ -170,3 +170,15 @@ final class ReviewTestDriver: ReviewLoopDriving {
         ])
     }
 }
+
+extension UpcomingReviewPrompt {
+    var preview: ReviewPromptPreview? {
+        if case .prompt(let preview) = self { return preview }
+        return nil
+    }
+
+    var message: String? {
+        if case .unavailable(let message) = self { return message }
+        return nil
+    }
+}

@@ -153,7 +153,7 @@ final class ReviewFixVerificationTests: ReviewLoopTestCase {
         driver.requestExtensionReload()
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops[0].phase, .awaitingExtensionReload)
-        let preview = try XCTUnwrap(ReviewLoopPresentation.progress(for: coordinator.loops[0])?.upcoming)
+        let preview = try XCTUnwrap(ReviewLoopPresentation.progress(for: coordinator.loops[0])?.upcoming.preview)
         XCTAssertTrue(preview.text.contains("read-only verification"))
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])

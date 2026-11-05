@@ -5,12 +5,10 @@ enum ReviewLoopPresentation {
         guard let loop else { return nil }
         let round = loop.rounds.last
         let unfinished = round.map { $0.result == nil } ?? false
-        let (upcoming, unavailableMessage) = nextPrompt(for: loop, round: round, unfinished: unfinished)
         return ReviewLoopProgress(
             step: step(for: loop, round: round),
             current: round.map { configuredPromptPreview(for: loop, round: $0) },
-            upcoming: upcoming,
-            upcomingPromptUnavailableMessage: unavailableMessage,
+            upcoming: nextPrompt(for: loop, round: round, unfinished: unfinished),
             threadID: round?.threadID
         )
     }
@@ -55,9 +53,9 @@ enum ReviewLoopPresentation {
         for loop: ReviewLoop,
         round: ReviewRound?,
         unfinished: Bool
-    ) -> (ReviewPromptPreview?, String?) {
+    ) -> UpcomingReviewPrompt {
         let noNextPrompt = "No further prompts scheduled."
-        if loop.phase.isFinished || loop.phase == .stopping { return (nil, noNextPrompt) }
+        if loop.phase.isFinished || loop.phase == .stopping { return .unavailable(message: noNextPrompt) }
         if loop.phase == .awaitingExtensionReload, let round {
             let prompt: String
             if let verification = round.fixVerification {
@@ -65,24 +63,26 @@ enum ReviewLoopPresentation {
             } else {
                 prompt = ReviewPrompts.extensionReloadContinuation(for: loop, round: round)
             }
-            return (ReviewPromptPreview(title: "Continue · round \(round.number)",
-                                        text: prompt,
-                                        note: "Reload the extension manually, then select Extension reloaded — continue."), nil)
+            return .prompt(preview: ReviewPromptPreview(
+                title: "Continue · round \(round.number)",
+                text: prompt,
+                note: "Reload the extension manually, then select Extension reloaded — continue."
+            ))
         }
         if loop.phase == .blocked {
-            return (nil, "Resume continues failed or interrupted work in the same chat. For a completed report that needs attention, resolve its blocker in the chat, then Resume to check the latest report and \(loop.workspaceKind == .folder ? "files" : "commit").")
+            return .unavailable(message: "Resume continues failed or interrupted work in the same chat. For a completed report that needs attention, resolve its blocker in the chat, then Resume to check the latest report and \(loop.workspaceKind == .folder ? "files" : "commit").")
         }
         if let round, unfinished, !round.fixRequested {
-            return (ReviewPromptPreview(
+            return .prompt(preview: ReviewPromptPreview(
                 title: "\(loop.workspaceKind == .folder ? "Fix & verify" : "Fix & commit") · round \(round.number)",
                 text: ReviewPrompts.fixPrompt(for: loop, round: round),
                 note: round.review == nil
                     ? "Only if findings are found. Wording follows the finding count."
                     : "After workspace checks pass."
-            ), nil)
+            ))
         }
         guard loop.completedRoundCount + (unfinished ? 1 : 0) < loop.maxRounds else {
-            return (nil, "Final round in progress; no further review scheduled.")
+            return .unavailable(message: "Final round in progress; no further review scheduled.")
         }
         let note: String
         if loop.phase == .queued { note = "After earlier loops for this project finish or are stopped, and the project is idle." }
@@ -90,10 +90,10 @@ enum ReviewLoopPresentation {
         else if loop.pauseRequested { note = "After this round pauses and you resume." }
         else if unfinished { note = loop.workspaceKind == .folder ? "After fixes are applied and verification passes. The next review uses the verified files." : "After fixes commit and verification passes. The next review uses the verified HEAD." }
         else { note = "After the project is idle and workspace checks pass." }
-        return (ReviewPromptPreview(
+        return .prompt(preview: ReviewPromptPreview(
             title: "Review · round \(loop.rounds.count + 1)",
             text: ReviewPrompts.reviewPrompt(for: loop),
             note: note
-        ), nil)
+        ))
     }
 }

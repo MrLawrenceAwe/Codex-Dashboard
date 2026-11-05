@@ -488,7 +488,7 @@ final class ReviewLoopCoordinatorTests: ReviewLoopTestCase {
         XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)
         XCTAssertEqual(coordinator.progress[coordinator.loops.last!.id.uuidString]?.step, "Round limit reached")
         XCTAssertEqual(coordinator.loops.last?.message, "All configured review rounds completed.")
-        XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming)
+        XCTAssertNil(coordinator.progress[coordinator.loops.last!.id.uuidString]?.upcoming.preview)
         try coordinator.apply(action(.resume, for: coordinator), projects: [project])
         await coordinator.advance(using: driver, threads: [])
         XCTAssertEqual(coordinator.loops.last?.phase, .limitReached)

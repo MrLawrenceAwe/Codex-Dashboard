@@ -164,7 +164,7 @@ Choose separate review and fix models, optional supported reasoning efforts,
 Standard/Fast speed, and a round limit of 1–20 (default five). Bugs and performance
 reviews offer general/personal project context and a finding priority limit. P0–P2
 includes P0, P1, and P2. These types also offer **Live testing**, off by default, and
-**Reload browser extension** before testing under **Testing & publishing**, alongside
+**Reload browser extension** under **Testing & publishing**, alongside
 remote push settings. Review models come from Codex's live
 model list. Select **Start review & fix** to begin the loop.
 
