@@ -116,14 +116,15 @@ function createChatOverview({ catalog }) {
 
   async function openGitActionsForProject(projectPath) {
     projectGitActionError = '';
-    const action = chatOverviewQuery.projectGitAction(currentThreads(), projectPath);
-    if (!action?.thread) {
+    const gitChange = deriveViewState().changedProjects.get(projectPath);
+    const thread = chatOverviewQuery.projectGitActionThread(currentThreads(), projectPath);
+    if (!gitChange || !thread) {
       projectGitActionError = 'No idle chat is available in this project’s repository.';
       renderChatOverview();
       return;
     }
     closeChatOverview();
-    const result = await codexHost.openProjectGitAction(action.thread, action.label);
+    const result = await codexHost.openProjectGitAction(thread, gitChange.action);
     if (result.opened || result.cancelled) return;
     projectGitActionError = result.reason;
     dashboardNavigation.openPage(chatOverview);

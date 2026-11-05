@@ -34,7 +34,7 @@ struct ReviewPageSnapshot: Encodable, Sendable {
     let acknowledgedActionID: String?
 }
 
-struct ReviewTypeOption: Codable, Sendable {
+struct ReviewTypeOption: Encodable, Sendable {
     let id: ReviewType
     let label: String
     let scopeDescription: String
@@ -54,18 +54,18 @@ struct ReviewTypeOption: Codable, Sendable {
     }
 }
 
-struct ReviewPromptPreview: Codable, Sendable {
+struct ReviewPromptPreview: Encodable, Sendable {
     let title: String
     let text: String
     let note: String
 }
 
-enum UpcomingReviewPrompt: Codable, Sendable {
+enum UpcomingReviewPrompt: Encodable, Sendable {
     case prompt(preview: ReviewPromptPreview)
     case unavailable(message: String)
 }
 
-struct ReviewLoopProgress: Codable, Sendable {
+struct ReviewLoopProgress: Encodable, Sendable {
     let step: String
     let current: ReviewPromptPreview?
     let upcoming: UpcomingReviewPrompt

@@ -125,14 +125,14 @@ const chatOverviewView = (() => {
     });
     const filterCounts = {
       unread: state.unreadCount,
-      changedProjects: state.allChangedProjectPaths.size,
+      changedProjects: state.changedProjects.size,
     };
     page.querySelectorAll('[data-filter-count]').forEach((count) => {
       count.textContent = String(filterCounts[count.dataset.filterCount] ?? 0);
     });
     const { matchingThreads, displayedThreads, leadingRunningThreadCount, hasMore } = chatOverviewQuery.selectThreads({
       threads,
-      allChangedProjectPaths: state.allChangedProjectPaths,
+      changedProjects: state.changedProjects,
       filterMode,
       isThreadUnread,
       visibleItemLimit,
@@ -153,6 +153,7 @@ const chatOverviewView = (() => {
       list,
       chatOverviewListView.renderThreadList(displayedThreads, {
         threads,
+        changedProjects: state.changedProjects,
         filterMode,
         leadingRunningThreadCount,
         collapsedProjectPaths,

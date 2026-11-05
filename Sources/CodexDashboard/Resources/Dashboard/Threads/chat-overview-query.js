@@ -1,45 +1,45 @@
 const chatOverviewQuery = (() => {
-  const hasUncommittedChanges = thread => ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
-  const hasUnpushedCommits = thread => ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(thread.projectGitStatus);
-  const hasPendingGitChanges = thread => !!thread.projectGroupPath
-    && (hasUncommittedChanges(thread) || hasUnpushedCommits(thread));
+  const gitChangeLabels = {
+    uncommittedChanges: { status: 'Uncommitted', action: 'Commit' },
+    unpushedCommits: { status: 'Unpushed', action: 'Push' },
+    uncommittedChangesAndUnpushedCommits: { status: 'Uncommitted · Unpushed', action: 'Commit' },
+  };
   const canOpenProjectGitActions = thread => thread.runState !== 'running' && thread.sharesGroupRepository;
 
-  function projectGitAction(threads, projectPath) {
-    const projectThreads = threads.filter(thread => String(thread.projectGroupPath || '').trim() === projectPath);
-    const changedThread = projectThreads.find(hasPendingGitChanges);
-    if (!changedThread) return;
-    const candidates = projectThreads.filter(canOpenProjectGitActions);
+  function projectGitActionThread(threads, projectPath) {
+    const candidates = threads.filter(thread => thread.projectGroupPath === projectPath
+      && canOpenProjectGitActions(thread));
     // Projectless automation runs can share the folder but open under Recents.
     // Use an assigned project chat when available, keeping recency within each group.
-    const thread = candidates.find(thread => thread.projectID) ?? candidates[0];
-    const label = (thread ?? changedThread).projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
-    const unavailableLabel = projectThreads.some(thread => thread.sharesGroupRepository)
-      ? 'Chat running' : 'No repository chat';
-    return { thread, label, unavailableLabel };
+    return candidates.find(thread => thread.projectID) ?? candidates[0];
   }
 
   function summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths) {
     let runningCount = 0;
     const indicatedChangedProjectPaths = new Set();
-    const allChangedProjectPaths = new Set();
+    const changedProjects = new Map();
+    const seenProjectPaths = new Set();
     let unreadCount = 0;
 
     threads.forEach((thread) => {
       if (thread.runState === 'running') runningCount += 1;
       if (isThreadUnread(thread)) unreadCount += 1;
-      if (hasPendingGitChanges(thread)) {
-        const projectPath = String(thread.projectGroupPath || '').trim();
-        allChangedProjectPaths.add(projectPath);
-        if (!hiddenChangeIndicatorPaths.has(projectPath)) indicatedChangedProjectPaths.add(projectPath);
+      const projectPath = thread.projectGroupPath;
+      if (projectPath && !seenProjectPaths.has(projectPath)) {
+        seenProjectPaths.add(projectPath);
+        const labels = gitChangeLabels[thread.projectGitStatus];
+        if (labels) {
+          changedProjects.set(projectPath, labels);
+          if (!hiddenChangeIndicatorPaths.has(projectPath)) indicatedChangedProjectPaths.add(projectPath);
+        }
       }
     });
-    return { runningCount, unreadCount, indicatedChangedProjectPaths, allChangedProjectPaths };
+    return { runningCount, unreadCount, indicatedChangedProjectPaths, changedProjects };
   }
 
   function selectThreads({
     threads,
-    allChangedProjectPaths,
+    changedProjects,
     filterMode,
     isThreadUnread,
     visibleItemLimit,
@@ -48,13 +48,13 @@ const chatOverviewQuery = (() => {
       filterMode === 'overview'
         || (filterMode === 'unread' && isThreadUnread(thread))
         || (filterMode === 'changedProjects'
-          && allChangedProjectPaths.has(String(thread.projectGroupPath || '').trim())));
+          && changedProjects.has(thread.projectGroupPath)));
     if (filterMode === 'changedProjects') {
-      const projectPaths = [...new Set(matchingThreads.map((thread) => String(thread.projectGroupPath || '').trim()))];
+      const projectPaths = [...new Set(matchingThreads.map((thread) => thread.projectGroupPath ?? ''))];
       const displayedProjectPaths = new Set(projectPaths.slice(0, visibleItemLimit));
       return {
         matchingThreads,
-        displayedThreads: matchingThreads.filter((thread) => displayedProjectPaths.has(String(thread.projectGroupPath || '').trim())),
+        displayedThreads: matchingThreads.filter((thread) => displayedProjectPaths.has(thread.projectGroupPath ?? '')),
         leadingRunningThreadCount: 0,
         hasMore: visibleItemLimit < projectPaths.length,
       };
@@ -77,5 +77,5 @@ const chatOverviewQuery = (() => {
     };
   }
 
-  return { summarizeActivity, selectThreads, hasUncommittedChanges, hasUnpushedCommits, hasPendingGitChanges, projectGitAction };
+  return { summarizeActivity, selectThreads, projectGitActionThread };
 })();

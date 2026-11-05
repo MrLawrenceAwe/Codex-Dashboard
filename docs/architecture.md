@@ -243,8 +243,9 @@ each path retains its own preflight checks. Continuations
 do not consume another round, and polling never retries a failed submission.
 Stop also handles turns whose submission acknowledgment arrives after cancellation.
 A stopping loop keeps its workspace reserved until submission finishes and the latest
-turn is confirmed inactive. Failed interruptions stay visible and are retried; only
-confirmed stopped loops can be deleted or replaced.
+turn is confirmed inactive. Failed interruptions stay visible and are retried. Once a
+loop is finished (completed, round limit reached, or confirmed stopped), it can be
+deleted from history.
 Storage failures prevent further remote side effects. Operational recovery and
 round-limit semantics are in the [usage guide](usage.md#review-loops).
 
