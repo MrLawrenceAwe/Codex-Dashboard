@@ -2,6 +2,7 @@ import Foundation
 
 enum CompatibilityStatus: Sendable {
     case compatible
+    case pending
     case warning
     case incompatible
     case unavailable
@@ -9,6 +10,7 @@ enum CompatibilityStatus: Sendable {
     var label: String {
         switch self {
         case .compatible: "Compatible"
+        case .pending: "Not yet checked"
         case .warning: "Warning"
         case .incompatible: "Incompatible"
         case .unavailable: "Unavailable"
@@ -27,7 +29,7 @@ struct CompatibilityReport: Equatable, Sendable {
     let checks: [CompatibilityCheck]
 
     var attentionChecks: [CompatibilityCheck] {
-        checks.filter { $0.status != .compatible }
+        checks.filter { $0.status != .compatible && $0.status != .pending }
     }
 
     var blockingCount: Int {
@@ -50,6 +52,7 @@ struct CompatibilityReport: Equatable, Sendable {
             return "Compatibility checks need attention \u{00b7} \(nonBlockingAttentionCount) \(nonBlockingAttentionCount == 1 ? "warning" : "warnings")"
         }
         if checks.isEmpty { return "Compatibility not checked" }
+        if checks.contains(where: { $0.status == .pending }) { return "Checked contracts are compatible · some checks pending" }
         return "All checked contracts are compatible"
     }
 

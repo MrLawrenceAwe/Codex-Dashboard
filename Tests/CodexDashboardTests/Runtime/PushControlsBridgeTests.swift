@@ -43,3 +43,15 @@ extension PushControlsBridgeTests {
         XCTAssertEqual(CompatibilityReport(checks: [check]).blockingCount, 0)
     }
 }
+
+@MainActor
+extension PushControlsBridgeTests {
+    func testUnopenedDialogIsPendingWithoutWarning() async throws {
+        let target = DevToolsTarget(id: "main", type: "page", url: nil, webSocketURL: nil)
+        let bridge = PushControlsBridge(devTools: PushInspectionDevTools(#"{"state":"waiting"}"#))
+        let result = await bridge.synchronize(in: [target])
+        let check = try XCTUnwrap(result)
+        XCTAssertEqual(check.status, .pending)
+        XCTAssertTrue(CompatibilityReport(checks: [check]).attentionChecks.isEmpty)
+    }
+}

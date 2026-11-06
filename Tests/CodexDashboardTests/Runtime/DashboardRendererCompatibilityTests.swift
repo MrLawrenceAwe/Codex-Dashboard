@@ -59,7 +59,8 @@ extension DashboardRendererTests {
                 "composer", "composer-controls", "profile-menu", "model-picker", "disable-push-without-remote",
             ]
         )
-        XCTAssertTrue(checks.allSatisfy { $0.status == .compatible })
+        XCTAssertTrue(checks.filter { $0.id != "disable-push-without-remote" }.allSatisfy { $0.status == .compatible })
+        XCTAssertEqual(checks.last?.status, .pending)
         let expressions = await devTools.expressions()
         let composerControlsExpression = try XCTUnwrap(
             expressions.first { $0.contains("Boolean(codexUIContracts.composerAddButton())") }

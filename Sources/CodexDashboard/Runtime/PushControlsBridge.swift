@@ -22,6 +22,8 @@ struct PushControlsBridge {
                     let inspection = try? JSONDecoder().decode(Inspection.self, from: data)
                 else { continue }
                 switch inspection.state {
+                case "waiting":
+                    checks.append(Self.pendingCheck)
                 case "incompatible":
                     checks.append(Self.check(status: .warning, detail:
                         "Push controls changed in Codex; automatic disabling is unavailable."))
@@ -39,7 +41,12 @@ struct PushControlsBridge {
             }
         }
         // An incompatible window must not be hidden by a compatible second window.
-        return checks.first { $0.status != .compatible } ?? checks.first
+        return checks.first { $0.status == .warning || $0.status == .unavailable }
+            ?? checks.first { $0.status == .compatible } ?? checks.first
+    }
+
+    static var pendingCheck: CompatibilityCheck {
+        check(status: .pending, detail: "Open Commit or push in a local repository to check these controls.")
     }
 
     static func check(status: CompatibilityStatus, detail: String) -> CompatibilityCheck {

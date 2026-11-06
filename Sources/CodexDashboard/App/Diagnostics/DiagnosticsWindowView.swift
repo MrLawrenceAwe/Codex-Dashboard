@@ -43,6 +43,7 @@ private struct CompatibilityCard: View {
     private func color(for status: CompatibilityStatus) -> Color {
         switch status {
         case .compatible: Color(red: 0.45, green: 0.94, blue: 0.61)
+        case .pending: Color.secondary
         case .warning, .unavailable: Color(red: 0.96, green: 0.77, blue: 0.42)
         case .incompatible: Color(red: 1.0, green: 0.42, blue: 0.42)
         }
