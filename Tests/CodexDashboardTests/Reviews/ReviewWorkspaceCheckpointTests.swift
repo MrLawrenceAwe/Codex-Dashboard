@@ -7,7 +7,7 @@ final class ReviewWorkspaceCheckpointTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         func git(_ arguments: [String]) async throws {
-            let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["-C", directory.path] + arguments, timeout: 5)
+            let result = try await Subprocess.run(executableURL: GitExecutable.url, arguments: ["-C", directory.path] + arguments, timeout: 5)
             XCTAssertEqual(result.terminationStatus, 0)
         }
         try await git(["init", "-b", "main"])

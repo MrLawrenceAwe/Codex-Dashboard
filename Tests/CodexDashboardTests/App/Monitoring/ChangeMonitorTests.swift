@@ -141,7 +141,7 @@ final class ChangeMonitorTests: XCTestCase {
         let nestedDirectory = projectDirectory.appendingPathComponent("Sources/Feature", isDirectory: true)
         try FileManager.default.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectDirectory.path, "init", "--quiet"],
             timeout: 3
         )
@@ -201,7 +201,7 @@ final class ChangeMonitorTests: XCTestCase {
 
         try await Task.sleep(for: .milliseconds(150))
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectDirectory.path, "init", "--quiet"],
             timeout: 3
         )
@@ -398,7 +398,7 @@ final class ChangeMonitorTests: XCTestCase {
     /// Fixture setup has a generous deadline for shared CI runners; runtime deadlines are tested separately.
     private func runFixtureGit(arguments: [String]) async throws {
         let output = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"] + arguments,
             timeout: 30
         )

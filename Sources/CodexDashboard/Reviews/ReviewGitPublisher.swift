@@ -52,7 +52,7 @@ struct ReviewGitPublisher: ReviewGitPublishing {
         // followTags, mirror, or force settings. Git rejects non-fast-forward updates.
         do {
             let remoteRef = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
-                arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
                             "ls-remote", "--exit-code", "--refs", "--", remote, destination], timeout: 60)
             guard remoteRef.terminationStatus == 0 || remoteRef.terminationStatus == 2 else {
                 throw ReviewLoopError(String(decoding: remoteRef.standardError, as: UTF8.self))
@@ -62,7 +62,7 @@ struct ReviewGitPublisher: ReviewGitPublishing {
                 // Fetch the actual destination, including commits absent from this checkout.
                 // Never fetch into or rewrite the local branch.
                 let fetched = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
-                    arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                    arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
                                 "fetch", "--no-tags", "--no-recurse-submodules", "--", remote, destination], timeout: 60)
                 guard fetched.terminationStatus == 0 else {
                     throw ReviewLoopError(String(decoding: fetched.standardError, as: UTF8.self))
@@ -92,7 +92,7 @@ struct ReviewGitPublisher: ReviewGitPublishing {
                     throw ReviewLoopError("The checkout changed during remote synchronization.")
                 }
                 let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
-                    arguments: ["GIT_TERMINAL_PROMPT=0", "/usr/bin/git", "-C", path,
+                    arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
                                 "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
                                 "--", remote, commitToPublish + ":" + destination], timeout: 60)
                 guard result.terminationStatus == 0 else {

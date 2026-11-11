@@ -11,6 +11,6 @@ enum ReviewGitCommand {
     }
 
     static func run(_ arguments: [String], at path: String, timeout: TimeInterval = 5) async throws -> SubprocessOutput {
-        try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"), arguments: ["--no-optional-locks", "-C", path] + arguments, timeout: timeout)
+        try await Subprocess.run(executableURL: GitExecutable.url, arguments: ["--no-optional-locks", "-C", path] + arguments, timeout: timeout)
     }
 }

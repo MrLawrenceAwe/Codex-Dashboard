@@ -81,6 +81,10 @@ retains lexical standardisation so it does not resolve symlinks for each event.
 `Support/GitMetadataLocator.swift` shares canonical ancestor discovery across catalog
 grouping, Git status, review checkpoints, and monitoring. Marker presence is separate
 from pointer validation so damaged repositories cannot silently become folder reviews.
+`Support/GitExecutable.swift` selects standalone Git from absolute PATH entries or
+the standard Homebrew locations before Apple's `/usr/bin/git` launcher. Review
+inspection, publication, project status, and Git test fixtures share this selection,
+so an installed standalone Git works even while Xcode licence acceptance is pending.
 
 Renderer resources are listed in `injection-manifest.json`:
 

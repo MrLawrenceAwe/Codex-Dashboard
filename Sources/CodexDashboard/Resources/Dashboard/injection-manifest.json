@@ -49,6 +49,7 @@
     "Sidebar/project-highlights",
     "Core/dashboard-lifecycle",
     "Sidebar/thread-usage-limit-indicators",
+    "Threads/running-chats-popover",
     "Threads/chat-overview-controller",
     "Reviews/review-rpc-client",
     "Reviews/review-presentation",

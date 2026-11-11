@@ -1,3 +1,4 @@
+#codex-dashboard-running-chats,
 #codex-dashboard-chat-overview-navigation,
 #codex-dashboard-chat-overview-page {
   --dashboard-bg: var(--app-color-background-surface, #212121);
@@ -240,3 +241,20 @@ aside [data-codex-sidebar-usage-limit] {
   #codex-dashboard-chat-overview-page, #codex-dashboard-chat-overview-page .dashboard-thread, #codex-dashboard-chat-overview-page .dashboard-open-affordance, #codex-dashboard-chat-overview-page .dashboard-project-chevron { transition: none; }
   #codex-dashboard-chat-overview-navigation .dashboard-nav-spinner::before, #codex-dashboard-chat-overview-page .dashboard-run-spinner::before { animation: none; }
 }
+
+/* Mounted at the document root so the sidebar cannot clip the hover popup. */
+#codex-dashboard-running-chats { position: fixed; z-index: 2147483647; width: min(300px, calc(100vw - 16px)); padding: 6px; border: 1px solid var(--dashboard-line-strong); border-radius: 10px; background: var(--dashboard-bg); color: var(--dashboard-text); box-shadow: 0 8px 28px #0004; }
+#codex-dashboard-running-chats[hidden] { display: none; }
+#codex-dashboard-running-chats .dashboard-running-heading { padding: 6px 8px 9px; color: var(--dashboard-muted); font-size: 11px; font-weight: 550; }
+#codex-dashboard-running-chats [data-running-list] { max-height: min(360px, calc(100vh - 80px)); overflow-y: auto; }
+#codex-dashboard-running-chats button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#codex-dashboard-running-chats button:hover, #codex-dashboard-running-chats button:focus-visible { background: var(--dashboard-surface-hover); outline: none; }
+#codex-dashboard-running-chats .dashboard-running-copy { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 8px; line-height: 16px; }
+#codex-dashboard-running-chats .dashboard-running-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+#codex-dashboard-running-chats .dashboard-running-project { max-width: 45%; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dashboard-muted); font-size: 10px; }
+#codex-dashboard-running-chats .dashboard-running-status { position: relative; display: grid; width: 16px; height: 16px; flex: 0 0 16px; place-items: center; color: var(--dashboard-green); }
+#codex-dashboard-running-chats .dashboard-running-status[data-state="running"]::before { position: absolute; inset: 1px; content: ""; border: 1.5px solid color-mix(in srgb, var(--dashboard-green) 25%, transparent); border-top-color: var(--dashboard-green); border-radius: 50%; animation: dashboard-nav-spin 800ms linear infinite; }
+#codex-dashboard-running-chats .dashboard-running-status svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) { #codex-dashboard-running-chats .dashboard-running-status::before { animation: none; } }
+
+#codex-dashboard-running-chats .dashboard-running-status[data-state="interrupted"] { color: var(--dashboard-amber); }

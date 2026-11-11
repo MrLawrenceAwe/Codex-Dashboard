@@ -11,7 +11,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         let url = try CodexTestFixtures.makeStateDatabase(now: 2_000_000_000, testCase: self)
         let project = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: project) }
-        let git = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+        let git = try await Subprocess.run(executableURL: GitExecutable.url,
             arguments: ["init", project.path], timeout: 3)
         XCTAssertEqual(git.terminationStatus, 0)
         let path = sqlStringLiteral(project.path)
@@ -58,7 +58,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
         for folder in [advisor, nested] {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
-        let git = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+        let git = try await Subprocess.run(executableURL: GitExecutable.url,
             arguments: ["init", jobs.path], timeout: 3)
         XCTAssertEqual(git.terminationStatus, 0)
         try Data("application".utf8).write(to: jobs.appendingPathComponent("notes.txt"))
@@ -101,7 +101,7 @@ final class CodexThreadCatalogProviderTests: XCTestCase {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
         for repository in [project, nested] {
-            let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            let result = try await Subprocess.run(executableURL: GitExecutable.url,
                 arguments: ["init", repository.path], timeout: 3)
             XCTAssertEqual(result.terminationStatus, 0)
         }

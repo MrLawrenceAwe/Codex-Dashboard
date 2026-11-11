@@ -5,6 +5,131 @@ import XCTest
 
 @MainActor
 final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
+    func testRunningChatsHoverRetainsFinishedChatAndNavigates() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        let running = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "active", title: "Active work", runState: .running),
+            .fixture(id: "idle", title: "Idle work"),
+        ])
+        let finished = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "active", title: "Active work", runState: .idle),
+            .fixture(id: "idle", title: "Idle work"),
+        ])
+        _ = try await webView.evaluateJavaScript(
+            """
+            window.__codexDashboard.applyThreads((\(running)).threads);
+            document.getElementById('codex-dashboard-chat-overview-navigation')
+              .dispatchEvent(new Event('pointerenter'));
+            true;
+            """
+        )
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('#codex-dashboard-running-chats:not([hidden]) button[data-running=\"true\"]') !== null",
+            in: webView
+        )
+        let initial = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const panel = document.getElementById('codex-dashboard-running-chats');
+              const row = panel.querySelector('button');
+              window.__hoverRow = row;
+              return [panel.querySelectorAll('button').length,
+                row.querySelector('.dashboard-running-status').getAttribute('aria-label'),
+                getComputedStyle(row.querySelector('.dashboard-running-status'), '::before').animationName];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(initial, [1, "Running", "dashboard-nav-spin"])
+
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const trigger = document.getElementById('codex-dashboard-chat-overview-navigation');
+              trigger.dispatchEvent(new Event('pointerleave'));
+              document.getElementById('codex-dashboard-running-chats').dispatchEvent(new Event('pointerenter'));
+              window.__codexDashboard.applyThreads((\(finished)).threads);
+            })()
+            """
+        )
+        try await Task.sleep(for: .milliseconds(220))
+        let completed = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const panel = document.getElementById('codex-dashboard-running-chats');
+              const row = panel.querySelector('button');
+              return [!panel.hidden, row === window.__hoverRow, row.dataset.running,
+                Boolean(row.querySelector('.dashboard-running-status svg'))];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(completed, [true, true, "false", true])
+
+        let navigation = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              let route;
+              window.addEventListener('message', event => {
+                if (event.data?.type === 'navigate-to-route') route = event.data.path;
+              });
+              const panel = document.getElementById('codex-dashboard-running-chats');
+              panel.querySelector('button').click();
+              document.getElementById('codex-dashboard-chat-overview-navigation').focus();
+              return [route, panel.hidden];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(navigation, ["/local/active", true])
+    }
+
+    func testRunningChatsShowsWarningForInterruptedWork() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        let running = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "active", runState: .running),
+        ])
+        let interrupted = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "active", latestLifecycleEvent: ThreadLifecycleEvent(kind: .usageLimitReached, timestamp: .now)),
+        ])
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const trigger = document.getElementById('codex-dashboard-chat-overview-navigation');
+              window.__codexDashboard.applyThreads((\(running)).threads);
+              trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+              window.__codexDashboard.applyThreads((\(interrupted)).threads);
+              const panel = document.getElementById('codex-dashboard-running-chats');
+              const status = panel.querySelector('.dashboard-running-status');
+              return [!panel.hidden, status.dataset.state, status.getAttribute('aria-label'),
+                Boolean(status.querySelector('svg')),
+                panel.querySelector('.dashboard-running-project').textContent.includes('Usage limit reached')];
+            })()
+            """
+        ) as? [AnyHashable]
+        XCTAssertEqual(result, [true, "interrupted", "Interrupted because the usage limit was reached", true, true])
+    }
+
+    func testRunningChatsKeyboardDismissalAndEmptyHover() async throws {
+        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
+        let running = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "active", runState: .running),
+        ])
+        let result = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const trigger = document.getElementById('codex-dashboard-chat-overview-navigation');
+              const panel = document.getElementById('codex-dashboard-running-chats');
+              trigger.focus();
+              const emptyHidden = panel.hidden;
+              window.__codexDashboard.applyThreads((\(running)).threads);
+              trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+              const focused = panel.contains(document.activeElement);
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+              return [emptyHidden, focused, panel.hidden, document.activeElement === trigger];
+            })()
+            """
+        ) as? [Bool]
+        XCTAssertEqual(result, [true, true, true, true])
+    }
+
     func testNativeSidebarProjectsExposeExpandedAndCollapsedChevrons() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html:
             """

@@ -147,7 +147,7 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
     // Uses local remote-tracking refs; refreshing the overview never contacts a remote.
     private static func hasUnpushedCommits(at path: String, timeout: TimeInterval) async throws -> Bool {
         func git(_ arguments: [String]) async throws -> SubprocessOutput {
-            try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            try await Subprocess.run(executableURL: GitExecutable.url,
                                      arguments: ["--no-optional-locks", "-C", path] + arguments,
                                      timeout: timeout)
         }
@@ -177,7 +177,7 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
             // for generated trees. `ls-files --directory` can stop at an untracked
             // directory while preserving the dashboard's dirty/clean contract.
             let tracked = try await Subprocess.run(
-                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                executableURL: GitExecutable.url,
                 arguments: [
                     "--no-optional-locks", "-C", path,
                     "status", "--porcelain=v1", "--untracked-files=no", "--no-ahead-behind",
@@ -188,7 +188,7 @@ actor ProjectGitStatusProvider: ProjectGitStatusProviding {
             guard tracked.terminationStatus == 0 else { return .unavailable }
 
             let untracked = try await Subprocess.run(
-                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                executableURL: GitExecutable.url,
                 arguments: [
                     "--no-optional-locks", "-C", path,
                     "ls-files", "--others", "--exclude-standard", "--directory",

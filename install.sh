@@ -31,6 +31,16 @@ if (( RUN_TESTS )); then
 fi
 swift build -c release
 
+DASHBOARD_RESOURCES="$(swift -e '
+import Foundation
+guard let bundle = Bundle(path: CommandLine.arguments[1]),
+      let resources = bundle.resourceURL?.appendingPathComponent("Dashboard"),
+      FileManager.default.fileExists(atPath: resources.path) else {
+    fatalError("Built Dashboard resources are missing")
+}
+print(resources.path)
+' "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle")"
+
 if [[ -z "${SIGNING_KEYCHAIN:-}" ]]; then
   export SIGNING_KEYCHAIN="$(python3 "$PROJECT_ROOT/Packaging/signing-keychain.py")"
 fi
@@ -52,7 +62,7 @@ cp "$PROJECT_ROOT/Packaging/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$PROJECT_ROOT/Packaging/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_VERSION" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD" "$APP_BUNDLE/Contents/Info.plist"
-ditto "$BUILD_ROOT/release/CodexDashboard_CodexDashboard.bundle/Dashboard" "$APP_BUNDLE/Contents/Resources/Dashboard"
+ditto "$DASHBOARD_RESOURCES" "$APP_BUNDLE/Contents/Resources/Dashboard"
 cp "$BUILD_ROOT/release/CodexDashboardKeychainHelper" "$APP_BUNDLE/Contents/Helpers/CodexDashboardKeychainHelper"
 "${SIGNING_RUNNER[@]}" codesign --force "${SIGNING_KEYCHAIN_ARGUMENTS[@]}" --sign "$RESOLVED_SIGNING_IDENTITY" \
   --identifier local.lawrenceawe.codex-dashboard.keychain-helper \

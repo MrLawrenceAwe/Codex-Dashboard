@@ -1,6 +1,7 @@
 function createChatOverview({ catalog }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
   const currentThreads = catalog.currentThreads;
+  const runningChatsPopover = createRunningChatsPopover({ currentThreads, onOpenThread: openThread });
   const storedPreferences = chatOverviewPreferences.loadPreferences();
   let filterMode = storedPreferences.filterMode;
   const pageSize = 10;
@@ -133,6 +134,7 @@ function createChatOverview({ catalog }) {
 
   function renderChatOverview() {
     cancelScheduledRender();
+    runningChatsPopover.update();
     const state = deriveViewState();
     if (state.unreadCount === 0) markAllReadError = '';
     const rendered = chatOverviewView.render({
@@ -177,6 +179,7 @@ function createChatOverview({ catalog }) {
   }
 
   function requestRender() {
+    runningChatsPopover.update();
     if (pageState.isOpen()) {
       scheduleRender();
       return;
@@ -186,7 +189,11 @@ function createChatOverview({ catalog }) {
   }
 
   function mountChatOverviewNavigationButton() {
-    if (document.getElementById(dashboardElements.elementIDs.chatOverviewNavButton)) return true;
+    const existingButton = document.getElementById(dashboardElements.elementIDs.chatOverviewNavButton);
+    if (existingButton) {
+      runningChatsPopover.mount(existingButton);
+      return true;
+    }
     if (!mountDashboardNavigationButton({
       id: dashboardElements.elementIDs.chatOverviewNavButton,
       label: 'Chat overview',
@@ -201,6 +208,7 @@ function createChatOverview({ catalog }) {
         <strong class="dashboard-nav-count" data-navigation-count aria-label="0 unread chats" hidden>0</strong>
       </div>`,
     })) return false;
+    runningChatsPopover.mount(document.getElementById(dashboardElements.elementIDs.chatOverviewNavButton));
     chatOverviewView.updateSidebarStatus(deriveViewState());
     pageState.applyVisibility();
     return true;
@@ -265,6 +273,7 @@ function createChatOverview({ catalog }) {
   }
 
   function openChatOverview() {
+    runningChatsPopover.close();
     if (!pageState.open()) return;
     if (unreadState.syncUnread()) viewNeedsRender = true;
     if (viewNeedsRender) renderChatOverview();
@@ -273,6 +282,7 @@ function createChatOverview({ catalog }) {
   }
 
   function closeChatOverview() {
+    runningChatsPopover.close();
     pageState.close();
     unreadState.scheduleUnreadSync();
   }
@@ -296,6 +306,7 @@ function createChatOverview({ catalog }) {
 
   function destroy() {
     destroyed = true;
+    runningChatsPopover.destroy();
     readConfirmation?.finish(readConfirmation.ids);
     pageState.close();
     cancelScheduledRender();

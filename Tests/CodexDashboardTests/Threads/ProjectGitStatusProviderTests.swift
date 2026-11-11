@@ -41,7 +41,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectURL.path, "init", "--quiet"],
             timeout: 3
         )
@@ -63,7 +63,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectURL.path, "init", "--quiet"],
             timeout: 3
         )
@@ -154,7 +154,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
 
         let git = Process()
-        git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        git.executableURL = GitExecutable.url
         git.arguments = ["-C", projectURL.path, "init", "--quiet"]
         try git.run()
         git.waitUntilExit()
@@ -175,14 +175,14 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: nestedURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: projectURL) }
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectURL.path, "init", "--quiet"],
             timeout: 3
         )
         try Data("metadata".utf8).write(to: projectURL.appendingPathComponent(".DS_Store"))
         try Data("nested metadata".utf8).write(to: nestedURL.appendingPathComponent(".DS_Store"))
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", projectURL.path, "add", ".DS_Store"],
             timeout: 3
         )
@@ -203,7 +203,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         func git(_ arguments: [String]) async throws {
             let output = try await Subprocess.run(
-                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                executableURL: GitExecutable.url,
                 arguments: ["-C", directory.path] + arguments, timeout: 3
             )
             XCTAssertEqual(output.terminationStatus, 0)
@@ -265,7 +265,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         try FileManager.default.createDirectory(at: secondProjectURL, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: repositoryURL) }
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", repositoryURL.path, "init", "--quiet"],
             timeout: 3
         )
@@ -298,7 +298,7 @@ final class ProjectGitStatusProviderTests: XCTestCase {
         let initial = await provider.loadStatuses(for: [directory.path], policy: .useCached)
         XCTAssertEqual(initial[directory.path], .notRepository)
         _ = try await Subprocess.run(
-            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            executableURL: GitExecutable.url,
             arguments: ["-C", directory.path, "init", "--quiet"],
             timeout: 3
         )

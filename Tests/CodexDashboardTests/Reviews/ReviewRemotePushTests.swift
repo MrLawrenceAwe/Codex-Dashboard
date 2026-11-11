@@ -4,7 +4,7 @@ import XCTest
 
 final class ReviewRemotePushTests: XCTestCase {
     private func git(_ arguments: [String], at path: String) async throws -> String {
-        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+        let result = try await Subprocess.run(executableURL: GitExecutable.url,
             arguments: ["-C", path] + arguments, timeout: 5)
         guard result.terminationStatus == 0 else {
             throw ReviewLoopError(String(decoding: result.standardError, as: UTF8.self))
