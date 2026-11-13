@@ -14,6 +14,27 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
     && a.path === b.path && a.hostID === b.hostID);
 
+  function disabledReason(context, action) {
+    if (!action || action === 'Git') return '';
+    const thread = findThread(context.threadID);
+    if (thread?.runState === 'running') return 'Wait for this chat to finish running.';
+    if (['Push', 'Commit & push'].includes(action)) {
+      const remote = remoteState(context.path);
+      if (remote !== true) return remote === false
+        ? 'No Git remote is configured for this repository.' : 'Checking Git remotes…';
+    }
+    // Group status is valid only when this chat uses that same repository.
+    const status = thread?.sharesGroupRepository ? thread.projectGitStatus : null;
+    if (!['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)) {
+      return 'Repository status is not available yet.';
+    }
+    const hasChanges = ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(status);
+    const hasUnpushed = ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status);
+    if (action === 'Push' && !hasUnpushed) return 'No unpushed commits.';
+    if (action !== 'Push' && !hasChanges) return 'No changes to commit.';
+    return '';
+  }
+
   function restoreMenuItems() {
     for (const [item, attributes] of menuChanges) {
       for (const [name, previous] of attributes) {
@@ -81,7 +102,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     if (pending) return;
     const context = codexUIContracts.headerGitContext();
     if (!context) return;
-    if (['Push', 'Commit & push'].includes(action) && remoteState(context.path) !== true) return;
+    if (disabledReason(context, action)) { sync(); return; }
     if (!action && sameContext(context, menuContext) && context.menu.open) {
       closeMenu();
       return;
@@ -110,6 +131,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
         return;
       }
       if (action && item) {
+        if (disabledReason(context, action)) { closeMenu(); return; }
         // Native menu selection retains Codex's disabled states and Git workflow.
         item.click();
         closeMenu();
@@ -121,7 +143,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
             if (!dialog?.compatible || dialog.threadID !== context.threadID
               || dialog.path !== context.path || dialog.hostConfig?.id !== context.hostID) return null;
             const combined = dialog.items[1];
-            if (remoteState(context.path) !== true) return true;
+            if (disabledReason(context, action)) return true;
             if (combined.getAttribute('aria-disabled') === 'true' || combined.getAttribute('data-disabled') === 'true') return null;
             combined.click();
             return true;
@@ -171,16 +193,11 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       }
     }
     if (toolbar.parentElement !== host) host.prepend(toolbar);
-    const running = findThread(context.threadID)?.runState === 'running';
     for (const button of toolbar.querySelectorAll('button')) {
-      const requiresRemote = ['Push', 'Commit & push'].includes(button.dataset.gitAction);
-      const remote = remoteState(context.path);
-      const disabled = Boolean(pending) || (running && button.dataset.gitAction !== 'Git')
-        || (requiresRemote && remote !== true);
+      const reason = disabledReason(context, button.dataset.gitAction);
+      const disabled = Boolean(pending) || Boolean(reason);
       if (button.disabled !== disabled) button.disabled = disabled;
-      const title = requiresRemote && remote !== true
-        ? remote === false ? 'No Git remote is configured for this repository.' : 'Checking Git remotes…'
-        : button.dataset.gitAction === 'Git' ? 'Git actions' : button.dataset.gitAction;
+      const title = reason || (button.dataset.gitAction === 'Git' ? 'Git actions' : button.dataset.gitAction);
       if (button.title !== title) button.title = title;
       if (button.dataset.gitAction === 'Git') {
         const expanded = String(Boolean(sameContext(context, menuContext) && context.menu.open));

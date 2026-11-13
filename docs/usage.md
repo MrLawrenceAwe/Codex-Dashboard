@@ -350,6 +350,11 @@ Codex’s native push workflow. Git opens the native menu for branch and other G
 actions. Native availability checks still apply; unavailable shortcuts leave the
 menu visible with the disabled action and its explanation.
 
+Commit and Commit & push are disabled when there are no changes to commit. Push
+is disabled when there are no unpushed commits. These states update with
+Dashboard’s repository status snapshots. Unknown repository status disables
+shortcuts until it is available.
+
 Push and Commit & push stay disabled until a remote is confirmed and remain
 disabled when none is configured. The Git menu’s Push action follows the same rule.
 

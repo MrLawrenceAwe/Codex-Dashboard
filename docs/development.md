@@ -156,6 +156,9 @@ shortcut opens the native commit dialog and activates its enabled commit-and-pus
 command after verifying the dialog’s conversation, repository and host.
 Native menu wrappers receive temporary placement attributes while opened from the
 header. Teardown restores placement, closes owned menus and removes the toolbar.
+Overview Git handoffs select the native trigger in the target chat's repository
+scope and exclude Dashboard's header buttons. They close menus opened by the
+handoff on completion, failure or cancellation so a failed action leaves no popup.
 A coalesced observer repairs replacement headers, with a timer fallback for hidden
 windows whose animation frames are suspended. The toolbar shares the local
 remote-metadata cache and subscriptions with `push-controls.js`; its push shortcuts

@@ -125,6 +125,7 @@ const codexHost = {
       }
     };
     const navigationEvents = ['click', 'message', 'popstate', 'hashchange', 'keydown'];
+    const openedMenus = new Map();
     navigationEvents.forEach((type) => window.addEventListener(type, handleNavigation, true));
     try {
       this.navigateToThread(thread);
@@ -150,6 +151,13 @@ const codexHost = {
         const lastAttempt = triggerAttempts.get(trigger);
         if (lastAttempt !== undefined && now - lastAttempt < 300) return;
         triggerAttempts.set(trigger, now);
+        const scoped = codexUIContracts.headerGitContext();
+        if (scoped?.trigger === trigger) {
+          openedMenus.set(trigger, scoped.menu.onOpenChange);
+          scoped.menu.onOpenChange(true);
+          return;
+        }
+        openedMenus.set(trigger, null);
         trigger.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true, button: 0, pointerType: 'mouse',
         }));
@@ -179,6 +187,12 @@ const codexHost = {
       return { opened: true };
     } finally {
       navigationEvents.forEach((type) => window.removeEventListener(type, handleNavigation, true));
+      for (const [trigger, onOpenChange] of openedMenus) {
+        if (onOpenChange) onOpenChange(false);
+        else codexUIContracts.gitActionsMenu(trigger)?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape', bubbles: true,
+        }));
+      }
     }
   },
 };

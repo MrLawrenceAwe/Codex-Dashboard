@@ -6,7 +6,7 @@ import XCTest
 @MainActor
 final class GitToolbarWebTests: SerializedDashboardWebTestCase {
     private func fixture(noRemote: Bool = false) async throws -> WKWebView {
-        try await DashboardWebTestHarness.mountedWebView(html: """
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
           <aside><nav><div class="sidebar-item"><button>New chat</button></div></nav></aside>
           <main>
@@ -98,6 +98,11 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
           </script>
         </body></html>
         """)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .uncommittedChangesAndUnpushedCommits),
+        ])
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(payload)).threads)")
+        return webView
     }
 
     func testHeaderActionsUseSelectedRepositoryWithSummaryHiddenAndRepairAfterReplacement() async throws {
@@ -178,6 +183,69 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         })()
         """) as? Bool
         XCTAssertEqual(blocked, true)
+    }
+
+    func testButtonsFollowRepositoryChangesAndUnpushedCommitsAcrossSnapshots() async throws {
+        let webView = try await fixture()
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        let cases: [(ProjectGitStatus, [Bool])] = [
+            (.clean, [true, true, true, false]),
+            (.unavailable, [true, true, true, false]),
+            (.uncommittedChanges, [false, false, true, false]),
+            (.unpushedCommits, [true, true, false, false]),
+            (.uncommittedChangesAndUnpushedCommits, [false, false, false, false]),
+            (.clean, [true, true, true, false]),
+        ]
+        for (status, expected) in cases {
+            let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+                .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: status),
+            ])
+            let actual = try await webView.evaluateJavaScript("""
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              return [...document.querySelectorAll('.dashboard-git-toolbar button')].map(button => button.disabled);
+            })()
+            """) as? [Bool]
+            XCTAssertEqual(actual, expected, "Unexpected availability for \(status)")
+        }
+        _ = try await webView.evaluateJavaScript("""
+        document.querySelector('[data-git-action=Commit]').click();
+        document.querySelector('[data-git-action=Push]').click();
+        document.querySelector('[data-git-action="Commit & push"]').click();
+        """)
+        let activations = try await webView.evaluateJavaScript("window.actions.length") as? Int
+        XCTAssertEqual(activations, 0)
+    }
+
+    func testOverviewCommitUsesScopedNativeMenuWithSummaryHidden() async throws {
+        let webView = try await fixture()
+        _ = try await webView.evaluateJavaScript("""
+        window.__codexDashboard.openChatOverview();
+        document.querySelector('[data-filter="changedProjects"]').click();
+        document.querySelector('[data-project-git-action]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript("window.actions.length === 1", in: webView)
+        let result = try await webView.evaluateJavaScript("""
+        [window.actions[0][0] === 'current', window.actions[0][1] === '/tmp/current',
+          window.actions[0][2] === 'Commit', !document.getElementById('git-menu'),
+          !window.__codexDashboard.isOpen()]
+        """) as? [Bool]
+        XCTAssertEqual(result, [true, true, true, true, true])
+    }
+
+    func testOverviewFailedHandoffClosesItsNativeMenu() async throws {
+        let webView = try await fixture()
+        _ = try await webView.evaluateJavaScript("""
+        window.allowCommit = false;
+        window.__codexDashboard.openChatOverview();
+        document.querySelector('[data-filter="changedProjects"]').click();
+        document.querySelector('[data-project-git-action]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript("!!document.getElementById('git-menu')", in: webView)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.__codexDashboard.isOpen() && !document.getElementById('git-menu')", in: webView, timeout: .seconds(7))
+        let activations = try await webView.evaluateJavaScript("window.actions.length") as? Int
+        XCTAssertEqual(activations, 0)
     }
 
     func testNavigationCancelsDelayedCommitInsteadOfActingOnAnotherChat() async throws {

@@ -483,9 +483,12 @@ const codexUIContracts = (() => {
   }
 
   function gitActionsButton() {
+    const scoped = headerGitContext();
+    if (scoped && !scoped.trigger.disabled) return scoped.trigger;
     return [...document.querySelectorAll('button[aria-label], button[title]')].find((button) => (
       isVisible(button)
         && !button.disabled
+        && !button.closest('.dashboard-git-toolbar')
         && (button.getAttribute('aria-label') === 'Git actions'
           || button.getAttribute('title') === 'Git actions')
     )) || null;

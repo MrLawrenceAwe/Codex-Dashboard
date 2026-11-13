@@ -292,6 +292,8 @@ extension ChatOverviewWebTests {
                 </div>
               </aside>
               <main>
+                <div class="dashboard-git-toolbar"><button title="Git actions" aria-label="Open Git actions"
+                  onclick="document.documentElement.dataset.proxyClicked = 'true'">Git ▾</button></div>
                 <button type="button" aria-label="Git actions">Git</button>
                 <div id="composer-host"><textarea placeholder="Do anything"></textarea></div>
               </main>
@@ -392,6 +394,7 @@ extension ChatOverviewWebTests {
               document.documentElement.dataset.commitOpened,
               document.getElementById('codex-dashboard-chat-overview-page').classList.contains('is-open'),
               document.documentElement.dataset.staleRowClicked || 'false',
+              document.documentElement.dataset.proxyClicked || 'false',
             ]
             """
         ) as? [Any]
@@ -405,6 +408,7 @@ extension ChatOverviewWebTests {
         XCTAssertEqual(values[2] as? String, "true")
         XCTAssertEqual(values[3] as? Bool, false)
         XCTAssertEqual(values[4] as? String, "false")
+        XCTAssertEqual(values[5] as? String, "false")
     }
 
     func testProjectGitActionWaitsForGitActionsMenu() async throws {
