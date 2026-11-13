@@ -60,8 +60,12 @@ struct ProjectCodeView: NSViewRepresentable {
             state.colorScheme = colorScheme
             let palette = ProjectCodePalette(dark: colorScheme == .dark)
             view.backgroundColor = palette.background
+            scroll.backgroundColor = palette.background
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineSpacing = 4
             let attributed = NSMutableAttributedString(string: text, attributes: [
                 .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
+                .paragraphStyle: paragraph,
                 .foregroundColor: palette.foreground
             ])
             let range = NSRange(location: 0, length: (text as NSString).length)
@@ -115,8 +119,8 @@ struct ProjectCodeView: NSViewRepresentable {
 private struct ProjectCodePalette {
     let dark: Bool
 
-    var background: NSColor { color(0xFFFFFF, 0x1E1F22) }
-    var foreground: NSColor { color(0x080808, 0xBCBEC4) }
+    var background: NSColor { ProjectViewerAppearance.background(dark: dark) }
+    var foreground: NSColor { color(0x242424, 0xDEDEDE) }
     var keyword: NSColor { color(0x0033B3, 0xCF8E6D) }
     var number: NSColor { color(0x1750EB, 0x2AACB8) }
     var string: NSColor { color(0x067D17, 0x6AAB73) }
@@ -165,7 +169,7 @@ private final class ProjectLineRuler: NSRulerView {
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let textView, let layout = textView.layoutManager, let container = textView.textContainer else { return }
-        NSColor.windowBackgroundColor.setFill()
+        textView.backgroundColor.setFill()
         bounds.fill()
         guard layout.numberOfGlyphs > 0 else { return }
         let visible = textView.visibleRect
@@ -176,7 +180,7 @@ private final class ProjectLineRuler: NSRulerView {
         var number = ns.substring(to: min(charStart, ns.length)).filter { $0 == "\n" }.count + 1
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: NSColor.secondaryLabelColor
+            .foregroundColor: NSColor.tertiaryLabelColor
         ]
         while index < NSMaxRange(glyphs), index < layout.numberOfGlyphs {
             var effective = NSRange()

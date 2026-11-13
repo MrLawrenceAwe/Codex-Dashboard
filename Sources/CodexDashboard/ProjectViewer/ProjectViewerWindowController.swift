@@ -8,11 +8,15 @@ final class ProjectViewerWindowController: NSWindowController, NSWindowDelegate 
 
     private init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.title = "Project Viewer — Codex Dashboard"
         window.minSize = NSSize(width: 880, height: 520)
         window.isReleasedWhenClosed = false
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.toolbarStyle = .unifiedCompact
         window.center()
         window.setFrameAutosaveName("CodexDashboardProjectViewer")
         super.init(window: window)
@@ -57,57 +61,110 @@ final class ProjectViewerWindowController: NSWindowController, NSWindowDelegate 
 struct ProjectViewerWindowView: View {
     @ObservedObject var model: ProjectViewerModel
     let chooseFolder: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("projectViewer.showFunctions") private var showFunctions = false
+    @State private var showFiles = true
+
+    private var canvas: Color { Color(nsColor: ProjectViewerAppearance.background(dark: colorScheme == .dark)) }
+    private var sidebar: Color { Color(nsColor: ProjectViewerAppearance.sidebar(dark: colorScheme == .dark)) }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
+                Button { showFiles.toggle() } label: {
+                    Image(systemName: "sidebar.left")
+                }.help(showFiles ? "Hide files" : "Show files")
+                    .accessibilityLabel("Toggle files sidebar")
                 if let root = model.root {
-                    Text(root.path)
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text(root.lastPathComponent)
+                        .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        .help(root.path)
+                } else {
+                    Text("Project Viewer").font(.system(size: 13, weight: .semibold))
                 }
                 Spacer()
                 if model.root != nil {
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text("\(model.files.count) files · \(model.totalLines.formatted()) lines").monospacedDigit()
-                        Text("\(deltaLabel(model.totalDelta)) lines since baseline").font(.caption).foregroundStyle(.secondary)
-                    }
                     if model.isScanning { ProgressView().controlSize(.small) }
                     Button(action: model.refresh) { Image(systemName: "arrow.clockwise") }.help("Refresh project")
-                    Button("Reset baseline", action: model.resetBaseline).disabled(model.isScanning || model.baselineDate == nil)
+                    Menu {
+                        Button("Reset baseline", action: model.resetBaseline)
+                            .disabled(model.isScanning || model.baselineDate == nil)
+                    } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.borderlessButton).fixedSize().help("Project actions")
                 }
-                Button("Open Folder…", action: chooseFolder)
-            }.padding(16).fixedSize(horizontal: false, vertical: true)
-            Divider()
+                Button(action: chooseFolder) { Label("Open folder", systemImage: "folder.badge.plus") }
+                Button { showFunctions.toggle() } label: {
+                    Image(systemName: "sidebar.right")
+                }.help(showFunctions ? "Hide functions" : "Show functions")
+                    .accessibilityLabel("Toggle functions sidebar")
+            }.buttonStyle(ProjectViewerButtonStyle()).controlSize(.small)
+                .font(.system(size: 13))
+                .padding(.leading, 80).padding(.trailing, 14).frame(height: 52)
             if model.root == nil {
-                ContentUnavailableView("No folder open", systemImage: "folder")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 14) {
+                    Image(systemName: "folder").font(.system(size: 30, weight: .light)).foregroundStyle(.tertiary)
+                    Text("Your project, at a glance").font(.system(size: 20, weight: .medium))
+                    Text("Explore code and follow changes as Codex works.").foregroundStyle(.secondary)
+                    Button("Open folder…", action: chooseFolder).buttonStyle(.bordered).padding(.top, 4)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
-                    fileSidebar.frame(minWidth: 220, idealWidth: 290, maxWidth: 460)
-                    codePane.frame(minWidth: 360, maxWidth: .infinity)
-                    functionSidebar.frame(minWidth: 210, idealWidth: 250, maxWidth: 400)
-                }
+                    if showFiles {
+                        fileSidebar.frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
+                    }
+                    codePane.frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                        .background(canvas)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.07)))
+                        .padding(.leading, 6).padding(.trailing, 12)
+                    if showFunctions {
+                        functionSidebar.frame(minWidth: 210, idealWidth: 250, maxWidth: 360)
+                    }
+                }.padding(.bottom, 4)
             }
             if let date = model.baselineDate {
-                Divider()
-                Text("Read-only · Baseline \(date.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    Label("Read-only", systemImage: "lock").font(.system(size: 10))
+                    Text("\(model.files.count) files · \(model.totalLines.formatted()) lines")
+                    Text("\(deltaLabel(model.totalDelta)) since baseline")
+                    Spacer()
+                    Text("Baseline \(date.formatted(date: .omitted, time: .shortened))")
+                }.monospacedDigit()
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16).padding(.vertical, 9)
+                    .padding(.horizontal, 16).padding(.vertical, 7)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let message = model.message {
                 Text(message).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(8)
             }
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(sidebar)
+            .ignoresSafeArea(.container, edges: .top)
+            .tint(.primary)
     }
 
     private var fileSidebar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("FILES").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            TextField("Filter files by path", text: $model.filter).textFieldStyle(.roundedBorder)
-            Toggle("Only size changes", isOn: $model.changedOnly).font(.caption)
+            HStack {
+                Text("Files").font(.system(size: 13, weight: .medium))
+                Spacer()
+                Button { model.changedOnly.toggle() } label: {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .foregroundStyle(model.changedOnly ? .primary : .secondary)
+                        .padding(5)
+                        .background(model.changedOnly ? Color.primary.opacity(0.08) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 5))
+                }.buttonStyle(.plain)
+                    .help(model.changedOnly ? "Show all files" : "Show size changes only")
+                    .accessibilityLabel("Size changes only")
+                    .accessibilityValue(model.changedOnly ? "On" : "Off")
+            }.foregroundStyle(.secondary)
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.tertiary)
+                TextField("Search files", text: $model.filter).textFieldStyle(.plain)
+            }.font(.system(size: 12)).padding(8)
+                .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7))
             List(selection: $model.selectedPath) {
                 OutlineGroup(model.tree, children: \.children) { node in
                     HStack(spacing: 6) {
@@ -131,8 +188,8 @@ struct ProjectViewerWindowView: View {
                         }
                     }.tag(node.id).help(node.id)
                 }
-            }.listStyle(.sidebar)
-        }.padding(12)
+            }.listStyle(.sidebar).scrollContentBackground(.hidden).font(.system(size: 13))
+        }.padding(.horizontal, 12).padding(.top, 8).background(sidebar)
     }
 
     private var fileTabs: some View {
@@ -145,7 +202,7 @@ struct ProjectViewerWindowView: View {
                             Button {
                                 model.selectedPath = path
                             } label: {
-                                Text(URL(fileURLWithPath: path).lastPathComponent)
+                                Label(URL(fileURLWithPath: path).lastPathComponent, systemImage: "doc.text")
                                     .lineLimit(1).truncationMode(.middle)
                                     .frame(maxWidth: 180)
                             }
@@ -159,14 +216,16 @@ struct ProjectViewerWindowView: View {
                             .accessibilityLabel("Close \(path)")
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 8).padding(.vertical, 6)
-                        .background(selected ? Color.accentColor.opacity(0.15) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 5))
+                        .font(.system(size: 12))
+                        .foregroundStyle(selected ? .primary : .secondary)
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(selected ? Color.primary.opacity(0.07) : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 7))
                         .id(path)
                     }
                 }
-                .padding(5)
-            }
+                .padding(7)
+            }.scrollIndicators(.hidden)
             .onChange(of: model.selectedPath, initial: true) {
                 if let path = model.selectedPath { proxy.scrollTo(path) }
             }
@@ -178,17 +237,16 @@ struct ProjectViewerWindowView: View {
         VStack(alignment: .leading, spacing: 0) {
             if !model.tabs.isEmpty {
                 fileTabs
-                Divider()
             }
             HStack {
-                Text(model.selectedPath ?? "Select a file").font(.system(.callout, design: .monospaced))
+                Text(model.selectedPath ?? "Select a file").font(.system(size: 11)).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
                 Spacer()
                 if let file = model.selectedFile {
                     Text("\(file.lines.map { String($0) } ?? "—") lines · \(ByteCountFormatter.string(fromByteCount: Int64(file.bytes), countStyle: .file))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-            }.padding(12)
+            }.padding(.horizontal, 18).padding(.vertical, 12)
             Divider()
             if let message = model.previewMessage {
                 ContentUnavailableView(message, systemImage: "doc")
@@ -202,8 +260,8 @@ struct ProjectViewerWindowView: View {
 
     private var functionSidebar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("FUNCTIONS").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text("Largest first · estimated line counts").font(.caption).foregroundStyle(.secondary)
+            Text("Functions").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+            Text("Largest first · estimated lines").font(.system(size: 11)).foregroundStyle(.tertiary)
             if model.functionRows.isEmpty {
                 Text("No recognised functions in this file.").font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -215,7 +273,7 @@ struct ProjectViewerWindowView: View {
                                 model.jump(to: row.function.startLine)
                             } label: {
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text(row.function.name).font(.system(.callout, design: .monospaced))
+                                    Text(row.function.name).font(.system(size: 12, design: .monospaced))
                                         .lineLimit(2).strikethrough(row.removed)
                                     HStack {
                                         Text("\(row.function.lineCount) lines")
@@ -234,13 +292,12 @@ struct ProjectViewerWindowView: View {
                                             .font(.caption2).foregroundStyle(.secondary)
                                     }
                                 }.padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                            }.buttonStyle(.plain).disabled(row.removed)
-                            Divider()
+                            }.buttonStyle(ProjectViewerButtonStyle()).disabled(row.removed)
                         }
                     }
                 }
             }
-        }.padding(12)
+        }.padding(14).background(sidebar)
     }
 
     private func fileStatus(_ status: String, at path: String) -> String {
@@ -249,4 +306,24 @@ struct ProjectViewerWindowView: View {
     }
 
     private func deltaLabel(_ value: Int) -> String { value > 0 ? "+\(value.formatted())" : value.formatted() }
+}
+
+private struct ProjectViewerButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HoverSurface(configuration: configuration)
+    }
+
+    private struct HoverSurface: View {
+        let configuration: ButtonStyle.Configuration
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .padding(6)
+                .background(Color.primary.opacity(configuration.isPressed ? 0.10 : hovered ? 0.06 : 0),
+                            in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(RoundedRectangle(cornerRadius: 6))
+                .onHover { hovered = $0 }
+        }
+    }
 }
