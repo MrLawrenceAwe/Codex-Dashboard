@@ -5,31 +5,6 @@ import XCTest
 
 @MainActor
 final class ChatOverviewWebTests: SerializedDashboardWebTestCase {
-    func testViewerButtonUsesChatCheckoutWithoutNavigating() async throws {
-        let webView = try await DashboardWebTestHarness.chatOverviewWebView()
-        var chat = ThreadSummary.fixture(checkoutPath: "/tmp/worktree with spaces")
-        chat.projectGroupPath = "/tmp/primary"
-        let payload = try DashboardWebTestHarness.snapshotPayload(for: [chat])
-        _ = try await webView.evaluateJavaScript(
-            """
-            window.__codexDashboard.applyThreads((\(payload)).threads);
-            window.__codexDashboard.openChatOverview();
-            """
-        )
-        let result = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              document.querySelector('.dashboard-thread-row [data-project-viewer]').click();
-              const request = JSON.parse(window.__codexDashboard.pendingProjectViewerRequest());
-              return [request.path, window.__codexDashboard.isOpen(),
-                window.__codexDashboard.acknowledgeProjectViewerRequest(request.id),
-                window.__codexDashboard.pendingProjectViewerRequest() === null];
-            })()
-            """
-        ) as? [AnyHashable]
-        XCTAssertEqual(result, ["/tmp/worktree with spaces", true, true, true])
-    }
-
     func testRunningChatsHoverRetainsFinishedChatAndNavigates() async throws {
         let webView = try await DashboardWebTestHarness.chatOverviewWebView()
         let running = try DashboardWebTestHarness.snapshotPayload(for: [

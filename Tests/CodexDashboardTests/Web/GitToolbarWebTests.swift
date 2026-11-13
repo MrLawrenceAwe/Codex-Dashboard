@@ -119,8 +119,12 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         (() => {
           const old = document.getElementById('header-actions');
           const next = document.createElement('div'); next.id = 'header-actions';
-          next.innerHTML = '<div data-app-shell-focus-area="main"><button aria-label="Chat actions">…</button></div>';
-          old.replaceWith(next);
+          next.setAttribute('data-app-shell-header-slot-content', 'end');
+          next.innerHTML = '<div><button aria-label="Chat actions">…</button></div>';
+          const slot = document.createElement('div');
+          slot.setAttribute('data-app-shell-header-slot', 'end');
+          slot.append(next);
+          old.closest('[data-app-shell-header-toolbar]').replaceWith(slot);
         })()
         """)
         try await DashboardWebTestHarness.waitForJavaScript(

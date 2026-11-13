@@ -17,7 +17,6 @@ This is an independent personal project and is not affiliated with OpenAI.
 - **Chat monitoring:** recent activity, unread status, completion and question tracking, uncommitted files and unpushed Git commits.
 - **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, project queues, pause/resume/stop controls, and optional remote pushing.
 - **Edit dictation:** built-in OpenAI dictation at the cursor in a sent-message edit field, using the existing sign-in.
-- **Project Viewer:** a separate read-only window with a file tree, code, and file/function size changes as Codex works.
 - **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
 
 See [Using Codex Dashboard](docs/usage.md) for feature behaviour and controls.

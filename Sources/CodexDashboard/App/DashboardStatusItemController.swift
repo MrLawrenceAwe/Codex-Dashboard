@@ -76,7 +76,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         )
         openDashboard.isEnabled = actions.canOpen
         menu.addItem(openDashboard)
-        menu.addItem(actionItem("Open Project Viewer…", action: #selector(openProjectViewer)))
 
         let restart = actionItem(
             DashboardActionPresentation.restartTitle,
@@ -158,10 +157,6 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         statusItem.button?.toolTip = Self.requiresCompatibilityAttention(report)
             ? "Codex Dashboard — \(report?.attentionSummary ?? "compatibility needs attention")"
             : "Codex Dashboard"
-    }
-
-    @objc private func openProjectViewer() {
-        ProjectViewerWindowController.shared.open()
     }
 
     @objc private func openDiagnostics() {

@@ -498,11 +498,19 @@ const codexUIContracts = (() => {
     )) || null;
   }
 
+  const chatHeaderSelector = '[data-app-shell-header-toolbar], [data-app-shell-header-slot="end"]';
+
   function chatHeaderActionsHost() {
-    return [...document.querySelectorAll('[data-app-shell-header-toolbar]')]
-      .filter(element => isVisible(element) && !element.closest('[aria-hidden="true"]'))
-      .map(element => element.querySelector('button[aria-label="Chat actions"]')?.closest('[data-app-shell-focus-area]')?.parentElement)
-      .find(Boolean) || null;
+    const buttons = document.querySelectorAll('button[aria-label="Chat actions"]');
+    for (const button of buttons) {
+      const header = button.closest(chatHeaderSelector);
+      if (!header || !isVisible(button) || button.closest('[aria-hidden="true"], [inert]')) continue;
+      const slot = button.closest('[data-app-shell-header-slot-content]');
+      if (slot && header.contains(slot)) return slot;
+      const focusArea = button.closest('[data-app-shell-focus-area]');
+      return focusArea && header.contains(focusArea) ? focusArea.parentElement : button.parentElement;
+    }
+    return null;
   }
 
   // Summary panels for other chats remain mounted, including while hidden.
@@ -576,6 +584,7 @@ const codexUIContracts = (() => {
     pushControls,
     pushControlHostAttribute,
     gitActionsButton,
+    chatHeaderSelector,
     chatHeaderActionsHost,
     headerGitContext,
     gitActionsMenu,

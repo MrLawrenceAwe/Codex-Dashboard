@@ -258,17 +258,3 @@ aside [data-codex-sidebar-usage-limit] {
 @media (prefers-reduced-motion: reduce) { #codex-dashboard-running-chats .dashboard-running-status::before { animation: none; } }
 
 #codex-dashboard-running-chats .dashboard-running-status[data-state="interrupted"] { color: var(--dashboard-amber); }
-
-/* The viewer opens a native window and never changes the chat layout. */
-.dashboard-project-viewer {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  color: var(--text-secondary, inherit); background: transparent;
-  border: 0; border-radius: 5px; padding: 6px; cursor: pointer; font: inherit;
-}
-.dashboard-project-viewer svg { width: 15px; height: 15px; }
-.dashboard-project-viewer:hover, .dashboard-project-viewer:focus-visible {
-  color: inherit; background: color-mix(in srgb, currentColor 8%, transparent);
-}
-#codex-dashboard-chat-overview-page .dashboard-thread-row { display: flex; align-items: center; }
-#codex-dashboard-chat-overview-page .dashboard-thread-row > .dashboard-thread { flex: 1; width: auto; }
-.dashboard-thread-row > .dashboard-project-viewer { align-self: center; margin-right: 8px; }

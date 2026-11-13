@@ -292,8 +292,7 @@ actor AccountPopoverRendererDevTools: DevToolsServing {
     }
 
     func evaluateString(_ expression: String, in target: DevToolsTarget, timeout: Duration) -> String? {
-        guard let action = actions[target.id] else { return nil }
-        return String(decoding: try! JSONEncoder().encode(["account": action]), as: UTF8.self)
+        actions[target.id]
     }
 }
 
@@ -399,7 +398,7 @@ final class DashboardRendererTests: XCTestCase {
             DevToolsTarget(id: $0, type: "page", url: "app://-/index.html",
                            webSocketURL: "ws://127.0.0.1/\($0)")
         }
-        for firstResult in ["null", "invalid"] {
+        for firstResult in ["null", RendererScript.accountPopoverUnavailable, "invalid"] {
             let renderer = try DashboardRenderer(
                 devTools: AccountPopoverRendererDevTools(targets: targets, actions: [
                     "first": firstResult,
@@ -426,7 +425,7 @@ final class DashboardRendererTests: XCTestCase {
         let unavailableRenderer = try DashboardRenderer(
             devTools: AccountPopoverRendererDevTools(
                 target: target,
-                action: nil
+                action: RendererScript.accountPopoverUnavailable
             ),
             injectionBundle: InjectionBundle(version: "test", mountExpression: "true")
         )

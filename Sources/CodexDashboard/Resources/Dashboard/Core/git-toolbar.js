@@ -223,7 +223,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   }
 
   function handleMutations(records) {
-    const hostSelector = '[data-app-shell-header-toolbar], [data-summary-panel-variant], [data-radix-popper-content-wrapper], [role="dialog"]';
+    const hostSelector = `${codexUIContracts.chatHeaderSelector}, [data-summary-panel-variant], [data-radix-popper-content-wrapper], [role="dialog"]`;
     const containsHost = node => node instanceof Element && (node.matches(hostSelector)
       || (node.firstElementChild && node.querySelector(`${hostSelector}, button[aria-label="Git actions"]`)));
     if (records.some(record => {
