@@ -132,7 +132,10 @@ controls, and history deletion; the main coordinator file owns round execution
 and persistence.
 
 `Core/push-controls.js` reads the open commit dialog's target and requests
-`git-context` immediately through Codex's Git worker bridge. Requests never fetch
+`git-context` immediately through Codex's Git worker bridge. The Changed projects
+Commit action prefetches that metadata for the selected chat's checkout before
+navigation. The dialog adopts a matching in-flight request or applies its cached
+result immediately and revalidates it. Requests never fetch
 or push. A five-second per-repository cache avoids flicker on reopening; each
 opening revalidates it. Replies are scoped to the dialog/repository generation and
 canceled on navigation or teardown. Missing, failed, timed-out, or incomplete

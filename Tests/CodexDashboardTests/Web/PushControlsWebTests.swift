@@ -6,7 +6,7 @@ import XCTest
 @MainActor
 final class PushControlsWebTests: SerializedDashboardWebTestCase {
 
-    private func fixture() async throws -> WKWebView {
+    private func fixture(dialogOpen: Bool = true) async throws -> WKWebView {
         try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
         <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
@@ -21,7 +21,7 @@ final class PushControlsWebTests: SerializedDashboardWebTestCase {
         <script>
           window.activeProps = { conversationId: 'thread' };
           document.getElementById('composer').__reactFiber$test = { memoizedProps: activeProps };
-          window.modalProps = { open: true, conversationId: 'thread', enablePushActions: true,
+          window.modalProps = { open: \(dialogOpen), conversationId: 'thread', enablePushActions: true,
             onOpenChange() {}, target: { root: '/tmp/repository', hostConfig: { id: 'local' } } };
           document.getElementById('commit-dialog').__reactFiber$test = { memoizedProps: modalProps };
           window.requestSequence = 0;
@@ -52,6 +52,72 @@ final class PushControlsWebTests: SerializedDashboardWebTestCase {
           });
         </script></body></html>
         """)
+    }
+
+    func testProjectsCommitPrefetchDisablesPushOnOpeningAndReusesPendingRequest() async throws {
+        for replyBeforeOpening in [true, false] {
+            let webView = try await fixture(dialogOpen: false)
+            let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+                .fixture(checkoutPath: "/tmp/repository", projectGitStatus: .uncommittedChanges),
+            ])
+            let immediate = try await webView.evaluateJavaScript("""
+            (() => {
+              window.__codexDashboard.applyThreads((\(payload)).threads);
+              window.__codexDashboard.openChatOverview();
+              document.querySelector('[data-filter="changedProjects"]').click();
+              document.querySelector('[data-project-git-action]').click();
+              const requested = remoteRequests.filter(r => r.type === 'worker-request').length;
+              if (\(replyBeforeOpening)) respondRemote(false);
+              modalProps.open = true;
+              window.__codexDashboard.readPushControls();
+              const disabledOnOpening = document.querySelectorAll('[data-dashboard-no-remote]').length;
+              if (!\(replyBeforeOpening)) respondRemote(false);
+              const disabledAfterReply = document.querySelectorAll('[data-dashboard-no-remote]').length;
+              const requests = remoteRequests.filter(r => r.type === 'worker-request').length;
+              window.__codexDashboard.destroy();
+              return [requested, lastRemoteRequest.params.cwd, disabledOnOpening, disabledAfterReply, requests];
+            })()
+            """) as? [Any]
+            let values = try XCTUnwrap(immediate)
+            XCTAssertEqual(values[0] as? Int, 1)
+            XCTAssertEqual(values[1] as? String, "/tmp/repository")
+            XCTAssertEqual(values[2] as? Int, replyBeforeOpening ? 2 : 0)
+            XCTAssertEqual(values[3] as? Int, 2)
+            // Completed prefetches are revalidated. In-flight requests are reused.
+            XCTAssertEqual(values[4] as? Int, replyBeforeOpening ? 2 : 1)
+        }
+    }
+
+    func testProjectsCommitPrefetchCannotDisableAnotherRepository() async throws {
+        let webView = try await fixture(dialogOpen: false)
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(checkoutPath: "/tmp/repository", projectGitStatus: .uncommittedChanges),
+        ])
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyThreads((\(payload)).threads);
+          window.__codexDashboard.openChatOverview();
+          document.querySelector('[data-filter="changedProjects"]').click();
+          document.querySelector('[data-project-git-action]').click();
+          const prefetch = lastRemoteRequest;
+          modalProps.target.root = '/tmp/another-repository';
+          modalProps.open = true;
+          window.__codexDashboard.readPushControls();
+          respondRemote(false, prefetch);
+          const staleDisabled = document.querySelectorAll('[data-dashboard-no-remote]').length;
+          respondRemote(true);
+          const currentDisabled = document.querySelectorAll('[data-dashboard-no-remote]').length;
+          window.__codexDashboard.destroy();
+          return [staleDisabled, currentDisabled,
+            remoteRequests.some(r => r.type === 'worker-request-cancel' && r.id === prefetch.id),
+            lastRemoteRequest.params.cwd];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 0)
+        XCTAssertEqual(values[1] as? Int, 0)
+        XCTAssertEqual(values[2] as? Bool, true)
+        XCTAssertEqual(values[3] as? String, "/tmp/another-repository")
     }
 
     func testDialogRequestsMetadataImmediatelyAndBlocksOnlyPushAfterReply() async throws {

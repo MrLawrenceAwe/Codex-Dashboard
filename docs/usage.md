@@ -314,6 +314,8 @@ selected in that dialog. When it has no Git remote, **Commit and push** and **Pu
 are grayed out and blocked for mouse and keyboard input. **Commit** keeps its normal
 behaviour. Checks use Codex's local Git metadata and never contact a remote. Opening the
 modal requests a check immediately, without waiting for Dashboard's refresh cycle.
+Clicking **Commit** in **Changed projects** starts the check during navigation,
+so a completed result can disable push actions as soon as the dialog opens.
 Results from the last five seconds are applied immediately on reopening and
 rechecked in the background. Changes to remotes are also picked up while the
 dialog stays open.

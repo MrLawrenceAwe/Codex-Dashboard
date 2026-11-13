@@ -81,6 +81,7 @@ function createPushControls() {
 
   function prefetchRemote(path) {
     if (!path?.startsWith('/') || context || pendingRemote?.path === path) return;
+    if (!unsubscribe || typeof window.electronBridge?.sendWorkerMessageFromView !== 'function') return;
     const cached = remoteCache.get(path);
     if (cached && Date.now() - cached.checkedAt < remoteFreshness) return;
     cancelRemote();
