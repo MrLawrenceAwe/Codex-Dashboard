@@ -5,6 +5,36 @@ import XCTest
 
 @MainActor
 final class GitToolbarWebTests: SerializedDashboardWebTestCase {
+    func testFileChangesBlockActionsAcrossInterruptionUntilSuccessfulCompletion() async throws {
+        let webView = try await fixture()
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        let states: [(ThreadRunState, Bool)] = [(.running, false), (.running, true), (.idle, true), (.running, true), (.idle, false)]
+        for (runState, blocked) in states {
+            let payload = try DashboardWebTestHarness.snapshotPayload(for: [
+                .fixture(id: "current", checkoutPath: "/tmp/current", runState: runState,
+                         projectGitStatus: .uncommittedChangesAndUnpushedCommits,
+                         gitActionsBlockedUntilCompletion: blocked),
+            ])
+            _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(payload)).threads)")
+            let matchesState = try await webView.evaluateJavaScript("""
+            [...document.querySelectorAll('.dashboard-git-toolbar button')].every(button =>
+              button.disabled === \(blocked)
+                && Number(getComputedStyle(button).opacity) === \(blocked ? "0.4" : "1")
+                && (\(blocked) ? button.title.includes('finish without interruption') : button.title === button.dataset.gitAction))
+            """) as? Bool
+            XCTAssertEqual(matchesState, true)
+            if blocked {
+                _ = try await webView.evaluateJavaScript("document.querySelectorAll('.dashboard-git-toolbar button').forEach(button => button.click())")
+                let actionCount = try await webView.evaluateJavaScript("window.actions.length") as? Int
+                XCTAssertEqual(actionCount, 0)
+            }
+        }
+        _ = try await webView.evaluateJavaScript("window.showCommitDialog = true; document.querySelector('[data-git-action=Commit]').click()")
+        try await DashboardWebTestHarness.waitForJavaScript("window.confirmedAction === 'commit'", in: webView)
+        let actionCount = try await webView.evaluateJavaScript("window.actions.length") as? Int
+        XCTAssertEqual(actionCount, 1)
+    }
+
     private func fixture(noRemote: Bool = false) async throws -> WKWebView {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>

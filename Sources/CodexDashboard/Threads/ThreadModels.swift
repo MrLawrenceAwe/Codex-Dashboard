@@ -49,6 +49,7 @@ struct ThreadSummary: Codable, Equatable, Identifiable, Sendable {
     var sharesGroupRepository = false
     var projectGitStatus: ProjectGitStatus
     var threadSource: String? = nil
+    var gitActionsBlockedUntilCompletion = false
 
     var isScheduledAutomation: Bool { threadSource == "automation" }
 
@@ -80,6 +81,7 @@ struct RendererThread: Codable, Equatable, Sendable {
     let projectGroupPath: String?
     let sharesGroupRepository: Bool
     let projectGitStatus: ProjectGitStatus
+    let gitActionsBlockedUntilCompletion: Bool
 
     init(_ thread: ThreadSummary) {
         id = thread.id
@@ -97,6 +99,7 @@ struct RendererThread: Codable, Equatable, Sendable {
         projectGroupPath = thread.projectGroupPath
         sharesGroupRepository = thread.sharesGroupRepository
         projectGitStatus = thread.projectGitStatus
+        gitActionsBlockedUntilCompletion = thread.gitActionsBlockedUntilCompletion
     }
 }
 

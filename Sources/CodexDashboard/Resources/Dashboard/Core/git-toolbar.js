@@ -19,7 +19,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     // Native Git queries finish before the Dashboard's next repository snapshot.
     if (action === 'Push' && context.pushHasNoCommits) return 'No unpushed commits.';
     const thread = findThread(context.threadID);
-    if (thread?.runState === 'running') return 'Wait for this chat to finish running.';
+    if (thread?.gitActionsBlockedUntilCompletion) return 'Wait for a response to finish without interruption before committing or pushing these files.';
     if (['Push', 'Commit & push'].includes(action)) {
       const remote = remoteState(context.path);
       if (remote !== true) return remote === false

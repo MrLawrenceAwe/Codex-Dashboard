@@ -362,6 +362,11 @@ Push and Commit & push stay disabled until a remote is confirmed and remain
 disabled when none is configured. The Git menu’s Push action follows the same rule.
 
 Buttons follow the selected local chat’s primary repository and disappear outside
-supported Git chats and on Dashboard pages. Commit and Push shortcuts are disabled
-while the chat is running. Dashboard restores the controls after navigation or
+supported Git chats and on Dashboard pages. A running response keeps Git shortcuts
+available until repository files differ from the last normally completed response.
+New edits block all three shortcuts until a response finishes normally; stopping,
+interrupting, or reaching a usage limit does not release that block. Staging or
+committing existing files alone does not count as a new file edit. If Dashboard
+has not observed a completed response checkpoint, shortcuts wait for one.
+Dashboard restores the controls after navigation or
 header replacement and removes them when the integration is disabled.

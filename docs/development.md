@@ -168,6 +168,14 @@ A coalesced observer repairs replacement headers, with a timer fallback for hidd
 windows whose animation frames are suspended. The toolbar shares the local
 remote-metadata cache and subscriptions with `push-controls.js`; its push shortcuts
 require a confirmed remote, and its native Git menu also blocks Push without one.
+The catalog supplies `gitActionsBlockedUntilCompletion` from `GitActionAvailability`.
+It compares repository file contents with a checkpoint captured at normal response
+completion, using raw rollout lifecycle events independently of notification launch
+filtering. Starting a response preserves availability; a changed fingerprint latches
+the block across aborts and usage limits until a new normal completion. Git-only
+staging and commits preserve the content fingerprint. Checks share one repository
+read per catalog refresh and stop comparing once that chat is blocked. Checkpoints
+live in the native catalog provider, so renderer remounts do not reset them.
 
 ## Renderer contracts
 

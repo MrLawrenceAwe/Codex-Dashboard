@@ -3,6 +3,53 @@ import XCTest
 @testable import CodexDashboard
 
 final class CodexThreadCatalogProviderTests: XCTestCase {
+    func testGitCheckpointSurvivesStartingAndAbortingANewResponse() async throws {
+        let now: Int64 = 2_000_000_000
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("catalog-checkpoint-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let git = try await Subprocess.run(executableURL: GitExecutable.url,
+            arguments: ["init", root.path], timeout: 3)
+        XCTAssertEqual(git.terminationStatus, 0)
+        let file = root.appendingPathComponent("notes.txt")
+        try Data("completed edits".utf8).write(to: file)
+        let database = try CodexTestFixtures.makeStateDatabase(now: now, runningWorkspacePath: root.path,
+            runningLifecycleEvents: ["task_complete"], testCase: self)
+        let query = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [database.path, "SELECT rollout_path FROM threads WHERE id = 'running';"], timeout: 3)
+        let rollout = URL(fileURLWithPath: String(decoding: query.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        let provider = CodexThreadCatalogProvider(stateDatabaseURL: database)
+        let launch = Date(timeIntervalSince1970: TimeInterval(now))
+        func thread() async throws -> ThreadSummary {
+            let catalog = try await provider.loadCatalog(codexLaunchDate: launch, requiredThreadIDs: [])
+            return try XCTUnwrap(catalog.threads.first { $0.id == "running" })
+        }
+        func append(_ type: String, at time: Int64) throws {
+            let timestamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: TimeInterval(time)))
+            let line = "{\"timestamp\":\"\(timestamp)\",\"type\":\"event_msg\",\"payload\":{\"type\":\"\(type)\"}}\n"
+            let handle = try FileHandle(forWritingTo: rollout)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data(line.utf8))
+        }
+        var current = try await thread()
+        XCTAssertNil(current.latestLifecycleEvent, "Old events remain excluded from completion notifications")
+        XCTAssertFalse(current.gitActionsBlockedUntilCompletion, "The raw pre-launch completion still establishes a Git checkpoint")
+        try append("task_started", at: now + 1)
+        current = try await thread()
+        XCTAssertEqual(current.runState, .running)
+        XCTAssertFalse(RendererThread(current).gitActionsBlockedUntilCompletion)
+        try Data("new response edits".utf8).write(to: file)
+        current = try await thread()
+        XCTAssertTrue(RendererThread(current).gitActionsBlockedUntilCompletion)
+        try append("turn_aborted", at: now + 2)
+        current = try await thread()
+        XCTAssertEqual(current.runState, .idle)
+        XCTAssertTrue(current.gitActionsBlockedUntilCompletion)
+        try append("task_complete", at: now + 3)
+        current = try await thread()
+        XCTAssertFalse(current.gitActionsBlockedUntilCompletion)
+    }
+
     private func sqlStringLiteral(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "''") + "'"
     }

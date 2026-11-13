@@ -17,7 +17,8 @@ extension ThreadSummary {
         runState: ThreadRunState = .idle,
         latestLifecycleEvent: ThreadLifecycleEvent? = nil,
         projectGitStatus: ProjectGitStatus = .clean,
-        sharesGroupRepository: Bool = true
+        sharesGroupRepository: Bool = true,
+        gitActionsBlockedUntilCompletion: Bool = false
     ) -> ThreadSummary {
         var thread = ThreadSummary(
             id: id,
@@ -36,6 +37,7 @@ extension ThreadSummary {
         thread.projectGroupPath = checkoutPath
         thread.sharesGroupRepository = sharesGroupRepository
         thread.isUnread = isUnread
+        thread.gitActionsBlockedUntilCompletion = gitActionsBlockedUntilCompletion
         return thread
     }
 }

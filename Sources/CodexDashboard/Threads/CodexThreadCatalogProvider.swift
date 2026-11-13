@@ -60,6 +60,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     private let loadedThreadLimit: Int
     private var rolloutQuestionReader = RolloutQuestionReader()
     private var rolloutActivityReader = RolloutActivityReader()
+    private let gitActionAvailability = GitActionAvailability()
     private var cachedDatabaseSignature: DatabaseSignature?
     private var cachedLaunchMilliseconds: Int64?
     private var cachedRequiredThreadIDs: Set<String>?
@@ -153,6 +154,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
         }
         // Any loaded task can be resumed or hit a usage limit without a database
         // write. The reader checks file signatures and only parses changed rollouts.
+        var recordedEvents: [String: ThreadLifecycleEvent] = [:]
         let candidates: [ThreadSummary] = threads.map { thread in
             let cwd = FileSystemPath.canonicalPath(thread.checkoutPath)
             // Project membership can differ from the checkout (for example, a
@@ -176,6 +178,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
                 return names.count > 1 ? URL(fileURLWithPath: checkout.path).lastPathComponent : checkout.name
             }
             let recordedEvent = rolloutActivityReader.latestRecordedEvent(at: thread.rolloutPath)
+            recordedEvents[thread.id] = recordedEvent
             let isCurrentEvent = recordedEvent.map { event in
                 codexLaunchDate.map { event.timestamp >= $0 } ?? false
             } ?? false
@@ -215,7 +218,8 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             }
             return summary
         }
-        let threadSummaries = candidates.filter { $0.preview != "" || $0.runState == .running }.sorted { left, right in
+        let availableCandidates = await gitActionAvailability.apply(to: candidates, events: recordedEvents)
+        let threadSummaries = availableCandidates.filter { $0.preview != "" || $0.runState == .running }.sorted { left, right in
             if left.recencyEpochMillis == right.recencyEpochMillis {
                 return left.id < right.id
             }
