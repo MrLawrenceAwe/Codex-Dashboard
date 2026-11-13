@@ -50,9 +50,16 @@ enum RendererScript {
         return "(() => window.__codexDashboard?.applyAccountPopoverSnapshot?.(\(json)) === true)()"
     }
 
-    static let accountPopoverUnavailable = "__codexDashboardUnavailable__"
-    static let readQueuedAccountPopoverAction =
-        "window.__codexDashboard?.readQueuedAccountPopoverAction?.() ?? '\(accountPopoverUnavailable)'"
+    static let readQueuedRendererActions = """
+        (() => {
+          const dashboard = window.__codexDashboard;
+          if (!dashboard?.readQueuedAccountPopoverAction) return null;
+          return JSON.stringify({
+            account: dashboard.readQueuedAccountPopoverAction(),
+            projectViewer: dashboard.pendingProjectViewerRequest?.()
+          });
+        })()
+        """
 
     static func acknowledgeAccountPopoverAction(_ action: AccountPopoverAction) throws -> String {
         "window.__codexDashboard?.acknowledgeAccountPopoverAction?.(\(try encodeJSON(action.requestID))) === true"

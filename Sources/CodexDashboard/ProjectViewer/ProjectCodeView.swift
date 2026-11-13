@@ -20,6 +20,7 @@ struct ProjectCodeView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
+        scroll.clipsToBounds = true
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -159,9 +160,12 @@ private struct ProjectCodePalette {
 
 private final class ProjectLineRuler: NSRulerView {
     private weak var textView: NSTextView?
+    override var isFlipped: Bool { true }
+
     init(textView: NSTextView, scrollView: NSScrollView) {
         self.textView = textView
         super.init(scrollView: scrollView, orientation: .verticalRuler)
+        clipsToBounds = true
         clientView = textView
         ruleThickness = 58
     }
@@ -172,8 +176,14 @@ private final class ProjectLineRuler: NSRulerView {
         textView.backgroundColor.setFill()
         bounds.fill()
         guard layout.numberOfGlyphs > 0 else { return }
-        let visible = textView.visibleRect
-        let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
+        guard let clipView = scrollView?.contentView else { return }
+        let visible = textView.convert(clipView.bounds, from: clipView)
+        let origin = textView.textContainerOrigin
+        // Use the full line width so horizontal scrolling never hides line numbers.
+        let viewport = NSRect(x: 0, y: visible.minY - origin.y,
+                              width: textView.bounds.width, height: visible.height)
+        let glyphs = layout.glyphRange(forBoundingRect: viewport, in: container)
+        guard glyphs.length > 0 else { return }
         var index = glyphs.location
         let ns = textView.string as NSString
         let charStart = layout.characterIndexForGlyph(at: min(index, max(0, layout.numberOfGlyphs - 1)))
@@ -186,7 +196,7 @@ private final class ProjectLineRuler: NSRulerView {
             var effective = NSRange()
             let line = layout.lineFragmentRect(forGlyphAt: index, effectiveRange: &effective)
             let label = "\(number)" as NSString
-            let y = line.minY + textView.textContainerInset.height - visible.minY
+            let y = convert(NSPoint(x: 0, y: line.minY + origin.y), from: textView).y
             label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: attributes).width - 10, y: y), withAttributes: attributes)
             number += 1
             index = NSMaxRange(effective)

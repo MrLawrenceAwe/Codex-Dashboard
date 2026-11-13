@@ -4,6 +4,13 @@ const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 
+// SourceKit's semantic stream can omit the names at their declarations.
+const swiftDeclarationTypes = {
+  5: 'class', 6: 'method', 7: 'property', 8: 'property', 9: 'method',
+  10: 'enum', 11: 'interface', 12: 'function', 13: 'variable', 14: 'variable',
+  23: 'struct', 26: 'typeParameter',
+};
+
 function typeScriptTokens(modulePath, fileName, text) {
   const ts = require(modulePath);
   const service = ts.createLanguageService({
@@ -39,23 +46,38 @@ function swiftTokens(fileName, text) {
     let legend = [];
     let buffer = Buffer.alloc(0);
     let finished = false;
-    const finish = tokens => {
+    const tokens = new Map();
+    const addDeclaration = symbol => {
+      const type = swiftDeclarationTypes[symbol.kind];
+      const start = symbol.selectionRange?.start;
+      if (type && start && starts[start.line] !== undefined) {
+        const name = symbol.name.split('(')[0];
+        const offset = starts[start.line] + start.character;
+        if (name && text.startsWith(name, offset)) {
+          tokens.set(offset, { offset, length: name.length, type });
+        }
+      }
+      for (const child of symbol.children || []) addDeclaration(child);
+    };
+    const finish = () => {
       if (finished) return;
       finished = true;
       clearTimeout(deadline);
+      process.off('SIGTERM', finish);
       server.stdin.destroy();
       server.stdout.destroy();
       server.kill();
-      resolve(tokens);
+      resolve([...tokens.values()]);
     };
-    const deadline = setTimeout(() => finish([]), 4500);
+    const deadline = setTimeout(finish, 12000);
+    process.once('SIGTERM', finish);
     const send = (method, params, id) => {
       const body = JSON.stringify({ jsonrpc: '2.0', method, params, id });
       server.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
     };
-    server.on('error', () => finish([]));
-    server.on('exit', () => finish([]));
-    server.stdin.on('error', () => finish([]));
+    server.on('error', finish);
+    server.on('exit', finish);
+    server.stdin.on('error', finish);
     server.stdout.on('data', chunk => {
       buffer = Buffer.concat([buffer, chunk]);
       for (;;) {
@@ -63,28 +85,32 @@ function swiftTokens(fileName, text) {
         if (headerEnd < 0) return;
         const length = Number(/Content-Length:\s*(\d+)/i.exec(buffer.subarray(0, headerEnd).toString())?.[1]);
         const end = headerEnd + 4 + length;
-        if (!Number.isFinite(length)) { finish([]); return; }
+        if (!Number.isFinite(length)) { finish(); return; }
         if (buffer.length < end) return;
         const reply = JSON.parse(buffer.subarray(headerEnd + 4, end).toString());
         buffer = buffer.subarray(end);
         if (reply.id === 1) {
           legend = reply.result?.capabilities?.semanticTokensProvider?.legend?.tokenTypes || [];
-          if (!legend.length) { finish([]); return; }
+          if (!reply.result) { finish(); return; }
           send('initialized', {});
           send('textDocument/didOpen', { textDocument: { uri, languageId: 'swift', version: 1, text } });
-          send('textDocument/semanticTokens/full', { textDocument: { uri } }, 2);
+          send('textDocument/documentSymbol', { textDocument: { uri } }, 2);
         } else if (reply.id === 2) {
-          const tokens = [];
+          for (const symbol of reply.result || []) addDeclaration(symbol);
+          if (!legend.length) { finish(); return; }
+          send('textDocument/semanticTokens/full', { textDocument: { uri } }, 3);
+        } else if (reply.id === 3) {
           let line = 0, column = 0;
           const data = reply.result?.data || [];
           for (let i = 0; i + 4 < data.length; i += 5) {
             line += data[i];
             column = data[i] ? data[i + 1] : column + data[i + 1];
             if (starts[line] !== undefined && legend[data[i + 3]]) {
-              tokens.push({ offset: starts[line] + column, length: data[i + 2], type: legend[data[i + 3]] });
+              const offset = starts[line] + column;
+              tokens.set(offset, { offset, length: data[i + 2], type: legend[data[i + 3]] });
             }
           }
-          finish(tokens);
+          finish();
           return;
         }
       }
@@ -94,11 +120,19 @@ function swiftTokens(fileName, text) {
       workspaceFolders: [],
       capabilities: {
         general: { positionEncodings: ['utf-16'] },
-        textDocument: { semanticTokens: { requests: { full: true }, tokenTypes: [
-          'namespace', 'type', 'class', 'enum', 'interface', 'struct', 'typeParameter', 'parameter',
-          'variable', 'property', 'enumMember', 'function', 'method', 'macro', 'keyword', 'modifier',
-          'comment', 'string', 'number', 'regexp', 'operator', 'decorator',
-        ], tokenModifiers: ['declaration', 'definition', 'readonly', 'static'], formats: ['relative'] } },
+        textDocument: {
+          documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+          semanticTokens: {
+            requests: { full: true },
+            tokenTypes: [
+              'namespace', 'type', 'class', 'enum', 'interface', 'struct', 'typeParameter', 'parameter',
+              'variable', 'property', 'enumMember', 'function', 'method', 'macro', 'keyword', 'modifier',
+              'comment', 'string', 'number', 'regexp', 'operator', 'decorator',
+            ],
+            tokenModifiers: ['declaration', 'definition', 'readonly', 'static'],
+            formats: ['relative'],
+          },
+        },
       },
     }, 1);
   });

@@ -222,7 +222,6 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
-        await projectViewerBridge.synchronize(devTools: devTools, targets: targets, threads: snapshot.threads)
         try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
         if let check = await PushControlsBridge(devTools: devTools).synchronize(in: targets) {
             pushControlsCompatibilityCheck = check
@@ -234,6 +233,7 @@ final class DashboardRenderer {
     func disable() async throws -> DashboardDisableOutcome {
         let wasMaintainingDashboard = maintainsDashboard
         maintainsDashboard = false
+        projectViewerBridge.cancelPendingOpen()
         await waitForSynchronizationsToFinish()
         await waitForReviewOperations()
 
@@ -286,18 +286,27 @@ final class DashboardRenderer {
     }
 
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
+        struct QueuedActions: Decodable {
+            let account: String?
+            let projectViewer: String?
+        }
+        guard maintainsDashboard else { return .unavailable }
         var foundAvailableRenderer = false
         for target in await targets() {
             do {
                 guard let serialized = try await devTools.evaluateString(
-                    RendererScript.readQueuedAccountPopoverAction,
+                    RendererScript.readQueuedRendererActions,
                     in: target,
                     timeout: .seconds(1)
-                ), serialized != RendererScript.accountPopoverUnavailable else { continue }
+                ), let actions = try? JSONDecoder().decode(QueuedActions.self, from: Data(serialized.utf8))
+                else { continue }
+                guard maintainsDashboard, !Task.isCancelled else { return .unavailable }
                 foundAvailableRenderer = true
-                if serialized == "null" { continue }
-                guard let data = serialized.data(using: .utf8),
-                      let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
+                if let request = actions.projectViewer, let threads = lastSnapshot?.threads {
+                    projectViewerBridge.receive(request, from: target, devTools: devTools, threads: threads)
+                }
+                guard let account = actions.account,
+                      let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: Data(account.utf8))
                 else { continue }
                 if (action.kind == .switchAccount || action.kind == .removeSavedAccount), action.accountID == nil {
                     continue
@@ -402,6 +411,7 @@ final class DashboardRenderer {
     }
 
     private func clearMountState() {
+        projectViewerBridge.cancelPendingOpen()
         pushControlsCompatibilityCheck = nil
         mountedTargetIDs = []
         lastSnapshot = nil

@@ -41,7 +41,7 @@ enum ProjectSemanticHighlighting {
         guard let handle = try? FileHandle(forReadingFrom: input) else { return [] }
         defer { try? handle.close() }
         let result = try? await Subprocess.run(executableURL: URL(fileURLWithPath: node),
-            arguments: [helper.path, engine, path] + engineArguments, timeout: 6, inputFile: handle)
+            arguments: [helper.path, engine, path] + engineArguments, timeout: 15, inputFile: handle)
         guard let result, result.terminationStatus == 0 else { return [] }
         return (try? JSONDecoder().decode([ProjectSemanticToken].self, from: result.standardOutput)) ?? []
     }

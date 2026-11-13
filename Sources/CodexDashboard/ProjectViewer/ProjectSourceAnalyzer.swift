@@ -18,16 +18,31 @@ enum ProjectSourceAnalyzer {
 
     static func lineCount(_ text: String) -> Int {
         guard !text.isEmpty else { return 0 }
-        let count = text.reduce(0) { $1 == "\n" ? $0 + 1 : $0 }
-        return count + (text.hasSuffix("\n") ? 0 : 1)
+        let bytes = text.utf8
+        let count = bytes.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+        return count + (bytes.last == 10 ? 0 : 1)
     }
 
     static func functions(in text: String, extension ext: String) -> [ProjectFunction] {
         guard supportedExtensions.contains(ext) else { return [] }
         let masked = mask(text, python: ["py", "pyw"].contains(ext), rust: ext == "rs")
-        let lines = masked.components(separatedBy: "\n")
-        if ["py", "pyw"].contains(ext) { return pythonFunctions(lines) }
+        if ["py", "pyw"].contains(ext) { return pythonFunctions(masked.components(separatedBy: "\n")) }
         let source = masked as NSString
+        // Regex matches and line offsets both use UTF-16.
+        var lineStarts = [0]
+        for (offset, codeUnit) in masked.utf16.enumerated() where codeUnit == 10 {
+            lineStarts.append(offset + 1)
+        }
+        func lineNumber(at offset: Int) -> Int {
+            var lower = 0
+            var upper = lineStarts.count
+            while lower < upper {
+                let middle = (lower + upper) / 2
+                if lineStarts[middle] <= offset { lower = middle + 1 }
+                else { upper = middle }
+            }
+            return lower
+        }
         // Supported declaration forms: named functions, arrow assignments, and methods.
         let patterns = [
             #"\b(?:func|function|fn|fun)\s+(?:\([^\n]*?\)\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^\n{};]*>)?\s*\("#,
@@ -64,8 +79,8 @@ enum ProjectSourceAnalyzer {
                     cursor += 1
                 }
                 guard depth == 0 else { continue }
-                let start = source.substring(to: match.range(at: 1).location).filter { $0 == "\n" }.count + 1
-                let end = source.substring(to: cursor).filter { $0 == "\n" }.count + 1
+                let start = lineNumber(at: match.range(at: 1).location)
+                let end = lineNumber(at: cursor)
                 declarations.append((name, start, end))
             }
         }

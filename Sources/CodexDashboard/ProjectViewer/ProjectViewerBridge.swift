@@ -15,6 +15,12 @@ final class ProjectViewerBridge {
     }
     private var handledIDs = Set<String>()
     private var handledOrder: [String] = []
+    private var openTask: Task<Void, Never>?
+
+    func cancelPendingOpen() {
+        openTask?.cancel()
+        openTask = nil
+    }
 
     func allowedRoot(_ request: Request, threads: [RendererThread]) async -> URL? {
         guard request.path.hasPrefix("/") else { return nil }
@@ -34,32 +40,33 @@ final class ProjectViewerBridge {
         return FileSystemPath.canonicalURL(request.path)
     }
 
-    func synchronize(devTools: any DevToolsServing, targets: [DevToolsTarget], threads: [RendererThread]) async {
-        for target in targets {
-            guard let serialized = try? await devTools.evaluateString(
-                "window.__codexDashboard?.pendingProjectViewerRequest?.() ?? null", in: target
-            ), let request = try? JSONDecoder().decode(Request.self, from: Data(serialized.utf8)) else { continue }
-            let key = target.id + ":" + request.id
-            let firstReceipt = handledIDs.insert(key).inserted
-            if firstReceipt {
-                handledOrder.append(key)
-                if handledOrder.count > 64 { handledIDs.remove(handledOrder.removeFirst()) }
-            }
+    func receive(_ serialized: String, from target: DevToolsTarget, devTools: any DevToolsServing,
+                 threads: [RendererThread]) {
+        guard let request = try? JSONDecoder().decode(Request.self, from: Data(serialized.utf8)) else { return }
+        let key = target.id + ":" + request.id
+        let firstReceipt = handledIDs.insert(key).inserted
+        Task {
             if let idData = try? JSONEncoder().encode(request.id) {
                 let id = String(decoding: idData, as: UTF8.self)
                 _ = try? await devTools.evaluateBoolean(
                     "window.__codexDashboard?.acknowledgeProjectViewerRequest?.(\(id)) === true", in: target
                 )
             }
-            guard firstReceipt, let root = await allowedRoot(request, threads: threads), !Task.isCancelled else { continue }
-            let paths: [String]?
+        }
+        guard firstReceipt else { return }
+        handledOrder.append(key)
+        if handledOrder.count > 64 { handledIDs.remove(handledOrder.removeFirst()) }
+        cancelPendingOpen()
+        openTask = Task {
+            guard !Task.isCancelled, let root = await allowedRoot(request, threads: threads),
+                  !Task.isCancelled else { return }
             if let threadID = request.threadID {
-                paths = (try? await catalog.editedFiles(for: threadID, checkout: request.path)) ?? []
+                ProjectViewerWindowController.shared.open(root: root) { [catalog] in
+                    (try? await catalog.editedFiles(for: threadID, checkout: request.path)) ?? []
+                }
             } else {
-                paths = nil
+                ProjectViewerWindowController.shared.open(root: root)
             }
-            guard !Task.isCancelled else { return }
-            ProjectViewerWindowController.shared.open(root: root, editedPaths: paths)
         }
     }
 }

@@ -34,10 +34,12 @@ final class ProjectViewerModel: ObservableObject {
     private var monitor: RecursiveProjectChangeMonitor?
     private var scanTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
+    private var highlightingTask: Task<Void, Never>?
+    private var editedFilesTask: Task<Void, Never>?
     private var refreshPending = false
     private var isOpen = false
     private var generation = UUID()
-    private var pendingEditedPaths: [String]?
+    private var pendingEditedTabs: (paths: [String], selection: String?)?
     private var shouldSelectInitialFile = true
 
     var selectedFile: ProjectFile? { selectedPath.flatMap { files[$0] ?? baseline[$0] } }
@@ -76,15 +78,15 @@ final class ProjectViewerModel: ObservableObject {
         return current - original
     }
 
-    func open(_ url: URL, editedPaths: [String]? = nil) {
+    func open(_ url: URL, selectInitialFile: Bool = true) {
         stop()
         isOpen = true
         let folder = url.standardizedFileURL.resolvingSymlinksInPath()
         root = folder
         files = [:]; baseline = [:]; baselineDate = nil
         tabs = []
-        pendingEditedPaths = editedPaths
-        shouldSelectInitialFile = editedPaths == nil
+        pendingEditedTabs = nil
+        shouldSelectInitialFile = selectInitialFile
         selectedPath = nil; code = ""; previewMessage = nil; message = nil
         filter = ""; changedOnly = false
         let token = generation
@@ -106,6 +108,8 @@ final class ProjectViewerModel: ObservableObject {
         generation = UUID()
         scanTask?.cancel(); scanTask = nil
         previewTask?.cancel(); previewTask = nil
+        editedFilesTask?.cancel(); editedFilesTask = nil
+        cancelHighlighting()
         monitor?.stop(); monitor = nil
         refreshPending = false; isScanning = false
     }
@@ -131,9 +135,9 @@ final class ProjectViewerModel: ObservableObject {
                 }
                 self.message = scan.warnings.isEmpty ? nil : scan.warnings.joined(separator: " ")
                 if self.baselineDate == nil { self.resetBaseline() }
-                if let editedPaths = self.pendingEditedPaths {
-                    self.pendingEditedPaths = nil
-                    self.applyEditedTabs(editedPaths)
+                if let editedTabs = self.pendingEditedTabs {
+                    self.pendingEditedTabs = nil
+                    self.applyEditedTabs(editedTabs.paths, selectFirst: self.selectedPath == editedTabs.selection)
                 } else if self.selectedPath == nil, self.tabs.isEmpty, self.shouldSelectInitialFile {
                     self.selectedPath = scan.files.first(where: { $0.lines != nil })?.path
                 } else {
@@ -147,15 +151,28 @@ final class ProjectViewerModel: ObservableObject {
         }
     }
 
-    func openEditedFiles(_ paths: [String]) {
-        pendingEditedPaths = paths
-        if !isScanning { refresh() }
+    func openEditedFiles(_ load: @escaping () async -> [String]) {
+        editedFilesTask?.cancel()
+        pendingEditedTabs = nil
+        let selection = selectedPath
+        editedFilesTask = Task { [weak self] in
+            let paths = await load()
+            guard let self, !Task.isCancelled else { return }
+            self.editedFilesTask = nil
+            if self.isScanning || paths.contains(where: { self.files[$0] == nil }) {
+                self.pendingEditedTabs = (paths, selection)
+                if !self.isScanning { self.refresh() }
+            } else {
+                self.applyEditedTabs(paths, selectFirst: self.selectedPath == selection)
+            }
+        }
     }
 
-    private func applyEditedTabs(_ paths: [String]) {
+    private func applyEditedTabs(_ paths: [String], selectFirst: Bool) {
         var seen = Set<String>()
-        tabs = paths.filter { files[$0] != nil && seen.insert($0).inserted }
-        selectedPath = tabs.first
+        let editedTabs = paths.filter { files[$0] != nil && seen.insert($0).inserted }
+        tabs = editedTabs + tabs.filter { !seen.contains($0) }
+        if selectFirst, let first = editedTabs.first { selectedPath = first }
     }
 
     func closeTab(_ path: String) {
@@ -195,12 +212,20 @@ final class ProjectViewerModel: ObservableObject {
 
     private func loadPreview(preserveCode: Bool = false) {
         previewTask?.cancel()
-        if !preserveCode { code = ""; jump = nil; semanticTokens = [] }
+        if !preserveCode {
+            cancelHighlighting()
+            code = ""
+            jump = nil
+            semanticTokens = []
+        }
         previewMessage = nil
         guard let root, let path = selectedPath else { return }
         guard files[path] != nil || baseline[path] != nil else { return }
-        guard let file = files[path] else { previewMessage = "This file was removed since the baseline."; return }
-        guard file.lines != nil else { previewMessage = file.note; return }
+        guard let file = files[path], file.lines != nil else {
+            cancelHighlighting()
+            previewMessage = files[path]?.note ?? "This file was removed since the baseline."
+            return
+        }
         let token = generation
         let worker = Task.detached(priority: .utility) { () throws -> String in
             let candidate = root.appendingPathComponent(path).resolvingSymlinksInPath()
@@ -212,16 +237,30 @@ final class ProjectViewerModel: ObservableObject {
             guard let self, !Task.isCancelled, token == self.generation, path == self.selectedPath else { return }
             switch result {
             case .success(let text):
-                if preserveCode, text == self.code, !self.semanticTokens.isEmpty { return }
                 if text != self.code {
+                    self.cancelHighlighting()
                     self.semanticTokens = []
                     self.code = text
                 }
-                let tokens = await ProjectSemanticHighlighting.tokens(text: text, path: root.appendingPathComponent(path).path)
-                guard !Task.isCancelled, token == self.generation, path == self.selectedPath else { return }
-                self.semanticTokens = tokens
-            case .failure(let error): self.previewMessage = error.localizedDescription
+                // An unchanged rescan must let the current analysis finish.
+                guard !text.isEmpty, self.highlightingTask == nil, self.semanticTokens.isEmpty else { return }
+                self.highlightingTask = Task { [weak self] in
+                    let tokens = await ProjectSemanticHighlighting.tokens(
+                        text: text, path: root.appendingPathComponent(path).path
+                    )
+                    guard let self, !Task.isCancelled, token == self.generation, path == self.selectedPath else { return }
+                    self.semanticTokens = tokens
+                    self.highlightingTask = nil
+                }
+            case .failure(let error):
+                self.cancelHighlighting()
+                self.previewMessage = error.localizedDescription
             }
         }
+    }
+
+    private func cancelHighlighting() {
+        highlightingTask?.cancel()
+        highlightingTask = nil
     }
 }

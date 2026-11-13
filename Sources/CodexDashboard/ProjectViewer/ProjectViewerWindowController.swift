@@ -27,14 +27,13 @@ final class ProjectViewerWindowController: NSWindowController, NSWindowDelegate 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func open(root: URL? = nil, editedPaths: [String]? = nil) {
+    func open(root: URL? = nil, loadEditedPaths: (() async -> [String])? = nil) {
         let wasVisible = window?.isVisible == true
         if let root {
             if model.root != root.standardizedFileURL.resolvingSymlinksInPath() || !wasVisible {
-                model.open(root, editedPaths: editedPaths)
-            } else if let editedPaths {
-                model.openEditedFiles(editedPaths)
+                model.open(root, selectInitialFile: loadEditedPaths == nil)
             }
+            if let loadEditedPaths { model.openEditedFiles(loadEditedPaths) }
         } else if !wasVisible, model.root != nil { model.resume() }
         if let name = model.root?.lastPathComponent { window?.title = "\(name) — Project Viewer" }
         NSApp.activate(ignoringOtherApps: true)
@@ -248,7 +247,9 @@ struct ProjectViewerWindowView: View {
                 }
             }.padding(.horizontal, 18).padding(.vertical, 12)
             Divider()
-            if let message = model.previewMessage {
+            if model.isScanning, model.baselineDate == nil {
+                ProgressView("Loading project…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let message = model.previewMessage {
                 ContentUnavailableView(message, systemImage: "doc")
             } else if model.selectedFile != nil {
                 ProjectCodeView(text: model.code, path: model.selectedPath ?? "", semanticTokens: model.semanticTokens, jump: model.jump)
