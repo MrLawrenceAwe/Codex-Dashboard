@@ -33,14 +33,16 @@ function createPushControls() {
     pendingRemote = undefined;
     // Replies are scoped to the dialog and selected repository, including a
     // dialog closed and reopened before an earlier request completes.
-    if (request.generation !== generation || request.path !== context?.path) return;
-    hasRemote = value;
-    remoteFailure = value === null;
+    const forDialog = request.generation !== null;
+    if (forDialog && (request.generation !== generation || request.path !== context?.path)) return;
     remoteCache.delete(request.path);
     if (value !== null) {
       remoteCache.set(request.path, { value, checkedAt: Date.now() });
       if (remoteCache.size > 64) remoteCache.delete(remoteCache.keys().next().value);
     }
+    if (!forDialog) return;
+    hasRemote = value;
+    remoteFailure = value === null;
     sync();
   }
 
@@ -58,13 +60,9 @@ function createPushControls() {
     finishRemote(response.id, value);
   }
 
-  function requestRemote() {
-    if (pendingRemote || (lastRequestedGeneration === generation
-      && Date.now() - lastRequestedAt < remoteFreshness)) return;
-    lastRequestedGeneration = generation;
-    lastRequestedAt = Date.now();
+  function requestRemote(path, hostConfig, dialogGeneration) {
     const id = `dashboard-push-${crypto.randomUUID()}`;
-    pendingRemote = { id, generation, path: context.path,
+    pendingRemote = { id, generation: dialogGeneration, path,
       timer: setTimeout(() => finishRemote(id, null), 2000) };
     if (!unsubscribe || typeof window.electronBridge?.sendWorkerMessageFromView !== 'function') {
       finishRemote(id, null);
@@ -74,11 +72,19 @@ function createPushControls() {
       Promise.resolve(window.electronBridge.sendWorkerMessageFromView('git', {
         type: 'worker-request', workerId: 'git', request: {
           id, method: 'git-context', enqueuedAtMs: Date.now(),
-          params: { cwd: context.path, hostConfig: context.hostConfig,
+          params: { cwd: path, hostConfig,
             operationSource: 'dashboard_push_controls' },
         },
       })).catch(() => finishRemote(id, null));
     } catch { finishRemote(id, null); }
+  }
+
+  function prefetchRemote(path) {
+    if (!path?.startsWith('/') || context || pendingRemote?.path === path) return;
+    const cached = remoteCache.get(path);
+    if (cached && Date.now() - cached.checkedAt < remoteFreshness) return;
+    cancelRemote();
+    requestRemote(path, { id: 'local' }, null);
   }
 
   function restore() {
@@ -106,19 +112,20 @@ function createPushControls() {
 
   function sync() {
     const next = codexUIContracts.pushControls();
-    const threadID = next?.local ? codexUIContracts.selectedThreadID() : null;
-    const usable = next?.local && next.threadID === threadID;
-    if (!usable || !context || next.dialog !== context.dialog
-      || next.path !== context.path || next.threadID !== context.threadID) {
+    const selected = next?.local && next.threadID === codexUIContracts.selectedThreadID() ? next : null;
+    if (selected?.dialog !== context?.dialog || selected?.path !== context?.path
+      || selected?.threadID !== context?.threadID) {
       restore();
-      cancelRemote();
-      context = usable ? next : null;
+      // A matching dialog can use the request started by the Projects page.
+      if (pendingRemote && (pendingRemote.generation !== null
+        || (selected && pendingRemote.path !== selected.path))) cancelRemote();
+      context = selected;
       const cached = context && remoteCache.get(context.path);
       hasRemote = cached && Date.now() - cached.checkedAt < remoteFreshness ? cached.value : null;
       remoteFailure = false;
       generation += 1;
     } else {
-      context = next;
+      context = selected;
     }
     if (!context) {
       if (next?.unsupported) lastState = 'incompatible';
@@ -133,7 +140,12 @@ function createPushControls() {
       return;
     }
     lastState = 'compatible';
-    requestRemote();
+    if (lastRequestedGeneration !== generation || Date.now() - lastRequestedAt >= remoteFreshness) {
+      lastRequestedGeneration = generation;
+      lastRequestedAt = Date.now();
+      if (pendingRemote) pendingRemote.generation = generation;
+      else requestRemote(context.path, context.hostConfig, generation);
+    }
     // Remove ownership of items replaced by Codex during a render.
     if ([...changes.keys()].some(item => !context.items.includes(item))) restore();
     if (hasRemote !== false) { restore(); return; }
@@ -205,5 +217,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read };
+  return { start, destroy, read, prefetchRemote };
 }

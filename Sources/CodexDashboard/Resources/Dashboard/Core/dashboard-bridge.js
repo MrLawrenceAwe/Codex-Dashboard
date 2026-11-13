@@ -1,7 +1,7 @@
 const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
-const chatOverview = createChatOverview({ catalog: threadCatalog });
+const chatOverview = createChatOverview({ catalog: threadCatalog, prefetchPushRemote: pushControls.prefetchRemote });
 const todoList = createTodoList({
   ...createTodoDependencies({ store: todoStore, imageStore: todoImageStore }),
   threadReferencesForProject: threadCatalog.threadReferencesForProject,

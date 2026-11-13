@@ -1,4 +1,4 @@
-function createChatOverview({ catalog }) {
+function createChatOverview({ catalog, prefetchPushRemote }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
   const currentThreads = catalog.currentThreads;
   const runningChatsPopover = createRunningChatsPopover({ currentThreads, onOpenThread: openThread });
@@ -124,6 +124,7 @@ function createChatOverview({ catalog }) {
       renderChatOverview();
       return;
     }
+    if (gitChange.action === 'Commit') prefetchPushRemote(thread.checkoutPath);
     closeChatOverview();
     const result = await codexHost.openProjectGitAction(thread, gitChange.action);
     if (result.opened || result.cancelled) return;
