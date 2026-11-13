@@ -111,8 +111,9 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     menuContext = context;
     menuAnchor = anchor;
     const commitAndPush = action === 'Commit & push';
-    if (commitAndPush) document.body.setAttribute('data-dashboard-git-handoff', '');
     const nativeAction = commitAndPush ? 'Commit' : action;
+    const startsCommit = nativeAction === 'Commit';
+    if (startsCommit) document.body.setAttribute('data-dashboard-git-handoff', '');
     if (nativeAction === 'Commit') prefetchRemote(context.path);
     context.menu.onOpenChange(true);
     sync();
@@ -133,22 +134,23 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
         // Native menu selection retains Codex's disabled states and Git workflow.
         item.click();
         closeMenu();
-        if (commitAndPush) {
+        if (startsCommit) {
+          const command = commitAndPush ? 'commit-and-push' : 'commit';
           const handoff = await domUtils.waitFor(() => {
             if (destroyed || pending !== operation
               || !sameContext(context, codexUIContracts.headerGitContext())) return true;
             const dialog = codexUIContracts.pushControls();
             if (!dialog?.compatible || dialog.threadID !== context.threadID
               || dialog.path !== context.path || dialog.hostConfig?.id !== context.hostID) return null;
-            const combined = dialog.items[1];
+            const option = dialog.items[commitAndPush ? 1 : 0];
             if (disabledReason(context, action)) return true;
-            if (combined.getAttribute('aria-disabled') === 'true' || combined.getAttribute('data-disabled') === 'true') return null;
-            combined.click();
+            if (option.getAttribute('aria-disabled') === 'true' || option.getAttribute('data-disabled') === 'true') return null;
+            option.click();
             return { selected: dialog.dialog };
           }, { timeout: 3000, interval: 50 });
           if (handoff?.selected) {
             await domUtils.waitFor(() => destroyed || !handoff.selected.isConnected
-              || !handoff.selected.querySelector('[cmdk-item][data-value="commit-and-push"]'),
+              || !handoff.selected.querySelector(`[cmdk-item][data-value="${command}"]`),
             { timeout: 1000, interval: 16 });
           }
         }

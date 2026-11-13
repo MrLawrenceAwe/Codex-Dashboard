@@ -35,12 +35,14 @@ const dashboardLifecycle = createDashboardLifecycle({
     pushControls.start();
     gitToolbar.mount();
     sidebarProjectHighlights.start();
+    sidebarProjectGitIndicators.mount();
     promptLibrary.mount();
     accountPopover.mount();
   },
   rebindFeatures() {
     gitToolbar.sync();
     sidebarProjectHighlights.mount();
+    sidebarProjectGitIndicators.mount();
     promptLibraryButton.scheduleSync();
   },
   syncComposer: promptLibraryButton.scheduleSync,
@@ -54,6 +56,7 @@ const dashboardLifecycle = createDashboardLifecycle({
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
     sidebarProjectHighlights.destroy();
+    sidebarProjectGitIndicators.destroy();
     promptLibrary.unmount();
     accountPopover.unmount();
   },
@@ -85,6 +88,7 @@ window.__codexDashboard = {
   openTodos: () => dashboardNavigation.openPage(todoList),
   applyThreads(nextThreads) {
     threadCatalog.applyThreads(nextThreads);
+    sidebarProjectGitIndicators.applyThreads(threadCatalog.currentThreads());
     gitToolbar.sync();
     chatOverview.applyThreads();
     todoList.refreshThreadOptions();

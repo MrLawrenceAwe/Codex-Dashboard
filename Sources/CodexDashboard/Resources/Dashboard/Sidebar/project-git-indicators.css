@@ -1,0 +1,13 @@
+aside [data-codex-project-git-status] {
+  display: inline-flex;
+  opacity: 1;
+  visibility: visible;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  color: var(--app-color-decoration-modified, #c9a86a);
+}
+aside [data-codex-project-git-status] svg { width: 15px; height: 15px; }

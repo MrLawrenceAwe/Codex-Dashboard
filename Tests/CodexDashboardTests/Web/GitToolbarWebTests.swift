@@ -74,10 +74,11 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
                             const option = document.createElement('div');
                             option.setAttribute('cmdk-item', ''); option.setAttribute('role', 'option');
                             option.setAttribute('data-value', value); option.setAttribute('aria-selected', String(value === 'commit'));
-                            option.setAttribute('aria-disabled', 'false'); option.setAttribute('data-disabled', 'false');
+                            option.setAttribute('aria-disabled', String(value === 'commit' && window.disableCommitConfirmation === true));
+                            option.setAttribute('data-disabled', 'false');
                             option.addEventListener('click', () => {
                               window.dialogOpacityAtSelection = getComputedStyle(dialog).opacity;
-                              window.confirmed = true; dialog.remove();
+                              window.confirmed = true; window.confirmedAction = value; dialog.remove();
                             });
                             root.append(option);
                           }
@@ -161,6 +162,44 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(restored, true)
     }
 
+    func testCommitStartsNativeWorkflowWithoutShowingEitherMenu() async throws {
+        for noRemote in [false, true] {
+            let webView = try await fixture(noRemote: noRemote)
+            _ = try await webView.evaluateJavaScript("""
+            window.showCommitDialog = true;
+            document.querySelector('[data-git-action=Commit]').click();
+            """)
+            try await DashboardWebTestHarness.waitForJavaScript(
+                "window.confirmedAction === 'commit' && !document.body.hasAttribute('data-dashboard-git-handoff')", in: webView)
+            let result = try await webView.evaluateJavaScript("""
+            [window.actions.length === 1, window.menuOpacityAtSelection === '0',
+              window.dialogOpacityAtSelection === '0', !document.querySelector('#git-menu, [role=dialog]')]
+            """) as? [Bool]
+            XCTAssertEqual(result, [true, true, true, true])
+        }
+    }
+
+    func testDisabledCommitConfirmationIsNotActivatedAndNavigationCancelsHandoff() async throws {
+        let webView = try await fixture()
+        _ = try await webView.evaluateJavaScript("""
+        window.showCommitDialog = true;
+        window.disableCommitConfirmation = true;
+        document.querySelector('[data-git-action=Commit]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript("!!document.querySelector('[role=dialog]')", in: webView)
+        try await Task.sleep(for: .milliseconds(150))
+        let blocked = try await webView.evaluateJavaScript("window.confirmed !== true") as? Bool
+        XCTAssertEqual(blocked, true)
+        _ = try await webView.evaluateJavaScript("""
+        window.selected = 'other';
+        document.querySelector('[cmdk-item][data-value=commit]').setAttribute('aria-disabled', 'false');
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "!document.body.hasAttribute('data-dashboard-git-handoff')", in: webView)
+        let cancelled = try await webView.evaluateJavaScript("window.confirmed !== true") as? Bool
+        XCTAssertEqual(cancelled, true)
+    }
+
     func testCommitAndPushStartsCombinedWorkflowWithOneClick() async throws {
         let webView = try await fixture()
         _ = try await webView.evaluateJavaScript("""
@@ -174,7 +213,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             "window.confirmed === true", in: webView)
         try await Task.sleep(for: .milliseconds(150))
         let started = try await webView.evaluateJavaScript("""
-        [window.confirmed === true, window.actions.length === 1,
+        [window.confirmedAction === 'commit-and-push', window.actions.length === 1,
           window.menuOpacityAtSelection === '0', window.dialogOpacityAtSelection === '0',
           !document.body.hasAttribute('data-dashboard-git-handoff')]
         """) as? [Bool]

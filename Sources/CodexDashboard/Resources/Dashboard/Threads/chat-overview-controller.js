@@ -7,6 +7,7 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
   const pageSize = 10;
   let visibleLimit = pageSize;
   const { collapsedProjectPaths, hiddenChangeIndicatorPaths } = storedPreferences;
+  sidebarProjectGitIndicators.setHiddenPaths(hiddenChangeIndicatorPaths);
   let renderFrame;
   let renderFallbackTimer;
   const pageState = createPageVisibilityController({
@@ -239,6 +240,7 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
           if (hiddenChangeIndicatorPaths.has(projectPath)) hiddenChangeIndicatorPaths.delete(projectPath);
           else hiddenChangeIndicatorPaths.add(projectPath);
           projectGitActionError = '';
+          sidebarProjectGitIndicators.setHiddenPaths(hiddenChangeIndicatorPaths);
           savePreferences();
           renderChatOverview();
           return;

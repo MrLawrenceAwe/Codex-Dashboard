@@ -23,9 +23,11 @@ or unpushed commits, with separate labels for each.
 
 Projects use Codex's saved names and roots. Removed projects' chats appear under
 **Other chats**. Hover or focus a sidebar project to choose one of seven highlight
-colours or **No highlight**. Projects remain individually collapsible.
+colours or **No highlight**. Projects remain individually collapsible. An amber Git
+icon beside a sidebar project name indicates uncommitted changes or unpushed
+commits; hover it for the status. It clears when the project is clean.
 
-**Hide change indicators** hides a project's indicators until restored. Hidden
+**Hide change indicators** hides a project's overview and sidebar Git indicators until restored. Hidden
 projects remain under **Indicators hidden** in Local changes. **Commit** opens
 Codex’s native Commit flow when there are uncommitted changes. **Push** selects
 Codex’s Push action when only unpushed commits remain. Both use an idle chat in
@@ -344,7 +346,9 @@ is never modified.
 
 Dashboard adds **Commit**, **Commit & push**, and **Push** beside the
 chat actions in the top toolbar, including when the summary panel is closed.
-Commit opens Codex’s native commit dialog. Commit & push starts Codex’s combined commit-and-push workflow directly.
+Commit starts Codex’s native commit workflow directly, leaving the message blank
+so Codex generates it automatically. Commit & push starts Codex’s combined
+commit-and-push workflow directly. The intermediate menus stay hidden for both actions.
 Push hands off to
 Codex’s native push workflow. Native availability checks still apply; unavailable shortcuts leave the
 menu visible with the disabled action and its explanation.
