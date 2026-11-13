@@ -206,6 +206,42 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(restored, true)
     }
 
+    func testWorkflowUsesMountedReactTreeInsteadOfStaleFiber() async throws {
+        let webView = try await fixture()
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          const trigger = document.getElementById('current-git');
+          const old = trigger.__reactFiber$test;
+          const menu = old.return;
+          const scope = menu.return;
+          const root = { stateNode: {} };
+          scope.return = root;
+          const nextRoot = { stateNode: root.stateNode };
+          const nextScope = { memoizedProps: scope.memoizedProps, return: nextRoot };
+          const nextMenu = { memoizedProps: { ...menu.memoizedProps, children: {
+            props: { children: { props: { id: 'localConversation.gitActions.cancelWorkflow' } } }
+          } }, return: nextScope };
+          const next = { memoizedProps: old.memoizedProps, return: nextMenu };
+          for (const [a, b] of [[old, next], [menu, nextMenu], [scope, nextScope], [root, nextRoot]]) {
+            a.alternate = b; b.alternate = a;
+          }
+          root.child = scope; scope.child = menu; menu.child = old;
+          nextRoot.child = nextScope; nextScope.child = nextMenu; nextMenu.child = next;
+          root.stateNode.current = nextRoot;
+          window.finishWorkflow = () => {
+            root.stateNode.current = root;
+            trigger.replaceChildren(document.createElement('svg'));
+          };
+          trigger.replaceChildren(document.createElement('span'));
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-git-action=Push]').title.includes('Git operation')", in: webView)
+        _ = try await webView.evaluateJavaScript("window.finishWorkflow()")
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+    }
+
     func testNoRemoteDisablesBothPushShortcutsAndNativeMenuPush() async throws {
         let webView = try await fixture(noRemote: true)
         try await DashboardWebTestHarness.waitForJavaScript(

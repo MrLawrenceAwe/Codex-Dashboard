@@ -23,7 +23,51 @@ const codexUIContracts = (() => {
   }
 
   function* parentFibers(element) {
-    for (let fiber = reactFiber(element); fiber; fiber = fiber.return) yield fiber;
+    for (let fiber = currentFiber(reactFiber(element)); fiber; fiber = fiber.return) yield fiber;
+  }
+
+  function currentFiber(fiber) {
+    // DOM nodes retain their original fiber while React alternates trees.
+    // Follow child membership through shared/bailout parents to the mounted tree.
+    if (!fiber?.alternate) return fiber;
+    const alternate = fiber.alternate;
+    let a = fiber;
+    let b = alternate;
+    while (a.return) {
+      const parentA = a.return;
+      const parentB = parentA.alternate;
+      if (!parentB) {
+        if (!parentA.return) break;
+        a = b = parentA.return;
+        continue;
+      }
+      if (parentA.child === parentB.child) {
+        for (let child = parentA.child; child; child = child.sibling) {
+          if (child === a) return fiber;
+          if (child === b) return alternate;
+        }
+        return fiber;
+      }
+      if (a.return !== b.return) {
+        a = parentA;
+        b = parentB;
+        continue;
+      }
+      let found = false;
+      for (const parent of [parentA, parentB]) {
+        for (let child = parent.child; child; child = child.sibling) {
+          if (child !== a && child !== b) continue;
+          const same = child === a;
+          a = same ? parent : parent.alternate;
+          b = same ? parent.alternate : parent;
+          found = true;
+          break;
+        }
+        if (found) break;
+      }
+      if (!found) return fiber;
+    }
+    return a.stateNode?.current === a ? fiber : alternate;
   }
 
   // Inspect speech controller props during startup/transcription, before the
