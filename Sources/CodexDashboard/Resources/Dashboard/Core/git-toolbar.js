@@ -16,6 +16,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function disabledReason(context, action) {
     if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
+    // Native Git queries finish before the Dashboard's next repository snapshot.
+    if (action === 'Push' && context.pushHasNoCommits) return 'No unpushed commits.';
     const thread = findThread(context.threadID);
     if (thread?.runState === 'running') return 'Wait for this chat to finish running.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -109,6 +111,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     menuContext = context;
     menuAnchor = anchor;
     const commitAndPush = action === 'Commit & push';
+    if (commitAndPush) document.body.setAttribute('data-dashboard-git-handoff', '');
     const nativeAction = commitAndPush ? 'Commit' : action;
     if (nativeAction === 'Commit') prefetchRemote(context.path);
     context.menu.onOpenChange(true);
@@ -131,7 +134,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
         item.click();
         closeMenu();
         if (commitAndPush) {
-          await domUtils.waitFor(() => {
+          const handoff = await domUtils.waitFor(() => {
             if (destroyed || pending !== operation
               || !sameContext(context, codexUIContracts.headerGitContext())) return true;
             const dialog = codexUIContracts.pushControls();
@@ -141,8 +144,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
             if (disabledReason(context, action)) return true;
             if (combined.getAttribute('aria-disabled') === 'true' || combined.getAttribute('data-disabled') === 'true') return null;
             combined.click();
-            return true;
+            return { selected: dialog.dialog };
           }, { timeout: 3000, interval: 50 });
+          if (handoff?.selected) {
+            await domUtils.waitFor(() => destroyed || !handoff.selected.isConnected
+              || !handoff.selected.querySelector('[cmdk-item][data-value="commit-and-push"]'),
+            { timeout: 1000, interval: 16 });
+          }
         }
       }
       // Unavailable actions leave the native menu visible with its explanation.
@@ -153,6 +161,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       closeMenu();
       if (toolbar) toolbar.title = 'Codex could not open Git actions. Try again.';
     } finally {
+      document.body.removeAttribute('data-dashboard-git-handoff');
       if (pending === operation) pending = undefined;
       if (!destroyed) sync();
     }
@@ -247,6 +256,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function destroy() {
     destroyed = true;
+    document.body.removeAttribute('data-dashboard-git-handoff');
     pending = undefined;
     observer?.disconnect();
     unsubscribeRemote?.();

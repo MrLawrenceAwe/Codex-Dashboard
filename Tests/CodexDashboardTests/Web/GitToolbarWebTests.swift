@@ -64,6 +64,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
                       item.setAttribute('role', 'menuitem'); item.textContent = action;
                       item.setAttribute('aria-disabled', String(action === 'Push' || (action === 'Commit' && !window.allowCommit)));
                       item.addEventListener('click', () => {
+                        window.menuOpacityAtSelection = getComputedStyle(wrapper).opacity;
                         window.actions.push([threadID, path, action]);
                         if (action === 'Commit' && window.showCommitDialog) {
                           const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
@@ -74,7 +75,10 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
                             option.setAttribute('cmdk-item', ''); option.setAttribute('role', 'option');
                             option.setAttribute('data-value', value); option.setAttribute('aria-selected', String(value === 'commit'));
                             option.setAttribute('aria-disabled', 'false'); option.setAttribute('data-disabled', 'false');
-                            option.addEventListener('click', () => { window.confirmed = true; });
+                            option.addEventListener('click', () => {
+                              window.dialogOpacityAtSelection = getComputedStyle(dialog).opacity;
+                              window.confirmed = true; dialog.remove();
+                            });
                             root.append(option);
                           }
                           dialog.__reactFiber$test = { memoizedProps: { open: true, enablePushActions: true,
@@ -170,9 +174,34 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             "window.confirmed === true", in: webView)
         try await Task.sleep(for: .milliseconds(150))
         let started = try await webView.evaluateJavaScript("""
-        [window.confirmed === true, window.actions.length === 1]
+        [window.confirmed === true, window.actions.length === 1,
+          window.menuOpacityAtSelection === '0', window.dialogOpacityAtSelection === '0',
+          !document.body.hasAttribute('data-dashboard-git-handoff')]
         """) as? [Bool]
-        XCTAssertEqual(started, [true, true])
+        XCTAssertEqual(started, [true, true, true, true, true])
+    }
+
+    func testPushDoesNotFlashEnabledWhileCompletedWorkflowSnapshotIsStale() async throws {
+        let webView = try await fixture()
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        _ = try await webView.evaluateJavaScript("window.setWorkflowRunning('current-git', true)")
+        try await DashboardWebTestHarness.waitForJavaScript("document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        _ = try await webView.evaluateJavaScript("""
+        (() => {
+          const trigger = document.getElementById('current-git');
+          trigger.__reactFiber$test.return.memoizedProps.children = { props: { children: [
+            { props: { children: { props: { id: 'localConversation.gitActions.commit' } } } },
+            { props: { onSelect() {}, disabled: true,
+              tooltipText: { props: { reason: 'nothing-to-push' } },
+              children: { props: { id: 'localConversation.gitActions.push' } } } }
+          ] } };
+          trigger.replaceChildren(document.createElement('svg'));
+        })()
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "document.querySelector('[data-git-action=Push]').title === 'No unpushed commits.'", in: webView)
+        let disabled = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').disabled") as? Bool
+        XCTAssertEqual(disabled, true)
     }
 
     func testPushStaysDisabledDuringNativeWorkflowAndRecoversWithoutSnapshot() async throws {

@@ -32,6 +32,14 @@
   top: var(--dashboard-git-menu-y) !important;
   transform: none !important;
 }
+/* Keep native selection mounted for the handoff without painting its menus. */
+body[data-dashboard-git-handoff] :is(
+  [data-radix-popper-content-wrapper]:has([role="menu"]),
+  [role="dialog"]:has([cmdk-item][data-value="commit-and-push"])
+) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 @media (max-width: 650px) {
   .dashboard-git-toolbar button { padding-inline: 5px; }
 }
