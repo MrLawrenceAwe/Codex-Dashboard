@@ -100,11 +100,7 @@ function createPromptLibrary({ findThread }) {
       ? { type: 'project', projectPath: composerProject.path }
       : { type: 'global' };
     const preset = values.has('hasPreset')
-      ? composerPresets.normalize({
-        model: String(values.get('presetModel') || ''),
-        reasoningEffort: String(values.get('presetReasoningEffort') || ''),
-        speed: String(values.get('presetSpeed') || ''),
-      })
+      ? composerPresets.readFields(form)
       : undefined;
     return { name, content, section, scope, preset };
   }

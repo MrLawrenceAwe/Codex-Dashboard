@@ -317,7 +317,6 @@ function createTodoList({
       updateItem,
       commitItems,
       composerActions,
-      readPreset: todoPresetReader.readPreset,
       setExpandedPresetTodoID: (id) => { expandedPresetTodoID = id; },
     });
     pageHost.append(page);

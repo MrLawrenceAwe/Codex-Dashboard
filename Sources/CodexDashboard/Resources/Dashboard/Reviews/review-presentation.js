@@ -125,5 +125,5 @@ const reviewPresentation = (() => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   }
 
-  return { reviewTypeLabel, promptContextLabel, roundStatus, roundStages, phaseLabel, priorityLabel, settingsLabels, controls, metrics, updatedAtLabel };
+  return { reviewTypeLabel, roundStatus, roundStages, phaseLabel, priorityLabel, settingsLabels, controls, metrics, updatedAtLabel };
 })();

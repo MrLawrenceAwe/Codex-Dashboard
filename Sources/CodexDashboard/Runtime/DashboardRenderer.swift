@@ -14,12 +14,10 @@ final class DashboardRenderer {
     private let rendererContractSource: String
     private let compatibilityChecker: RendererCompatibilityChecker
     private let reviewLoopBridge: ReviewLoopBridge?
+    private let accountPopoverBridge: AccountPopoverBridge
     private let promptLibraryBridge: PromptLibraryBridge?
     private var mountedTargetIDs: Set<String> = []
     private var lastSnapshot: DashboardSnapshot?
-    private var receivedAccountRequestIDs: Set<String> = []
-    private var completedAccountRequests: [String: AccountPopoverSnapshot] = [:]
-    private var completedAccountRequestOrder: [String] = []
     private var synchronizationWaiters: [CheckedContinuation<Void, Never>] = []
     private var synchronizationInProgress = false
     private var pendingSynchronization: PendingSynchronization?
@@ -45,6 +43,7 @@ final class DashboardRenderer {
         now: @escaping () -> Date = Date.init
     ) throws {
         self.devTools = devTools
+        accountPopoverBridge = AccountPopoverBridge(devTools: devTools)
         self.injectionBundle = try injectionBundle ?? InjectionBundle.load()
         promptLibraryBridge = promptLibraryStore.map {
             PromptLibraryBridge(devTools: devTools, store: $0)
@@ -285,46 +284,12 @@ final class DashboardRenderer {
 
     func pollAccountPopoverAction() async -> AccountPopoverActionPollResult {
         guard maintainsDashboard else { return .unavailable }
-        var foundAvailableRenderer = false
-        for target in await targets() {
-            do {
-                guard let serialized = try await devTools.evaluateString(
-                    RendererScript.readQueuedAccountPopoverAction,
-                    in: target,
-                    timeout: .seconds(1)
-                ), serialized != RendererScript.accountPopoverUnavailable else { continue }
-                guard maintainsDashboard, !Task.isCancelled else { return .unavailable }
-                foundAvailableRenderer = true
-                if serialized == "null" { continue }
-                guard let data = serialized.data(using: .utf8),
-                      let action = try? JSONDecoder().decode(AccountPopoverAction.self, from: data)
-                else { continue }
-                if (action.kind == .switchAccount || action.kind == .removeSavedAccount), action.accountID == nil {
-                    continue
-                }
-                if let snapshot = completedAccountRequests[action.requestID] {
-                    _ = try? await devTools.evaluateBoolean(
-                        RendererScript.completeAccountPopoverAction(action, snapshot: snapshot), in: target
-                    )
-                    continue
-                }
-                guard receivedAccountRequestIDs.insert(action.requestID).inserted else { continue }
-                // Receipt is recorded locally before the UI acknowledgement. A lost
-                // acknowledgement must never repeat a sign-out or account switch.
-                _ = try? await devTools.evaluateBoolean(
-                    RendererScript.acknowledgeAccountPopoverAction(action), in: target
-                )
-                return .action(action)
-            } catch {
-                // A closed or unavailable window must not starve the other windows.
-                continue
-            }
-        }
-        if !foundAvailableRenderer {
+        let result = await accountPopoverBridge.poll(in: await targets(), isEnabled: { maintainsDashboard })
+        if result == .unavailable {
             // Rediscover closed/replaced windows on the next poll.
             lastTargetRefresh = nil
         }
-        return foundAvailableRenderer ? .empty : .unavailable
+        return result
     }
 
     func synchronizeAccountPopover(_ snapshot: AccountPopoverSnapshot) async {
@@ -334,18 +299,7 @@ final class DashboardRenderer {
     }
 
     func completeAccountPopoverAction(_ action: AccountPopoverAction, snapshot: AccountPopoverSnapshot) async {
-        completedAccountRequests[action.requestID] = snapshot
-        completedAccountRequestOrder.append(action.requestID)
-        if completedAccountRequestOrder.count > 64 {
-            let expired = completedAccountRequestOrder.removeFirst()
-            completedAccountRequests[expired] = nil
-            receivedAccountRequestIDs.remove(expired)
-        }
-        for target in await targets() {
-            _ = try? await devTools.evaluateBoolean(
-                RendererScript.completeAccountPopoverAction(action, snapshot: snapshot), in: target
-            )
-        }
+        await accountPopoverBridge.complete(action, snapshot: snapshot, targets: { await targets() })
     }
 
     func useStoredPromptLibraryOnNextSync() {

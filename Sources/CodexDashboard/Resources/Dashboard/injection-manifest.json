@@ -35,7 +35,6 @@
     "Todos/todo-image-store",
     "Todos/todo-store",
     "Todos/todo-query",
-    "Todos/todo-preset-reader",
     "Todos/todo-image-view",
     "Todos/todo-tag-view",
     "Todos/todo-dialog-host",

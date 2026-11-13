@@ -276,5 +276,5 @@ const todoStore = (() => {
     });
   }
 
-  return { create, load, loadTags, storageKey, tagsStorageKey, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, normalizeProject, normalizeThread, save, writeProtectionReason };
+  return { create, load, loadTags, storageKey, tagsStorageKey, maximumTags, isAcceptedImageType, normalizeTags, normalizeImage, normalizeItem, save, writeProtectionReason };
 })();

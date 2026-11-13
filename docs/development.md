@@ -99,6 +99,9 @@ Renderer resources are listed in `injection-manifest.json`:
 | `Prompts` | Prompt storage, contracts, dialogs, rendering, and reordering |
 | `Reviews` | Review page controls, setup, cards, history, and app-server requests |
 
+`Runtime/AccountPopoverBridge.swift` owns native account-action decoding, receipt
+deduplication, acknowledgement, and completion replay. It records completion before
+rediscovering renderer targets; DashboardRenderer retains target discovery and mounting.
 The account popover keeps its request, acknowledgement, deadline, and timer in one
 pending-action record. Progress text, panel retention, and control availability
 derive from that record; background snapshots do not complete requests.
@@ -203,6 +206,8 @@ is applied in one place after rendering, including model and folder restrictions
 `review-presentation.js` supplies shared labels independently of setup rendering.
 The standalone renderer contract bundle includes `ComposerPresetSchema` so model-picker
 compatibility checks use the same reasoning-effort values as preset validation.
+`Composer/composer-presets.js` owns preset field markup and reading for prompts and
+to-dos, using shared field markers.
 Reasoning order and labels come from the shared composer preset schema and
 presentation helpers. Chat rows and review model cards resolve display names and
 fall back to identifiers when no display name is known. Review navigation markers and

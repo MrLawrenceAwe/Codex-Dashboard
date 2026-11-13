@@ -87,5 +87,5 @@ const todoTagView = (() => {
       </dialog>`;
   }
 
-  return { tagMarkup, managedTagMarkup, tagOptions, tagPickerMarkup, filterTagOptions, updateTagDraft, updateTagOptions, updateManagedTags, dialogMarkup };
+  return { tagMarkup, tagOptions, tagPickerMarkup, filterTagOptions, updateTagDraft, updateTagOptions, updateManagedTags, dialogMarkup };
 })();

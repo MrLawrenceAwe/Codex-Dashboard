@@ -71,8 +71,15 @@ const composerPresets = (() => {
       ['model', 'Model', models],
       ['reasoningEffort', 'Reasoning effort', reasoningEfforts],
       ['speed', 'Speed', speeds],
-    ].map(([key, title, options]) => `<label>${title}<select ${attributes[key]}>${selectOptions(options, preset?.[key] || COMPOSER_PRESET_SCHEMA.defaults[key])}</select></label>`).join('\n');
+    ].map(([key, title, options]) => `<label>${title}<select data-composer-preset-field="${key}" ${attributes[key]}>${selectOptions(options, preset?.[key] || COMPOSER_PRESET_SCHEMA.defaults[key])}</select></label>`).join('\n');
   }
 
-  return { fieldsMarkup, isValid, label, models, normalize, reasoningLabel, speeds, summary };
+  function readFields(fields) {
+    return normalize(Object.fromEntries(
+      [...fields.querySelectorAll('[data-composer-preset-field]')]
+        .map((field) => [field.dataset.composerPresetField, field.value]),
+    ));
+  }
+
+  return { readFields, fieldsMarkup, isValid, label, models, normalize, reasoningLabel, speeds, summary };
 })();

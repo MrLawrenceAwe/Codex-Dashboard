@@ -1,4 +1,4 @@
-function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, composerActions, readPreset, setExpandedPresetTodoID }) {
+function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, composerActions, setExpandedPresetTodoID }) {
   function bindItemEditing(page) {
     page.querySelector('[data-todo-list]').addEventListener('click', (event) => {
       if (event.target.matches('[data-todo-preset-details] > summary')) {
@@ -31,10 +31,8 @@ function bindTodoItemInteractions(page, { getItems, updateItem, commitItems, com
         if (currentProjectID !== project?.id) changes.thread = null;
         void updateItem(row.dataset.todoId, changes);
       } else if (event.target.matches('[data-todo-preset-enabled], [data-todo-item-preset-model], [data-todo-item-preset-effort], [data-todo-item-preset-speed]')) {
-        const preset = readPreset(
-          row.querySelector('[data-todo-preset-enabled]'),
-          row.querySelector('[data-todo-item-preset-fields]'),
-        );
+        const preset = row.querySelector('[data-todo-preset-enabled]').checked
+          ? composerPresets.readFields(row.querySelector('[data-todo-item-preset-fields]')) || null : null;
         setExpandedPresetTodoID(row.dataset.todoId);
         void updateItem(row.dataset.todoId, { preset });
       } else if (event.target.matches('[data-todo-tag]')) {
