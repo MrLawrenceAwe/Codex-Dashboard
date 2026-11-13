@@ -164,7 +164,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   }
 
   function sync() {
-    const host = codexUIContracts.gitToolbarHost();
+    const host = codexUIContracts.chatHeaderActionsHost();
     const context = host ? codexUIContracts.headerGitContext() : null;
     if (menuContext && !sameContext(context, menuContext)) closeMenu();
     if (!host || !context) {

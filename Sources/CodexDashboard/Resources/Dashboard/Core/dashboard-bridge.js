@@ -1,6 +1,7 @@
 const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
+const projectViewerControls = createProjectViewerControls(threadCatalog.findThread);
 const gitToolbar = createGitToolbar({
   findThread: threadCatalog.findThread,
   prefetchRemote: pushControls.prefetchRemote,
@@ -34,12 +35,14 @@ const dashboardLifecycle = createDashboardLifecycle({
     sentMessageDictation.mount();
     pushControls.start();
     gitToolbar.mount();
+    projectViewerControls.mount();
     sidebarProjectHighlights.start();
     promptLibrary.mount();
     accountPopover.mount();
   },
   rebindFeatures() {
     gitToolbar.sync();
+    projectViewerControls.sync();
     sidebarProjectHighlights.mount();
     promptLibraryButton.scheduleSync();
   },
@@ -48,6 +51,8 @@ const dashboardLifecycle = createDashboardLifecycle({
   syncUsageLimitSidebarMarkers: chatOverview.syncUsageLimitSidebarMarkers,
   syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
+    projectViewerControls.destroy();
+    projectViewerLauncher.destroy();
     sentMessageDictation.destroy();
     gitToolbar.destroy();
     pushControls.destroy();
@@ -67,6 +72,8 @@ function ensureDashboardMounted() {
 
 window.__codexDashboard = {
   version: DASHBOARD_VERSION,
+  pendingProjectViewerRequest: projectViewerLauncher.pending,
+  acknowledgeProjectViewerRequest: projectViewerLauncher.acknowledge,
   editDictationStatus: sentMessageDictation.status,
   probeEditDictation: sentMessageDictation.probe,
   readPushControls: pushControls.read,
@@ -86,6 +93,7 @@ window.__codexDashboard = {
   applyThreads(nextThreads) {
     threadCatalog.applyThreads(nextThreads);
     gitToolbar.sync();
+    projectViewerControls.sync();
     chatOverview.applyThreads();
     todoList.refreshThreadOptions();
     todoList.refreshSidebarActions();

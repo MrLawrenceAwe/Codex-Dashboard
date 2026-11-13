@@ -57,6 +57,7 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
     }
 
     private let stateDatabaseURL: URL
+    private let globalStateURL: URL
     private let loadedThreadLimit: Int
     private var rolloutQuestionReader = RolloutQuestionReader()
     private var rolloutActivityReader = RolloutActivityReader()
@@ -69,10 +70,13 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
 
     init(
         stateDatabaseURL: URL = CodexConfiguration.stateDatabaseURL,
+        globalStateURL: URL? = nil,
         loadedThreadLimit: Int = CodexThreadCatalogProvider.defaultLoadedThreadLimit,
         subprocessTimeout: TimeInterval = 3
     ) {
         self.stateDatabaseURL = stateDatabaseURL
+        self.globalStateURL = globalStateURL ?? stateDatabaseURL.deletingLastPathComponent()
+            .appendingPathComponent(".codex-global-state.json")
         self.loadedThreadLimit = max(1, loadedThreadLimit)
         self.subprocessTimeout = subprocessTimeout
     }
@@ -226,6 +230,37 @@ actor CodexThreadCatalogProvider: ThreadCatalogProviding {
             totalThreadCount: (threads.first?.totalCount ?? 0)
                 + threadSummaries.count { $0.preview.isEmpty && $0.runState == .running }
         )
+    }
+
+    func editedFiles(for threadID: String, checkout: String) async throws -> [String] {
+        struct Rollout: Decodable { let path: String }
+        let rows: [Rollout] = try await query(databaseURL: stateDatabaseURL, sql: """
+            SELECT rollout_path AS path FROM threads
+            WHERE id = \(Self.sqlStringLiteral(threadID))
+              AND cwd = \(Self.sqlStringLiteral(checkout)) AND archived = 0
+            """)
+        guard let path = rows.first?.path, path.hasPrefix("/") else { return [] }
+        return try ProjectEditedFileReader.paths(in: URL(fileURLWithPath: path),
+                                                root: FileSystemPath.canonicalURL(checkout))
+    }
+
+    func savedProjectContainsRoot(id: String, path: String) async throws -> Bool {
+        struct ProjectIDs: Decodable {
+            let byHost: [String: [String: String]]
+            enum CodingKeys: String, CodingKey {
+                case byHost = "app-server-project-id-by-legacy-project-id-by-host"
+            }
+        }
+        let host = "local:" + stateDatabaseURL.deletingLastPathComponent().path
+        let savedIDs = try? JSONDecoder().decode(ProjectIDs.self, from: Data(contentsOf: globalStateURL))
+        let mappedID = savedIDs?.byHost[host]?[id] ?? id
+        let roots: [ProjectRoot] = try await query(databaseURL: stateDatabaseURL, sql: """
+            SELECT projects.id, projects.name, project_roots.path
+            FROM projects JOIN project_roots ON project_roots.project_id = projects.id
+            WHERE projects.id IN (\(Self.sqlStringLiteral(id)), \(Self.sqlStringLiteral(mappedID)))
+            """)
+        let canonicalPath = FileSystemPath.canonicalPath(path)
+        return roots.contains { FileSystemPath.canonicalPath($0.path) == canonicalPath }
     }
 
     private static func sqlStringLiteral(_ value: String) -> String {

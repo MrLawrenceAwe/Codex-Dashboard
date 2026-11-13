@@ -123,7 +123,7 @@ struct InjectionBundle: Sendable {
         }.joined(separator: "\n")
     }
 
-    private static var defaultResourceBundle: Bundle {
+    static var defaultResourceBundle: Bundle {
         if Bundle.main.url(
             forResource: "injection-manifest",
             withExtension: "json",

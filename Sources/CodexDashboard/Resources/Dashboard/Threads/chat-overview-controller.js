@@ -232,6 +232,12 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
         renderChatOverview();
       },
       onListClick: (event) => {
+        const viewer = event.target.closest('[data-project-viewer]');
+        if (viewer) {
+          event.preventDefault();
+          projectViewerLauncher.open(viewer.dataset.projectViewer, { threadID: viewer.dataset.viewerThread });
+          return;
+        }
         const projectIndicators = event.target.closest('[data-project-indicators]');
         if (projectIndicators) {
           event.preventDefault();

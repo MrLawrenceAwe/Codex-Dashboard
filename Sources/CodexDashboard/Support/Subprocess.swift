@@ -29,7 +29,8 @@ enum Subprocess {
     static func run(
         executableURL: URL,
         arguments: [String],
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        inputFile: FileHandle? = nil
     ) async throws -> SubprocessOutput {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
@@ -39,6 +40,7 @@ enum Subprocess {
         process.arguments = arguments
         process.standardOutput = outputPipe
         process.standardError = errorPipe
+        if let inputFile { process.standardInput = inputFile }
         let runningProcess = RunningSubprocess(process: process)
         try runningProcess.start()
         defer { runningProcess.terminate() }

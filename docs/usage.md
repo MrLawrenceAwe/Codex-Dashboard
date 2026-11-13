@@ -362,3 +362,41 @@ Buttons follow the selected local chat’s primary repository and disappear outs
 supported Git chats and on Dashboard pages. Commit and Push shortcuts are disabled
 while the chat is running. Dashboard restores the controls after navigation or
 header replacement and removes them when the integration is disabled.
+
+## Project Viewer
+
+Choose **Project Viewer** in the Codex chat header to open the chat's checkout,
+including a worktree. Launching from a chat opens a tab for each available file
+in its recorded edit history, most recently edited first. Shell edits without a
+recorded file change are not included. Clicking another file opens another tab.
+Hover or focus a local project row in the sidebar to reveal
+its folder icon, which opens the saved project root. Viewer buttons are also
+available in Chat overview. To browse another folder, choose **Open Project Viewer…**
+from the Dashboard menu-bar icon, then **Open Folder…**.
+
+The viewer is a separate, resizable macOS window. It does not consume space in the
+Codex chat. Drag the dividers to resize the file tree, code, and function columns.
+The code is read-only and selectable, with line numbers and horizontal scrolling.
+The IntelliJ-style palette follows macOS light or dark appearance. Swift uses
+SourceKit and JavaScript/TypeScript uses an installed TypeScript language service
+for semantic colours. Other files use syntax colouring. Click a function to select and scroll to its source.
+
+The first scan establishes a baseline for that folder. File rows show physical
+line counts and signed changes; new and removed files stay visible. The function
+list shows the largest functions first, their line ranges, and size changes.
+**Only size changes** filters the file tree; the path filter finds nested files.
+**Reset baseline** starts a fresh comparison. Baselines are held in memory for the
+open folder; closing/reopening the window or changing folders starts a new one.
+Filesystem events refresh the view automatically; the refresh button also rescans.
+
+Function ranges are lightweight lexical estimates, including the declaration and
+body. Supported forms include Swift, JavaScript/TypeScript, Python, Rust, Go, and
+common C-style methods. Unusual syntax, expression-only functions, overload
+reordering, and renames may be omitted or shown as removed/new. Line counts are a
+size indicator, not a measure of code quality or complexity.
+
+Generated/dependency folders (including `.git`, `.build`, `node_modules`, `dist`,
+`build`, `target`, and virtual environments), app bundles, and symlinks are excluded.
+Binary/non-UTF-8 and files over 1 MB are listed without code or line counts.
+Scans are bounded to 30,000 entries and 64 MB of text reads. Warnings identify
+partial scans; unavailable sizes do not count as zero-line shrinkage.

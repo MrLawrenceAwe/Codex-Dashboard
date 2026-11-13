@@ -50,6 +50,7 @@ const chatOverviewListView = (() => {
           ${statusMarkup}
         </span>
       </button>
+      ${thread.checkoutPath?.startsWith('/') ? `<button type="button" class="dashboard-project-viewer" data-project-viewer="${domUtils.escapeHTML(thread.checkoutPath)}" data-viewer-thread="${domUtils.escapeHTML(thread.id)}" title="Open project in a separate viewer window" aria-label="Open Project Viewer for ${domUtils.escapeHTML(thread.projectName)}">${dashboardIcons.render('project')}</button>` : ''}
     </div>`;
   }
 
@@ -64,12 +65,13 @@ const chatOverviewListView = (() => {
   }
 
   function renderProjectActions(projectPath, threads, gitChange, indicatorsHidden) {
-    if (!gitChange) return '';
+    const viewer = projectPath?.startsWith('/') ? `<button type="button" class="dashboard-project-viewer" data-project-viewer="${domUtils.escapeHTML(projectPath)}" title="Open project in a separate viewer window">${dashboardIcons.render('project')}<span>Project Viewer</span></button>` : '';
+    if (!gitChange) return viewer;
     const thread = chatOverviewQuery.projectGitActionThread(threads, projectPath);
     const label = gitChange.action;
     const unavailableLabel = threads.some(thread => thread.projectGroupPath === projectPath && thread.sharesGroupRepository)
       ? 'Chat running' : 'No repository chat';
-    return `
+    return `${viewer}
       <button type="button" class="dashboard-project-indicators" data-project-indicators="${domUtils.escapeHTML(projectPath)}" title="${indicatorsHidden ? 'Show change indicators for this project' : 'Hide change indicators for this project'}">${dashboardIcons.render(indicatorsHidden ? 'rotateCounterclockwise' : 'eyeOff')}<span>${indicatorsHidden ? 'Show change indicators' : 'Hide change indicators'}</span></button>
       <button type="button" class="dashboard-project-git-action" data-project-git-action="${domUtils.escapeHTML(projectPath)}" title="${thread ? `Open Codex’s ${label} flow for this project` : `${label} requires an idle chat in this project’s repository`}"${thread ? '' : ' disabled'}>${dashboardIcons.render('gitChanges')}<span>${thread ? label : unavailableLabel}</span></button>`;
   }

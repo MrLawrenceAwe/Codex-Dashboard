@@ -13,6 +13,7 @@ final class DashboardRenderer {
     private let injectionBundle: InjectionBundle
     private let rendererContractSource: String
     private let compatibilityChecker: RendererCompatibilityChecker
+    private let projectViewerBridge = ProjectViewerBridge()
     private let reviewLoopBridge: ReviewLoopBridge?
     private let promptLibraryBridge: PromptLibraryBridge?
     private var mountedTargetIDs: Set<String> = []
@@ -221,6 +222,7 @@ final class DashboardRenderer {
             guard !Task.isCancelled, maintainsDashboard else { return }
             lastSnapshot = snapshot
         }
+        await projectViewerBridge.synchronize(devTools: devTools, targets: targets, threads: snapshot.threads)
         try await reviewLoopBridge?.synchronize(targets: targets, threads: snapshot.threads)
         if let check = await PushControlsBridge(devTools: devTools).synchronize(in: targets) {
             pushControlsCompatibilityCheck = check

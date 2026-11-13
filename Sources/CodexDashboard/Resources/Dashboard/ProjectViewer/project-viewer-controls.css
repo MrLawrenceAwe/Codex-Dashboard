@@ -1,0 +1,28 @@
+.dashboard-viewer-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 0 7px;
+  height: var(--height-button-toolbar, 28px);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+.dashboard-viewer-control svg { width: 15px; height: 15px; }
+.dashboard-viewer-control:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.dashboard-viewer-control:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+[data-dashboard-viewer-control="sidebar"] { width: 24px; height: 24px; padding: 0; opacity: 0; }
+[data-app-action-sidebar-project-row]:is(:hover, :focus-within) [data-dashboard-viewer-control="sidebar"] { opacity: 1; }
+:is(.codex-dashboard-open, .codex-todo-open, .codex-review-open) [data-dashboard-viewer-control="header"] { display: none; }
+@media (max-width: 800px) {
+  [data-dashboard-viewer-control="header"] span { display: none; }
+}

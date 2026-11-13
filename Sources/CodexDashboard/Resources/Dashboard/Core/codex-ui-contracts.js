@@ -139,6 +139,17 @@ const codexUIContracts = (() => {
         name: String(row?.getAttribute(projectAttributes.name) || '').trim(),
       };
     },
+    localPath(row) {
+      const { id } = sidebarProjects.metadata(row);
+      if (!id) return null;
+      for (const fiber of parentFibers(row)) {
+        const group = (fiber.memoizedProps || fiber.pendingProps)?.group;
+        if (group?.projectId !== id || group.projectKind !== 'local') continue;
+        const path = String(group.path || '');
+        if (path.trim()) return path;
+      }
+      return null;
+    },
     containingRow(element) {
       return element.closest(`[${projectAttributes.id}]`);
     },
@@ -160,14 +171,7 @@ const codexUIContracts = (() => {
     return [...document.querySelectorAll(sidebarProjects.selector)].reduce((result, row) => {
       const { id, name } = sidebarProjects.metadata(row);
       if (!id || !name || seen.has(id)) return result;
-      let path = '';
-      for (const fiber of parentFibers(row)) {
-        const group = (fiber.memoizedProps || fiber.pendingProps)?.group;
-        if (group?.projectId === id && group?.projectKind === 'local') {
-          path = String(group.path || '').trim();
-        }
-        if (path) break;
-      }
+      const path = sidebarProjects.localPath(row)?.trim() || '';
       seen.add(id);
       result.push({ id, name, path });
       return result;
@@ -494,7 +498,7 @@ const codexUIContracts = (() => {
     )) || null;
   }
 
-  function gitToolbarHost() {
+  function chatHeaderActionsHost() {
     return [...document.querySelectorAll('[data-app-shell-header-toolbar]')]
       .filter(element => isVisible(element) && !element.closest('[aria-hidden="true"]'))
       .map(element => element.querySelector('button[aria-label="Chat actions"]')?.closest('[data-app-shell-focus-area]')?.parentElement)
@@ -572,7 +576,7 @@ const codexUIContracts = (() => {
     pushControls,
     pushControlHostAttribute,
     gitActionsButton,
-    gitToolbarHost,
+    chatHeaderActionsHost,
     headerGitContext,
     gitActionsMenu,
     gitActionMenuItem,

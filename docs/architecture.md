@@ -257,3 +257,19 @@ checks automatically. Blocking drift prevents remounting; warnings and failed ch
 details propagate to the menu, notification, copied diagnostics, and Diagnostics
 window. This integration uses private contracts that may require maintenance after
 Codex updates.
+
+## Project Viewer
+
+`ProjectViewerWindowController` owns one native AppKit/SwiftUI window, independently
+of the Codex renderer layout. The menu-bar entry works without a renderer connection.
+`ProjectViewerBridge` validates chat checkout and group requests against the thread
+snapshot. For sidebar requests, it checks the saved project ID and root against
+the local catalog so projects without recent chats can open too.
+`ProjectViewerModel` scans off the main actor, coalesces events during scans, rejects
+old generations after a folder switch, and stops watches/tasks when the window closes.
+It reuses `RecursiveProjectChangeMonitor`; baselines are session-only metadata.
+`ProjectFileScanner` bounds enumeration and reads, skips symlinks/generated folders,
+and normalises text line endings. Incomplete scans retain unvisited baseline entries
+instead of reporting false deletions. `ProjectSourceAnalyzer` masks comments/literals
+and estimates named-function ranges without executing project code. `ProjectCodeView`
+uses a selectable, non-editable NSTextView and native line-number ruler.

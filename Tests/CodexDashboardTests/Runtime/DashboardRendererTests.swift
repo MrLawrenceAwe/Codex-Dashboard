@@ -208,7 +208,7 @@ actor PromptLibraryRendererDevTools: DevToolsServing {
     func expressions() -> [String] { booleanExpressions }
 
     func promptLibraryReadCount() -> Int {
-        stringExpressions.filter { !$0.contains("readPushControls") }.count
+        stringExpressions.filter { $0.contains("exportPromptLibrary") || $0.contains("exportPendingPromptLibrary") }.count
     }
 
     func setPendingLibrary(_ library: String?) {
