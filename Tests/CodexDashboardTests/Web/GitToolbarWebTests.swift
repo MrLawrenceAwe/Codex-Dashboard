@@ -110,7 +110,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         let labels = try await webView.evaluateJavaScript("""
         [...document.querySelectorAll('#header-actions .dashboard-git-toolbar button')].map(button => button.textContent)
         """) as? [String]
-        XCTAssertEqual(labels, ["Commit", "Commit & push", "Push", "Git ▾"])
+        XCTAssertEqual(labels, ["Commit", "Commit & push", "Push"])
         _ = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Commit]').click()")
         try await DashboardWebTestHarness.waitForJavaScript("window.actions.length === 1", in: webView)
         let action = try await webView.evaluateJavaScript("window.actions[0]") as? [String]
@@ -177,7 +177,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
           !document.querySelector('[data-git-action=Commit]').disabled]
         """) as? [Bool]
         XCTAssertEqual(disabled, [true, true, true])
-        _ = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Git]').click()")
+        _ = try await webView.evaluateJavaScript("window.allowCommit = false; document.querySelector('[data-git-action=Commit]').click()")
         try await DashboardWebTestHarness.waitForJavaScript("!!document.querySelector('[data-dashboard-git-menu]')", in: webView)
         let blocked = try await webView.evaluateJavaScript("""
         (() => {
@@ -193,12 +193,12 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         let webView = try await fixture()
         try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
         let cases: [(ProjectGitStatus, [Bool])] = [
-            (.clean, [true, true, true, false]),
-            (.unavailable, [true, true, true, false]),
-            (.uncommittedChanges, [false, false, true, false]),
-            (.unpushedCommits, [true, true, false, false]),
-            (.uncommittedChangesAndUnpushedCommits, [false, false, false, false]),
-            (.clean, [true, true, true, false]),
+            (.clean, [true, true, true]),
+            (.unavailable, [true, true, true]),
+            (.uncommittedChanges, [false, false, true]),
+            (.unpushedCommits, [true, true, false]),
+            (.uncommittedChangesAndUnpushedCommits, [false, false, false]),
+            (.clean, [true, true, true]),
         ]
         for (status, expected) in cases {
             let payload = try DashboardWebTestHarness.snapshotPayload(for: [

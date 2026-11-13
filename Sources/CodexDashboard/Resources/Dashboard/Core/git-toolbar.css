@@ -18,8 +18,7 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.dashboard-git-toolbar button:hover:not(:disabled),
-.dashboard-git-toolbar button[aria-expanded="true"] {
+.dashboard-git-toolbar button:hover:not(:disabled) {
   background: var(--color-background-secondary-ghost-hover, color-mix(in srgb, currentColor 8%, transparent));
 }
 .dashboard-git-toolbar button:focus-visible {

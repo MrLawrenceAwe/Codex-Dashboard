@@ -15,7 +15,6 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     && a.path === b.path && a.hostID === b.hostID);
 
   function disabledReason(context, action) {
-    if (!action || action === 'Git') return '';
     const thread = findThread(context.threadID);
     if (thread?.runState === 'running') return 'Wait for this chat to finish running.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -103,10 +102,6 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     const context = codexUIContracts.headerGitContext();
     if (!context) return;
     if (disabledReason(context, action)) { sync(); return; }
-    if (!action && sameContext(context, menuContext) && context.menu.open) {
-      closeMenu();
-      return;
-    }
     closeMenu();
     const operation = { context };
     pending = operation;
@@ -123,14 +118,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
           || !sameContext(context, codexUIContracts.headerGitContext())) return { cancelled: true };
         const menu = codexUIContracts.gitActionsMenu(context.trigger);
         positionMenu();
-        if (!action) return menu;
         return menu && codexUIContracts.gitActionMenuItem(menu, nativeAction);
-      }, { timeout: action ? 3000 : 1200, interval: 50 });
+      }, { timeout: 3000, interval: 50 });
       if (item?.cancelled) {
         closeMenu();
         return;
       }
-      if (action && item) {
+      if (item) {
         if (disabledReason(context, action)) { closeMenu(); return; }
         // Native menu selection retains Codex's disabled states and Git workflow.
         item.click();
@@ -152,7 +146,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       }
       // Unavailable actions leave the native menu visible with its explanation.
       if (!item) {
-        toolbar.title = `${action || 'Git actions'} is unavailable. Check the Git menu.`;
+        toolbar.title = `${action} is unavailable. Check the Git menu.`;
       }
     } catch {
       closeMenu();
@@ -178,17 +172,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       toolbar.className = 'dashboard-git-toolbar';
       toolbar.setAttribute('role', 'group');
       toolbar.setAttribute('aria-label', 'Repository actions');
-      for (const action of ['Commit', 'Commit & push', 'Push', 'Git']) {
+      for (const action of ['Commit', 'Commit & push', 'Push']) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = action === 'Git' ? 'Git ▾' : action;
+        button.textContent = action;
         button.dataset.gitAction = action;
-        button.title = action === 'Git' ? 'Git actions' : action;
-        if (action === 'Git') {
-          button.setAttribute('aria-haspopup', 'menu');
-          button.setAttribute('aria-label', 'Open Git actions');
-        }
-        button.addEventListener('click', () => activate(action === 'Git' ? null : action, button));
+        button.title = action;
+        button.addEventListener('click', () => activate(action, button));
         toolbar.append(button);
       }
     }
@@ -197,12 +187,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       const reason = disabledReason(context, button.dataset.gitAction);
       const disabled = Boolean(pending) || Boolean(reason);
       if (button.disabled !== disabled) button.disabled = disabled;
-      const title = reason || (button.dataset.gitAction === 'Git' ? 'Git actions' : button.dataset.gitAction);
+      const title = reason || button.dataset.gitAction;
       if (button.title !== title) button.title = title;
-      if (button.dataset.gitAction === 'Git') {
-        const expanded = String(Boolean(sameContext(context, menuContext) && context.menu.open));
-        if (button.getAttribute('aria-expanded') !== expanded) button.setAttribute('aria-expanded', expanded);
-      }
     }
     positionMenu();
     if (positionedMenu && !positionedMenu.isConnected) restoreMenu();

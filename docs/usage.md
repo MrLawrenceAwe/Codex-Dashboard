@@ -342,12 +342,11 @@ is never modified.
 
 ## Git actions in the chat header
 
-Dashboard adds **Commit**, **Commit & push**, **Push**, and **Git ▾** beside the
+Dashboard adds **Commit**, **Commit & push**, and **Push** beside the
 chat actions in the top toolbar, including when the summary panel is closed.
 Commit opens Codex’s native commit dialog. Commit & push starts Codex’s combined commit-and-push workflow directly.
 Push hands off to
-Codex’s native push workflow. Git opens the native menu for branch and other Git
-actions. Native availability checks still apply; unavailable shortcuts leave the
+Codex’s native push workflow. Native availability checks still apply; unavailable shortcuts leave the
 menu visible with the disabled action and its explanation.
 
 Commit and Commit & push are disabled when there are no changes to commit. Push
