@@ -491,6 +491,38 @@ const codexUIContracts = (() => {
     )) || null;
   }
 
+  function gitToolbarHost() {
+    return [...document.querySelectorAll('[data-app-shell-header-toolbar]')]
+      .filter(element => isVisible(element) && !element.closest('[aria-hidden="true"]'))
+      .map(element => element.querySelector('button[aria-label="Chat actions"]')?.closest('[data-app-shell-focus-area]')?.parentElement)
+      .find(Boolean) || null;
+  }
+
+  // Summary panels for other chats remain mounted, including while hidden.
+  // Match the native Git scope to the selected chat before reading callbacks.
+  function headerGitContext() {
+    const isGitMenu = (element, depth = 0) => {
+      if (!element || depth > 8) return false;
+      if (Array.isArray(element)) return element.some(child => isGitMenu(child, depth + 1));
+      return ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']
+        .includes(element.props?.id) || isGitMenu(element.props?.children, depth + 1);
+    };
+    const threadID = selectedThreadID();
+    if (!threadID) return null;
+    for (const trigger of document.querySelectorAll('button[aria-label="Git actions"]')) {
+      const ancestors = [...parentFibers(trigger)].map(fiber => fiber.memoizedProps);
+      const scope = ancestors.find(props => props?.surface === 'summary-panel'
+        && props.conversationId === threadID && typeof props.target?.root === 'string'
+        && props.target?.hostId === 'local' && props.registerCommands === true);
+      const menu = ancestors.find(props => props?.triggerButton?.props?.label === 'Git actions'
+        && typeof props.open === 'boolean' && typeof props.onOpenChange === 'function'
+        && isGitMenu(props.children));
+      if (!scope || !menu) continue;
+      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu };
+    }
+    return null;
+  }
+
   function gitActionsMenu(trigger) {
     const menuID = trigger.getAttribute('aria-controls');
     const menu = menuID ? document.getElementById(menuID) : null;
@@ -537,6 +569,8 @@ const codexUIContracts = (() => {
     pushControls,
     pushControlHostAttribute,
     gitActionsButton,
+    gitToolbarHost,
+    headerGitContext,
     gitActionsMenu,
     gitActionMenuItem,
   };

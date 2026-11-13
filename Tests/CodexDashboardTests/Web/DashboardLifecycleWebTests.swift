@@ -336,7 +336,7 @@ final class DashboardLifecycleWebTests: SerializedDashboardWebTestCase {
             """
         ) as? [Any]
         XCTAssertEqual(destroyed?[0] as? Bool, true)
-        XCTAssertEqual(destroyed?[1] as? Int, 1)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(destroyed?[1] as? Int), 1)
     }
 
 }

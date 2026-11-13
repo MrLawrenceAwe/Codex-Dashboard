@@ -1,0 +1,38 @@
+.dashboard-git-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+.dashboard-git-toolbar button {
+  height: var(--height-button-toolbar, 28px);
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-secondary, inherit);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dashboard-git-toolbar button:hover:not(:disabled),
+.dashboard-git-toolbar button[aria-expanded="true"] {
+  background: var(--color-background-secondary-ghost-hover, color-mix(in srgb, currentColor 8%, transparent));
+}
+.dashboard-git-toolbar button:focus-visible {
+  outline: 2px solid var(--color-ring, currentColor);
+  outline-offset: -2px;
+}
+.dashboard-git-toolbar button:disabled { opacity: 0.4; cursor: default; }
+:is(.codex-dashboard-open, .codex-todo-open, .codex-review-open) .dashboard-git-toolbar { display: none; }
+[data-dashboard-git-menu] {
+  left: var(--dashboard-git-menu-x) !important;
+  top: var(--dashboard-git-menu-y) !important;
+  transform: none !important;
+}
+@media (max-width: 650px) {
+  .dashboard-git-toolbar button { padding-inline: 5px; }
+}

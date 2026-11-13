@@ -1,6 +1,7 @@
 const dashboardElements = {
   elementIDs: {
     style: 'codex-dashboard-style',
+    gitToolbar: 'codex-dashboard-git-toolbar',
     chatOverviewNavButton: 'codex-dashboard-chat-overview-navigation',
     chatOverviewPage: 'codex-dashboard-chat-overview-page',
     todoNavButton: 'codex-dashboard-todo-navigation',

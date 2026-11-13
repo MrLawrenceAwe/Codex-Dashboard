@@ -7,6 +7,7 @@ function createPushControls() {
   let hasRemote = null;
   let lastState = 'waiting';
   const remoteCache = new Map();
+  const remoteListeners = new Set();
   const remoteFreshness = 5000;
   let unsubscribe;
   let pendingRemote;
@@ -36,10 +37,9 @@ function createPushControls() {
     const forDialog = request.generation !== null;
     if (forDialog && (request.generation !== generation || request.path !== context?.path)) return;
     remoteCache.delete(request.path);
-    if (value !== null) {
-      remoteCache.set(request.path, { value, checkedAt: Date.now() });
-      if (remoteCache.size > 64) remoteCache.delete(remoteCache.keys().next().value);
-    }
+    remoteCache.set(request.path, { value, checkedAt: Date.now() });
+    if (remoteCache.size > 64) remoteCache.delete(remoteCache.keys().next().value);
+    remoteListeners.forEach(listener => listener());
     if (!forDialog) return;
     hasRemote = value;
     remoteFailure = value === null;
@@ -86,6 +86,15 @@ function createPushControls() {
     if (cached && Date.now() - cached.checkedAt < remoteFreshness) return;
     cancelRemote();
     requestRemote(path, { id: 'local' }, null);
+  }
+
+  function remoteState(path) {
+    return remoteCache.get(path)?.value ?? null;
+  }
+
+  function subscribeRemote(listener) {
+    remoteListeners.add(listener);
+    return () => remoteListeners.delete(listener);
   }
 
   function restore() {
@@ -210,6 +219,7 @@ function createPushControls() {
     unsubscribe?.();
     unsubscribe = undefined;
     remoteCache.clear();
+    remoteListeners.clear();
     observer?.disconnect();
     observer = undefined;
     blockedEvents.forEach(type => document.removeEventListener(type, block, true));
@@ -218,5 +228,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read, prefetchRemote };
+  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote };
 }

@@ -1,6 +1,12 @@
 const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
+const gitToolbar = createGitToolbar({
+  findThread: threadCatalog.findThread,
+  prefetchRemote: pushControls.prefetchRemote,
+  remoteState: pushControls.remoteState,
+  subscribeRemote: pushControls.subscribeRemote,
+});
 const chatOverview = createChatOverview({ catalog: threadCatalog, prefetchPushRemote: pushControls.prefetchRemote });
 const todoList = createTodoList({
   ...createTodoDependencies({ store: todoStore, imageStore: todoImageStore }),
@@ -27,11 +33,13 @@ const dashboardLifecycle = createDashboardLifecycle({
   mountFeatures() {
     sentMessageDictation.mount();
     pushControls.start();
+    gitToolbar.mount();
     sidebarProjectHighlights.start();
     promptLibrary.mount();
     accountPopover.mount();
   },
   rebindFeatures() {
+    gitToolbar.sync();
     sidebarProjectHighlights.mount();
     promptLibraryButton.scheduleSync();
   },
@@ -41,6 +49,7 @@ const dashboardLifecycle = createDashboardLifecycle({
   syncUnread: chatOverview.syncUnread,
   destroyFeatures() {
     sentMessageDictation.destroy();
+    gitToolbar.destroy();
     pushControls.destroy();
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
@@ -76,6 +85,7 @@ window.__codexDashboard = {
   openTodos: () => dashboardNavigation.openPage(todoList),
   applyThreads(nextThreads) {
     threadCatalog.applyThreads(nextThreads);
+    gitToolbar.sync();
     chatOverview.applyThreads();
     todoList.refreshThreadOptions();
     todoList.refreshSidebarActions();

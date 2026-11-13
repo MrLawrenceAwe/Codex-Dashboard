@@ -8,6 +8,7 @@
     "Core/codex-ui-contracts",
     "Core/codex-host",
     "Core/push-controls",
+    "Core/git-toolbar",
     "Core/dashboard-navigation-button",
     "Composer/composer-presets",
     "Prompts/prompt-library-contract",
@@ -63,6 +64,7 @@
   "stylesheets": [
     "Core/dashboard-theme",
     "Core/push-controls",
+    "Core/git-toolbar",
     "Threads/chat-overview",
     "Sidebar/project-highlights",
     "Sidebar/thread-todo-actions",

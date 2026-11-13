@@ -339,3 +339,21 @@ targets, and copyable details.
 to finish, then removes the injected controls. Remote publication can delay removal.
 A normal Codex restart also removes the controls. The signed Codex application bundle
 is never modified.
+
+## Git actions in the chat header
+
+Dashboard adds **Commit**, **Commit & push**, **Push**, and **Git ▾** beside the
+chat actions in the top toolbar, including when the summary panel is closed.
+Commit opens Codex’s native commit dialog. Commit & push starts Codex’s combined commit-and-push workflow directly.
+Push hands off to
+Codex’s native push workflow. Git opens the native menu for branch and other Git
+actions. Native availability checks still apply; unavailable shortcuts leave the
+menu visible with the disabled action and its explanation.
+
+Push and Commit & push stay disabled until a remote is confirmed and remain
+disabled when none is configured. The Git menu’s Push action follows the same rule.
+
+Buttons follow the selected local chat’s primary repository and disappear outside
+supported Git chats and on Dashboard pages. Commit and Push shortcuts are disabled
+while the chat is running. Dashboard restores the controls after navigation or
+header replacement and removes them when the integration is disabled.

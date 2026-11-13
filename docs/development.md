@@ -147,6 +147,20 @@ three cmdk command values, independent of translated text. Mouse, keyboard, and
 cmdk selection are guarded; owned attributes are restored on context changes or
 teardown. Runtime warnings reach Diagnostics without rerunning unrelated probes.
 
+`Core/git-toolbar.js` mounts repository actions beside the native Chat actions
+button. `codex-ui-contracts.js` identifies the summary Git menu by its action
+message IDs and matches its conversation, host and repository scope to the selected
+chat, including hidden summary panels. Shortcuts open the native menu and select
+only enabled native items; chat changes cancel pending handoffs. The combined
+shortcut opens the native commit dialog and activates its enabled commit-and-push
+command after verifying the dialog’s conversation, repository and host.
+Native menu wrappers receive temporary placement attributes while opened from the
+header. Teardown restores placement, closes owned menus and removes the toolbar.
+A coalesced observer repairs replacement headers, with a timer fallback for hidden
+windows whose animation frames are suspended. The toolbar shares the local
+remote-metadata cache and subscriptions with `push-controls.js`; its push shortcuts
+require a confirmed remote, and its native Git menu also blocks Push without one.
+
 ## Renderer contracts
 
 Internal Codex data uses `Thread`; UI copy uses **chat** and **to-do**. Chat overview
