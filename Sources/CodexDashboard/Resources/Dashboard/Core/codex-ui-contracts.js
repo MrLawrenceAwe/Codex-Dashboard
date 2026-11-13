@@ -516,11 +516,10 @@ const codexUIContracts = (() => {
   // Summary panels for other chats remain mounted, including while hidden.
   // Match the native Git scope to the selected chat before reading callbacks.
   function headerGitContext() {
-    const isGitMenu = (element, depth = 0) => {
+    const containsMessage = (element, ids, depth = 0) => {
       if (!element || depth > 8) return false;
-      if (Array.isArray(element)) return element.some(child => isGitMenu(child, depth + 1));
-      return ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']
-        .includes(element.props?.id) || isGitMenu(element.props?.children, depth + 1);
+      if (Array.isArray(element)) return element.some(child => containsMessage(child, ids, depth + 1));
+      return ids.includes(element.props?.id) || containsMessage(element.props?.children, ids, depth + 1);
     };
     const threadID = selectedThreadID();
     if (!threadID) return null;
@@ -531,9 +530,10 @@ const codexUIContracts = (() => {
         && props.target?.hostId === 'local' && props.registerCommands === true);
       const menu = ancestors.find(props => props?.triggerButton?.props?.label === 'Git actions'
         && typeof props.open === 'boolean' && typeof props.onOpenChange === 'function'
-        && isGitMenu(props.children));
+        && containsMessage(props.children, ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']));
       if (!scope || !menu) continue;
-      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu };
+      const workflowRunning = containsMessage(menu.children, ['localConversation.gitActions.cancelWorkflow']);
+      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning };
     }
     return null;
   }

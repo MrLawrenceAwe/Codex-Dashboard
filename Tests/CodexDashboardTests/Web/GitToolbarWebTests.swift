@@ -95,6 +95,14 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             }
             attachGit('other-git', 'other', '/tmp/other');
             attachGit('current-git', 'current', '/tmp/current');
+            window.setWorkflowRunning = (id, running) => {
+              const trigger = document.getElementById(id);
+              trigger.__reactFiber$test.return.memoizedProps.children = { props: { children: [
+                { props: { children: { props: { id: running
+                  ? 'localConversation.gitActions.cancelWorkflow' : 'localConversation.gitActions.commit' } } } }
+              ] } };
+              trigger.replaceChildren(document.createElement(running ? 'span' : 'svg'));
+            };
           </script>
         </body></html>
         """)
@@ -165,6 +173,37 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         [window.confirmed === true, window.actions.length === 1]
         """) as? [Bool]
         XCTAssertEqual(started, [true, true])
+    }
+
+    func testPushStaysDisabledDuringNativeWorkflowAndRecoversWithoutSnapshot() async throws {
+        let webView = try await fixture()
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        // An operation in another mounted summary must not block this repository.
+        _ = try await webView.evaluateJavaScript("window.setWorkflowRunning('other-git', true)")
+        try await Task.sleep(for: .milliseconds(150))
+        let available = try await webView.evaluateJavaScript("!document.querySelector('[data-git-action=Push]').disabled") as? Bool
+        XCTAssertEqual(available, true)
+
+        // Native pushes can start outside our toolbar, with the summary hidden.
+        _ = try await webView.evaluateJavaScript("window.setWorkflowRunning('current-git', true)")
+        try await DashboardWebTestHarness.waitForJavaScript("document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        let blocked = try await webView.evaluateJavaScript("""
+        (() => {
+          const buttons = [...document.querySelectorAll('.dashboard-git-toolbar button')];
+          buttons.forEach(button => button.click());
+          const push = buttons.find(button => button.dataset.gitAction === 'Push');
+          return buttons.every(button => button.disabled)
+            && Number(getComputedStyle(push).opacity) === 0.4
+            && push.title.includes('Git operation') && window.actions.length === 0;
+        })()
+        """) as? Bool
+        XCTAssertEqual(blocked, true)
+
+        // Failure/cancellation may leave unpushed commits and no new snapshot.
+        _ = try await webView.evaluateJavaScript("window.setWorkflowRunning('current-git', false)")
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        let restored = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').title === 'Push'") as? Bool
+        XCTAssertEqual(restored, true)
     }
 
     func testNoRemoteDisablesBothPushShortcutsAndNativeMenuPush() async throws {

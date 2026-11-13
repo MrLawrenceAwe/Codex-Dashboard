@@ -15,6 +15,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     && a.path === b.path && a.hostID === b.hostID);
 
   function disabledReason(context, action) {
+    if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
     const thread = findThread(context.threadID);
     if (thread?.runState === 'running') return 'Wait for this chat to finish running.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -209,7 +210,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   }
 
   function handleMutations(records) {
-    const hostSelector = `${codexUIContracts.chatHeaderSelector}, [data-summary-panel-variant], [data-radix-popper-content-wrapper], [role="dialog"]`;
+    const hostSelector = `${codexUIContracts.chatHeaderSelector}, button[aria-label="Git actions"], [data-summary-panel-variant], [data-radix-popper-content-wrapper], [role="dialog"]`;
     const containsHost = node => node instanceof Element && (node.matches(hostSelector)
       || (node.firstElementChild && node.querySelector(`${hostSelector}, button[aria-label="Git actions"]`)));
     if (records.some(record => {
