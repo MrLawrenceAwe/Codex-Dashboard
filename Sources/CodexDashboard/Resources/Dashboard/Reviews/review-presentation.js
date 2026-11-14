@@ -95,11 +95,11 @@ const reviewPresentation = (() => {
     ];
   }
 
-  function controls(loop, retained) {
+  function controls(loop) {
     const stop = { action: 'stop', label: 'Stop loop' };
     if (loop.phase === 'queued') return [{ action: 'stop', label: 'Cancel queued loop' }];
     if (loop.phase === 'stopping') return [{ action: 'stop', label: 'Retry Stop' }];
-    if (loop.isFinished) return retained ? [{ clear: loop.id, label: 'Move to history' }] : [];
+    if (loop.isFinished) return loop.movedToHistoryAt == null ? [{ action: 'moveToHistory', label: 'Move to history' }] : [];
     if (loop.phase === 'awaitingExtensionReload') {
       return [{ action: 'resume', label: 'Extension reloaded — continue' }, stop];
     }

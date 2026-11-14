@@ -58,8 +58,8 @@ test('settings retain labels, ordering, saved model fallback, and folder publish
       'Review: Not recorded', 'Fix: Not recorded']);
 });
 
-test('controls distinguish queue, stopping, resume, pause, and retained history', () => {
-  const controls = loop => JSON.parse(JSON.stringify(presentation.controls(loop, true)));
+test('controls distinguish queue, stopping, resume, pause, and explicit history', () => {
+  const controls = loop => JSON.parse(JSON.stringify(presentation.controls(loop)));
   assert.deepEqual(controls({ phase: 'queued' }), [{ action: 'stop', label: 'Cancel queued loop' }]);
   assert.deepEqual(controls({ phase: 'stopping' }), [{ action: 'stop', label: 'Retry Stop' }]);
   for (const phase of ['paused', 'blocked']) {
@@ -71,8 +71,8 @@ test('controls distinguish queue, stopping, resume, pause, and retained history'
   assert.deepEqual(controls({ phase: 'running', pauseRequested: true })[0],
     { action: 'pause', disabled: true, label: 'Pausing after round…' });
   const finished = { id: 'loop', phase: 'completed', isFinished: true };
-  assert.deepEqual(controls(finished), [{ clear: 'loop', label: 'Move to history' }]);
-  assert.equal(presentation.controls(finished, false).length, 0);
+  assert.deepEqual(controls(finished), [{ action: 'moveToHistory', label: 'Move to history' }]);
+  assert.equal(presentation.controls({ ...finished, movedToHistoryAt: 123 }).length, 0);
 });
 
 test('metrics count addressed findings only in fixed rounds and deduplicate fix commits', () => {

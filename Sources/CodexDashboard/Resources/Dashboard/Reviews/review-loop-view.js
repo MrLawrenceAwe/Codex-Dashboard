@@ -43,12 +43,12 @@ const reviewLoopView = (() => {
     return page;
   }
 
-  function currentLoops(snapshot, retainedLoopIDs) {
-    return snapshot.loops.filter(loop => !loop.isFinished || retainedLoopIDs.has(loop.id));
+  function currentLoops(snapshot) {
+    return snapshot.loops.filter(loop => !loop.isFinished || loop.movedToHistoryAt == null);
   }
 
-  function renderNavigationStatus(snapshot, retainedLoopIDs = new Set()) {
-    const loops = currentLoops(snapshot, retainedLoopIDs);
+  function renderNavigationStatus(snapshot) {
+    const loops = currentLoops(snapshot);
     const statuses = [
       { kind: 'running', phases: ['waiting', 'running'], label: 'running or waiting' },
       { kind: 'paused', phases: ['paused'], label: 'paused' },
@@ -67,22 +67,22 @@ const reviewLoopView = (() => {
     }
   }
 
-  function render(snapshot, pendingAction, retainedLoopIDs = new Set()) {
-    renderNavigationStatus(snapshot, retainedLoopIDs);
+  function render(snapshot, pendingAction) {
+    renderNavigationStatus(snapshot);
     const root = panel();
     if (!root) return;
     const { loops, error } = snapshot;
     reviewLoopSetupView.render(snapshot, pendingAction);
     const unfinishedCount = loops.filter(loop => !loop.isFinished).length;
-    const current = currentLoops(snapshot, retainedLoopIDs);
+    const current = currentLoops(snapshot);
     root.querySelector('[data-review-empty]').hidden = current.length > 0;
     root.querySelector('[data-review-active-count]').textContent = current.length;
     root.querySelector('[data-review-overview]').textContent = loops.length ? `${unfinishedCount} unfinished · ${loops.length} total` : '';
     const notice = root.querySelector('[data-review-error]');
     notice.hidden = !error;
     notice.textContent = error || '';
-    reviewLoopCardView.renderCards(root.querySelector('[data-review-board]'), current, snapshot, pendingAction, retainedLoopIDs);
-    const history = loops.filter(loop => loop.isFinished && !retainedLoopIDs.has(loop.id)).reverse();
+    reviewLoopCardView.renderCards(root.querySelector('[data-review-board]'), current, snapshot, pendingAction);
+    const history = loops.filter(loop => loop.isFinished && loop.movedToHistoryAt != null).reverse();
     root.querySelector('[data-review-history]').hidden = !history.length;
     root.querySelector('[data-review-history-count]').textContent = history.length;
     const historySelect = root.querySelector('[data-review-history-select]');
@@ -102,7 +102,7 @@ const reviewLoopView = (() => {
     root.querySelectorAll('[data-review-history-action]').forEach(button => {
       button.disabled = !!pendingAction || (button.dataset.reviewHistoryAction === 'deleteOlder' && selectedIndex >= history.length - 1);
     });
-    reviewLoopCardView.renderCards(root.querySelector('[data-review-history-card]'), history.filter(loop => loop.id === historySelect.value), snapshot, pendingAction, new Set());
+    reviewLoopCardView.renderCards(root.querySelector('[data-review-history-card]'), history.filter(loop => loop.id === historySelect.value), snapshot, pendingAction);
   }
 
   return { createPage, render, renderNavigationStatus };

@@ -1,7 +1,6 @@
 const reviewLoopPage = (() => {
   let snapshot = { projects: [], loops: [], reviewTypes: [], error: null };
   let pendingAction = null;
-  const retainedLoopIDs = new Set();
 
   const pageState = createPageVisibilityController({
     pageID: dashboardElements.elementIDs.reviewPage,
@@ -21,7 +20,7 @@ const reviewLoopPage = (() => {
         <span class="review-nav-marker" data-review-navigation-done role="status" hidden><span aria-hidden="true">✓</span><span data-review-navigation-done-count aria-hidden="true">0</span></span>
       </span>`,
     });
-    if (mounted) reviewLoopView.renderNavigationStatus(snapshot, retainedLoopIDs);
+    if (mounted) reviewLoopView.renderNavigationStatus(snapshot);
     return mounted;
   }
 
@@ -66,12 +65,6 @@ const reviewLoopPage = (() => {
       }
       const control = event.target.closest('[data-review-action]');
       if (control) queueAction({ kind: control.dataset.reviewAction, loopID: control.dataset.reviewLoopID });
-      const clear = event.target.closest('[data-review-clear]');
-      if (clear) {
-        retainedLoopIDs.delete(clear.dataset.reviewClear);
-        render();
-        return;
-      }
       const thread = event.target.closest('[data-review-thread]');
       if (thread) {
         dashboardNavigation.close();
@@ -91,34 +84,23 @@ const reviewLoopPage = (() => {
   }
 
   function render() {
-    reviewLoopView.render(snapshot, pendingAction, retainedLoopIDs);
+    reviewLoopView.render(snapshot, pendingAction);
   }
 
   function applySnapshot(nextSnapshot) {
     snapshot = nextSnapshot;
-    if (pageState.isOpen()) {
-      for (const loop of nextSnapshot.loops) {
-        if (!loop.isFinished) retainedLoopIDs.add(loop.id);
-      }
-    }
-    const knownIDs = new Set(nextSnapshot.loops.map(loop => loop.id));
-    for (const id of retainedLoopIDs) if (!knownIDs.has(id)) retainedLoopIDs.delete(id);
     if (nextSnapshot.acknowledgedActionID === pendingAction?.id) pendingAction = null;
     render();
     return true;
   }
   function open() {
     if (!pageState.open()) return false;
-    for (const loop of snapshot.loops) {
-      if (!loop.isFinished) retainedLoopIDs.add(loop.id);
-    }
     render();
     return true;
   }
   function close() {
     if (!pageState.isOpen()) return;
     pageState.close();
-    retainedLoopIDs.clear();
     render();
   }
   function destroy() {

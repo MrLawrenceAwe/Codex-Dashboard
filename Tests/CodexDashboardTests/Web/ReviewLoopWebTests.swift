@@ -479,7 +479,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           const api = window.__codexDashboard;
           const projects = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => ({id,name:id,path:'/tmp/' + id}));
           const loops = projects.map((project, i) => ({id:project.id,project,
-            phase:['running','paused','completed','limitReached','stopped','stopped'][i],isFinished:i >= 2,
+            phase:['running','paused','completed','limitReached','stopped','stopped'][i],isFinished:i >= 2,movedToHistoryAt:i >= 2 ? 123 : null,
             priorityLimit:'P2',completedRoundCount:1,maxRounds:5,message:'Status',rounds:[{number:1,result:{outcome:'fixed',summary:'Saved summary'}}]}));
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects,loops,error:null};
           const apply = () => api.applyReviewPageSnapshot(snapshot);
@@ -504,7 +504,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
           return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["A,B", "F", 4, "D", true, true, "B", "D", 5, "F", "F", "", true, "B", 0, false])
+        XCTAssertEqual(result, ["A,B", "F", 4, "D", true, true, "A,B", "D", 4, "F", "F", "", true, "B", 0, false])
     }
 
     func testPreviousReviewDetailsStartCollapsedAndStayOpenDuringRefresh() async throws {
@@ -513,7 +513,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[{id:'finished',project,phase:'completed',isFinished:true,priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
+          const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[{id:'finished',project,phase:'completed',isFinished:true,movedToHistoryAt:123,priorityLimit:'P2',completedRoundCount:1,maxRounds:5,
             rounds:[{number:1,result:{outcome:'clean',summary:'No findings'}}]}],error:null};
           api.applyReviewPageSnapshot(snapshot);
           const history = document.querySelector('[data-review-history]');
@@ -534,7 +534,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loops = ['old','new'].map((id,index) => ({id,project,reviewType:index ? 'performance' : 'organisationAndNaming',phase:'completed',isFinished:true,completedRoundCount:1,maxRounds:5,rounds:[]}));
+          const loops = ['old','new'].map((id,index) => ({id,project,reviewType:index ? 'performance' : 'organisationAndNaming',phase:'completed',isFinished:true,movedToHistoryAt:123,completedRoundCount:1,maxRounds:5,rounds:[]}));
           loops[1].updatedAt = Date.UTC(2026,9,3,14,35) / 1000;
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops,error:null};
           const dateText = timestamp => new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp * 1000));
@@ -617,8 +617,8 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
                                 "2 blocked or awaiting extension reload review loops",
                                 "2 done (completed or round limit reached) review loops", true,
                                 "2", "2", true, true, true, "3", "2",
-                                "0 done (completed or round limit reached) review loops",
-                                "0 done (completed or round limit reached) review loops",
+                                "1 done (completed or round limit reached) review loop",
+                                "1 done (completed or round limit reached) review loop",
                                 true, true, true, "0"])
     }
 
@@ -955,56 +955,40 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(result, [false, true, "Example <project>", true, "Fixed <issue>", "Pause after round", 1, "1 of 5", true, true, "Pausing after round…", false, 1, "Completed"])
     }
 
-    func testFinishedLoopStaysOnBoardUntilClearedOrPageCloses() async throws {
+    func testFinishedLoopStaysOnBoardAcrossNavigationUntilExplicitHistoryAction() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML, baseURL: URL(string: "https://review-loop.test"))
         let result = try await webView.evaluateAsyncJavaScript("""
         (() => {
           const api = window.__codexDashboard;
           const project = {id:'p',name:'Example',path:'/tmp/example'};
-          const loop = {id:'loop-1',project,phase:'running',isFinished:false,completedRoundCount:0,maxRounds:1,rounds:[],message:'Reviewing'};
+          const loop = {id:'loop-1',project,phase:'running',isFinished:false,completedRoundCount:0,maxRounds:1,rounds:[]};
           const snapshot = {reviewTypes: \(Self.reviewTypesJSON),projects:[project],loops:[loop],error:null};
           const board = () => document.querySelector('[data-review-board]');
           const history = () => document.querySelector('[data-review-history]');
           const done = () => document.querySelector('[data-review-navigation-done]');
-          const doneCount = () => done().querySelector('[data-review-navigation-done-count]').textContent;
           api.applyReviewPageSnapshot(snapshot);
-          api.openReviews();
-          loop.phase = 'completed';
-          loop.message = 'No findings remain.';
-          loop.isFinished = true;
-          api.applyReviewPageSnapshot(snapshot);
-          api.applyReviewPageSnapshot(snapshot);
-          const retained = [board().children.length, board().querySelector('[data-review-status]').textContent,
-            !!board().querySelector('[data-review-clear]'), history().hidden, done().hidden, doneCount()];
-          document.getElementById('codex-dashboard-review-navigation').remove();
-          api.ensureMounted();
-          retained.push(done().hidden, doneCount());
-          board().querySelector('[data-review-clear]').click();
-          const cleared = [board().children.length, history().hidden, document.querySelector('[data-review-history-select]').value,
-            done().hidden, doneCount()];
-          api.applyReviewPageSnapshot(snapshot);
-          document.getElementById('codex-dashboard-review-navigation').remove();
-          api.ensureMounted();
-          cleared.push(done().hidden, doneCount());
+          // Finish while another page is open.
           api.openTodos();
-          api.openReviews();
-          const reopened = [board().children.length, history().hidden];
-          loop.phase = 'running';
-          loop.isFinished = false;
+          loop.phase = 'completed'; loop.isFinished = true;
           api.applyReviewPageSnapshot(snapshot);
-          loop.phase = 'limitReached';
-          loop.isFinished = true;
-          api.applyReviewPageSnapshot(snapshot);
-          const retainedAgain = [board().children.length, done().hidden, doneCount()];
-          api.openTodos();
           api.openReviews();
-          return [...retained, ...cleared, ...reopened, ...retainedAgain, board().children.length, history().hidden,
-            done().hidden, doneCount()];
+          const states = [board().children.length,history().hidden,done().hidden];
+          api.openTodos(); api.openReviews();
+          states.push(board().children.length,history().hidden,done().hidden);
+          board().querySelector('[data-review-action="moveToHistory"]').click();
+          const action = JSON.parse(api.pendingReviewAction());
+          states.push(action.kind,action.loopID,board().children.length);
+          // Only a successfully saved snapshot moves the card.
+          loop.movedToHistoryAt = 123;
+          api.applyReviewPageSnapshot({...snapshot,acknowledgedActionID:action.id});
+          states.push(board().children.length,history().hidden,done().hidden);
+          api.openTodos(); api.openReviews();
+          states.push(board().children.length,history().hidden);
+          return states;
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, [1, "No findings remain.", true, true, false, "1", false, "1",
-                                0, false, "loop-1", true, "0", true, "0", 0, false,
-                                1, false, "1", 0, false, true, "0"])
+        XCTAssertEqual(result, [1, true, false, 1, true, false, "moveToHistory", "loop-1", 1,
+                                0, false, true, 0, false])
     }
 
     func testRoundsShowFindingsAndTheirPriorities() async throws {
@@ -1122,7 +1106,7 @@ final class ReviewLoopWebTests: SerializedDashboardWebTestCase {
             limitColor === successColor];
         })()
         """) as? [AnyHashable]
-        XCTAssertEqual(result, ["Round limit reached", "Round limit reached", 0, false, "All configured review rounds completed.", true])
+        XCTAssertEqual(result, ["Round limit reached", "Round limit reached", 1, false, "All configured review rounds completed.", true])
     }
 
     func testLivePromptDisclosuresRetainExpansionAfterRefreshAndRenderAsText() async throws {

@@ -84,18 +84,18 @@ const reviewLoopCardView = (() => {
     </div></li>`;
   }
 
-  function renderCards(board, loops, snapshot, pendingAction, retainedLoopIDs) {
+  function renderCards(board, loops, snapshot, pendingAction) {
     const cards = new Map([...board.children].map(card => [card.dataset.loopId, card]));
     for (const [index, loop] of loops.entries()) {
       const card = cards.get(loop.id) || createCard(loop);
       if (board.children[index] !== card) board.insertBefore(card, board.children[index] || null);
-      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, retainedLoopIDs.has(loop.id), snapshot.models || [], snapshot.reviewTypes || []);
+      renderCard(card, loop, snapshot.progress?.[loop.id], pendingAction, snapshot.models || [], snapshot.reviewTypes || []);
       cards.delete(loop.id);
     }
     cards.forEach(card => card.remove());
   }
 
-  function renderCard(root, loop, progress, pendingAction, retained, models, reviewTypes) {
+  function renderCard(root, loop, progress, pendingAction, models, reviewTypes) {
     root.querySelector('[data-review-project-name]').textContent = loop.project.name;
     root.setAttribute('aria-label', loop.project.name);
     const badge = root.querySelector('[data-review-badge]');
@@ -114,7 +114,7 @@ const reviewLoopCardView = (() => {
     root.dataset.phase = loop.phase;
     renderFeedback(root, loop);
     renderProgress(root, loop, progress);
-    renderControls(root, loop, pendingAction, retained);
+    renderControls(root, loop, pendingAction);
     renderPlaybackSetting(root, loop, pendingAction);
     renderRounds(root, loop);
   }
@@ -128,12 +128,11 @@ const reviewLoopCardView = (() => {
     updateMarkup(root.querySelector('[data-review-context]'), markup);
   }
 
-  function renderControls(root, loop, pendingAction, retained) {
+  function renderControls(root, loop, pendingAction) {
     const controls = root.querySelector('[data-review-controls]');
-    const choices = reviewPresentation.controls(loop, retained);
+    const choices = reviewPresentation.controls(loop);
     const markup = choices.map(control => {
-      const attribute = control.action ? `data-review-action="${escape(control.action)}"`
-        : `data-review-clear="${escape(control.clear)}"`;
+      const attribute = `data-review-action="${escape(control.action)}"`;
       return `<button type="button" ${attribute}${control.disabled ? ' disabled' : ''}>${escape(control.label)}</button>`;
     }).join('');
     updateMarkup(controls, markup);

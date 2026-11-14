@@ -126,6 +126,15 @@ extension ReviewLoopCoordinator {
         }
     }
 
+    func moveToHistory(_ action: ReviewLoopAction) throws {
+        guard let id = action.loopID, var updated = matchingLoop(id), updated.phase.isFinished else {
+            throw ReviewLoopError("Only a finished loop can be moved to history.")
+        }
+        guard updated.movedToHistoryAt == nil else { return }
+        updated.movedToHistoryAt = Date.now.timeIntervalSince1970
+        try persist(updated)
+    }
+
     func deleteHistory(_ action: ReviewLoopAction) throws {
         let next: [ReviewLoop]
         if action.kind == .deleteAll {

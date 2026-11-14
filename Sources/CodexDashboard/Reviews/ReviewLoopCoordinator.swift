@@ -60,6 +60,8 @@ final class ReviewLoopCoordinator {
             guard try applyControlAction(action) else { return }
         case .openFile:
             throw ReviewLoopError("A file link must be opened from its review card.")
+        case .moveToHistory:
+            try moveToHistory(action)
         case .delete, .deleteOlder, .deleteAll:
             try deleteHistory(action)
         }

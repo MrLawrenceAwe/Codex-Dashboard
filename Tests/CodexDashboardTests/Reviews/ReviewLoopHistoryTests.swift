@@ -3,6 +3,40 @@ import XCTest
 
 @MainActor
 final class ReviewLoopHistoryTests: ReviewLoopTestCase {
+    func testFinishedLoopsOnlyEnterHistoryThroughExplicitPersistedAction() throws {
+        for phase in [ReviewLoopPhase.completed, .limitReached, .stopped] {
+            let store = ReviewTestStore()
+            var loop = ReviewLoop(id: UUID(), startActionID: "finished", project: project,
+                                  promptContext: .general, maxRounds: 1)
+            loop.phase = phase
+            store.loops = [loop]
+            let coordinator = ReviewLoopCoordinator(store: store)
+            XCTAssertNil(coordinator.loops[0].movedToHistoryAt)
+            let action = ReviewLoopAction(id: "move", kind: .moveToHistory, projectID: nil,
+                                          promptContext: nil, maxRounds: nil, loopID: loop.id)
+            try coordinator.apply(action, projects: [])
+            let timestamp = try XCTUnwrap(coordinator.loops[0].movedToHistoryAt)
+            let saved = try JSONDecoder().decode(ReviewLoop.self, from: JSONEncoder().encode(store.loops[0]))
+            XCTAssertEqual(saved.movedToHistoryAt, timestamp)
+            XCTAssertEqual(ReviewLoopCoordinator(store: store).loops[0].movedToHistoryAt, timestamp)
+            try coordinator.apply(action, projects: [])
+            XCTAssertEqual(coordinator.loops[0].movedToHistoryAt, timestamp)
+        }
+    }
+
+    func testMovingActiveLoopToHistoryIsRejectedAndSaveFailureKeepsItCurrent() throws {
+        let (coordinator, store, _) = try make()
+        let id = try XCTUnwrap(coordinator.loops.first?.id)
+        let action = ReviewLoopAction(id: "move", kind: .moveToHistory, projectID: nil,
+                                      promptContext: nil, maxRounds: nil, loopID: id)
+        XCTAssertThrowsError(try coordinator.apply(action, projects: []))
+        stop(coordinator)
+        store.failSave = true
+        XCTAssertThrowsError(try coordinator.apply(action, projects: []))
+        XCTAssertNil(coordinator.loops[0].movedToHistoryAt)
+        XCTAssertNil(store.loops[0].movedToHistoryAt)
+    }
+
     func testUpdateTimestampPersistsAndHistoryDeletionKeepsOtherTimestamps() throws {
         let (_, store, _) = try make()
         let startedAt = try XCTUnwrap(store.loops.first?.updatedAt)

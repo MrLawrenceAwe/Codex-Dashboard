@@ -303,7 +303,8 @@ addressed across successful fix rounds, and distinct fix commits. These counts
 summarise recorded rounds and do not represent unique issues across reviews.
 Motion follows the system’s reduced-motion preference.
 
-Finished loops move to history. Expand **Manage history** to delete saved loops and their
+Finished loops stay under **Current loops**, including after navigation or app restart.
+Use **Move to history** on a finished loop to move it to history explicitly. Expand **Manage history** to delete saved loops and their
 round records; the review chats remain available. **Delete loops created earlier**
 uses creation order, regardless of the displayed last updated dates. **Delete all
 finished loops** removes every finished loop. Both bulk deletion actions include

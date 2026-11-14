@@ -7,39 +7,33 @@ const { test } = require('node:test');
 const resource = name => fs.readFileSync(path.join(__dirname,
   '../../Sources/CodexDashboard/Resources/Dashboard/Reviews', name), 'utf8');
 
-test('page retains a newly finished loop until closed and prunes removed loops', () => {
+test('page keeps finished snapshots through navigation, teardown, and recreation', () => {
   let open = false;
-  let retained;
-  const page = vm.runInNewContext(`${resource('review-loop-page.js')}\nreviewLoopPage`, {
+  let displayed;
+  const createPage = () => vm.runInNewContext(`${resource('review-loop-page.js')}\nreviewLoopPage`, {
     dashboardElements: { elementIDs: {} },
     createPageVisibilityController: () => ({
       open: () => { open = true; return true; },
       close: () => { open = false; },
       isOpen: () => open,
     }),
-    reviewLoopView: { render: (_snapshot, _pending, ids) => { retained = [...ids]; } },
+    reviewLoopView: { render: snapshot => { displayed = snapshot.loops; } },
   });
-  const loop = { id: 'loop', phase: 'running', isFinished: false };
+  const loop = { id: 'loop', phase: 'completed', isFinished: true };
+  const page = createPage();
   page.applySnapshot({ loops: [loop] });
-  assert.deepEqual(retained, []);
   page.open();
-  assert.deepEqual(retained, ['loop']);
-  loop.phase = 'completed';
-  loop.isFinished = true;
-  page.applySnapshot({ loops: [loop] });
-  assert.deepEqual(retained, ['loop']);
   page.close();
   page.open();
-  assert.deepEqual(retained, []);
-  loop.phase = 'running';
-  loop.isFinished = false;
-  page.applySnapshot({ loops: [loop] });
-  assert.deepEqual(retained, ['loop']);
-  page.applySnapshot({ loops: [] });
-  assert.deepEqual(retained, []);
+  assert.deepEqual(displayed, [loop]);
+  page.destroy();
+  const recreated = createPage();
+  recreated.applySnapshot({ loops: [loop] });
+  recreated.open();
+  assert.deepEqual(displayed, [loop]);
 });
 
-test('navigation counts terminal loops only while retained on the current board', () => {
+test('navigation counts terminal loops until explicitly moved to history', () => {
   const markers = Object.fromEntries(['running', 'blocked', 'done'].map(kind => [kind, {
     hidden: true,
     attributes: {},
@@ -60,12 +54,13 @@ test('navigation counts terminal loops only while retained on the current board'
   view.renderNavigationStatus(snapshot);
   assert.equal(markers.running.count.textContent, '1');
   assert.equal(markers.blocked.count.textContent, '1');
-  assert.equal(markers.done.count.textContent, '0');
-  assert.equal(markers.done.hidden, true);
-  view.renderNavigationStatus(snapshot, new Set(['done', 'stopped']));
   assert.equal(markers.done.count.textContent, '1');
   assert.equal(markers.done.hidden, false);
   assert.equal(markers.done.attributes['aria-label'], '1 done (completed or round limit reached) review loop');
+  snapshot.loops[2].movedToHistoryAt = 123;
+  view.renderNavigationStatus(snapshot);
+  assert.equal(markers.done.count.textContent, '0');
+  assert.equal(markers.done.hidden, true);
   view.renderNavigationStatus({ loops: [] });
   assert.equal(markers.running.hidden, true);
   assert.equal(markers.blocked.hidden, true);

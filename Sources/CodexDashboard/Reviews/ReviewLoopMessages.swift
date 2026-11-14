@@ -2,7 +2,7 @@ import Foundation
 
 struct ReviewLoopAction: Codable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case start, queue, pause, resume, stop, setMuteTestPlayback, openFile, delete, deleteOlder, deleteAll
+        case start, queue, pause, resume, stop, setMuteTestPlayback, openFile, moveToHistory, delete, deleteOlder, deleteAll
     }
 
     let id: String
