@@ -11,7 +11,8 @@ struct RendererCompatibilityChecker {
     }
 
     func check() async -> [CompatibilityCheck] {
-        guard let target = await devTools.mainRendererTargets().first else {
+        let targets = await devTools.mainRendererTargets()
+        guard let target = targets.first else {
             return [CompatibilityCheck(
                 id: "renderer",
                 title: "Renderer connection",
@@ -109,8 +110,7 @@ struct RendererCompatibilityChecker {
             failureDetail: "The model-picker or reasoning controls used by saved prompt presets were not found.",
             in: target
         ))
-        let pushCheck = await PushControlsBridge(devTools: devTools).synchronize(in: [target])
-        checks.append(pushCheck ?? PushControlsBridge.pendingCheck)
+        checks += await GitControlsBridge(devTools: devTools).synchronize(in: targets)
         return checks
     }
 

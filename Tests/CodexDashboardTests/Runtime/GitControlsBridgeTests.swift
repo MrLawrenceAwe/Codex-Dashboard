@@ -4,7 +4,7 @@ import XCTest
 @testable import CodexDashboard
 
 @MainActor
-final class PushControlsBridgeTests: XCTestCase {}
+final class GitControlsBridgeTests: XCTestCase {}
 
 private actor PushInspectionDevTools: DevToolsServing {
     let value: String
@@ -15,14 +15,14 @@ private actor PushInspectionDevTools: DevToolsServing {
 }
 
 @MainActor
-extension PushControlsBridgeTests {
+extension GitControlsBridgeTests {
     func testChangedMenuProducesNonBlockingCompatibilityWarning() async throws {
         let target = DevToolsTarget(id: "main", type: "page", url: nil, webSocketURL: nil)
-        let bridge = PushControlsBridge(devTools: PushInspectionDevTools(
-            #"{"state":"incompatible"}"#
+        let bridge = GitControlsBridge(devTools: PushInspectionDevTools(
+            #"{"pushControls":{"state":"incompatible"}}"#
         ))
         let result = await bridge.synchronize(in: [target])
-        let check = try XCTUnwrap(result)
+        let check = try XCTUnwrap(result.first { $0.id == GitControlsBridge.pushControlsID })
         XCTAssertEqual(check.id, "disable-push-without-remote")
         XCTAssertEqual(check.title, "Disable push without a remote")
         XCTAssertEqual(check.status, .warning)
@@ -32,12 +32,12 @@ extension PushControlsBridgeTests {
 }
 
 @MainActor
-extension PushControlsBridgeTests {
+extension GitControlsBridgeTests {
     func testUnavailableGitChannelProducesNonBlockingWarning() async throws {
         let target = DevToolsTarget(id: "main", type: "page", url: nil, webSocketURL: nil)
-        let bridge = PushControlsBridge(devTools: PushInspectionDevTools(#"{"state":"remote-unavailable"}"#))
+        let bridge = GitControlsBridge(devTools: PushInspectionDevTools(#"{"pushControls":{"state":"remote-unavailable"}}"#))
         let result = await bridge.synchronize(in: [target])
-        let check = try XCTUnwrap(result)
+        let check = try XCTUnwrap(result.first { $0.id == GitControlsBridge.pushControlsID })
         XCTAssertEqual(check.status, .warning)
         XCTAssertTrue(check.detail.contains("Git remotes could not be checked through Codex"))
         XCTAssertEqual(CompatibilityReport(checks: [check]).blockingCount, 0)
@@ -45,12 +45,12 @@ extension PushControlsBridgeTests {
 }
 
 @MainActor
-extension PushControlsBridgeTests {
+extension GitControlsBridgeTests {
     func testUnopenedDialogIsPendingWithoutWarning() async throws {
         let target = DevToolsTarget(id: "main", type: "page", url: nil, webSocketURL: nil)
-        let bridge = PushControlsBridge(devTools: PushInspectionDevTools(#"{"state":"waiting"}"#))
+        let bridge = GitControlsBridge(devTools: PushInspectionDevTools(#"{"pushControls":{"state":"waiting"}}"#))
         let result = await bridge.synchronize(in: [target])
-        let check = try XCTUnwrap(result)
+        let check = try XCTUnwrap(result.first { $0.id == GitControlsBridge.pushControlsID })
         XCTAssertEqual(check.status, .pending)
         XCTAssertTrue(CompatibilityReport(checks: [check]).attentionChecks.isEmpty)
     }

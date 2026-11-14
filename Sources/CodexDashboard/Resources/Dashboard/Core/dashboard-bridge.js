@@ -74,6 +74,7 @@ window.__codexDashboard = {
   editDictationStatus: sentMessageDictation.status,
   probeEditDictation: sentMessageDictation.probe,
   readPushControls: pushControls.read,
+  readGitToolbar: () => dashboardNavigation.isOpen() ? 'pending' : gitToolbar.readCompatibility(),
   reviewRequest: reviewRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewPageSnapshot: reviewLoopPage.applySnapshot,

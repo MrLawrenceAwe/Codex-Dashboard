@@ -338,6 +338,14 @@ identify failed checks; **Unavailable** means a check could not complete, while
 **Compatibility not checked** means no checks have run. Blocking drift prevents
 remounting. Diagnostics also shows versions, refresh state, loaded chats, renderer
 targets, and copyable details.
+
+The **Git toolbar actions** check also runs during normal synchronization. It warns
+when Commit, Commit & push, or Push is missing in a supported local Git chat,
+including when Codex's toolbar anchor or native Git menu changes. Navigation gets
+a short settling period. Dashboard pages, dialogs, and chats without a Git checkout
+leave this check pending. The warning clears when the shortcuts return or you
+leave the eligible chat.
+
 **Disable dashboard integration** waits for current synchronization and review operations
 to finish, then removes the injected controls. Remote publication can delay removal.
 A normal Codex restart also removes the controls. The signed Codex application bundle

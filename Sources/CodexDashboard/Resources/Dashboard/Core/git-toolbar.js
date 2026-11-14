@@ -9,8 +9,11 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   let menuAnchor;
   let destroyed = false;
   let unsubscribeRemote;
+  let missingSince;
+  let inspectedThreadID;
   const menuChanges = new Map();
   const combinedPushChecks = new Map();
+  const actions = ['Commit', 'Commit & push', 'Push'];
 
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
     && a.path === b.path && a.hostID === b.hostID);
@@ -235,7 +238,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       toolbar.className = 'dashboard-git-toolbar';
       toolbar.setAttribute('role', 'group');
       toolbar.setAttribute('aria-label', 'Repository actions');
-      for (const action of ['Commit', 'Commit & push', 'Push']) {
+      for (const action of actions) {
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = action;
@@ -255,6 +258,31 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     }
     positionMenu();
     if (positionedMenu && !positionedMenu.isConnected) restoreMenu();
+  }
+
+  function readCompatibility() {
+    const composer = codexUIContracts.composer();
+    const threadID = codexUIContracts.selectedThreadID();
+    // Confirm eligibility independently of the toolbar anchor and native Git
+    // menu, since a Codex update can remove either of them.
+    const eligible = threadID && domUtils.isVisible(composer)
+      && !composer.closest('[aria-hidden="true"], [inert]')
+      && (findThread(threadID)?.sharesGroupRepository || codexUIContracts.headerGitContext());
+    if (!eligible || inspectedThreadID !== threadID) {
+      missingSince = undefined;
+      inspectedThreadID = eligible ? threadID : undefined;
+    }
+    if (!eligible) return 'pending';
+    if (domUtils.isVisible(toolbar) && actions.every(action => {
+      const button = toolbar.querySelector(`button[data-git-action="${action}"]`);
+      return domUtils.isVisible(button);
+    })) {
+      missingSince = undefined;
+      return 'compatible';
+    }
+    // Let the toolbar's normal mount and repair finish after navigation.
+    missingSince ??= performance.now();
+    return performance.now() - missingSince >= 750 ? 'missing' : 'pending';
   }
 
   function scheduleSync() {
@@ -313,6 +341,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     pending = undefined;
     for (const check of combinedPushChecks.values()) clearTimeout(check.timer);
     combinedPushChecks.clear();
+    missingSince = undefined;
+    inspectedThreadID = undefined;
     observer?.disconnect();
     unsubscribeRemote?.();
     unsubscribeRemote = undefined;
@@ -329,5 +359,5 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     toolbar = undefined;
   }
 
-  return { mount, sync, destroy };
+  return { mount, sync, destroy, readCompatibility };
 }

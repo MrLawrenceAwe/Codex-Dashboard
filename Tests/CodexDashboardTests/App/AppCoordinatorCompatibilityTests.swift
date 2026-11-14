@@ -206,12 +206,12 @@ extension AppCoordinatorTests {
     func testPushControlWarningUpdatesDiagnosticsDuringNormalSynchronization() async {
         let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
         let coordinator = makeAppCoordinator(observeFileChanges: false, runtimeFactory: { _ in runtime })
-        let warning = PushControlsBridge.check(status: .warning,
+        let warning = GitControlsBridge.pushCheck(status: .warning,
             detail: "Push controls changed in Codex; automatic disabling is unavailable.")
-        runtime.pushControlsCompatibilityCheck = warning
+        runtime.gitControlsCompatibilityChecks = [warning]
         await coordinator.synchronizeDashboard()
         XCTAssertEqual(coordinator.compatibilityReport?.checks.first { $0.id == warning.id }, warning)
-        runtime.pushControlsCompatibilityCheck = PushControlsBridge.check(status: .compatible, detail: "Supported")
+        runtime.gitControlsCompatibilityChecks = [GitControlsBridge.pushCheck(status: .compatible, detail: "Supported")]
         await coordinator.synchronizeDashboard()
         XCTAssertEqual(coordinator.compatibilityReport?.checks.filter { $0.id == warning.id }.count, 1)
         XCTAssertEqual(coordinator.compatibilityReport?.checks.first { $0.id == warning.id }?.status, .compatible)

@@ -143,7 +143,7 @@ or push. A five-second per-repository cache avoids flicker on reopening; each
 opening revalidates it. Replies are scoped to the dialog/repository generation and
 canceled on navigation or teardown. Missing, failed, timed-out, or incomplete
 remote metadata restores the host controls and raises a runtime warning.
-`PushControlsBridge` only publishes those compatibility observations during normal
+`GitControlsBridge` publishes toolbar visibility and push-control compatibility observations during normal
 synchronization; it does not gate the UI update or run a second Git scan.
 The renderer requires the commit dialog target props, local host identity, and
 three cmdk command values, independent of translated text. Mouse, keyboard, and
