@@ -57,6 +57,16 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             window.electronBridge = {
               subscribeToWorkerMessages(worker, callback) { if (worker === 'git') remoteListener = callback; return () => {}; },
               sendWorkerMessageFromView(worker, message) {
+                if (worker === 'git' && message.request?.method === 'branch-ahead-count') {
+                  window.aheadChecks = (window.aheadChecks || 0) + 1;
+                  setTimeout(() => remoteListener({
+                    type: 'worker-response', workerId: 'git', response: {
+                      id: message.request.id, method: 'branch-ahead-count',
+                      result: { type: 'ok', value: { commitsAhead: window.commitsAhead ?? 0 } }
+                    }
+                  }), 10);
+                  return Promise.resolve();
+                }
                 if (worker === 'git' && message.type === 'worker-request') setTimeout(() => remoteListener({
                   type: 'worker-response', workerId: 'git', response: {
                     id: message.request.id, method: 'git-context', result: { type: 'ok', value: {
@@ -178,7 +188,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
 
     func testDeferredNativeGitCommandUsesTheMatchingDialogForAllThreeShortcuts() async throws {
         let webView = try await fixture(deferredGit: true)
-        _ = try await webView.evaluateJavaScript("window.showCommitDialog = true")
+        _ = try await webView.evaluateJavaScript("window.showCommitDialog = true; window.commitsAhead = 1")
         for (action, command) in [("Commit", "commit"), ("Commit & push", "commit-and-push"), ("Push", "push")] {
             let button = #"document.querySelector('[data-git-action="\#(action)"]')"#
             try await DashboardWebTestHarness.waitForJavaScript("\(button)?.disabled === false", in: webView)
@@ -341,6 +351,48 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(cleanPayload)).threads)")
         let reason = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').title") as? String
         XCTAssertEqual(reason, "No unpushed commits.")
+    }
+
+    func testCombinedWorkflowKeepsPushDisabledUntilGitConfirmsCommitsRemain() async throws {
+        let webView = try await fixture()
+        let dirty = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .uncommittedChanges),
+        ])
+        let ahead = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .unpushedCommits),
+        ])
+        let clean = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .clean),
+        ])
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        _ = try await webView.evaluateJavaScript("""
+        window.showCommitDialog = true;
+        window.__codexDashboard.applyThreads((\(dirty)).threads);
+        const push = document.querySelector('[data-git-action=Push]');
+        window.pushEnabled = false;
+        new MutationObserver(() => { if (!push.disabled) window.pushEnabled = true; })
+          .observe(push, { attributes: true, attributeFilter: ['disabled'] });
+        document.querySelector('[data-git-action="Commit & push"]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.confirmedAction === 'commit-and-push' && !document.body.hasAttribute('data-dashboard-git-handoff')", in: webView)
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(ahead)).threads)")
+        try await DashboardWebTestHarness.waitForJavaScript("window.aheadChecks >= 2", in: webView)
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(clean)).threads)")
+        let flashed = try await webView.evaluateJavaScript("window.pushEnabled") as? Bool
+        XCTAssertEqual(flashed, false)
+
+        // A later combined operation can leave an unpushed commit after failure.
+        _ = try await webView.evaluateJavaScript("""
+        window.confirmedAction = null;
+        window.commitsAhead = 1;
+        window.__codexDashboard.applyThreads((\(dirty)).threads);
+        document.querySelector('[data-git-action="Commit & push"]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.confirmedAction === 'commit-and-push' && !document.body.hasAttribute('data-dashboard-git-handoff')", in: webView)
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(ahead)).threads)")
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
     }
 
     func testPushStaysDisabledDuringNativeWorkflowAndRecoversWithoutSnapshot() async throws {

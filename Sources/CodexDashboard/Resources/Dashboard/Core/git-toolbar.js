@@ -1,4 +1,4 @@
-function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote }) {
+function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead }) {
   let toolbar;
   let observer;
   let frame;
@@ -10,9 +10,49 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   let destroyed = false;
   let unsubscribeRemote;
   const menuChanges = new Map();
+  const combinedPushChecks = new Map();
 
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
     && a.path === b.path && a.hostID === b.hostID);
+
+  function repositoryStatus(context) {
+    const thread = findThread(context.threadID);
+    return thread?.sharesGroupRepository ? thread.projectGitStatus : null;
+  }
+
+  function hasUnpushedCommits(status) {
+    return status === 'unpushedCommits' || status === 'uncommittedChangesAndUnpushedCommits';
+  }
+
+  function reconcileCombinedPush(context) {
+    const check = combinedPushChecks.get(context.path);
+    if (!check) return;
+    const status = repositoryStatus(context);
+    if (pending || context.workflowRunning) return;
+    if (status === 'clean') {
+      clearTimeout(check.timer);
+      combinedPushChecks.delete(context.path);
+      return;
+    }
+    if (!hasUnpushedCommits(status) || check.running || check.timer !== undefined) return;
+    check.running = true;
+    checkBranchAhead(context.path).then(count => {
+      if (combinedPushChecks.get(context.path) !== check) return;
+      check.running = false;
+      const current = codexUIContracts.headerGitContext();
+      if (current?.path === context.path && !pending && !current.workflowRunning && count > 0) {
+        combinedPushChecks.delete(context.path);
+        sync();
+        return;
+      }
+      // The catalog can still contain the between-commit-and-push snapshot.
+      // Recheck while it disagrees, or if Git temporarily could not report its count.
+      check.timer = setTimeout(() => {
+        check.timer = undefined;
+        sync();
+      }, 1000);
+    });
+  }
 
   function disabledReason(context, action) {
     if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
@@ -27,13 +67,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     // Use the repository snapshot for availability; hidden native menus can retain
     // a pre-commit nothing-to-push hint. Native selection still checks enabled items.
     // Group status is valid only when this chat uses that same repository.
-    const status = thread?.sharesGroupRepository ? thread.projectGitStatus : null;
+    const status = repositoryStatus(context);
     if (!['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)) {
       return 'Repository status is not available yet.';
     }
     const hasChanges = ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(status);
-    const hasUnpushed = ['unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status);
-    if (action === 'Push' && !hasUnpushed) return 'No unpushed commits.';
+    if (action === 'Push' && !hasUnpushedCommits(status)) return 'No unpushed commits.';
+    if (action === 'Push' && combinedPushChecks.has(context.path)) return 'Checking for unpushed commits…';
     if (action !== 'Push' && !hasChanges) return 'No changes to commit.';
     return '';
   }
@@ -113,6 +153,10 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       const option = dialog.items.find(item => item.getAttribute('data-value') === command);
       if (!option || option.getAttribute('aria-disabled') === 'true'
         || option.getAttribute('data-disabled') === 'true' || option.disabled) return null;
+      if (action === 'Commit & push') {
+        clearTimeout(combinedPushChecks.get(context.path)?.timer);
+        combinedPushChecks.set(context.path, { running: false });
+      }
       option.click();
       return { selected: dialog.dialog };
     }, { timeout: 5000, interval: 50 });
@@ -184,6 +228,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       return;
     }
     prefetchRemote(context.path);
+    reconcileCombinedPush(context);
     if (!toolbar) {
       toolbar = document.createElement('div');
       toolbar.id = dashboardElements.elementIDs.gitToolbar;
@@ -266,6 +311,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     destroyed = true;
     document.body.removeAttribute('data-dashboard-git-handoff');
     pending = undefined;
+    for (const check of combinedPushChecks.values()) clearTimeout(check.timer);
+    combinedPushChecks.clear();
     observer?.disconnect();
     unsubscribeRemote?.();
     unsubscribeRemote = undefined;

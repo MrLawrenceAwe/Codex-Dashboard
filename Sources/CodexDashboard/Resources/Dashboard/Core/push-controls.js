@@ -8,6 +8,7 @@ function createPushControls() {
   let lastState = 'waiting';
   const remoteCache = new Map();
   const remoteListeners = new Set();
+  const aheadChecks = new Map();
   const remoteFreshness = 5000;
   let unsubscribe;
   let pendingRemote;
@@ -47,9 +48,14 @@ function createPushControls() {
   }
 
   function receiveRemote(message) {
-    if (!pendingRemote || message?.type !== 'worker-response' || message.workerId !== 'git'
-      || message.response?.id !== pendingRemote?.id) return;
+    if (message?.type !== 'worker-response' || message.workerId !== 'git') return;
     const response = message.response;
+    if (response?.method === 'branch-ahead-count') {
+      const count = response.result?.type === 'ok' ? response.result.value?.commitsAhead : null;
+      aheadChecks.get(response.id)?.(Number.isInteger(count) && count >= 0 ? count : null);
+      return;
+    }
+    if (!pendingRemote || response?.id !== pendingRemote.id) return;
     const metadata = response.result?.type === 'ok' ? response.result.value : null;
     let value = null;
     if (response.method === 'git-context'
@@ -58,6 +64,28 @@ function createPushControls() {
       else if (metadata.remotesOmitted === 0) value = false;
     }
     finishRemote(response.id, value);
+  }
+
+  function checkBranchAhead(path) {
+    return new Promise(resolve => {
+      if (!unsubscribe) { resolve(null); return; }
+      const id = `dashboard-ahead-${crypto.randomUUID()}`;
+      const finish = count => {
+        clearTimeout(timer);
+        aheadChecks.delete(id);
+        resolve(count);
+      };
+      const timer = setTimeout(() => finish(null), 2000);
+      aheadChecks.set(id, finish);
+      try {
+        Promise.resolve(window.electronBridge.sendWorkerMessageFromView('git', {
+          type: 'worker-request', workerId: 'git', request: {
+            id, method: 'branch-ahead-count', enqueuedAtMs: Date.now(),
+            params: { root: path, hostConfig: { id: 'local' }, operationSource: 'dashboard_push_controls' },
+          },
+        })).catch(() => finish(null));
+      } catch { finish(null); }
+    });
   }
 
   function requestRemote(path, hostConfig, dialogGeneration) {
@@ -216,6 +244,7 @@ function createPushControls() {
 
   function destroy() {
     cancelRemote();
+    for (const finish of aheadChecks.values()) finish(null);
     unsubscribe?.();
     unsubscribe = undefined;
     remoteCache.clear();
@@ -228,5 +257,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote };
+  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead };
 }
