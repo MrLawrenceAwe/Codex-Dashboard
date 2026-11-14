@@ -7,6 +7,7 @@ const gitToolbar = createGitToolbar({
   remoteState: pushControls.remoteState,
   subscribeRemote: pushControls.subscribeRemote,
   checkBranchAhead: pushControls.checkBranchAhead,
+  checkWorkingTree: pushControls.checkWorkingTree,
 });
 const chatOverview = createChatOverview({ catalog: threadCatalog, prefetchPushRemote: pushControls.prefetchRemote });
 const todoList = createTodoList({

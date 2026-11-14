@@ -8,7 +8,7 @@ function createPushControls() {
   let lastState = 'waiting';
   const remoteCache = new Map();
   const remoteListeners = new Set();
-  const aheadChecks = new Map();
+  const statusChecks = new Map();
   const remoteFreshness = 5000;
   let unsubscribe;
   let pendingRemote;
@@ -50,9 +50,8 @@ function createPushControls() {
   function receiveRemote(message) {
     if (message?.type !== 'worker-response' || message.workerId !== 'git') return;
     const response = message.response;
-    if (response?.method === 'branch-ahead-count') {
-      const count = response.result?.type === 'ok' ? response.result.value?.commitsAhead : null;
-      aheadChecks.get(response.id)?.(Number.isInteger(count) && count >= 0 ? count : null);
+    if (statusChecks.has(response?.id)) {
+      statusChecks.get(response.id)(response);
       return;
     }
     if (!pendingRemote || response?.id !== pendingRemote.id) return;
@@ -66,25 +65,41 @@ function createPushControls() {
     finishRemote(response.id, value);
   }
 
-  function checkBranchAhead(path) {
+  function checkGitStatus(method, params, readValue) {
     return new Promise(resolve => {
       if (!unsubscribe) { resolve(null); return; }
-      const id = `dashboard-ahead-${crypto.randomUUID()}`;
-      const finish = count => {
+      const id = `dashboard-status-${crypto.randomUUID()}`;
+      const finish = response => {
         clearTimeout(timer);
-        aheadChecks.delete(id);
-        resolve(count);
+        statusChecks.delete(id);
+        const value = response?.method === method && response.result?.type === 'ok'
+          ? response.result.value : null;
+        resolve(readValue(value));
       };
       const timer = setTimeout(() => finish(null), 2000);
-      aheadChecks.set(id, finish);
+      statusChecks.set(id, finish);
       try {
         Promise.resolve(window.electronBridge.sendWorkerMessageFromView('git', {
           type: 'worker-request', workerId: 'git', request: {
-            id, method: 'branch-ahead-count', enqueuedAtMs: Date.now(),
-            params: { root: path, hostConfig: { id: 'local' }, operationSource: 'dashboard_push_controls' },
+            id, method, enqueuedAtMs: Date.now(),
+            params: { ...params, hostConfig: { id: 'local' }, operationSource: 'dashboard_push_controls' },
           },
         })).catch(() => finish(null));
       } catch { finish(null); }
+    });
+  }
+
+  function checkBranchAhead(path) {
+    return checkGitStatus('branch-ahead-count', { root: path }, value =>
+      Number.isInteger(value?.commitsAhead) && value.commitsAhead >= 0 ? value.commitsAhead : null);
+  }
+
+  function checkWorkingTree(path) {
+    return checkGitStatus('status-summary', { cwd: path, includeUntrackedFiles: true }, value => {
+      if (value?.type !== 'success'
+        || ![value.stagedCount, value.unstagedCount, value.untrackedCount].every(count =>
+          Number.isInteger(count) && count >= 0)) return null;
+      return value.stagedCount + value.unstagedCount + value.untrackedCount;
     });
   }
 
@@ -244,7 +259,7 @@ function createPushControls() {
 
   function destroy() {
     cancelRemote();
-    for (const finish of aheadChecks.values()) finish(null);
+    for (const finish of statusChecks.values()) finish(null);
     unsubscribe?.();
     unsubscribe = undefined;
     remoteCache.clear();
@@ -257,5 +272,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead };
+  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead, checkWorkingTree };
 }

@@ -1,4 +1,4 @@
-function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead }) {
+function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead, checkWorkingTree }) {
   let toolbar;
   let observer;
   let frame;
@@ -13,6 +13,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   let inspectedThreadID;
   const menuChanges = new Map();
   const combinedPushChecks = new Map();
+  const commitChecks = new Map();
   const actions = ['Commit', 'Commit & push', 'Push'];
 
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
@@ -27,28 +28,33 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     return status === 'unpushedCommits' || status === 'uncommittedChangesAndUnpushedCommits';
   }
 
-  function reconcileCombinedPush(context) {
-    const check = combinedPushChecks.get(context.path);
+  function hasUncommittedChanges(status) {
+    return status === 'uncommittedChanges' || status === 'uncommittedChangesAndUnpushedCommits';
+  }
+
+  function reconcileOperation(context, checks, hasChanges, readCount) {
+    const check = checks.get(context.path);
     if (!check) return;
     const status = repositoryStatus(context);
     if (pending || context.workflowRunning) return;
-    if (status === 'clean') {
+    if (['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)
+      && !hasChanges(status)) {
       clearTimeout(check.timer);
-      combinedPushChecks.delete(context.path);
+      checks.delete(context.path);
       return;
     }
-    if (!hasUnpushedCommits(status) || check.running || check.timer !== undefined) return;
+    if (!hasChanges(status) || check.running || check.timer !== undefined) return;
     check.running = true;
-    checkBranchAhead(context.path).then(count => {
-      if (combinedPushChecks.get(context.path) !== check) return;
+    readCount(context.path).then(count => {
+      if (checks.get(context.path) !== check) return;
       check.running = false;
       const current = codexUIContracts.headerGitContext();
       if (current?.path === context.path && !pending && !current.workflowRunning && count > 0) {
-        combinedPushChecks.delete(context.path);
+        checks.delete(context.path);
         sync();
         return;
       }
-      // The catalog can still contain the between-commit-and-push snapshot.
+      // The catalog can still contain a snapshot from before the operation finished.
       // Recheck while it disagrees, or if Git temporarily could not report its count.
       check.timer = setTimeout(() => {
         check.timer = undefined;
@@ -74,10 +80,11 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     if (!['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)) {
       return 'Repository status is not available yet.';
     }
-    const hasChanges = ['uncommittedChanges', 'uncommittedChangesAndUnpushedCommits'].includes(status);
+    const hasChanges = hasUncommittedChanges(status);
     if (action === 'Push' && !hasUnpushedCommits(status)) return 'No unpushed commits.';
     if (action === 'Push' && combinedPushChecks.has(context.path)) return 'Checking for unpushed commits…';
     if (action !== 'Push' && !hasChanges) return 'No changes to commit.';
+    if (action !== 'Push' && commitChecks.has(context.path)) return 'Checking for uncommitted changes…';
     return '';
   }
 
@@ -156,6 +163,10 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       const option = dialog.items.find(item => item.getAttribute('data-value') === command);
       if (!option || option.getAttribute('aria-disabled') === 'true'
         || option.getAttribute('data-disabled') === 'true' || option.disabled) return null;
+      if (action !== 'Push') {
+        clearTimeout(commitChecks.get(context.path)?.timer);
+        commitChecks.set(context.path, { running: false });
+      }
       if (action === 'Commit & push') {
         clearTimeout(combinedPushChecks.get(context.path)?.timer);
         combinedPushChecks.set(context.path, { running: false });
@@ -231,7 +242,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       return;
     }
     prefetchRemote(context.path);
-    reconcileCombinedPush(context);
+    reconcileOperation(context, combinedPushChecks, hasUnpushedCommits, checkBranchAhead);
+    reconcileOperation(context, commitChecks, hasUncommittedChanges, checkWorkingTree);
     if (!toolbar) {
       toolbar = document.createElement('div');
       toolbar.id = dashboardElements.elementIDs.gitToolbar;
@@ -341,6 +353,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     pending = undefined;
     for (const check of combinedPushChecks.values()) clearTimeout(check.timer);
     combinedPushChecks.clear();
+    for (const check of commitChecks.values()) clearTimeout(check.timer);
+    commitChecks.clear();
     missingSince = undefined;
     inspectedThreadID = undefined;
     observer?.disconnect();

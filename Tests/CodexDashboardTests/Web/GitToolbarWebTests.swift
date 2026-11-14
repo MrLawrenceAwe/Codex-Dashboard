@@ -57,6 +57,16 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             window.electronBridge = {
               subscribeToWorkerMessages(worker, callback) { if (worker === 'git') remoteListener = callback; return () => {}; },
               sendWorkerMessageFromView(worker, message) {
+                if (worker === 'git' && message.request?.method === 'status-summary') {
+                  setTimeout(() => remoteListener({
+                    type: 'worker-response', workerId: 'git', response: {
+                      id: message.request.id, method: 'status-summary',
+                      result: { type: 'ok', value: { type: 'success',
+                        stagedCount: 0, unstagedCount: window.uncommittedCount ?? 1, untrackedCount: 0 } }
+                    }
+                  }), 10);
+                  return Promise.resolve();
+                }
                 if (worker === 'git' && message.request?.method === 'branch-ahead-count') {
                   window.aheadChecks = (window.aheadChecks || 0) + 1;
                   setTimeout(() => remoteListener({
