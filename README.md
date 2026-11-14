@@ -14,10 +14,12 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 ## Features
 
-- **Chat monitoring:** recent activity, unread status, completion and question tracking, uncommitted files and unpushed Git commits.
-- **Review loops:** project and ordinary-folder reviews with automatic fixes, file verification, and Git commits when available, separate model choices, project queues, pause/resume/stop controls, and optional remote pushing.
-- **Edit dictation:** built-in OpenAI dictation at the cursor in a sent-message edit field, using the existing sign-in.
-- **Workflow tools:** a reusable prompt library and a persistent to-do list with tags, projects and images.
+- **Chats:** activity, unread status, completion and question tracking.
+- **Projects and Git:** sidebar colours, change indicators, and native Commit, Commit & push, and Push shortcuts.
+- **Accounts:** saved-account switching, allowance tracking, reset countdowns, and macOS or optional ntfy phone alerts.
+- **Review loops:** queued reviews and automatic fixes for repositories or ordinary folders, with model choices, verification, and optional Git commits and pushing.
+- **Dictation:** dictate into sent-message edits using your existing sign-in.
+- **Prompts and to-dos:** reusable prompts and persistent tasks with tags, projects, images, and model settings.
 
 See [Using Codex Dashboard](docs/usage.md) for feature behaviour and controls.
 
@@ -29,7 +31,7 @@ with the dashboard enabled when untrusted local software has access to your acco
 
 ## Install
 
-Requires macOS 14+, the Codex desktop app, and a Swift 6 toolchain. CI uses macOS 26 and Xcode 26.6 for WebKit visual baselines.
+Requires macOS 14+, the Codex desktop app, and a Swift 6 toolchain.
 
 Run:
 
@@ -37,56 +39,42 @@ Run:
 ./install.sh
 ```
 
-This runs the native and WebKit test suite (`swift test`), builds and signs
-`Codex Dashboard.app`, then stages and verifies a replacement in `$HOME/Applications`.
-It restores the previous bundle if replacement or installed-bundle verification fails.
-Use `./install.sh --relaunch`
-to open the new build, or `--skip-tests` during local iteration. `--no-launch` is the
-default and is also accepted explicitly. The separate renderer checks run with
-`node --test Tests/Renderer/*.test.cjs`; see [testing details](docs/development.md#testing).
+The installer runs `swift test`, builds and signs the app, and installs it in
+`$HOME/Applications`, restoring the previous bundle if replacement or verification
+fails. Add `--relaunch` to open the new build or `--skip-tests` for local iteration.
+The default is `--no-launch`.
 
-Local installs create and reuse a **Codex Dashboard Local Development** signing
-certificate in your login Keychain. Saved-account credentials are accessed by a
-separately signed helper whose approvals persist across Dashboard-only rebuilds.
-Choose **Always Allow** when macOS first asks the helper to access a saved account;
-each account is a separate Keychain item. Changes to the helper or signing
-certificate may require approval again.
+Local installs reuse a **Codex Dashboard Local Development** signing certificate.
+Choose **Always Allow** when the signed helper first requests access to each saved
+account. Approvals persist across Dashboard-only rebuilds; helper or certificate
+changes may require approval again.
 
 If the login keychain password is unavailable, run
 `python3 Packaging/signing-keychain.py --create` once, then rerun the installer.
-This prepares a separate keychain for build signing; later installs reuse it without
-asking for the login keychain password. Changing certificates can require approval
-again for saved-account access. See [local signing](docs/development.md#local-signing).
+This creates a separate signing keychain for later installs to reuse.
 
 To use an existing signing certificate, set `SIGNING_IDENTITY` to its name or SHA-1
-fingerprint when running the installer. The installer stops if signing fails.
-See [local signing](docs/development.md#local-signing) for certificate trust,
-Keychain partition identities, and approval persistence details.
+fingerprint. See [local signing](docs/development.md#local-signing) for details.
 
-To uninstall without permanently deleting the bundle, run `./uninstall.sh`.
-It moves the installed app to the Trash.
+Run `./uninstall.sh` to move the installed app to the Trash.
 
 ## Use
 
 1. Open **Codex Dashboard** from `$HOME/Applications`; it appears in the menu bar.
 2. Finish any active response in Codex.
 3. Select **Restart & Enable**, or leave Codex in the background with no running chats to enable it automatically.
-4. Select **Chat overview** directly in the Codex sidebar. It opens in
-   the main content pane while the rest of Codex navigation stays available.
+4. Select **Chat overview** in the Codex sidebar.
 
 Keep Dashboard running to refresh activity and restore its controls after Codex
 reloads. Use the menu bar for Diagnostics, Launch at Login, automatic completion and question
 focus, and **Disable dashboard integration**.
 
-See [Using Codex Dashboard](docs/usage.md) for chat filters, prompts, to-dos,
-accounts, usage alerts, review loops, and recovery instructions.
-
 ## Development
 
-See [architecture and behaviour](docs/architecture.md) for runtime, storage, refresh,
-and notification details. See [development and testing](docs/development.md) for
-renderer previews, resource organisation, migrations, and visual baselines.
+Run `swift test` for native and WebKit tests and
+`node --test Tests/Renderer/*.test.cjs` for renderer checks. CI uses macOS 26 and
+Xcode 26.6 for visual baselines.
 
-See [review-loop controls](docs/usage.md#review-loops) for reload controls, manual
-recovery, and static-review rules, or [extension testing details](docs/development.md#review-loop-extension-testing)
-for installation checks and debugging connection cleanup.
+See [architecture](docs/architecture.md) for runtime and storage,
+[development and testing](docs/development.md) for previews and visual baselines,
+and [review-loop controls](docs/usage.md#review-loops) for recovery and testing rules.
