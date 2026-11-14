@@ -250,11 +250,19 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(started, [true, true, true, true, true])
     }
 
-    func testPushDoesNotFlashEnabledWhileCompletedWorkflowSnapshotIsStale() async throws {
+    func testCommitOnlyEnablesPushDespiteStaleNativeNothingToPushHint() async throws {
         let webView = try await fixture()
-        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
-        _ = try await webView.evaluateJavaScript("window.setWorkflowRunning('current-git', true)")
-        try await DashboardWebTestHarness.waitForJavaScript("document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        let dirtyPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .uncommittedChanges),
+        ])
+        _ = try await webView.evaluateJavaScript("""
+        window.__codexDashboard.applyThreads((\(dirtyPayload)).threads);
+        window.showCommitDialog = true;
+        document.querySelector('[data-git-action=Commit]').click();
+        """)
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.confirmedAction === 'commit' && !document.body.hasAttribute('data-dashboard-git-handoff')", in: webView)
+        // The hidden native menu may retain its pre-commit no-commits hint.
         _ = try await webView.evaluateJavaScript("""
         (() => {
           const trigger = document.getElementById('current-git');
@@ -267,10 +275,21 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
           trigger.replaceChildren(document.createElement('svg'));
         })()
         """)
-        try await DashboardWebTestHarness.waitForJavaScript(
-            "document.querySelector('[data-git-action=Push]').title === 'No unpushed commits.'", in: webView)
-        let disabled = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').disabled") as? Bool
-        XCTAssertEqual(disabled, true)
+        let committedPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .unpushedCommits),
+        ])
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(committedPayload)).threads)")
+        let state = try await webView.evaluateJavaScript("""
+        [...document.querySelectorAll('.dashboard-git-toolbar button')].map(button => button.disabled)
+        """) as? [Bool]
+        XCTAssertEqual(state, [true, true, false])
+        // A later clean snapshot, after a push, disables Push again.
+        let cleanPayload = try DashboardWebTestHarness.snapshotPayload(for: [
+            .fixture(id: "current", checkoutPath: "/tmp/current", projectGitStatus: .clean),
+        ])
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(cleanPayload)).threads)")
+        let reason = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').title") as? String
+        XCTAssertEqual(reason, "No unpushed commits.")
     }
 
     func testPushStaysDisabledDuringNativeWorkflowAndRecoversWithoutSnapshot() async throws {

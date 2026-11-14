@@ -16,8 +16,6 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function disabledReason(context, action) {
     if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
-    // Native Git queries finish before the Dashboard's next repository snapshot.
-    if (action === 'Push' && context.pushHasNoCommits) return 'No unpushed commits.';
     const thread = findThread(context.threadID);
     if (thread?.gitActionsBlockedUntilCompletion) return 'Wait for a response to finish without interruption before committing or pushing these files.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -25,6 +23,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       if (remote !== true) return remote === false
         ? 'No Git remote is configured for this repository.' : 'Checking Git remotes…';
     }
+    // Use the repository snapshot for availability; hidden native menus can retain
+    // a pre-commit nothing-to-push hint. Native selection still checks enabled items.
     // Group status is valid only when this chat uses that same repository.
     const status = thread?.sharesGroupRepository ? thread.projectGitStatus : null;
     if (!['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)) {

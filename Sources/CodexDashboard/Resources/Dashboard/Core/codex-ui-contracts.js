@@ -577,16 +577,7 @@ const codexUIContracts = (() => {
         && containsMessage(props.children, ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']));
       if (!scope || !menu) continue;
       const workflowRunning = containsMessage(menu.children, ['localConversation.gitActions.cancelWorkflow']);
-      const findPush = (element, depth = 0) => {
-        if (!element || depth > 8) return null;
-        if (Array.isArray(element)) return element.map(child => findPush(child, depth + 1)).find(Boolean);
-        const props = element.props;
-        if (typeof props?.onSelect === 'function'
-          && containsMessage(props.children, ['localConversation.gitActions.push'])) return props;
-        return findPush(props?.children, depth + 1);
-      };
-      const pushHasNoCommits = findPush(menu.children)?.tooltipText?.props?.reason === 'nothing-to-push';
-      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning, pushHasNoCommits };
+      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning };
     }
     return null;
   }

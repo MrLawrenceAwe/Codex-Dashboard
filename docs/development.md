@@ -154,7 +154,10 @@ teardown. Runtime warnings reach Diagnostics without rerunning unrelated probes.
 button. `codex-ui-contracts.js` identifies the summary Git menu by its action
 message IDs and matches its conversation, host and repository scope to the selected
 chat, including hidden summary panels. Shortcuts open the native menu and select
-only enabled native items; chat changes cancel pending handoffs. The Commit and Commit & push
+only enabled native items; chat changes cancel pending handoffs. Button availability
+uses the Dashboard repository snapshot rather than native menu tooltip hints, which
+can remain stale after a commit. Native workflows still disable all three buttons
+while running. The Commit and Commit & push
 shortcuts open the native commit dialog and activate its enabled matching command
 after verifying the dialog’s conversation, repository and host. The intermediate
 menu and dialog stay hidden during this handoff; Commit leaves the message blank
