@@ -342,7 +342,7 @@ targets, and copyable details.
 The **Git toolbar actions** check also runs during normal synchronization. It warns
 when Commit, Commit & push, or Push is missing in a supported local Git chat,
 including when Codex's toolbar anchor or native Git menu changes. Navigation gets
-a short settling period. Dashboard pages, dialogs, and chats without a Git checkout
+a short settling period. Dashboard pages, dialogs, and chats without a Git checkout, and chats outside a project
 leave this check pending. The warning clears when the shortcuts return or you
 leave the eligible chat.
 
@@ -385,8 +385,9 @@ shortcuts until it is available.
 Push and Commit & push stay disabled until a remote is confirmed and remain
 disabled when none is configured. The Git menu’s Push action follows the same rule.
 
-Buttons follow the selected local chat’s primary repository and disappear outside
-supported Git chats and on Dashboard pages. A running response keeps Git shortcuts
+Buttons follow the selected local project chat’s primary repository. They appear
+only in chats assigned to a project with a supported Git checkout, and disappear
+on Dashboard pages. A running response keeps Git shortcuts
 available until repository files differ from the last normally completed response.
 New edits block all three shortcuts until a response finishes normally; stopping,
 interrupting, or reaching a usage limit does not release that block. Staging or

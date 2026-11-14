@@ -19,6 +19,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
     && a.path === b.path && a.hostID === b.hostID);
 
+  function isProjectChat(threadID) {
+    if (threadID !== codexUIContracts.selectedThreadID()) return false;
+    if (codexUIContracts.activeComposerExplicitlyHasNoProject()) return false;
+    if (codexUIContracts.activeComposerProjectID()) return true;
+    return Boolean(findThread(threadID)?.projectID);
+  }
+
   function repositoryStatus(context) {
     const thread = findThread(context.threadID);
     return thread?.sharesGroupRepository ? thread.projectGitStatus : null;
@@ -155,6 +162,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     const command = { Commit: 'commit', 'Commit & push': 'commit-and-push', Push: 'push' }[action];
     const handoff = await domUtils.waitFor(() => {
       if (destroyed || pending !== operation
+        || !isProjectChat(context.threadID)
         || !sameContext(context, codexUIContracts.headerGitContext())) return true;
       const dialog = codexUIContracts.pushControls();
       if (!dialog?.compatible || !dialog.local || dialog.threadID !== context.threadID
@@ -184,7 +192,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   async function activate(action, anchor) {
     if (pending) return;
     const context = codexUIContracts.headerGitContext();
-    if (!context) return;
+    if (!context || !isProjectChat(context.threadID)) return;
     if (disabledReason(context, action)) { sync(); return; }
     closeMenu();
     const operation = { context };
@@ -203,6 +211,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       context.menu.onOpenChange(true);
       const item = await domUtils.waitFor(() => {
         if (destroyed || pending !== operation
+          || !isProjectChat(context.threadID)
           || !sameContext(context, codexUIContracts.headerGitContext())) return { cancelled: true };
         const menu = codexUIContracts.gitActionsMenu(context.trigger);
         positionMenu();
@@ -235,7 +244,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function sync() {
     const host = codexUIContracts.chatHeaderActionsHost();
-    const context = host ? codexUIContracts.headerGitContext() : null;
+    const context = host && isProjectChat(codexUIContracts.selectedThreadID())
+      ? codexUIContracts.headerGitContext() : null;
     if (menuContext && !sameContext(context, menuContext)) closeMenu();
     if (!host || !context) {
       toolbar?.remove();
@@ -277,7 +287,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     const threadID = codexUIContracts.selectedThreadID();
     // Confirm eligibility independently of the toolbar anchor and native Git
     // menu, since a Codex update can remove either of them.
-    const eligible = threadID && domUtils.isVisible(composer)
+    const eligible = isProjectChat(threadID) && domUtils.isVisible(composer)
       && !composer.closest('[aria-hidden="true"], [inert]')
       && (findThread(threadID)?.sharesGroupRepository || codexUIContracts.headerGitContext());
     if (!eligible || inspectedThreadID !== threadID) {

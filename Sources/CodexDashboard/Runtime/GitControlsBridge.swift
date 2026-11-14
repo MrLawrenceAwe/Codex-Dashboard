@@ -60,11 +60,11 @@ struct GitControlsBridge {
         switch state {
         case "missing":
             toolbarCheck(status: .warning, detail:
-                "Git toolbar actions are missing in a local Git chat. Codex Dashboard could not display Commit, Commit & push, and Push.")
+                "Git toolbar actions are missing in a local project Git chat. Codex Dashboard could not display Commit, Commit & push, and Push.")
         case "compatible":
-            toolbarCheck(status: .compatible, detail: "All three Git shortcuts are visible in the local Git chat.")
+            toolbarCheck(status: .compatible, detail: "All three Git shortcuts are visible in the local project Git chat.")
         default:
-            toolbarCheck(status: .pending, detail: "Open a local Git chat to check the toolbar shortcuts.")
+            toolbarCheck(status: .pending, detail: "Open a local project Git chat to check the toolbar shortcuts.")
         }
     }
 
