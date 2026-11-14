@@ -16,6 +16,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function disabledReason(context, action) {
     if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
+    if (!context.menu && !context.openCommitDialog) return 'Codex is preparing Git actions for this chat.';
     const thread = findThread(context.threadID);
     if (thread?.gitActionsBlockedUntilCompletion) return 'Wait for a response to finish without interruption before committing or pushing these files.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -100,6 +101,28 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     } else if (menuChanges.size) restoreMenuItems();
   }
 
+  async function selectDialogAction(context, operation, action) {
+    const command = { Commit: 'commit', 'Commit & push': 'commit-and-push', Push: 'push' }[action];
+    const handoff = await domUtils.waitFor(() => {
+      if (destroyed || pending !== operation
+        || !sameContext(context, codexUIContracts.headerGitContext())) return true;
+      const dialog = codexUIContracts.pushControls();
+      if (!dialog?.compatible || !dialog.local || dialog.threadID !== context.threadID
+        || dialog.path !== context.path) return null;
+      if (disabledReason(context, action)) return null;
+      const option = dialog.items.find(item => item.getAttribute('data-value') === command);
+      if (!option || option.getAttribute('aria-disabled') === 'true'
+        || option.getAttribute('data-disabled') === 'true' || option.disabled) return null;
+      option.click();
+      return { selected: dialog.dialog };
+    }, { timeout: 5000, interval: 50 });
+    if (handoff?.selected) {
+      await domUtils.waitFor(() => destroyed || !handoff.selected.isConnected
+        || !handoff.selected.querySelector(`[cmdk-item][data-value="${command}"]`),
+      { timeout: 1000, interval: 16 });
+    }
+  }
+
   async function activate(action, anchor) {
     if (pending) return;
     const context = codexUIContracts.headerGitContext();
@@ -108,16 +131,18 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     closeMenu();
     const operation = { context };
     pending = operation;
-    menuContext = context;
-    menuAnchor = anchor;
-    const commitAndPush = action === 'Commit & push';
-    const nativeAction = commitAndPush ? 'Commit' : action;
-    const startsCommit = nativeAction === 'Commit';
-    if (startsCommit) document.body.setAttribute('data-dashboard-git-handoff', '');
-    if (nativeAction === 'Commit') prefetchRemote(context.path);
-    context.menu.onOpenChange(true);
+    const nativeAction = action === 'Commit & push' ? 'Commit' : action;
+    document.body.setAttribute('data-dashboard-git-handoff', '');
     sync();
     try {
+      if (context.openCommitDialog) {
+        context.openCommitDialog();
+        await selectDialogAction(context, operation, action);
+        return;
+      }
+      menuContext = context;
+      menuAnchor = anchor;
+      context.menu.onOpenChange(true);
       const item = await domUtils.waitFor(() => {
         if (destroyed || pending !== operation
           || !sameContext(context, codexUIContracts.headerGitContext())) return { cancelled: true };
@@ -134,26 +159,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
         // Native menu selection retains Codex's disabled states and Git workflow.
         item.click();
         closeMenu();
-        if (startsCommit) {
-          const command = commitAndPush ? 'commit-and-push' : 'commit';
-          const handoff = await domUtils.waitFor(() => {
-            if (destroyed || pending !== operation
-              || !sameContext(context, codexUIContracts.headerGitContext())) return true;
-            const dialog = codexUIContracts.pushControls();
-            if (!dialog?.compatible || dialog.threadID !== context.threadID
-              || dialog.path !== context.path || dialog.hostConfig?.id !== context.hostID) return null;
-            const option = dialog.items[commitAndPush ? 1 : 0];
-            if (disabledReason(context, action)) return true;
-            if (option.getAttribute('aria-disabled') === 'true' || option.getAttribute('data-disabled') === 'true') return null;
-            option.click();
-            return { selected: dialog.dialog };
-          }, { timeout: 3000, interval: 50 });
-          if (handoff?.selected) {
-            await domUtils.waitFor(() => destroyed || !handoff.selected.isConnected
-              || !handoff.selected.querySelector(`[cmdk-item][data-value="${command}"]`),
-            { timeout: 1000, interval: 16 });
-          }
-        }
+        await selectDialogAction(context, operation, action);
       }
       // Unavailable actions leave the native menu visible with its explanation.
       if (!item) {
@@ -228,7 +234,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       if (record.target.closest?.('.dashboard-git-toolbar')) return false;
       if (record.target.closest?.(hostSelector)) return true;
       if (record.type === 'attributes') return record.attributeName === 'aria-current'
-        || (record.attributeName === 'aria-hidden' && containsHost(record.target));
+        || (['aria-hidden', 'inert'].includes(record.attributeName) && containsHost(record.target));
       return [...record.addedNodes, ...record.removedNodes].some(containsHost);
     })) scheduleSync();
   }
@@ -248,7 +254,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       unsubscribeRemote = subscribeRemote(scheduleSync);
       observer = new MutationObserver(handleMutations);
       observer.observe(document.body, { childList: true, subtree: true, attributes: true,
-        attributeFilter: ['aria-hidden', 'aria-expanded', 'aria-current', 'aria-disabled', 'data-disabled', 'disabled', 'style'] });
+      attributeFilter: ['aria-hidden', 'aria-expanded', 'aria-current', 'aria-disabled', 'data-disabled', 'disabled', 'inert', 'style'] });
       window.addEventListener('resize', scheduleSync);
       document.addEventListener('click', blockRemoteAction, true);
       document.addEventListener('keydown', blockRemoteAction, true);

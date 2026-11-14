@@ -16,7 +16,7 @@ protocol DashboardRuntime: AnyObject {
     func rendererTargets() async -> [DevToolsTarget]
     func waitForReviewOperations() async
     func prepareForRestart()
-    func restartCodex() async throws -> [DevToolsTarget]
+    func restartCodex(activate: Bool) async throws -> [DevToolsTarget]
     func synchronizeDashboard(
         with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
@@ -74,22 +74,15 @@ final class CodexDashboardRuntime: DashboardRuntime {
         renderer.prepareForRestart()
     }
 
-    func restartCodex() async throws -> [DevToolsTarget] {
-        // A randomly chosen debugging port can be occupied after the old Codex
-        // process exits. Relaunch once with a newly selected port before giving
-        // up, rather than leaving the dashboard unavailable until a manual retry.
-        for attempt in 0..<2 {
-            try await codex.restart()
-            let deadline = ContinuousClock.now + .seconds(18)
-            while true {
-                let targets = await renderer.targets(forceRefresh: true)
-                if !targets.isEmpty { return targets }
-                guard ContinuousClock.now < deadline else { break }
-                try await Task.sleep(for: .milliseconds(350))
-            }
-            if attempt == 1 { throw DashboardError.rendererTimedOut }
+    func restartCodex(activate: Bool) async throws -> [DevToolsTarget] {
+        try await codex.restart(activate: activate)
+        let deadline = ContinuousClock.now + .seconds(18)
+        while true {
+            let targets = await renderer.targets(forceRefresh: true)
+            if !targets.isEmpty { return targets }
+            guard ContinuousClock.now < deadline else { throw DashboardError.rendererTimedOut }
+            try await Task.sleep(for: .milliseconds(350))
         }
-        throw DashboardError.rendererTimedOut
     }
 
     func synchronizeDashboard(

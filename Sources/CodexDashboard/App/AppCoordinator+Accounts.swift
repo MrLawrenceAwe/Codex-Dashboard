@@ -135,7 +135,7 @@ extension AppCoordinator {
         connectionError = nil
         let targets: [DevToolsTarget]
         do {
-            targets = try await dashboardRuntime.restartCodex()
+            targets = try await dashboardRuntime.restartCodex(activate: true)
         } catch let restartError {
             do {
                 try await accounts.rollback(accountTransaction)
@@ -153,7 +153,7 @@ extension AppCoordinator {
             await accounts.refreshState()
             accounts.setStatusMessage("Codex could not restart, so the account change was rolled back.")
             dashboardRuntime.prepareForRestart()
-            _ = try? await dashboardRuntime.restartCodex()
+            _ = try? await dashboardRuntime.restartCodex(activate: true)
             setFailure(restartError, lastKnownState: .codexClosed)
             return
         }

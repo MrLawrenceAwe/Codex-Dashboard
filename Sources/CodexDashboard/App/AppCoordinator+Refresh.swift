@@ -37,6 +37,8 @@ extension AppCoordinator {
                 try await publishSnapshot(to: targets, using: dashboardRuntime)
                 updatePublished(\.connectionState, to: .dashboardMounted)
                 updatePublished(\.connectionError, to: nil)
+                updatePublished(\.connectionNotice, to: nil)
+                automaticRestartAttempts = 0
             } catch {
                 guard !Task.isCancelled, dashboardRuntime.maintainsDashboard else { return }
                 setFailure(

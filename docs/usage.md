@@ -343,10 +343,25 @@ to finish, then removes the injected controls. Remote publication can delay remo
 A normal Codex restart also removes the controls. The signed Codex application bundle
 is never modified.
 
+### Automatic dashboard recovery
+
+While Codex is running in the background and no chats are running, Dashboard
+restarts Codex automatically if its integration is missing or a mount fails.
+Automatic restarts keep Codex in the background and pause while speech input is
+active. Each attempt checks chat activity again before restarting. If chat activity
+cannot be checked or a required compatibility check fails, Codex is left running.
+
+Recovery stops after three actual restarts for the same failure. A successful
+mount resets the limit; **Restart & Enable** also starts a fresh attempt manually.
+Recovery runs on the normal monitoring polls. **Disable dashboard integration**
+turns off automatic recovery until you enable integration again. Compatibility
+advisories unrelated to a failed mount do not trigger restarts.
+
+
 ## Git actions in the chat header
 
-Dashboard adds **Commit**, **Commit & push**, and **Push** beside the
-chat actions in the top toolbar, including when the summary panel is closed.
+Dashboard adds **Commit**, **Commit & push**, and **Push** next to the chat’s
+Share and Summary buttons, including when the summary panel is closed.
 Commit starts Codex’s native commit workflow directly, leaving the message blank
 so Codex generates it automatically. Commit & push starts Codex’s combined
 commit-and-push workflow directly. The intermediate menus stay hidden for both actions.

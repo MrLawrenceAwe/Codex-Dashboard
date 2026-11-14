@@ -150,10 +150,13 @@ three cmdk command values, independent of translated text. Mouse, keyboard, and
 cmdk selection are guarded; owned attributes are restored on context changes or
 teardown. Runtime warnings reach Diagnostics without rerunning unrelated probes.
 
-`Core/git-toolbar.js` mounts repository actions beside the native Chat actions
-button. `codex-ui-contracts.js` identifies the summary Git menu by its action
+`Core/git-toolbar.js` mounts repository actions in the header group containing
+the Summary button. `codex-ui-contracts.js` identifies the summary Git menu by its action
 message IDs and matches its conversation, host and repository scope to the selected
-chat, including hidden summary panels. Shortcuts open the native menu and select
+chat, including hidden summary panels. When Codex hides the Git menu with
+Git-based diffs disabled, the shortcuts call the selected checkout's deferred
+commit command and select the corresponding enabled action in its native dialog.
+When the menu is present, shortcuts open it and select
 only enabled native items; chat changes cancel pending handoffs. Button availability
 uses the Dashboard repository snapshot rather than native menu tooltip hints, which
 can remain stale after a commit. Native workflows still disable all three buttons

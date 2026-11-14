@@ -49,7 +49,7 @@ final class CodexProcessController {
         runningApplications.compactMap(\.launchDate).max()
     }
 
-    func restart() async throws {
+    func restart(activate: Bool = true) async throws {
         guard FileManager.default.fileExists(atPath: applicationURL.path) else {
             throw DashboardError.missingCodexApplication
         }
@@ -75,7 +75,7 @@ final class CodexProcessController {
         CodexConfiguration.selectFreshDevToolsPortForLaunch()
         let launchConfiguration = NSWorkspace.OpenConfiguration()
         launchConfiguration.arguments = CodexConfiguration.launchArguments
-        launchConfiguration.activates = true
+        launchConfiguration.activates = activate
         try await applicationLauncher(applicationURL, launchConfiguration)
     }
 

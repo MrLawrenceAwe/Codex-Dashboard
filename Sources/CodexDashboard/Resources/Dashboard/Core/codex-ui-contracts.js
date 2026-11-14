@@ -532,7 +532,7 @@ const codexUIContracts = (() => {
 
   function gitActionsButton() {
     const scoped = headerGitContext();
-    if (scoped && !scoped.trigger.disabled) return scoped.trigger;
+    if (scoped?.trigger && !scoped.trigger.disabled) return scoped.trigger;
     return [...document.querySelectorAll('button[aria-label], button[title]')].find((button) => (
       isVisible(button)
         && !button.disabled
@@ -545,7 +545,7 @@ const codexUIContracts = (() => {
   const chatHeaderSelector = '[data-app-shell-header-toolbar], [data-app-shell-header-slot="end"]';
 
   function chatHeaderActionsHost() {
-    const buttons = document.querySelectorAll('button[aria-label="Chat actions"]');
+    const buttons = document.querySelectorAll('button[aria-label="Toggle summary"]');
     for (const button of buttons) {
       const header = button.closest(chatHeaderSelector);
       if (!header || !isVisible(button) || button.closest('[aria-hidden="true"], [inert]')) continue;
@@ -567,17 +567,47 @@ const codexUIContracts = (() => {
     };
     const threadID = selectedThreadID();
     if (!threadID) return null;
+    const isSelectedScope = props => props?.surface === 'summary-panel'
+      && props.conversationId === threadID && typeof props.target?.root === 'string'
+      && props.target.root.startsWith('/')
+      && props.target.hostId === 'local' && props.registerCommands === true;
     for (const trigger of document.querySelectorAll('button[aria-label="Git actions"]')) {
       const ancestors = [...parentFibers(trigger)].map(fiber => fiber.memoizedProps);
-      const scope = ancestors.find(props => props?.surface === 'summary-panel'
-        && props.conversationId === threadID && typeof props.target?.root === 'string'
-        && props.target?.hostId === 'local' && props.registerCommands === true);
+      const scope = ancestors.find(isSelectedScope);
       const menu = ancestors.find(props => props?.triggerButton?.props?.label === 'Git actions'
         && typeof props.open === 'boolean' && typeof props.onOpenChange === 'function'
         && containsMessage(props.children, ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']));
       if (!scope || !menu) continue;
       const workflowRunning = containsMessage(menu.children, ['localConversation.gitActions.cancelWorkflow']);
       return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning };
+    }
+    // The summary still registers the native Git command when Git-based diffs
+    // are disabled, but omits the Git menu from the checkout section.
+    for (const button of document.querySelectorAll('[data-summary-panel-variant] button[aria-label="Actions"]')) {
+      const ancestors = [...parentFibers(button)];
+      const scope = ancestors.map(fiber => fiber.memoizedProps)
+        .find(props => isSelectedScope(props) && props.deferQueries === true);
+      if (!scope) continue;
+      const summary = ancestors.find(fiber => fiber.memoizedProps?.surface === 'summary-panel'
+        && fiber.memoizedProps.deferGitQueries === true && fiber.memoizedProps.registerCommands === true);
+      const registrar = summary?.child;
+      if (registrar?.memoizedProps?.deferQueries !== true) continue;
+      // Read this checkout's registration. A window-wide command could route to
+      // another mounted chat, and the full Git command can push without a dialog.
+      const lastEffect = registrar.child?.updateQueue?.lastEffect;
+      if (!lastEffect) continue;
+      for (let effect = lastEffect.next; effect; effect = effect.next) {
+        const deps = effect.deps;
+        if (deps?.[3] === 'git.commit' && typeof deps[2] === 'function') {
+          return {
+            threadID, path: scope.target.root, hostID: scope.target.hostId,
+            workflowRunning: deps[1] === false,
+            openCommitDialog: deps[1] === true && typeof effect.inst?.destroy === 'function'
+              ? () => deps[2](undefined, 'toolbar') : null,
+          };
+        }
+        if (effect === lastEffect) break;
+      }
     }
     return null;
   }

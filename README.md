@@ -70,7 +70,7 @@ It moves the installed app to the Trash.
 
 1. Open **Codex Dashboard** from `$HOME/Applications`; it appears in the menu bar.
 2. Finish any active response in Codex.
-3. Select **Restart & Enable**.
+3. Select **Restart & Enable**, or leave Codex in the background with no running chats to enable it automatically.
 4. Select **Chat overview** directly in the Codex sidebar. It opens in
    the main content pane while the rest of Codex navigation stays available.
 

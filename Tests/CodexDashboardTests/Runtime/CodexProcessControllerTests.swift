@@ -58,15 +58,20 @@ final class CodexProcessControllerTests: XCTestCase {
         let application = StubRunningCodexApplication()
         application.exitsGracefully = true
         var didLaunch = false
+        var activates: Bool?
         let controller = CodexProcessController(
             applicationURL: applicationURL,
             runningApplicationsProvider: { application.isRunning ? [application] : [] },
-            applicationLauncher: { _, _ in didLaunch = true },
+            applicationLauncher: { _, configuration in
+                didLaunch = true
+                activates = configuration.activates
+            },
             sleep: { _ in }
         )
 
-        try await controller.restart()
+        try await controller.restart(activate: false)
 
+        XCTAssertEqual(activates, false)
         XCTAssertEqual(application.terminateCallCount, 1)
         XCTAssertEqual(application.forceTerminateCallCount, 0)
         XCTAssertTrue(didLaunch)

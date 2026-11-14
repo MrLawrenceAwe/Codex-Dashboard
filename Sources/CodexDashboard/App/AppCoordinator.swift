@@ -49,6 +49,7 @@ final class AppCoordinator: ObservableObject {
     var compatibilityCheckTask: Task<Void, Never>?
     private(set) var dashboardRuntime: (any DashboardRuntime)?
     var refreshGeneration = 0
+    var automaticRestartAttempts = 0
     var catalogWarning: String?
     var unreadStateWarning: String?
     private var activationObserver: NSObjectProtocol?
@@ -201,9 +202,16 @@ final class AppCoordinator: ObservableObject {
     func synchronizeDashboard() async {
         guard !isPerformingAction else { return }
         await synchronizationCoalescer.perform { [weak self] in await self?.synchronizeRuntime() }
+        await recoverDashboardIfNeeded()
     }
 
     func restartCodexAndEnableDashboard() async {
+        guard !isPerformingAction else { return }
+        automaticRestartAttempts = 0
+        await restartCodexAndEnableDashboard(automatically: false)
+    }
+
+    func restartCodexAndEnableDashboard(automatically: Bool) async {
         guard !isPerformingAction, let dashboardRuntime else { return }
         // Reserve the action before preflight can suspend. Drain synchronization
         // before checking chats so it cannot launch work after the idle check.
@@ -229,13 +237,23 @@ final class AppCoordinator: ObservableObject {
             connectionError = Self.incompatibleContractMessage
             return
         }
+        guard !Task.isCancelled else { return }
+        if automatically {
+            guard dashboardRuntime.codexIsRunning,
+                  dashboardRuntime.maintainsDashboard,
+                  !codexForegrounder.isCodexFrontmost,
+                  await dashboardRuntime.hasActiveSpeechInput() == false,
+                  !codexForegrounder.isCodexFrontmost,
+                  !Task.isCancelled else { return }
+            automaticRestartAttempts += 1
+        }
         dashboardRuntime.prepareForRestart()
         connectionState = .checking
         connectionError = nil
         var rendererAvailable = false
 
         do {
-            let targets = try await dashboardRuntime.restartCodex()
+            let targets = try await dashboardRuntime.restartCodex(activate: !automatically)
             rendererAvailable = true
             _ = try await refreshThreadState()
             try await dashboardRuntime.synchronizeDashboard(
@@ -244,6 +262,8 @@ final class AppCoordinator: ObservableObject {
                 forceRemount: true
             )
             connectionState = .dashboardMounted
+            connectionNotice = nil
+            automaticRestartAttempts = 0
         } catch {
             setFailure(
                 error,

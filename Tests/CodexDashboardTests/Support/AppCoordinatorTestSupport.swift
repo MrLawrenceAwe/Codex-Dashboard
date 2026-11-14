@@ -323,13 +323,13 @@ final class CoordinatorMemoryCredentialVault: AccountCredentialVault, @unchecked
 @MainActor
 final class StubDashboardRuntime: DashboardRuntime {
     var pushControlsCompatibilityCheck: CompatibilityCheck?
-    let codexIsRunning: Bool
+    var codexIsRunning: Bool
     let codexLaunchDate: Date? = nil
-    let maintainsDashboard: Bool
+    var maintainsDashboard: Bool
     let reviewLoopThreadIDs: Set<String>
     private let compatibilityChecks: [CompatibilityCheck]
-    private let synchronizationError: Error?
-    private let restartError: Error?
+    var synchronizationError: Error?
+    var restartError: Error?
     private let onRestart: (() -> Void)?
     private let accountPopoverActionWaitResult: AccountPopoverActionPollResult
     private(set) var accountPopoverPollCount = 0
@@ -363,8 +363,9 @@ final class StubDashboardRuntime: DashboardRuntime {
         self.onRestart = onRestart
     }
 
+    var targetsAreAvailable = true
     func rendererTargets() async -> [DevToolsTarget] {
-        guard maintainsDashboard else { return [] }
+        guard targetsAreAvailable, maintainsDashboard else { return [] }
         return [DevToolsTarget(
             id: "main",
             type: "page",
@@ -380,8 +381,10 @@ final class StubDashboardRuntime: DashboardRuntime {
     var onWaitForReviewOperations: (() async -> Void)?
     func waitForReviewOperations() async { await onWaitForReviewOperations?() }
     func prepareForRestart() {}
-    func restartCodex() async throws -> [DevToolsTarget] {
+    private(set) var restartActivations: [Bool] = []
+    func restartCodex(activate: Bool) async throws -> [DevToolsTarget] {
         restartCallCount += 1
+        restartActivations.append(activate)
         onRestart?()
         if let restartError { throw restartError }
         return []

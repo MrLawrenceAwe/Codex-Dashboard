@@ -35,17 +35,18 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(actionCount, 1)
     }
 
-    private func fixture(noRemote: Bool = false) async throws -> WKWebView {
+    private func fixture(noRemote: Bool = false, deferredGit: Bool = false) async throws -> WKWebView {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
           <aside><nav><div class="sidebar-item"><button>New chat</button></div></nav></aside>
           <main>
             <div data-app-shell-header-toolbar><div>Chat title</div><div id="header-actions">
-              <div data-app-shell-focus-area="main"><button aria-label="Chat actions">…</button></div>
+              <div data-app-shell-focus-area="main"><button aria-label="Toggle summary">…</button></div>
             </div></div>
             <div id="composer"><textarea></textarea></div>
             <div hidden><button id="other-git" aria-label="Git actions"></button></div>
             <div hidden><button id="current-git" aria-label="Git actions" aria-controls="git-menu"></button></div>
+            <div hidden data-summary-panel-variant="summary"><button id="checkout-actions" aria-label="Actions"></button></div>
           </main>
           <script>
             window.selected = 'current';
@@ -92,11 +93,12 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
                     for (const action of ['Commit', 'Push', 'Switch branch']) {
                       const item = document.createElement('button');
                       item.setAttribute('role', 'menuitem'); item.textContent = action;
-                      item.setAttribute('aria-disabled', String(action === 'Push' || (action === 'Commit' && !window.allowCommit)));
+                      item.setAttribute('aria-disabled', String((action === 'Push' && !window.allowPush)
+                        || (action === 'Commit' && !window.allowCommit)));
                       item.addEventListener('click', () => {
                         window.menuOpacityAtSelection = getComputedStyle(wrapper).opacity;
                         window.actions.push([threadID, path, action]);
-                        if (action === 'Commit' && window.showCommitDialog) {
+                        if (['Commit', 'Push'].includes(action) && window.showCommitDialog) {
                           const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
                           const root = document.createElement('div'); root.setAttribute('cmdk-root', '');
                           root.setAttribute('data-codex-shortcut-capture', ''); root.tabIndex = -1;
@@ -130,6 +132,32 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             }
             attachGit('other-git', 'other', '/tmp/other');
             attachGit('current-git', 'current', '/tmp/current');
+            if (\(deferredGit)) {
+              const git = document.getElementById('current-git');
+              const oldMenu = git.__reactFiber$test.return;
+              const scope = oldMenu.return;
+              scope.memoizedProps.deferQueries = true;
+              const effect = {
+                deps: [null, true, () => oldMenu.memoizedProps.onOpenChange(true), 'git.commit'],
+                inst: { destroy() {} }
+              };
+              effect.next = effect;
+              const summary = {
+                memoizedProps: { surface: 'summary-panel', deferGitQueries: true, registerCommands: true },
+                child: { memoizedProps: { deferQueries: true }, child: { updateQueue: { lastEffect: effect } } },
+                return: scope
+              };
+              document.getElementById('checkout-actions').__reactFiber$test = { return: summary };
+              git.remove();
+              const observer = new MutationObserver(() => {
+                // Reuse the native commit-dialog fixture without exposing a Git menu trigger.
+                const item = document.querySelector('#git-menu [role=menuitem]');
+                if (!item) return;
+                item.click();
+                oldMenu.memoizedProps.onOpenChange(false);
+              });
+              observer.observe(document.body, { childList: true, subtree: true });
+            }
             window.setWorkflowRunning = (id, running) => {
               const trigger = document.getElementById(id);
               trigger.__reactFiber$test.return.memoizedProps.children = { props: { children: [
@@ -148,6 +176,29 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         return webView
     }
 
+    func testDeferredNativeGitCommandUsesTheMatchingDialogForAllThreeShortcuts() async throws {
+        let webView = try await fixture(deferredGit: true)
+        _ = try await webView.evaluateJavaScript("window.showCommitDialog = true")
+        for (action, command) in [("Commit", "commit"), ("Commit & push", "commit-and-push"), ("Push", "push")] {
+            let button = #"document.querySelector('[data-git-action="\#(action)"]')"#
+            try await DashboardWebTestHarness.waitForJavaScript("\(button)?.disabled === false", in: webView)
+            _ = try await webView.evaluateJavaScript("\(button).click()")
+            try await DashboardWebTestHarness.waitForJavaScript(
+                "window.confirmedAction === '\(command)' && !document.body.hasAttribute('data-dashboard-git-handoff')",
+                in: webView)
+        }
+    }
+
+    func testPushCompletesWhenNativeMenuOpensItsDialog() async throws {
+        let webView = try await fixture()
+        _ = try await webView.evaluateJavaScript("window.allowPush = true; window.showCommitDialog = true")
+        try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
+        _ = try await webView.evaluateJavaScript("document.querySelector('[data-git-action=Push]').click()")
+        try await DashboardWebTestHarness.waitForJavaScript(
+            "window.confirmedAction === 'push' && !document.body.hasAttribute('data-dashboard-git-handoff')",
+            in: webView)
+    }
+
     func testHeaderActionsUseSelectedRepositoryWithSummaryHiddenAndRepairAfterReplacement() async throws {
         let webView = try await fixture()
         let labels = try await webView.evaluateJavaScript("""
@@ -163,7 +214,7 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
           const old = document.getElementById('header-actions');
           const next = document.createElement('div'); next.id = 'header-actions';
           next.setAttribute('data-app-shell-header-slot-content', 'end');
-          next.innerHTML = '<div><button aria-label="Chat actions">…</button></div>';
+          next.innerHTML = '<div><button aria-label="Toggle summary">…</button></div>';
           const slot = document.createElement('div');
           slot.setAttribute('data-app-shell-header-slot', 'end');
           slot.append(next);
