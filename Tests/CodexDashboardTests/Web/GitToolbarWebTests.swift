@@ -526,37 +526,6 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(activations, 0)
     }
 
-    func testOverviewCommitUsesScopedNativeMenuWithSummaryHidden() async throws {
-        let webView = try await fixture()
-        _ = try await webView.evaluateJavaScript("""
-        window.__codexDashboard.openChatOverview();
-        document.querySelector('[data-filter="changedProjects"]').click();
-        document.querySelector('[data-project-git-action]').click();
-        """)
-        try await DashboardWebTestHarness.waitForJavaScript("window.actions.length === 1", in: webView)
-        let result = try await webView.evaluateJavaScript("""
-        [window.actions[0][0] === 'current', window.actions[0][1] === '/tmp/current',
-          window.actions[0][2] === 'Commit', !document.getElementById('git-menu'),
-          !window.__codexDashboard.isOpen()]
-        """) as? [Bool]
-        XCTAssertEqual(result, [true, true, true, true, true])
-    }
-
-    func testOverviewFailedHandoffClosesItsNativeMenu() async throws {
-        let webView = try await fixture()
-        _ = try await webView.evaluateJavaScript("""
-        window.allowCommit = false;
-        window.__codexDashboard.openChatOverview();
-        document.querySelector('[data-filter="changedProjects"]').click();
-        document.querySelector('[data-project-git-action]').click();
-        """)
-        try await DashboardWebTestHarness.waitForJavaScript("!!document.getElementById('git-menu')", in: webView)
-        try await DashboardWebTestHarness.waitForJavaScript(
-            "window.__codexDashboard.isOpen() && !document.getElementById('git-menu')", in: webView, timeout: .seconds(7))
-        let activations = try await webView.evaluateJavaScript("window.actions.length") as? Int
-        XCTAssertEqual(activations, 0)
-    }
-
     func testNavigationCancelsDelayedCommitInsteadOfActingOnAnotherChat() async throws {
         let webView = try await fixture()
         _ = try await webView.evaluateJavaScript("""

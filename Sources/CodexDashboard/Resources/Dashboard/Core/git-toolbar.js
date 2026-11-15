@@ -1,4 +1,4 @@
-function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead, checkWorkingTree }) {
+function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead, checkWorkingTree, repositoryState, projectGitActions }) {
   let toolbar;
   let observer;
   let frame;
@@ -11,13 +11,18 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   let unsubscribeRemote;
   let missingSince;
   let inspectedThreadID;
+  let projectRefreshTimer;
+  let feedback;
+  let feedbackContext;
+  let feedbackMessage;
+  const projectStatuses = new Map();
   const menuChanges = new Map();
   const combinedPushChecks = new Map();
   const commitChecks = new Map();
   const actions = ['Commit', 'Commit & push', 'Push'];
 
   const sameContext = (a, b) => Boolean(a && b && a.threadID === b.threadID
-    && a.path === b.path && a.hostID === b.hostID);
+    && a.path === b.path && a.hostID === b.hostID && a.projectID === b.projectID);
 
   function isProjectChat(threadID) {
     if (threadID !== codexUIContracts.selectedThreadID()) return false;
@@ -26,7 +31,44 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     return Boolean(findThread(threadID)?.projectID);
   }
 
+  function selectedProjectContext() {
+    const composerID = codexUIContracts.activeComposerThreadID();
+    if (composerID && !composerID.startsWith('client-new-thread:')) return null;
+    const project = codexUIContracts.activeComposerProject();
+    const projectID = codexUIContracts.activeComposerProjectID();
+    if (!project?.path || !projectID) return null;
+    prefetchRemote(project.path);
+    if (repositoryState(project.path) !== true) return null;
+    return {
+      threadID: null, projectID,
+      path: project.path, hostID: 'local', newChat: true,
+    };
+  }
+
+  function gitContext() {
+    const project = selectedProjectContext();
+    if (project) return project;
+    const threadID = codexUIContracts.selectedThreadID();
+    return isProjectChat(threadID) ? codexUIContracts.headerGitContext() : null;
+  }
+
+  function refreshProjectStatus(context) {
+    const previous = projectStatuses.get(context.path);
+    if (previous?.loading || (previous && Date.now() - previous.checkedAt < 2000)) return;
+    const request = { ...previous, loading: true };
+    projectStatuses.set(context.path, request);
+    Promise.all([checkWorkingTree(context.path), checkBranchAhead(context.path)]).then(([changes, ahead]) => {
+      if (destroyed || projectStatuses.get(context.path) !== request) return;
+      const status = changes === null || ahead === null ? null
+        : changes > 0 ? (ahead > 0 ? 'uncommittedChangesAndUnpushedCommits' : 'uncommittedChanges')
+          : (ahead > 0 ? 'unpushedCommits' : 'clean');
+      projectStatuses.set(context.path, { status, checkedAt: Date.now(), loading: false });
+      sync();
+    });
+  }
+
   function repositoryStatus(context) {
+    if (context.newChat) return projectStatuses.get(context.path)?.status ?? null;
     const thread = findThread(context.threadID);
     return thread?.sharesGroupRepository ? thread.projectGitStatus : null;
   }
@@ -55,7 +97,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     readCount(context.path).then(count => {
       if (checks.get(context.path) !== check) return;
       check.running = false;
-      const current = codexUIContracts.headerGitContext();
+      const current = gitContext();
       if (current?.path === context.path && !pending && !current.workflowRunning && count > 0) {
         checks.delete(context.path);
         sync();
@@ -71,8 +113,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   }
 
   function disabledReason(context, action) {
-    if (context.workflowRunning) return 'Wait for the current Git operation to finish.';
-    if (!context.menu && !context.openCommitDialog) return 'Codex is preparing Git actions for this chat.';
+    if (context.workflowRunning || projectGitActions.isRunning(context.path)) return 'Wait for the current Git operation to finish.';
+    if (!context.newChat && !context.menu && !context.openCommitDialog) return 'Codex is preparing Git actions for this chat.';
     const thread = findThread(context.threadID);
     if (thread?.gitActionsBlockedUntilCompletion) return 'Wait for a response to finish without interruption before committing or pushing these files.';
     if (['Push', 'Commit & push'].includes(action)) {
@@ -162,8 +204,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     const command = { Commit: 'commit', 'Commit & push': 'commit-and-push', Push: 'push' }[action];
     const handoff = await domUtils.waitFor(() => {
       if (destroyed || pending !== operation
-        || !isProjectChat(context.threadID)
-        || !sameContext(context, codexUIContracts.headerGitContext())) return true;
+        || (!context.newChat && !isProjectChat(context.threadID))
+        || !sameContext(context, gitContext())) return true;
       const dialog = codexUIContracts.pushControls();
       if (!dialog?.compatible || !dialog.local || dialog.threadID !== context.threadID
         || dialog.path !== context.path) return null;
@@ -189,10 +231,19 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     }
   }
 
+  function showFeedback(context, message) {
+    feedbackContext = context;
+    feedbackMessage = message;
+    if (feedback) {
+      feedback.textContent = message;
+      feedback.hidden = !sameContext(context, gitContext());
+    }
+  }
+
   async function activate(action, anchor) {
     if (pending) return;
-    const context = codexUIContracts.headerGitContext();
-    if (!context || !isProjectChat(context.threadID)) return;
+    const context = gitContext();
+    if (!context || (!context.newChat && !isProjectChat(context.threadID))) return;
     if (disabledReason(context, action)) { sync(); return; }
     closeMenu();
     const operation = { context };
@@ -201,6 +252,13 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     document.body.setAttribute('data-dashboard-git-handoff', '');
     sync();
     try {
+      if (context.newChat) {
+        await projectGitActions.run(context.path, action, {
+          isCurrent: () => !destroyed && sameContext(context, selectedProjectContext()),
+          report: message => showFeedback(context, message),
+        });
+        return;
+      }
       if (context.openCommitDialog) {
         context.openCommitDialog();
         await selectDialogAction(context, operation, action);
@@ -211,8 +269,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       context.menu.onOpenChange(true);
       const item = await domUtils.waitFor(() => {
         if (destroyed || pending !== operation
-          || !isProjectChat(context.threadID)
-          || !sameContext(context, codexUIContracts.headerGitContext())) return { cancelled: true };
+          || (!context.newChat && !isProjectChat(context.threadID))
+          || !sameContext(context, gitContext())) return { cancelled: true };
         const menu = codexUIContracts.gitActionsMenu(context.trigger);
         positionMenu();
         return menu && codexUIContracts.gitActionMenuItem(menu, nativeAction);
@@ -232,10 +290,12 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       if (!item) {
         toolbar.title = `${action} is unavailable. Check the Git menu.`;
       }
-    } catch {
+    } catch (error) {
       closeMenu();
-      if (toolbar) toolbar.title = 'Codex could not open Git actions. Try again.';
+      if (context.newChat) showFeedback(context, String(error.message).slice(0, 600));
+      else if (toolbar) toolbar.title = 'Codex could not open Git actions. Try again.';
     } finally {
+      if (context.newChat) projectStatuses.delete(context.path);
       document.body.removeAttribute('data-dashboard-git-handoff');
       if (pending === operation) pending = undefined;
       if (!destroyed) sync();
@@ -244,14 +304,19 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function sync() {
     const host = codexUIContracts.chatHeaderActionsHost();
-    const context = host && isProjectChat(codexUIContracts.selectedThreadID())
-      ? codexUIContracts.headerGitContext() : null;
+    const context = host ? gitContext() : null;
+    clearTimeout(projectRefreshTimer);
+    projectRefreshTimer = undefined;
     if (menuContext && !sameContext(context, menuContext)) closeMenu();
     if (!host || !context) {
       toolbar?.remove();
       return;
     }
     prefetchRemote(context.path);
+    if (context.newChat) {
+      refreshProjectStatus(context);
+      projectRefreshTimer = setTimeout(sync, 2000);
+    }
     reconcileOperation(context, combinedPushChecks, hasUnpushedCommits, checkBranchAhead);
     reconcileOperation(context, commitChecks, hasUncommittedChanges, checkWorkingTree);
     if (!toolbar) {
@@ -270,6 +335,14 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
         toolbar.append(button);
       }
     }
+    if (!feedback) {
+      feedback = document.createElement('div');
+      feedback.className = 'dashboard-git-feedback';
+      feedback.setAttribute('role', 'status');
+      toolbar.append(feedback);
+    }
+    feedback.hidden = !feedbackMessage || !sameContext(context, feedbackContext);
+    if (!feedback.hidden) feedback.textContent = feedbackMessage;
     if (toolbar.parentElement !== host) host.prepend(toolbar);
     for (const button of toolbar.querySelectorAll('button')) {
       const reason = disabledReason(context, button.dataset.gitAction);
@@ -287,12 +360,14 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     const threadID = codexUIContracts.selectedThreadID();
     // Confirm eligibility independently of the toolbar anchor and native Git
     // menu, since a Codex update can remove either of them.
-    const eligible = isProjectChat(threadID) && domUtils.isVisible(composer)
+    const selectedProject = selectedProjectContext();
+    const contextID = selectedProject?.projectID ?? threadID;
+    const eligible = (selectedProject || isProjectChat(threadID)) && domUtils.isVisible(composer)
       && !composer.closest('[aria-hidden="true"], [inert]')
-      && (findThread(threadID)?.sharesGroupRepository || codexUIContracts.headerGitContext());
-    if (!eligible || inspectedThreadID !== threadID) {
+      && (selectedProject || findThread(threadID)?.sharesGroupRepository || gitContext());
+    if (!eligible || inspectedThreadID !== contextID) {
       missingSince = undefined;
-      inspectedThreadID = eligible ? threadID : undefined;
+      inspectedThreadID = eligible ? contextID : undefined;
     }
     if (!eligible) return 'pending';
     if (domUtils.isVisible(toolbar) && actions.every(action => {
@@ -367,6 +442,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     commitChecks.clear();
     missingSince = undefined;
     inspectedThreadID = undefined;
+    clearTimeout(projectRefreshTimer);
+    projectStatuses.clear();
     observer?.disconnect();
     unsubscribeRemote?.();
     unsubscribeRemote = undefined;
@@ -381,6 +458,9 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     closeMenu();
     toolbar?.remove();
     toolbar = undefined;
+    feedback = undefined;
+    feedbackContext = undefined;
+    feedbackMessage = undefined;
   }
 
   return { mount, sync, destroy, readCompatibility };

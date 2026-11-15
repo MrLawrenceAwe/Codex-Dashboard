@@ -97,7 +97,8 @@ const chatOverviewView = (() => {
     visibleItemLimit,
     collapsedProjectPaths,
     hiddenChangeIndicatorPaths,
-    projectGitActionError,
+    projectGitActionNotice,
+    projectGitActionPending,
     markAllReadPending,
     markAllReadError,
     isThreadUnread,
@@ -109,8 +110,8 @@ const chatOverviewView = (() => {
     if (!page) return false;
     const notice = page.querySelector('[data-chat-overview-notice]');
     if (notice) {
-      notice.textContent = markAllReadError || projectGitActionError;
-      notice.hidden = !markAllReadError && !projectGitActionError;
+      notice.textContent = markAllReadError || projectGitActionNotice;
+      notice.hidden = !markAllReadError && !projectGitActionNotice;
     }
     const markAllRead = page.querySelector('[data-mark-all-read]');
     if (markAllRead) {
@@ -154,6 +155,7 @@ const chatOverviewView = (() => {
       chatOverviewListView.renderThreadList(displayedThreads, {
         threads,
         changedProjects: state.changedProjects,
+        projectGitActionPending,
         filterMode,
         leadingRunningThreadCount,
         collapsedProjectPaths,

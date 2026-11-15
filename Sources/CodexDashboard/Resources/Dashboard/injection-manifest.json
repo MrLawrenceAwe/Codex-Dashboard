@@ -8,6 +8,7 @@
     "Core/codex-ui-contracts",
     "Core/codex-host",
     "Core/push-controls",
+    "Core/project-git-actions",
     "Core/git-toolbar",
     "Core/dashboard-navigation-button",
     "Composer/composer-presets",

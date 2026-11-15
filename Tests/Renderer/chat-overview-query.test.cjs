@@ -13,22 +13,6 @@ const view = vm.runInNewContext(`${resource('chat-overview-list-view.js')}\nchat
   dashboardIcons: { render: () => '' },
 });
 
-test('Git actions prefer a project chat over newer projectless automation runs', () => {
-  const projectGroupPath = '/Users/example/Job Search Companion';
-  const thread = (id, overrides = {}) => ({ id, projectGroupPath, runState: 'idle',
-    sharesGroupRepository: true, projectID: 'project', projectGitStatus: 'uncommittedChanges', ...overrides });
-  const automation = thread('automation', { projectID: null });
-  const assigned = thread('project-chat');
-  const candidates = [automation,
-    thread('running', { runState: 'running' }),
-    thread('nested', { sharesGroupRepository: false }),
-    thread('other-project', { projectGroupPath: '/other' }),
-    assigned, thread('older-project-chat')];
-  assert.equal(query.projectGitActionThread(candidates, projectGroupPath), assigned);
-  assert.equal(query.projectGitActionThread([automation], projectGroupPath), automation);
-  assert.equal(query.projectGitActionThread(candidates.slice(1, 4), projectGroupPath), undefined);
-});
-
 test('Overview includes running chats before paged recent history without duplicates', () => {
   const threads = [
     { id: 'newer-idle', runState: 'idle' },
@@ -85,7 +69,7 @@ test('Local changes counts, filtering, and labels agree for every Git status', (
   }
 });
 
-test('Unread project actions can use an idle chat outside the visible group', () => {
+test('Unread project actions use the repository without selecting a chat', () => {
   const project = { projectName: 'Project', projectGroupPath: '/project',
     projectGitStatus: 'unpushedCommits', sharesGroupRepository: true };
   const unread = { ...project, id: 'unread', runState: 'running' };
@@ -99,11 +83,10 @@ test('Unread project actions can use an idle chat outside the visible group', ()
     threads, changedProjects: state.changedProjects, filterMode: 'unread', collapsedProjectPaths: new Set(),
     hiddenChangeIndicatorPaths: new Set(), isUnread: thread => thread === unread,
   });
-  assert.equal(query.projectGitActionThread(threads, '/project'), idle);
-  assert.match(markup, /title="Open Codex’s Push flow for this project"><span>Push<\/span>/);
+  assert.match(markup, /title="Push in this project’s repository"><span>Push<\/span>/);
 });
 
-test('Git status is resolved once per project independently of the action chat', () => {
+test('Git status is resolved once per project independently of chat activity', () => {
   let statusReads = 0;
   const projectGroupPath = '/project';
   const threads = ['running', 'idle', 'idle'].map((runState, index) => ({
@@ -121,9 +104,8 @@ test('Git status is resolved once per project independently of the action chat',
     isUnread: () => true,
   });
   assert.equal(statusReads, 1);
-  assert.equal(query.projectGitActionThread(threads, projectGroupPath), threads[1]);
   assert.match(markup, /<span>Unpushed<\/span>/);
-  assert.match(markup, /title="Open Codex’s Push flow for this project"/);
+  assert.match(markup, /title="Push in this project’s repository"/);
 });
 
 test('Project paths retain trailing spaces for counts, paging, grouping, actions, and preferences', () => {
@@ -144,7 +126,6 @@ test('Project paths retain trailing spaces for counts, paging, grouping, actions
     threads, ...state, filterMode: 'changedProjects', visibleItemLimit: 2,
   });
   assert.equal(selection.hasMore, false);
-  assert.equal(query.projectGitActionThread(threads, '/project '), threads[1]);
   const markup = view.renderThreadList(selection.displayedThreads, {
     threads, changedProjects: state.changedProjects, filterMode: 'changedProjects',
     hiddenChangeIndicatorPaths: hidden,
@@ -173,19 +154,21 @@ test('Project paths retain trailing spaces for counts, paging, grouping, actions
 });
 
 
-test('Unavailable Git actions retain their explanations', () => {
-  for (const [runState, sharesGroupRepository, label] of [
-    ['running', true, 'Chat running'],
-    ['idle', false, 'No repository chat'],
-  ]) {
+test('Git actions use the repository independently of idle chat availability', () => {
+  for (const [runState, sharesGroupRepository] of [['running', true], ['idle', false]]) {
     const thread = { id: 'chat', projectName: 'Project', projectGroupPath: '/project',
       projectGitStatus: 'unpushedCommits', runState, sharesGroupRepository };
     const state = query.summarizeActivity([thread], () => false, new Set());
     const markup = view.renderThreadList([thread], {
-      threads: [thread], changedProjects: state.changedProjects, filterMode: 'changedProjects',
+      changedProjects: state.changedProjects, filterMode: 'changedProjects',
       hiddenChangeIndicatorPaths: new Set(),
     });
-    assert.match(markup, /title="Push requires an idle chat in this project’s repository" disabled/);
-    assert.ok(markup.includes(`<span>${label}</span>`));
+    assert.match(markup, /title="Push in this project’s repository">/);
+    assert.ok(markup.includes('<span>Push</span>'));
+    const pending = view.renderThreadList([thread], {
+      changedProjects: state.changedProjects, filterMode: 'changedProjects',
+      hiddenChangeIndicatorPaths: new Set(), projectGitActionPending: true,
+    });
+    assert.match(pending, /title="Wait for the current Git operation to finish" disabled/);
   }
 });

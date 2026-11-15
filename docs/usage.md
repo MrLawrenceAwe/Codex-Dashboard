@@ -28,15 +28,12 @@ icon beside a sidebar project name indicates uncommitted changes or unpushed
 commits; hover it for the status. It clears when the project is clean.
 
 **Hide change indicators** hides a project's overview and sidebar Git indicators until restored. Hidden
-projects remain under **Indicators hidden** in Local changes. **Commit** opens
-Codex’s native Commit flow when there are uncommitted changes. **Push** selects
-Codex’s Push action when only unpushed commits remain. Both use an idle chat in
-the same repository.
-Project-assigned chats are preferred over projectless runs in Recents.
-Chats in separate nested repositories cannot handle their parent project's
-Git actions. The handoff stops if you switch chats, including while the initial chat
-selection is pending. Git status uses local remote-tracking refs without fetching;
-repositories without a remote show only uncommitted changes.
+projects remain under **Indicators hidden** in Local changes. **Commit** commits
+the project's pending changes directly. **Push** publishes its unpushed commits.
+Both use the same repository workflow as blank project chats and keep the dashboard
+open. Progress and errors appear above the project list. Git status uses local
+remote-tracking refs without fetching; repositories without a remote show only
+uncommitted changes.
 
 By default, Dashboard brings Codex forward and opens a chat when its response
 finishes or it asks a structured question, including questions asked while work
@@ -386,8 +383,14 @@ Push and Commit & push stay disabled until a remote is confirmed and remain
 disabled when none is configured. The Git menu’s Push action follows the same rule.
 
 Buttons follow the selected local project chat’s primary repository. They appear
-only in chats assigned to a project with a supported Git checkout, and disappear
-on Dashboard pages. A running response keeps Git shortcuts
+in project chats with a supported Git checkout, including the blank new-chat
+screen before the first message. New chats check the selected project's Git status
+and run actions directly through Codex's Git worker. Commit and Commit & push
+include staged, unstaged, and untracked changes. Codex generates the commit message
+in a temporary read-only session. Progress and errors appear beneath the shortcuts.
+A failed push preserves the local commit for retry with Push. Project or branch
+changes cancel any remaining steps before the next Git write.
+The shortcuts disappear on Dashboard pages. A running response keeps Git shortcuts
 available until repository files differ from the last normally completed response.
 New edits block all three shortcuts until a response finishes normally; stopping,
 interrupting, or reaching a usage limit does not release that block. Staging or

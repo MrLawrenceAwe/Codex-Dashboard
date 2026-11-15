@@ -150,6 +150,12 @@ three cmdk command values, independent of translated text. Mouse, keyboard, and
 cmdk selection are guarded; owned attributes are restored on context changes or
 teardown. Runtime warnings reach Diagnostics without rerunning unrelated probes.
 
+`Core/project-git-actions.js` handles blank project chats and dashboard project
+actions directly through the Git worker, independently of mounted chat menus. Message generation uses an ephemeral
+read-only app-server session through the existing RPC client. Worker requests are
+tracked by ID, mutation requests are never retried automatically, and teardown
+cancels pending requests and releases message-generation sessions.
+
 `Core/git-toolbar.js` mounts repository actions in the header group containing
 the Summary button. `codex-ui-contracts.js` identifies the summary Git menu by its action
 message IDs and matches its conversation, host and repository scope to the selected
@@ -167,9 +173,8 @@ menu and dialog stay hidden during this handoff; Commit leaves the message blank
 for native automatic generation.
 Native menu wrappers receive temporary placement attributes while opened from the
 header. Teardown restores placement, closes owned menus and removes the toolbar.
-Overview Git handoffs select the native trigger in the target chat's repository
-scope and exclude Dashboard's header buttons. They close menus opened by the
-handoff on completion, failure or cancellation so a failed action leaves no popup.
+Dashboard project actions stay on the overview, show operation progress, and
+refresh the repository status after completion while catalog updates catch up.
 A coalesced observer repairs replacement headers, with a timer fallback for hidden
 windows whose animation frames are suspended. The toolbar shares the local
 remote-metadata cache and subscriptions with `push-controls.js`; its push shortcuts
@@ -193,7 +198,7 @@ operations, including the renderer’s `openChatOverview` entry point, use
 `projectGroupPath` for grouping and Git checks, and `projectGitStatus` for
 uncommitted changes and unpushed commits. `sharesGroupRepository` indicates that the
 chat's checkout and its dashboard group resolve to the same repository. Saved project
-assignment is independent of this grouping. Git action readiness also requires an idle chat.
+assignment is independent of this grouping. Dashboard Git actions use the group's repository directly.
 Preview fixtures include the same fields.
 
 Sidebar entries mount after the outer New chat action row, outside Quick chat and

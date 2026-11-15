@@ -530,21 +530,15 @@ const codexUIContracts = (() => {
     return props[name] == null ? null : String(props[name]);
   }
 
-  function gitActionsButton() {
-    const scoped = headerGitContext();
-    if (scoped?.trigger && !scoped.trigger.disabled) return scoped.trigger;
-    return [...document.querySelectorAll('button[aria-label], button[title]')].find((button) => (
-      isVisible(button)
-        && !button.disabled
-        && !button.closest('.dashboard-git-toolbar')
-        && (button.getAttribute('aria-label') === 'Git actions'
-          || button.getAttribute('title') === 'Git actions')
-    )) || null;
-  }
-
   const chatHeaderSelector = '[data-app-shell-header-toolbar], [data-app-shell-header-slot="end"]';
 
   function chatHeaderActionsHost() {
+    const composerID = activeComposerThreadID();
+    if ((!composerID || composerID.startsWith('client-new-thread:')) && activeComposerProjectID()) {
+      // Blank project chats have an end slot but no Share or Summary buttons.
+      return [...document.querySelectorAll('[data-app-shell-header-slot="end"] [data-app-shell-header-slot-content]')]
+        .find(element => isVisible(element) && !element.closest('[aria-hidden="true"], [inert]')) || null;
+    }
     const buttons = document.querySelectorAll('button[aria-label="Toggle summary"]');
     for (const button of buttons) {
       const header = button.closest(chatHeaderSelector);
@@ -568,7 +562,8 @@ const codexUIContracts = (() => {
     const threadID = selectedThreadID();
     if (!threadID) return null;
     const isSelectedScope = props => props?.surface === 'summary-panel'
-      && props.conversationId === threadID && typeof props.target?.root === 'string'
+      && props.conversationId === threadID
+      && typeof props.target?.root === 'string'
       && props.target.root.startsWith('/')
       && props.target.hostId === 'local' && props.registerCommands === true;
     for (const trigger of document.querySelectorAll('button[aria-label="Git actions"]')) {
@@ -579,7 +574,7 @@ const codexUIContracts = (() => {
         && containsMessage(props.children, ['localConversation.gitActions.commit', 'localConversation.gitActions.cancelWorkflow']));
       if (!scope || !menu) continue;
       const workflowRunning = containsMessage(menu.children, ['localConversation.gitActions.cancelWorkflow']);
-      return { threadID, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning };
+      return { threadID: scope.conversationId, path: scope.target.root, hostID: scope.target.hostId, trigger, menu, workflowRunning };
     }
     // The summary still registers the native Git command when Git-based diffs
     // are disabled, but omits the Git menu from the checkout section.
@@ -600,7 +595,7 @@ const codexUIContracts = (() => {
         const deps = effect.deps;
         if (deps?.[3] === 'git.commit' && typeof deps[2] === 'function') {
           return {
-            threadID, path: scope.target.root, hostID: scope.target.hostId,
+            threadID: scope.conversationId, path: scope.target.root, hostID: scope.target.hostId,
             workflowRunning: deps[1] === false,
             openCommitDialog: deps[1] === true && typeof effect.inst?.destroy === 'function'
               ? () => deps[2](undefined, 'toolbar') : null,
@@ -657,7 +652,6 @@ const codexUIContracts = (() => {
     probeModelPickerControls,
     pushControls,
     pushControlHostAttribute,
-    gitActionsButton,
     chatHeaderSelector,
     chatHeaderActionsHost,
     headerGitContext,

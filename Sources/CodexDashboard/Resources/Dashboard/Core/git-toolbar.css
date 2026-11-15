@@ -1,4 +1,5 @@
 .dashboard-git-toolbar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -43,3 +44,20 @@ body[data-dashboard-git-handoff] :is(
 @media (max-width: 650px) {
   .dashboard-git-toolbar button { padding-inline: 5px; }
 }
+
+.dashboard-git-feedback {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  width: max-content;
+  max-width: min(360px, 80vw);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-default, #8884);
+  border-radius: 8px;
+  background: var(--color-background-surface, Canvas);
+  color: var(--color-text-default, CanvasText);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.dashboard-git-feedback[hidden] { display: none; }

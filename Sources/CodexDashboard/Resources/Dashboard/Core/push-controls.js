@@ -28,7 +28,7 @@ function createPushControls() {
     } catch { /* A changed bridge must not prevent teardown or navigation. */ }
   }
 
-  function finishRemote(id, value) {
+  function finishRemote(id, value, repository = null) {
     if (id !== pendingRemote?.id) return;
     const request = pendingRemote;
     clearTimeout(request.timer);
@@ -38,7 +38,7 @@ function createPushControls() {
     const forDialog = request.generation !== null;
     if (forDialog && (request.generation !== generation || request.path !== context?.path)) return;
     remoteCache.delete(request.path);
-    remoteCache.set(request.path, { value, checkedAt: Date.now() });
+    remoteCache.set(request.path, { value, repository, checkedAt: Date.now() });
     if (remoteCache.size > 64) remoteCache.delete(remoteCache.keys().next().value);
     remoteListeners.forEach(listener => listener());
     if (!forDialog) return;
@@ -62,7 +62,9 @@ function createPushControls() {
       if (metadata.remotes.length > 0) value = true;
       else if (metadata.remotesOmitted === 0) value = false;
     }
-    finishRemote(response.id, value);
+    const repository = ['complete', 'partial'].includes(metadata?.status)
+      ? true : metadata?.status === 'not_git' ? false : null;
+    finishRemote(response.id, value, repository);
   }
 
   function checkGitStatus(method, params, readValue) {
@@ -133,6 +135,10 @@ function createPushControls() {
 
   function remoteState(path) {
     return remoteCache.get(path)?.value ?? null;
+  }
+
+  function repositoryState(path) {
+    return remoteCache.get(path)?.repository ?? null;
   }
 
   function subscribeRemote(listener) {
@@ -272,5 +278,5 @@ function createPushControls() {
     hasRemote = null;
   }
 
-  return { start, destroy, read, prefetchRemote, remoteState, subscribeRemote, checkBranchAhead, checkWorkingTree };
+  return { start, destroy, read, prefetchRemote, remoteState, repositoryState, subscribeRemote, checkBranchAhead, checkWorkingTree };
 }

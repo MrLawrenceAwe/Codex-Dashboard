@@ -1,15 +1,18 @@
 const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
+const projectGitActions = createProjectGitActions({ requestRPC: reviewRPCClient.request });
 const gitToolbar = createGitToolbar({
+  projectGitActions,
   findThread: threadCatalog.findThread,
   prefetchRemote: pushControls.prefetchRemote,
   remoteState: pushControls.remoteState,
   subscribeRemote: pushControls.subscribeRemote,
   checkBranchAhead: pushControls.checkBranchAhead,
   checkWorkingTree: pushControls.checkWorkingTree,
+  repositoryState: pushControls.repositoryState,
 });
-const chatOverview = createChatOverview({ catalog: threadCatalog, prefetchPushRemote: pushControls.prefetchRemote });
+const chatOverview = createChatOverview({ catalog: threadCatalog, projectGitActions });
 const todoList = createTodoList({
   ...createTodoDependencies({ store: todoStore, imageStore: todoImageStore }),
   threadReferencesForProject: threadCatalog.threadReferencesForProject,
@@ -54,6 +57,7 @@ const dashboardLifecycle = createDashboardLifecycle({
   destroyFeatures() {
     sentMessageDictation.destroy();
     gitToolbar.destroy();
+    projectGitActions.destroy();
     pushControls.destroy();
     reviewRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());

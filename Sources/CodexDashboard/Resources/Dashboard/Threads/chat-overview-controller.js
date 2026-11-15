@@ -1,4 +1,4 @@
-function createChatOverview({ catalog, prefetchPushRemote }) {
+function createChatOverview({ catalog, projectGitActions }) {
   // Snapshots are sorted newest-first on arrival; lookups preserve that order.
   const currentThreads = catalog.currentThreads;
   const runningChatsPopover = createRunningChatsPopover({ currentThreads, onOpenThread: openThread });
@@ -16,7 +16,10 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
     rootClass: 'codex-dashboard-open',
   });
   let viewNeedsRender = true;
-  let projectGitActionError = '';
+  let projectGitActionNotice = '';
+  let projectGitActionPending = false;
+  const gitStatusOverrides = new Map();
+  let gitStatusTimer;
   let markAllReadPending = false;
   let markAllReadError = '';
   let destroyed = false;
@@ -48,7 +51,9 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
   }
 
   function deriveViewState() {
-    return chatOverviewQuery.summarizeActivity(currentThreads(), isThreadUnread, hiddenChangeIndicatorPaths);
+    const threads = currentThreads().map(thread => gitStatusOverrides.has(thread.projectGroupPath)
+      ? { ...thread, projectGitStatus: gitStatusOverrides.get(thread.projectGroupPath) } : thread);
+    return chatOverviewQuery.summarizeActivity(threads, isThreadUnread, hiddenChangeIndicatorPaths);
   }
 
   function openThread(thread) {
@@ -91,7 +96,7 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
     if (!unreadIDs.length) return;
     markAllReadPending = true;
     markAllReadError = '';
-    projectGitActionError = '';
+    projectGitActionNotice = '';
     renderChatOverview();
     try {
       const { available, failedIDs } = codexHost.markThreadsRead(unreadIDs);
@@ -116,22 +121,45 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
     }
   }
 
-  async function openGitActionsForProject(projectPath) {
-    projectGitActionError = '';
+  function scheduleGitStatusRefresh() {
+    clearTimeout(gitStatusTimer);
+    if (destroyed || !pageState.isOpen() || !gitStatusOverrides.size) return;
+    gitStatusTimer = setTimeout(async () => {
+      for (const path of gitStatusOverrides.keys()) {
+        const status = await projectGitActions.readStatus(path).catch(() => null);
+        if (destroyed || !pageState.isOpen()) return;
+        if (status && gitStatusOverrides.has(path)) gitStatusOverrides.set(path, status);
+      }
+      applyThreads();
+      scheduleGitStatusRefresh();
+    }, 2000);
+  }
+
+  async function runGitActionForProject(projectPath) {
+    if (projectGitActionPending) return;
     const gitChange = deriveViewState().changedProjects.get(projectPath);
-    const thread = chatOverviewQuery.projectGitActionThread(currentThreads(), projectPath);
-    if (!gitChange || !thread) {
-      projectGitActionError = 'No idle chat is available in this project’s repository.';
-      renderChatOverview();
-      return;
-    }
-    if (gitChange.action === 'Commit') prefetchPushRemote(thread.checkoutPath);
-    closeChatOverview();
-    const result = await codexHost.openProjectGitAction(thread, gitChange.action);
-    if (result.opened || result.cancelled) return;
-    projectGitActionError = result.reason;
-    dashboardNavigation.openPage(chatOverview);
+    if (!gitChange || !projectPath) return;
+    projectGitActionPending = true;
+    projectGitActionNotice = 'Preparing Git action…';
     renderChatOverview();
+    try {
+      await projectGitActions.run(projectPath, gitChange.action, {
+        isCurrent: () => !destroyed && pageState.isOpen()
+          && currentThreads().some(thread => thread.projectGroupPath === projectPath),
+        report(message) {
+          projectGitActionNotice = message;
+          if (!destroyed) renderChatOverview();
+        },
+      });
+    } catch (error) {
+      projectGitActionNotice = String(error.message).slice(0, 600);
+    } finally {
+      const status = await projectGitActions.readStatus(projectPath).catch(() => null);
+      if (!destroyed && status) gitStatusOverrides.set(projectPath, status);
+      projectGitActionPending = false;
+      scheduleGitStatusRefresh();
+      if (!destroyed) renderChatOverview();
+    }
   }
 
   function renderChatOverview() {
@@ -145,7 +173,8 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
       visibleItemLimit: visibleLimit,
       collapsedProjectPaths,
       hiddenChangeIndicatorPaths,
-      projectGitActionError,
+      projectGitActionNotice,
+      projectGitActionPending,
       markAllReadPending,
       markAllReadError,
       isThreadUnread,
@@ -239,7 +268,7 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
           const projectPath = projectIndicators.dataset.projectIndicators;
           if (hiddenChangeIndicatorPaths.has(projectPath)) hiddenChangeIndicatorPaths.delete(projectPath);
           else hiddenChangeIndicatorPaths.add(projectPath);
-          projectGitActionError = '';
+          projectGitActionNotice = '';
           sidebarProjectGitIndicators.setHiddenPaths(hiddenChangeIndicatorPaths);
           savePreferences();
           renderChatOverview();
@@ -248,7 +277,7 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
         const projectGitAction = event.target.closest('[data-project-git-action]');
         if (projectGitAction) {
           event.preventDefault();
-          void openGitActionsForProject(projectGitAction.dataset.projectGitAction);
+          void runGitActionForProject(projectGitAction.dataset.projectGitAction);
           return;
         }
         const projectToggle = event.target.closest('[data-project-toggle]');
@@ -282,15 +311,21 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
     if (viewNeedsRender) renderChatOverview();
     else chatOverviewView.updateSidebarStatus(deriveViewState());
     unreadState.scheduleUnreadSync(1500);
+    scheduleGitStatusRefresh();
   }
 
   function closeChatOverview() {
     runningChatsPopover.close();
     pageState.close();
+    clearTimeout(gitStatusTimer);
     unreadState.scheduleUnreadSync();
   }
 
   function applyThreads() {
+    for (const [path, status] of gitStatusOverrides) {
+      if (currentThreads().some(thread => thread.projectGroupPath === path && thread.projectGitStatus === status)
+        || !currentThreads().some(thread => thread.projectGroupPath === path)) gitStatusOverrides.delete(path);
+    }
     threadUsageLimitIndicators.applyThreads(currentThreads());
     unreadState.applyThreads(currentThreads());
     checkReadConfirmation();
@@ -309,6 +344,8 @@ function createChatOverview({ catalog, prefetchPushRemote }) {
 
   function destroy() {
     destroyed = true;
+    clearTimeout(gitStatusTimer);
+    gitStatusOverrides.clear();
     runningChatsPopover.destroy();
     readConfirmation?.finish(readConfirmation.ids);
     pageState.close();
