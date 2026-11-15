@@ -4,6 +4,20 @@ extension AppCoordinator {
     static let automaticRecoveryLimitMessage =
         "Automatic recovery stopped after 3 restart attempts. Use Restart & Enable to try again."
 
+    var dashboardHasCompatibilityWarning: Bool {
+        (compatibilityReport?.nonBlockingAttentionCount ?? 0) > 0
+    }
+
+    /// A mounted renderer is not a successful recovery while warning checks remain.
+    func recordSuccessfulDashboardMount() {
+        updatePublished(\.connectionState, to: .dashboardMounted)
+        updatePublished(\.connectionError, to: nil)
+        updatePublished(\.connectionNotice, to: nil)
+        if !dashboardHasCompatibilityWarning, compatibilityReport?.blockingCount ?? 0 == 0 {
+            automaticRestartAttempts = 0
+        }
+    }
+
     /// Run outside the synchronization coalescer: restart drains that coalescer.
     func recoverDashboardIfNeeded() async {
         guard !Task.isCancelled,
@@ -13,7 +27,7 @@ extension AppCoordinator {
               dashboardRuntime.codexIsRunning,
               dashboardRuntime.maintainsDashboard,
               !codexForegrounder.isCodexFrontmost,
-              !connectionState.dashboardIsMounted || connectionNotice != nil,
+              !connectionState.dashboardIsMounted || connectionNotice != nil || dashboardHasCompatibilityWarning,
               catalogWarning == nil,
               !threads.contains(where: { $0.runState == .running }),
               compatibilityReport?.blockingCount ?? 0 == 0 else { return }

@@ -219,19 +219,10 @@ final class AppCoordinator: ObservableObject {
         refreshGeneration += 1
         defer { isPerformingAction = false }
         await cancelSynchronization()
+        let requiresRemount = !connectionState.dashboardIsMounted
+            || connectionError != nil || connectionNotice != nil
         connectionNotice = nil
-        do {
-            _ = try await refreshThreadState()
-        } catch {
-            connectionError =
-                "Codex was not restarted because active chats could not be checked. "
-                    + error.localizedDescription
-            return
-        }
-        guard !threads.contains(where: { $0.runState == .running }) else {
-            connectionNotice = "Finish or cancel active Codex chats before restarting."
-            return
-        }
+        guard await checkForIdleChatsBeforeRestart() else { return }
         await checkCompatibility()
         guard compatibilityReport?.blockingCount ?? 0 == 0 else {
             connectionError = Self.incompatibleContractMessage
@@ -239,10 +230,16 @@ final class AppCoordinator: ObservableObject {
         }
         guard !Task.isCancelled else { return }
         if automatically {
+            // Rechecking may clear a stale warning without restarting a healthy mount.
+            guard requiresRemount || dashboardHasCompatibilityWarning else {
+                automaticRestartAttempts = 0
+                return
+            }
             guard dashboardRuntime.codexIsRunning,
                   dashboardRuntime.maintainsDashboard,
                   !codexForegrounder.isCodexFrontmost,
                   await dashboardRuntime.hasActiveSpeechInput() == false,
+                  await checkForIdleChatsBeforeRestart(),
                   !codexForegrounder.isCodexFrontmost,
                   !Task.isCancelled else { return }
             automaticRestartAttempts += 1
@@ -261,15 +258,32 @@ final class AppCoordinator: ObservableObject {
                 on: targets,
                 forceRemount: true
             )
-            connectionState = .dashboardMounted
-            connectionNotice = nil
-            automaticRestartAttempts = 0
+            // Inspect the new renderer, not the checks captured before relaunch.
+            await checkCompatibility()
+            recordSuccessfulDashboardMount()
         } catch {
             setFailure(
                 error,
                 lastKnownState: rendererAvailable ? .rendererAvailable : .codexClosed
             )
         }
+    }
+
+    private func checkForIdleChatsBeforeRestart() async -> Bool {
+        do {
+            _ = try await refreshThreadState()
+        } catch {
+            connectionError =
+                "Codex was not restarted because active chats could not be checked. "
+                    + error.localizedDescription
+            return false
+        }
+        guard !Task.isCancelled else { return false }
+        guard !threads.contains(where: { $0.runState == .running }) else {
+            connectionNotice = "Finish or cancel active Codex chats before restarting."
+            return false
+        }
+        return true
     }
 
     func disableIntegration() async {

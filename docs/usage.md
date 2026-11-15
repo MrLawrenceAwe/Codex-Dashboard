@@ -351,16 +351,18 @@ is never modified.
 ### Automatic dashboard recovery
 
 While Codex is running in the background and no chats are running, Dashboard
-restarts Codex automatically if its integration is missing or a mount fails.
+restarts Codex automatically if its integration is missing, a mount fails, or the
+menu-bar compatibility warning is showing.
 Automatic restarts keep Codex in the background and pause while speech input is
 active. Each attempt checks chat activity again before restarting. If chat activity
 cannot be checked or a required compatibility check fails, Codex is left running.
 
 Recovery stops after three actual restarts for the same failure. A successful
-mount resets the limit; **Restart & Enable** also starts a fresh attempt manually.
+mount with no compatibility warnings resets the limit; **Restart & Enable** also starts a fresh attempt manually.
 Recovery runs on the normal monitoring polls. **Disable dashboard integration**
-turns off automatic recovery until you enable integration again. Compatibility
-advisories unrelated to a failed mount do not trigger restarts.
+turns off automatic recovery until you enable integration again. Checks run again
+before restarting and after the new renderer mounts. Stale warnings that clear
+during preflight do not restart an otherwise healthy mount.
 
 
 ## Git actions in the chat header

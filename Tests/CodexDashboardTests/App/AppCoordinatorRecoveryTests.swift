@@ -4,6 +4,91 @@ import XCTest
 
 @MainActor
 final class AppCoordinatorRecoveryTests: XCTestCase {
+    private var warning: CompatibilityCheck {
+        CompatibilityCheck(id: "model-picker", title: "Model settings controls", status: .warning, detail: "Controls missing")
+    }
+
+    func testMountedDashboardWithWarningTriggersBackgroundRestart() async {
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true, compatibilityChecks: [warning])
+        let coordinator = makeAppCoordinator(runtimeFactory: { _ in runtime })
+        await coordinator.checkCompatibility()
+        coordinator.connectionState = .dashboardMounted
+
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(runtime.restartActivations, [false])
+        XCTAssertEqual(coordinator.automaticRestartAttempts, 1)
+    }
+
+    func testPersistentWarningStopsAtThreeDespiteSuccessfulMounts() async {
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true, compatibilityChecks: [warning])
+        let coordinator = makeAppCoordinator(runtimeFactory: { _ in runtime })
+        await coordinator.checkCompatibility()
+        coordinator.connectionState = .dashboardMounted
+        for _ in 0..<8 { await coordinator.synchronizeDashboard() }
+
+        XCTAssertEqual(runtime.restartActivations, [false, false, false])
+        XCTAssertEqual(coordinator.automaticRestartAttempts, 3)
+        XCTAssertEqual(coordinator.connectionNotice, AppCoordinator.automaticRecoveryLimitMessage)
+    }
+
+    func testWarningClearedByFreshPreflightCheckDoesNotRestartHealthyMount() async {
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
+        let coordinator = makeAppCoordinator(runtimeFactory: { _ in runtime })
+        coordinator.connectionState = .dashboardMounted
+        coordinator.compatibilityReport = CompatibilityReport(checks: [warning])
+        coordinator.automaticRestartAttempts = 2
+
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertEqual(coordinator.compatibilityReport?.nonBlockingAttentionCount, 0)
+        XCTAssertEqual(coordinator.automaticRestartAttempts, 0)
+    }
+
+    func testPostRestartWarningCheckMustBeHealthyBeforeResettingBudget() async {
+        let checker = SequencedCompatibilityChecker(results: [[warning], [warning], []])
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
+        let coordinator = makeAppCoordinator(compatibilityChecker: checker, runtimeFactory: { _ in runtime })
+        await coordinator.checkCompatibility()
+        coordinator.connectionState = .dashboardMounted
+        coordinator.automaticRestartAttempts = 2
+
+        await coordinator.synchronizeDashboard()
+        await coordinator.synchronizeDashboard()
+
+        XCTAssertEqual(runtime.restartCallCount, 1)
+        XCTAssertEqual(coordinator.compatibilityReport?.nonBlockingAttentionCount, 0)
+        XCTAssertEqual(coordinator.automaticRestartAttempts, 0)
+        XCTAssertNil(coordinator.connectionNotice)
+    }
+
+    func testUnavailableCompatibilityCheckAlsoTriggersBoundedRecovery() async {
+        let unavailable = CompatibilityCheck(id: "renderer", title: "Renderer", status: .unavailable, detail: "Connection lost")
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true, compatibilityChecks: [unavailable])
+        let coordinator = makeAppCoordinator(runtimeFactory: { _ in runtime })
+        await coordinator.checkCompatibility()
+        for _ in 0..<5 { await coordinator.synchronizeDashboard() }
+        XCTAssertEqual(runtime.restartCallCount, 3)
+    }
+
+    func testChatStartingDuringWarningPreflightPreventsRestart() async {
+        let catalog = SequencedCatalogProvider(catalogs: [
+            ThreadCatalog(threads: [], totalThreadCount: 0),
+            ThreadCatalog(threads: [.fixture(id: "newly-running", runState: .running)], totalThreadCount: 1),
+        ])
+        let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true, compatibilityChecks: [warning])
+        let coordinator = makeAppCoordinator(catalogProvider: catalog, runtimeFactory: { _ in runtime })
+        coordinator.connectionState = .dashboardMounted
+        coordinator.compatibilityReport = CompatibilityReport(checks: [warning])
+
+        await coordinator.recoverDashboardIfNeeded()
+
+        XCTAssertEqual(runtime.restartCallCount, 0)
+        XCTAssertEqual(coordinator.automaticRestartAttempts, 0)
+        XCTAssertEqual(coordinator.connectionNotice, "Finish or cancel active Codex chats before restarting.")
+    }
+
     func testMissingDashboardRecoversInBackgroundThroughNormalSynchronization() async {
         let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
         // An enabled integration with no renderer models a normal Codex launch.
@@ -51,7 +136,8 @@ final class AppCoordinatorRecoveryTests: XCTestCase {
         foregrounder.isCodexFrontmost = true
         let runtime = StubDashboardRuntime(codexIsRunning: true, maintainsDashboard: true)
         let coordinator = makeAppCoordinator(codexForegrounder: foregrounder, runtimeFactory: { _ in runtime })
-        coordinator.connectionState = .codexRunningWithoutRenderer
+        coordinator.connectionState = .dashboardMounted
+        coordinator.compatibilityReport = CompatibilityReport(checks: [warning])
         await coordinator.recoverDashboardIfNeeded()
         XCTAssertEqual(runtime.restartCallCount, 0)
     }

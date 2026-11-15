@@ -416,7 +416,10 @@ final class StubDashboardRuntime: DashboardRuntime {
         lastAccountPopoverSnapshot = snapshot
     }
 
-    func rendererCompatibilityChecks() async -> [CompatibilityCheck] { compatibilityChecks }
+    func rendererCompatibilityChecks() async -> [CompatibilityCheck] {
+        compatibilityChecks.filter { check in !gitControlsCompatibilityChecks.contains { $0.id == check.id } }
+            + gitControlsCompatibilityChecks
+    }
 }
 
 @MainActor
