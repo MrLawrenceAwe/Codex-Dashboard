@@ -228,7 +228,7 @@ function createProjectGitActions({ requestRPC }) {
         const result = await workerRequest(path, 'push', params);
         if (result?.status !== 'success') throw new Error('Git did not confirm the push.');
       }
-      report(action === 'Commit' ? 'Committed.' : 'Pushed.');
+      report(action === 'Commit' ? 'Committed.' : 'Pushed.', true);
     } catch (error) {
       throw new Error((committed && action === 'Commit & push' ? 'Committed locally. Push did not complete. ' : '') + error.message);
     } finally {

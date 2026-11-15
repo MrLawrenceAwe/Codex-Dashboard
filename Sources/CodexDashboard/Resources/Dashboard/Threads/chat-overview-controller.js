@@ -17,6 +17,7 @@ function createChatOverview({ catalog, projectGitActions }) {
   });
   let viewNeedsRender = true;
   let projectGitActionNotice = '';
+  let projectGitNoticeTimer;
   let projectGitActionPending = false;
   const gitStatusOverrides = new Map();
   let gitStatusTimer;
@@ -140,15 +141,23 @@ function createChatOverview({ catalog, projectGitActions }) {
     const gitChange = deriveViewState().changedProjects.get(projectPath);
     if (!gitChange || !projectPath) return;
     projectGitActionPending = true;
+    clearTimeout(projectGitNoticeTimer);
     projectGitActionNotice = 'Preparing Git action…';
     renderChatOverview();
     try {
       await projectGitActions.run(projectPath, gitChange.action, {
         isCurrent: () => !destroyed && pageState.isOpen()
           && currentThreads().some(thread => thread.projectGroupPath === projectPath),
-        report(message) {
+        report(message, completed = false) {
+          clearTimeout(projectGitNoticeTimer);
           projectGitActionNotice = message;
           if (!destroyed) renderChatOverview();
+          if (completed) {
+            projectGitNoticeTimer = setTimeout(() => {
+              projectGitActionNotice = '';
+              if (!destroyed) renderChatOverview();
+            }, 3000);
+          }
         },
       });
     } catch (error) {
@@ -344,6 +353,7 @@ function createChatOverview({ catalog, projectGitActions }) {
 
   function destroy() {
     destroyed = true;
+    clearTimeout(projectGitNoticeTimer);
     clearTimeout(gitStatusTimer);
     gitStatusOverrides.clear();
     runningChatsPopover.destroy();

@@ -15,6 +15,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
   let feedback;
   let feedbackContext;
   let feedbackMessage;
+  let feedbackTimer;
   const projectStatuses = new Map();
   const menuChanges = new Map();
   const combinedPushChecks = new Map();
@@ -231,12 +232,20 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     }
   }
 
-  function showFeedback(context, message) {
+  function showFeedback(context, message, completed = false) {
+    clearTimeout(feedbackTimer);
     feedbackContext = context;
     feedbackMessage = message;
     if (feedback) {
       feedback.textContent = message;
       feedback.hidden = !sameContext(context, gitContext());
+    }
+    if (completed) {
+      feedbackTimer = setTimeout(() => {
+        feedbackMessage = undefined;
+        feedbackContext = undefined;
+        if (feedback) feedback.hidden = true;
+      }, 3000);
     }
   }
 
@@ -255,7 +264,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       if (context.newChat) {
         await projectGitActions.run(context.path, action, {
           isCurrent: () => !destroyed && sameContext(context, selectedProjectContext()),
-          report: message => showFeedback(context, message),
+          report: (message, completed) => showFeedback(context, message, completed),
         });
         return;
       }
@@ -458,6 +467,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     closeMenu();
     toolbar?.remove();
     toolbar = undefined;
+    clearTimeout(feedbackTimer);
     feedback = undefined;
     feedbackContext = undefined;
     feedbackMessage = undefined;
