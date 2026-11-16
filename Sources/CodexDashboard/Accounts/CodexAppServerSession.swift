@@ -24,6 +24,9 @@ final class CodexAppServerSession: @unchecked Sendable {
         process.standardError = FileHandle.nullDevice
         var environment = ProcessInfo.processInfo.environment
         environment["CODEX_HOME"] = codexHomeURL.path
+        // Account probes must never inherit a shared history directory.
+        environment.removeValue(forKey: "CODEX_SQLITE_HOME")
+        environment.removeValue(forKey: "CODEX_APP_SERVER_WS_URL")
         process.environment = environment
 
         let outputReader = try AsyncPipeReader(handle: outputPipe.fileHandleForReading)
@@ -50,6 +53,11 @@ final class CodexAppServerSession: @unchecked Sendable {
             terminate()
             throw error
         }
+    }
+
+    func request(id: Int, method: String, serializedParams: Data, timeout: Duration) async throws -> Data {
+        let params = try JSONSerialization.jsonObject(with: serializedParams) as? [String: Any]
+        return try await request(id: id, method: method, params: params, timeout: timeout)
     }
 
     func notify(method: String) throws {

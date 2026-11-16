@@ -15,8 +15,8 @@ This is an independent personal project and is not affiliated with OpenAI.
 ## Features
 
 - **Chats:** activity, unread status, completion and question tracking.
-- **Projects and Git:** sidebar colours, change indicators, and native Commit, Commit & push, and Push shortcuts.
-- **Accounts:** saved-account switching, allowance tracking, reset countdowns, and macOS or optional ntfy phone alerts.
+- **Projects and Git:** a shared local project list across account windows, sidebar colours, change indicators, and native Commit, Commit & push, and Push shortcuts.
+- **Accounts:** saved-account switching, separate account windows with optional shared-chat handoff, allowance tracking, reset countdowns, and macOS or optional ntfy phone alerts.
 - **Review loops:** queued reviews and automatic fixes for repositories or ordinary folders, with model choices, verification, and optional Git commits and pushing.
 - **Dictation:** dictate into sent-message edits using your existing sign-in.
 - **Prompts and to-dos:** reusable prompts and persistent tasks with tags, projects, images, and model settings.

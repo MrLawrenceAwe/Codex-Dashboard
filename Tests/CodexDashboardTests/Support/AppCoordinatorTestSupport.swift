@@ -382,9 +382,10 @@ final class StubDashboardRuntime: DashboardRuntime {
     func waitForReviewOperations() async { await onWaitForReviewOperations?() }
     func prepareForRestart() {}
     private(set) var restartActivations: [Bool] = []
-    func restartCodex(activate: Bool) async throws -> [DevToolsTarget] {
+    func restartCodex(activate: Bool, beforeLaunch: (() async throws -> Void)?) async throws -> [DevToolsTarget] {
         restartCallCount += 1
         restartActivations.append(activate)
+        try await beforeLaunch?()
         onRestart?()
         if let restartError { throw restartError }
         return []

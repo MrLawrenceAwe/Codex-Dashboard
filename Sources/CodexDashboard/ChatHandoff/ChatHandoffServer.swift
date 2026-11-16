@@ -1,0 +1,461 @@
+import Foundation
+import Network
+import Darwin
+
+/// Desktop windows are clients, never additional writers. The child server alone
+/// opens the shared catalog and rollouts. Its credentials live in a private home,
+/// separate from both windows' sign-ins.
+@MainActor
+final class ChatHandoffServer {
+    struct Window: Codable, Sendable {
+        let id: String
+        let home: URL
+        let accountIdentifier: String
+        let token: String
+    }
+    struct Configuration: Codable, Sendable {
+        let root: URL
+        let historyHome: URL
+        let executable: URL
+        let windows: [Window]
+    }
+    struct Endpoint: Codable {
+        let id: String
+        let url: String
+        let supportsAccountSwitch: Bool?
+    }
+    private struct Client {
+        let connection: NWConnection
+        let window: Window
+    }
+    private struct Pending {
+        let continuation: CheckedContinuation<Data, Error>
+        let generation: UUID
+    }
+    let configuration: Configuration
+    private var listeners: [NWListener] = []
+    private var clients: [UUID: Client] = [:]
+    private var owner: Process?
+    private var input: FileHandle?
+    private var output: FileHandle?
+    private var buffer = Data()
+    private var generation = UUID()
+    private var nextID = 0
+    private var pending: [String: Pending] = [:]
+    private var requestsToClient: [String: UUID] = [:]
+    private var policy = ChatHandoffPolicy()
+    private var selected: Window?
+    private var ownerCredential: Data?
+    private var turnClient: UUID?
+    private var loaded: [String: [String: Any]] = [:]
+    private var initializeResult: [String: Any]?
+    private var forwarding = 0
+    private var writerLock: Int32 = -1
+    private var failed = false
+    private var authCache: [String: (expires: Date, credential: Data, response: Data)] = [:]
+    private var terminationSource: DispatchSourceSignal?
+
+    init(configuration: Configuration) { self.configuration = configuration }
+    var ownerHome: URL { configuration.root.appendingPathComponent("owner") }
+
+    func start() async throws -> [Endpoint] {
+        let fm = FileManager.default
+        try fm.createDirectory(at: configuration.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        // Advisory lock protects against two Dashboard brokers adopting the same
+        // history. The activation controller separately excludes native owners.
+        let lock = configuration.historyHome.appendingPathComponent(".dashboard-chat-writer.lock")
+        writerLock = Darwin.open(lock.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard writerLock >= 0 else { throw ChatHandoffError.unsafeOwner }
+        guard flock(writerLock, LOCK_EX | LOCK_NB) == 0 else {
+            Darwin.close(writerLock); writerLock = -1
+            throw ChatHandoffError.unsafeOwner
+        }
+        var endpoints: [Endpoint] = []
+        for window in configuration.windows {
+            let options = NWProtocolWebSocket.Options()
+            options.autoReplyPing = true
+            // Each window has a private loopback endpoint and bearer credential.
+            options.setClientRequestHandler(.main) { _, headers in
+                let expected = "Basic " + Data("dashboard:\(window.token)".utf8).base64EncodedString()
+                let authenticated = headers.contains { $0.name.lowercased() == "authorization" && $0.value == expected }
+                return .init(status: authenticated ? .accept : .reject, subprotocol: nil)
+            }
+            let parameters = NWParameters.tcp
+            parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+            parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
+            let listener = try NWListener(using: parameters)
+            listener.newConnectionHandler = { [weak self] connection in
+                Task { @MainActor in self?.accept(connection, window: window) }
+            }
+            let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
+                let completion = ListenerCompletion(continuation)
+                listener.stateUpdateHandler = { state in
+                    Task { @MainActor in
+                        switch state {
+                        case .ready:
+                            guard let continuation = completion.take() else { return }
+                            continuation.resume(returning: listener.port!.rawValue)
+                        case .failed(let error): completion.take()?.resume(throwing: error)
+                        default: break
+                        }
+                    }
+                }
+                listener.start(queue: .main)
+            }
+            listeners.append(listener)
+            // Store endpoint URLs only in the private activation file; never log them.
+            endpoints.append(Endpoint(id: window.id, url: "ws://dashboard:\(window.token)@127.0.0.1:\(port)",
+                                      supportsAccountSwitch: window.id == "main"))
+        }
+        return endpoints
+    }
+
+    private func trace(_ message: String) {
+        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_HANDOFF_TRACE"] == "1" else { return }
+        let file = configuration.root.appendingPathComponent("trace.log")
+        if !FileManager.default.fileExists(atPath: file.path) { FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600]) }
+        guard let handle = try? FileHandle(forWritingTo: file) else { return }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data((message + "\n").utf8))
+    }
+
+    private func accept(_ connection: NWConnection, window: Window) {
+        trace("connection accepted")
+        let id = UUID()
+        clients[id] = Client(connection: connection, window: windowForConnection(window))
+        connection.stateUpdateHandler = { [weak self] state in
+            if case .failed = state { Task { @MainActor in self?.clients.removeValue(forKey: id) } }
+            if case .cancelled = state { Task { @MainActor in self?.clients.removeValue(forKey: id) } }
+        }
+        connection.start(queue: .main)
+        receive(id)
+    }
+
+    private func windowForConnection(_ window: Window) -> Window {
+        // The main window reconnects after Dashboard installs a saved credential.
+        // Capture its identity for this connection so existing clients cannot
+        // silently start sending under the newly selected account.
+        guard window.id == "main",
+              let data = try? Data(contentsOf: window.home.appendingPathComponent("auth.json")),
+              let identity = AccountIdentityDecoder.identity(in: data),
+              configuration.windows.contains(where: { $0.accountIdentifier == identity.identifier }) else { return window }
+        return Window(id: window.id, home: window.home, accountIdentifier: identity.identifier, token: window.token)
+    }
+
+    private func receive(_ id: UUID) {
+        guard let client = clients[id] else { return }
+        client.connection.receiveMessage { [weak self] data, context, _, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let data, let metadata = context?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata,
+                   (metadata.opcode == .text || metadata.opcode == .binary) {
+                    await self.handle(data, from: id)
+                }
+                if error == nil { self.receive(id) }
+                else { self.clients.removeValue(forKey: id) }
+            }
+        }
+    }
+
+    private func send(_ object: [String: Any], to id: UUID) {
+        guard let client = clients[id], let data = try? JSONSerialization.data(withJSONObject: object) else { return }
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
+        let context = NWConnection.ContentContext(identifier: "json-rpc", metadata: [metadata])
+        client.connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { _ in })
+    }
+
+    private func handle(_ data: Data, from id: UUID) async {
+        guard let client = clients[id], let request = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        guard let method = request["method"] as? String else {
+            if let responseID = request["id"] as? String, requestsToClient[responseID] == id {
+                requestsToClient.removeValue(forKey: responseID)
+                var response = request
+                response["id"] = approvalIDs.removeValue(forKey: responseID)
+                try? write(response)
+            }
+            return
+        }
+        guard let requestID = request["id"] else { return }
+        trace("request " + method)
+        do {
+            guard !failed else { throw ChatHandoffError.disconnected }
+            var params = request["params"] as? [String: Any] ?? [:]
+            if method == "initialize" {
+                _ = try credential(client.window)
+                if initializeResult == nil { try await waitForTransition() }
+                if initializeResult == nil {
+                    guard policy.isIdle, forwarding == 0 else { throw ChatHandoffError.busy }
+                    try policy.beginSwitch()
+                    defer { policy.finishSwitch() }
+                    try await select(client.window)
+                }
+                send(["id": requestID, "result": initializeResult ?? [:]], to: id)
+                return
+            }
+            guard !method.hasPrefix("accountSession/"), !(method.hasPrefix("account/") && !method.hasSuffix("/read")) else { throw ChatHandoffError.unsupported }
+            if method == "getAuthStatus" || (method.hasPrefix("account/") && method.hasSuffix("/read")) {
+                let result = try await isolatedAccountRequest(method, params: params, window: client.window)
+                send(["id": requestID, "result": result], to: id)
+                return
+            }
+            let reads = ChatHandoffPolicy.isReadOnly(method)
+            if reads { try await waitForTransition() }
+            let startsTurn = method == "turn/start" || method == "review/start"
+            if startsTurn || method == "thread/start" { _ = try credential(client.window) }
+            if startsTurn {
+                guard forwarding == 0 else { throw ChatHandoffError.busy }
+                try policy.beginTurn()
+                turnClient = id
+            } else if !policy.isIdle {
+                guard !policy.switching && (reads || method == "turn/interrupt" || (method == "turn/steer" && turnClient == id)) else { throw ChatHandoffError.busy }
+            }
+            defer { if startsTurn { policy.finishStarting() } }
+            if owner == nil || ((startsTurn || method == "thread/start")
+                && (selected?.id != client.window.id || selected?.accountIdentifier != client.window.accountIdentifier)) {
+                guard forwarding == 0 else { throw ChatHandoffError.busy }
+                try policy.beginSwitch()
+                defer { policy.finishSwitch() }
+                try await select(client.window)
+            }
+            if method == "thread/list" { params["currentAccountOnly"] = false }
+            if startsTurn, let threadID = params["threadId"] as? String, loaded[threadID] == nil {
+                _ = try await call("thread/resume", params: ["threadId": threadID])
+                loaded[threadID] = ["threadId": threadID]
+            }
+            forwarding += 1
+            defer { forwarding -= 1 }
+            let result = try await call(method, params: params)
+            if startsTurn { policy.observe(method: "turn/started", params: result) }
+            if ["thread/resume", "thread/start"].contains(method), let thread = result["thread"] as? [String: Any], let threadID = thread["id"] as? String {
+                loaded[threadID] = ["threadId": threadID]
+            }
+            if ["thread/unsubscribe", "thread/archive", "thread/delete"].contains(method), let threadID = params["threadId"] as? String {
+                loaded.removeValue(forKey: threadID)
+            }
+            send(["id": requestID, "result": result], to: id)
+        } catch {
+            trace("request failed " + method + (method == "fs/readFile" ? ": " + error.localizedDescription : ""))
+            send(["id": requestID, "error": ["code": -32001, "message": error.localizedDescription]], to: id)
+        }
+    }
+
+    private func waitForTransition() async throws {
+        let deadline = ContinuousClock.now + .seconds(60)
+        while policy.switching {
+            guard !failed, ContinuousClock.now < deadline else { throw ChatHandoffError.disconnected }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        guard !failed else { throw ChatHandoffError.disconnected }
+    }
+
+    private func credential(_ window: Window) throws -> Data {
+        let data = try Data(contentsOf: window.home.appendingPathComponent("auth.json"))
+        guard AccountIdentityDecoder.identity(in: data)?.identifier == window.accountIdentifier else { throw ChatHandoffError.identity }
+        return data
+    }
+
+    private func isolatedAccountRequest(_ method: String, params: [String: Any], window: Window) async throws -> [String: Any] {
+        let cacheKey = window.id + ":" + method + ":" + (try JSONSerialization.data(withJSONObject: params, options: .sortedKeys)).base64EncodedString()
+        let selectedCredential = try credential(window)
+        if let cached = authCache[cacheKey], cached.expires > .now, cached.credential == selectedCredential {
+            return (try JSONSerialization.jsonObject(with: cached.response) as? [String: Any])?["result"] as? [String: Any] ?? [:]
+        }
+        let home = configuration.root.appendingPathComponent("usage-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: home) }
+        try ActiveCodexCredentialFile(url: home.appendingPathComponent("auth.json"), fileManager: .default).write(selectedCredential)
+        try "cli_auth_credentials_store = \"file\"\n".write(to: home.appendingPathComponent("config.toml"), atomically: true, encoding: .utf8)
+        let session = try CodexAppServerSession(executableURL: configuration.executable, codexHomeURL: home)
+        defer { session.terminate() }
+        _ = try await session.request(id: 1, method: "initialize", params: ["clientInfo": ["name": "dashboard-account-usage", "version": "1"]], timeout: .seconds(15))
+        try session.notify(method: "initialized")
+        let data = try await session.request(id: 2, method: method, serializedParams: JSONSerialization.data(withJSONObject: params), timeout: .seconds(30))
+        if let refreshed = try? Data(contentsOf: home.appendingPathComponent("auth.json")), AccountIdentityDecoder.identity(in: refreshed)?.identifier == window.accountIdentifier {
+            try persist(refreshed, for: window, expected: selectedCredential)
+        }
+        if method == "getAuthStatus" || method == "account/read" {
+            authCache[cacheKey] = (.now.addingTimeInterval(15), try credential(window), data)
+        }
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any])?["result"] as? [String: Any] ?? [:]
+    }
+
+    private func persist(_ data: Data, for window: Window, expected: Data) throws {
+        let file = window.home.appendingPathComponent("auth.json")
+        // A sign-out or account change must not be undone by a late refresh.
+        guard let current = try? Data(contentsOf: file),
+              current == expected, current != data,
+              AccountIdentityDecoder.identity(in: current)?.identifier == window.accountIdentifier else { return }
+        try ActiveCodexCredentialFile(url: file, fileManager: .default).write(data)
+    }
+
+    private func select(_ window: Window) async throws {
+        try await stopOwner()
+        let fm = FileManager.default
+        try fm.createDirectory(at: ownerHome, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        // The shared catalog keeps its original paths. No rollout or database is
+        // copied or merged; existing creator metadata is preserved.
+        for name in ["sessions", "archived_sessions"] {
+            try fm.createDirectory(at: configuration.historyHome.appendingPathComponent(name), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        }
+        for name in ["sessions", "archived_sessions", "config.toml", "skills", "rules", "plugins"] {
+            let target = configuration.historyHome.appendingPathComponent(name)
+            let link = ownerHome.appendingPathComponent(name)
+            if fm.fileExists(atPath: target.path), !fm.fileExists(atPath: link.path) {
+                try fm.createSymbolicLink(at: link, withDestinationURL: target)
+            }
+        }
+        let selectedCredential = try credential(window)
+        try ActiveCodexCredentialFile(url: ownerHome.appendingPathComponent("auth.json"), fileManager: .default).write(selectedCredential)
+        let incoming = Pipe(), outgoing = Pipe()
+        let process = Process()
+        process.executableURL = configuration.executable
+        process.arguments = ["-c", "cli_auth_credentials_store=\"file\"", "app-server", "--stdio"]
+        var environment = ProcessInfo.processInfo.environment
+        environment["CODEX_HOME"] = ownerHome.path
+        environment["CODEX_SQLITE_HOME"] = configuration.historyHome.path
+        environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "Codex Desktop"
+        for key in ["CODEX_APP_SERVER_WS_URL", "CODEX_APP_SERVER_USE_LOCAL_DAEMON"] { environment.removeValue(forKey: key) }
+        process.environment = environment
+        process.standardInput = incoming; process.standardOutput = outgoing; process.standardError = FileHandle.nullDevice
+        generation = UUID(); let current = generation
+        output = outgoing.fileHandleForReading
+        output?.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            Task { @MainActor in self?.consume(data, generation: current) }
+        }
+        try process.run()
+        try outgoing.fileHandleForWriting.close()
+        try incoming.fileHandleForReading.close()
+        owner = process; input = incoming.fileHandleForWriting; selected = window; ownerCredential = selectedCredential
+        try Data(String(process.processIdentifier).utf8).write(to: configuration.root.appendingPathComponent("owner-pid"), options: .atomic)
+        let response = try await call("initialize", params: ["clientInfo": ["name": "Codex Desktop", "version": "1"], "capabilities": ["experimentalApi": true]])
+        initializeResult = response
+        try write(["method": "initialized"])
+        _ = try await call("account/read", params: ["refreshToken": false])
+        guard AccountIdentityDecoder.identity(in: try Data(contentsOf: ownerHome.appendingPathComponent("auth.json")))?.identifier == window.accountIdentifier else { throw ChatHandoffError.identity }
+        for params in loaded.values { _ = try await call("thread/resume", params: params) }
+    }
+
+    private func stopOwner() async throws {
+        guard let process = owner else { return }
+        guard policy.runningTurns.isEmpty || !process.isRunning else { throw ChatHandoffError.busy }
+        // Wait for exit before importing another account. A process which refuses
+        // to stop leaves the switch failed, never starts a competing writer.
+        generation = UUID()
+        output?.readabilityHandler = nil
+        try? input?.close()
+        if process.isRunning { process.terminate() }
+        for _ in 0..<100 where process.isRunning { try await Task.sleep(for: .milliseconds(50)) }
+        guard !process.isRunning else { failed = true; throw ChatHandoffError.disconnected }
+        if let window = selected, let data = try? Data(contentsOf: ownerHome.appendingPathComponent("auth.json")), AccountIdentityDecoder.identity(in: data)?.identifier == window.accountIdentifier {
+            if let expected = ownerCredential { try persist(data, for: window, expected: expected) }
+        }
+        let abandoned = pending.values.map(\.continuation)
+        pending.removeAll()
+        for continuation in abandoned { continuation.resume(throwing: ChatHandoffError.disconnected) }
+        try? FileManager.default.removeItem(at: configuration.root.appendingPathComponent("owner-pid"))
+        ownerCredential = nil
+        owner = nil; input = nil; output = nil; buffer = Data()
+    }
+
+    private func call(_ method: String, params: [String: Any]) async throws -> [String: Any] {
+        nextID += 1; let id = "broker-\(nextID)"; let current = generation
+        let data: Data = try await withCheckedThrowingContinuation { continuation in
+            pending[id] = Pending(continuation: continuation, generation: current)
+            do { try write(["id": id, "method": method, "params": params]) }
+            catch { pending.removeValue(forKey: id)?.continuation.resume(throwing: error) }
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(60))
+                guard let self, let request = self.pending.removeValue(forKey: id), request.generation == current else { return }
+                self.failed = true
+                request.continuation.resume(throwing: ChatHandoffError.disconnected)
+            }
+        }
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        if let error = object["error"] as? [String: Any] {
+            throw DashboardError.synchronizationFailed(error["message"] as? String ?? "The shared chat request failed.")
+        }
+        return object["result"] as? [String: Any] ?? [:]
+    }
+    private func write(_ value: [String: Any]) throws {
+        guard let owner, owner.isRunning, let input else { throw ChatHandoffError.disconnected }
+        var data = try JSONSerialization.data(withJSONObject: value); data.append(10)
+        try input.write(contentsOf: data)
+    }
+    private func consume(_ data: Data, generation current: UUID) {
+        guard current == generation else { return }
+        if data.isEmpty {
+            failed = true
+            for entry in pending.values { entry.continuation.resume(throwing: ChatHandoffError.disconnected) }
+            pending.removeAll()
+            return
+        }
+        buffer.append(data)
+        while let newline = buffer.firstIndex(of: 10) {
+            let line = Data(buffer[..<newline]); buffer.removeSubrange(...newline)
+            guard var object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            if let method = object["method"] as? String {
+                if object["id"] != nil {
+                    guard let client = turnClient else { continue }
+                    let id = "approval-\(UUID().uuidString)"
+                    // Keep server ids separate from client request ids.
+                    let serverID = object["id"]!
+                    object["id"] = id
+                    approvalIDs[id] = serverID
+                    requestsToClient[id] = client
+                    send(object, to: client)
+                    continue
+                }
+                trace("notification " + method)
+                policy.observe(method: method, params: object["params"] as? [String: Any] ?? [:])
+                // Restarting the private writer changes its global account, but
+                // never changes a desktop client's sign-in. Forwarding this
+                // internal event makes Codex retire an already accepted send as
+                // "active account changed". Client identity comes exclusively
+                // from its own credential-backed account reads above.
+                if method == "account/updated" || method == "account/login/completed" { continue }
+                for (id, client) in clients {
+                    let accountScoped = method.hasPrefix("account/") || method.hasPrefix("modelProvider/authRecovery")
+                    if accountScoped && client.window.accountIdentifier != selected?.accountIdentifier { continue }
+                    send(object, to: id)
+                }
+            } else if let id = object["id"] as? String { pending.removeValue(forKey: id)?.continuation.resume(returning: line) }
+        }
+    }
+    private var approvalIDs: [String: Any] = [:]
+
+    func handleTermination(readyFile: URL) {
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                do { try await self.shutdown(); try? FileManager.default.removeItem(at: readyFile); exit(0) }
+                catch { /* Keep the writer alive until every active turn finishes. */ }
+            }
+        }
+        terminationSource = source
+        source.resume()
+    }
+
+    func shutdown() async throws {
+        guard policy.isIdle || (failed && owner?.isRunning != true) else { throw ChatHandoffError.busy }
+        try await stopOwner()
+        for listener in listeners { listener.cancel() }
+        for client in clients.values { client.connection.cancel() }
+        clients.removeAll()
+        if writerLock >= 0 { Darwin.close(writerLock); writerLock = -1 }
+    }
+}
+
+@MainActor
+private final class ListenerCompletion {
+    var continuation: CheckedContinuation<UInt16, Error>?
+    init(_ value: CheckedContinuation<UInt16, Error>) { continuation = value }
+    func take() -> CheckedContinuation<UInt16, Error>? {
+        defer { continuation = nil }
+        return continuation
+    }
+}
+

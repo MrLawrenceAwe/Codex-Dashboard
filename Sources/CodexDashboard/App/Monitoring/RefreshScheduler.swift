@@ -25,12 +25,18 @@ final class RefreshScheduler {
     private var unreadPollingTask: Task<Void, Never>?
     private var accountUsagePollingTask: Task<Void, Never>?
     private var inactiveAccountUsagePollingTask: Task<Void, Never>?
+    private let codexHome: URL
+    private let pollInactiveAccounts: Bool
     private let dataChanges: CodexDataChangeMonitor?
     private let projectGitChanges: ProjectGitChangeMonitor?
 
     var isFileChangeMonitoringConfigured: Bool { dataChanges != nil }
 
-    init(observeFileChanges: Bool = true) {
+    init(observeFileChanges: Bool = true,
+         codexHome: URL = CodexConfiguration.codexDirectory,
+         pollInactiveAccounts: Bool = true) {
+        self.codexHome = codexHome
+        self.pollInactiveAccounts = pollInactiveAccounts
         dataChanges = observeFileChanges ? CodexDataChangeMonitor() : nil
         projectGitChanges = observeFileChanges ? ProjectGitChangeMonitor() : nil
     }
@@ -86,14 +92,14 @@ final class RefreshScheduler {
         )
         inactiveAccountUsagePollingTask = recurringTask(
             interval: { Schedule.inactiveAccountUsage },
-            action: refreshInactiveAccountUsage
+            action: { [self] in if pollInactiveAccounts { await refreshInactiveAccountUsage() } }
         )
         projectGitChanges?.start(refreshProjectGitStatuses: updateProjectGitStatuses)
         dataChanges?.start(
-            catalogURL: CodexConfiguration.stateDatabaseURL,
-            unreadStateURL: CodexConfiguration.globalStateURL,
+            catalogURL: codexHome.appendingPathComponent("state_5.sqlite"),
+            unreadStateURL: codexHome.appendingPathComponent(".codex-global-state.json"),
             accountMetadataURL: CodexConfiguration.accountMetadataURL,
-            authenticationURL: CodexConfiguration.authenticationURL,
+            authenticationURL: codexHome.appendingPathComponent("auth.json"),
             refreshCatalog: synchronizeDashboard,
             refreshUnread: updateUnreadState,
             refreshAccounts: refreshAccountState

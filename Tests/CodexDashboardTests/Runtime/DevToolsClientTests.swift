@@ -36,6 +36,39 @@ private final class DevToolsConnectionFactoryProbe: @unchecked Sendable {
 }
 
 final class DevToolsClientTests: XCTestCase {
+    func testFailedWindowFocusEvictsSocketBeforeNextOperation() async throws {
+        let factory = DevToolsConnectionFactoryProbe()
+        let client = DevToolsClient(connectionFactory: factory.make)
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html", webSocketURL: "ws://127.0.0.1/main")
+        do { try await client.bringToFront(target); XCTFail("The test connection does not support focusing") }
+        catch {}
+        let result = try await client.evaluateBoolean("true", in: target)
+        XCTAssertTrue(result)
+        XCTAssertEqual(factory.creations(), 2, "A failed focus must not leave a closed socket cached")
+        let counts = await factory.connection.counts()
+        XCTAssertEqual(counts.cancellations, 1)
+        await client.disconnect()
+    }
+
+    func testDisconnectCancelsOnlyThisClientsConnections() async throws {
+        let firstFactory = DevToolsConnectionFactoryProbe()
+        let secondFactory = DevToolsConnectionFactoryProbe()
+        let first = DevToolsClient(connectionFactory: firstFactory.make)
+        let second = DevToolsClient(connectionFactory: secondFactory.make)
+        let target = DevToolsTarget(id: "main", type: "page", url: "app://-/index.html",
+                                    webSocketURL: "ws://127.0.0.1/main")
+        _ = try await first.evaluateBoolean("true", in: target)
+        _ = try await second.evaluateBoolean("true", in: target)
+        await first.disconnect()
+        let firstCounts = await firstFactory.connection.counts()
+        let secondCounts = await secondFactory.connection.counts()
+        XCTAssertEqual(firstCounts.cancellations, 1)
+        XCTAssertEqual(secondCounts.cancellations, 0)
+        _ = try await second.evaluateBoolean("true", in: target)
+        XCTAssertEqual(secondFactory.creations(), 1)
+        await second.disconnect()
+    }
+
     func testDefaultSessionAllowsAccountActionLongPolling() {
         let configuration = DevToolsClient.sessionConfiguration()
 

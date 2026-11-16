@@ -34,11 +34,14 @@ final class SavedAccountDocumentStore: @unchecked Sendable {
             }
         )
         var document = migration.document
-        let original = document
+        var original = document
         if migration.requiresIdentitySynchronization {
             synchronizeSavedAccountIdentities(in: &document)
         }
         reconcileActiveAccount(in: &document, allowNameFallback: migration.requiresNameFallback)
+        // The active principal belongs to this manager's auth file. Switching
+        // focus between windows must not continually rewrite the shared registry.
+        original.activeAccountID = document.activeAccountID
         if document != original
             || migration.requiresNameFallback
             || migration.requiresIdentitySynchronization

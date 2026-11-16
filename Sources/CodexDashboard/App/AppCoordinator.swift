@@ -40,6 +40,7 @@ final class AppCoordinator: ObservableObject {
     let codexForegrounder: any CodexForegrounding
     let keyboardActivityDetector: any KeyboardActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
+    let accountWindows = AccountWindowLauncher()
     let accounts: AccountCoordinator
     let notificationUsageRefresher: NotificationUsageRefresher
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
@@ -80,6 +81,9 @@ final class AppCoordinator: ObservableObject {
         compatibilityChecker: any LocalCompatibilityChecking = LocalCodexCompatibilityChecker(),
         userDefaults: UserDefaults = .standard,
         observeFileChanges: Bool = true,
+        codexHome: URL = CodexConfiguration.codexDirectory,
+        pollInactiveAccountUsage: Bool = true,
+        isAccountWindow: Bool = false,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         keyboardActivityDetector: any KeyboardActivityDetecting = SystemKeyboardActivityDetector(),
@@ -109,12 +113,14 @@ final class AppCoordinator: ObservableObject {
         accounts = AccountCoordinator(
             manager: accountManager,
             usageProvider: accountUsageProvider,
-            usageCacheStore: accountUsageCacheStore
+            usageCacheStore: accountUsageCacheStore,
+            isAccountWindow: isAccountWindow
         )
         notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
         automaticallyOpenCompletedChats = userDefaults.object(forKey: Self.automaticallyOpenCompletedChatsKey) as? Bool ?? true
         automaticallyOpenQuestionChats = userDefaults.object(forKey: Self.automaticallyOpenQuestionChatsKey) as? Bool ?? true
-        refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges)
+        refreshScheduler = RefreshScheduler(observeFileChanges: observeFileChanges, codexHome: codexHome,
+                                            pollInactiveAccounts: pollInactiveAccountUsage)
         compatibilityMonitor = CompatibilityMonitor(
             localChecker: compatibilityChecker,
             userDefaults: userDefaults,
@@ -181,6 +187,11 @@ final class AppCoordinator: ObservableObject {
             }
         }
         Task { await checkCompatibility() }
+    }
+
+    func disconnectRuntime() async {
+        await cancelSynchronization()
+        await dashboardRuntime?.disconnect()
     }
 
     func stopMonitoring() {
@@ -310,7 +321,7 @@ final class AppCoordinator: ObservableObject {
         await dashboardRuntime?.openChatOverview()
     }
 
-    private func cancelSynchronization() async {
+    func cancelSynchronization() async {
         await synchronizationCoalescer.cancelAndWait()
         await dashboardRuntime?.waitForReviewOperations()
     }

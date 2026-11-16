@@ -9,7 +9,9 @@ protocol CodexForegrounding {
 @MainActor
 final class CodexApplicationForegroundController: CodexForegrounding {
     var isCodexFrontmost: Bool {
-        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == CodexConfiguration.bundleIdentifier
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.bundleIdentifier == CodexConfiguration.bundleIdentifier else { return false }
+        return CodexConfiguration.isMainApplication(app)
     }
 
     func foregroundCodex() {
@@ -18,7 +20,7 @@ final class CodexApplicationForegroundController: CodexForegrounding {
         }
         let application = NSRunningApplication.runningApplications(
             withBundleIdentifier: CodexConfiguration.bundleIdentifier
-        ).max { ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast) }
+        ).filter { CodexConfiguration.isMainApplication($0) }.max { ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast) }
         application?.activate(options: [.activateAllWindows])
     }
 }

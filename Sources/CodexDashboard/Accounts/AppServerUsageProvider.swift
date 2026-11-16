@@ -93,6 +93,18 @@ actor AppServerUsageProvider: AccountUsageProviding {
     }
 
     private func fetchUsage() async throws -> CodexAccountUsage {
+        if ChatHandoffService.isEnabled {
+            session?.terminate()
+            session = nil
+            let file = ActiveCodexCredentialFile(url: codexHomeURL.appendingPathComponent("auth.json"), fileManager: .default)
+            guard let credential = try file.read() else { throw CodexAccountUsageError.authenticationExpired }
+            let result = try await fetchUsage(using: credential)
+            guard AccountIdentityDecoder.identity(in: result.credential)?.identifier == AccountIdentityDecoder.identity(in: credential)?.identifier else {
+                throw CodexAccountError.credentialAccountMismatch
+            }
+            if result.credential != credential, try file.read() == credential { try file.write(result.credential) }
+            return result.usage
+        }
         let activeSession: CodexAppServerSession
         if let session, session.isRunning {
             activeSession = session

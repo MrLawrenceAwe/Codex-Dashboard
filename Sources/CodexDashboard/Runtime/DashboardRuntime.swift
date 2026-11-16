@@ -7,6 +7,7 @@ enum DashboardDisableOutcome: Equatable {
 
 @MainActor
 protocol DashboardRuntime: AnyObject {
+    func disconnect() async
     var codexIsRunning: Bool { get }
     var codexLaunchDate: Date? { get }
     var maintainsDashboard: Bool { get }
@@ -16,7 +17,7 @@ protocol DashboardRuntime: AnyObject {
     func rendererTargets() async -> [DevToolsTarget]
     func waitForReviewOperations() async
     func prepareForRestart()
-    func restartCodex(activate: Bool) async throws -> [DevToolsTarget]
+    func restartCodex(activate: Bool, beforeLaunch: (() async throws -> Void)?) async throws -> [DevToolsTarget]
     func synchronizeDashboard(
         with snapshot: DashboardSnapshot,
         on targets: [DevToolsTarget],
@@ -32,6 +33,14 @@ protocol DashboardRuntime: AnyObject {
     func useStoredPromptLibraryOnNextSync()
     func flushPromptLibrary() async throws
     func rendererCompatibilityChecks() async -> [CompatibilityCheck]
+}
+
+extension DashboardRuntime {
+    func disconnect() async {}
+
+    func restartCodex(activate: Bool) async throws -> [DevToolsTarget] {
+        try await restartCodex(activate: activate, beforeLaunch: nil)
+    }
 }
 
 @MainActor
@@ -51,6 +60,8 @@ final class CodexDashboardRuntime: DashboardRuntime {
             reviewLoopStore: ReviewLoopFileStore(url: CodexConfiguration.reviewLoopURL)
         )
     }
+
+    func disconnect() async { await renderer.disconnect() }
 
     var codexIsRunning: Bool { codex.isRunning }
     var codexLaunchDate: Date? { codex.launchDate }
@@ -74,8 +85,8 @@ final class CodexDashboardRuntime: DashboardRuntime {
         renderer.prepareForRestart()
     }
 
-    func restartCodex(activate: Bool) async throws -> [DevToolsTarget] {
-        try await codex.restart(activate: activate)
+    func restartCodex(activate: Bool, beforeLaunch: (() async throws -> Void)?) async throws -> [DevToolsTarget] {
+        try await codex.restart(activate: activate, beforeLaunch: beforeLaunch)
         let deadline = ContinuousClock.now + .seconds(18)
         while true {
             let targets = await renderer.targets(forceRefresh: true)

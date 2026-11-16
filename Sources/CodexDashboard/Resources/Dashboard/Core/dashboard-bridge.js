@@ -1,7 +1,7 @@
 const sentMessageDictation = createSentMessageDictation();
 const pushControls = createPushControls();
 const threadCatalog = createThreadCatalog();
-const projectGitActions = createProjectGitActions({ requestRPC: reviewRPCClient.request });
+const projectGitActions = createProjectGitActions({ requestRPC: codexRPCClient.request });
 const gitToolbar = createGitToolbar({
   projectGitActions,
   findThread: threadCatalog.findThread,
@@ -59,7 +59,7 @@ const dashboardLifecycle = createDashboardLifecycle({
     gitToolbar.destroy();
     projectGitActions.destroy();
     pushControls.destroy();
-    reviewRPCClient.destroy();
+    codexRPCClient.destroy();
     dashboardPages.forEach(({ controller }) => controller.destroy());
     sidebarProjectHighlights.destroy();
     sidebarProjectGitIndicators.destroy();
@@ -80,7 +80,8 @@ window.__codexDashboard = {
   probeEditDictation: sentMessageDictation.probe,
   readPushControls: pushControls.read,
   readGitToolbar: () => dashboardNavigation.isOpen() ? 'pending' : gitToolbar.readCompatibility(),
-  reviewRequest: reviewRPCClient.request,
+  reviewRequest: codexRPCClient.request,
+  projectRequest: codexRPCClient.request,
   pendingReviewAction: reviewLoopPage.pendingAction,
   applyReviewPageSnapshot: reviewLoopPage.applySnapshot,
   ensureMounted: ensureDashboardMounted,

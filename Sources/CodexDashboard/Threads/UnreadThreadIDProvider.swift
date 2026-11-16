@@ -21,7 +21,7 @@ enum UnreadThreadIDError: LocalizedError {
 
 actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     private struct GlobalState: Decodable {
-        let threadReadState: ThreadReadState
+        let threadReadState: ThreadReadState?
 
         private enum CodingKeys: String, CodingKey {
             case threadReadState = "electron-thread-read-state-v1"
@@ -88,9 +88,9 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
 
     static func decodeUnreadThreadIDs(from data: Data, identityKey: String?) throws -> Set<String> {
         let state = try JSONDecoder().decode(GlobalState.self, from: data)
-        guard let identityKey else { return [] }
+        guard let identityKey, let readState = state.threadReadState else { return [] }
         return Set(
-            (state.threadReadState.unreadByIdentity[identityKey] ?? [:])
+            (readState.unreadByIdentity[identityKey] ?? [:])
                 .filter { hostID, _ in hostID == "local" || hostID.hasPrefix("local:") }
                 .flatMap(\.value)
         )

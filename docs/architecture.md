@@ -12,6 +12,38 @@ through a loopback-only Chromium DevTools connection. Single-instance arbitratio
 prevents older controllers from overwriting the active dashboard. Codex's signed
 application bundle is not modified.
 
+`AccountWindowLauncher` opens saved accounts in independent desktop processes using
+`CODEX_HOME`, `CODEX_ELECTRON_USER_DATA_PATH`, and `--user-data-dir`. UUID-scoped
+profiles retain their own databases and refreshed credentials; the main Dashboard
+connection excludes explicit desktop profiles from process discovery, restarts,
+and foreground activation. `AccountWindowDashboards` discovers running profiles
+and gives each one an `AppCoordinator` with scoped catalog, unread-state provider,
+usage provider, file watchers, foreground controller, review store, and renderer
+endpoint. Each instance has its own loopback-only debugging port. Closing an
+instance stops its monitors and disconnects its renderer sockets without affecting
+other windows. A restart retains its coordinator through the temporary process gap.
+
+`SharedProjectSynchronizer` polls the connected windows' `project/list` snapshots
+and merges them against persisted per-window baselines in `shared-projects.json`.
+It writes through each window's own `project/create`, `project/update`, and
+`project/delete` requests. Codex’s native project services apply sidebar order
+and pins using that window's sidebar IDs. Account-specific remote entries are
+retained. Stable IDs in project metadata, idempotency keys, and a checkpoint
+before mutations make interrupted writes recoverable. Initial adoption
+keeps existing registrations and duplicate folder groups; tombstones prevent an
+offline replica from resurrecting removed projects. Sign-ins, chats, and remote
+project connections never enter this shared catalogue.
+
+`AccountWindowPresenter` targets both the process and its renderer with
+`Page.bringToFront`, reopens a running profile with no window, and checks visibility,
+DOM focus, the frontmost process, and Codex mode before confirming success. Presentation
+requests suppress automatic recovery for that profile while it is being raised.
+Temporary presentation sockets disconnect on success and failure.
+
+Saved-account transactions serialize across coordinators; active-account
+reconciliation does not rewrite shared metadata merely because another window has
+a different sign-in.
+
 The injection manifest defines runtime resources and the renderer compatibility
 contract bundle. Swift supplies the prompt-library and shared composer-preset schemas;
 the injection version hashes the assembled payload. The renderer bridge connects
@@ -257,3 +289,41 @@ checks automatically. Blocking drift prevents remounting; warnings and failed ch
 details propagate to the menu, notification, copied diagnostics, and Diagnostics
 window. This integration uses private contracts that may require maintenance after
 Codex updates.
+
+### Shared chat handoff
+
+`ChatHandoffServer` runs as a separate Dashboard executable mode, using one
+app-server child for the original catalog and rollout paths. Native windows
+connect through authenticated loopback WebSocket endpoints, one per saved
+account. Their own homes retain the credentials and presentation preferences.
+The writer has a private credential home and uses `CODEX_SQLITE_HOME` plus the
+original session directories. No history migration or copy is involved.
+
+`ChatHandoffPolicy` reserves a send before any asynchronous account transition,
+tracks all parent and child turn notifications, and rejects overlapping starts
+and cross-window steering. A transition waits for the previous child to exit,
+loads and checks the next credential, initializes the replacement server, and
+resumes loaded chats. Request IDs and approval IDs have separate routing tables;
+approvals return only through the initiating client. Notifications fan out to
+the windows; private writer account-change events are consumed, while quota
+and auth-recovery notifications are restricted to the selected account.
+Account reads use isolated credential homes rather than the writer’s identity.
+
+`ChatHandoffService` checks for idle windows and unmerged secondary chat stores,
+then terminates native instances and verifies their descendants exited before
+starting the broker. A catalog lock excludes another Dashboard broker. A
+launchd environment override routes normal GUI launches to the broker for the
+current login; a disabled or missing endpoint never falls back to a native
+writer. The previous override is restored when shared chats are disabled.
+Native login mutations are rejected while shared mode is enabled.
+
+The broker never retries model turns. An uncertain response fails closed so a
+user can inspect history before sending again. A normal termination request is
+ignored while a turn or account transition is in progress.
+
+Project sync uses distinct presentation replicas for independent and shared
+backends. Shared clients adopt the main server's project IDs before observation,
+including newly created projects without markers. Backend changes retire only
+obsolete sidebar cache entries, so the independent store's IDs are not mistaken
+for project deletions. Window coordinators are rebuilt when either the debug
+port or the backend mode changes.

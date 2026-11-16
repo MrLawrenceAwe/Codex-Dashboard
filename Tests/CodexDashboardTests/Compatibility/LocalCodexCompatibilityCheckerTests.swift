@@ -4,6 +4,18 @@ import XCTest
 @testable import CodexDashboard
 
 final class LocalCodexCompatibilityCheckerTests: XCTestCase {
+    func testFreshProfileDoesNotTreatMissingUnreadMarkersAsDrift() async throws {
+        let database = try CodexTestFixtures.makeDatabase(
+            schema: "CREATE TABLE threads (id TEXT, rollout_path TEXT, recency_at_ms INTEGER);", testCase: self)
+        let global = try makeGlobalState("{}")
+        let checker = LocalCodexCompatibilityChecker(applicationURL: URL(fileURLWithPath: "/missing/Codex.app"),
+                                                     stateDatabaseURL: database, globalStateURL: global)
+        let checks = await checker.checkLocalContracts()
+        XCTAssertEqual(status("unread-state", in: checks), .pending)
+        XCTAssertEqual(status("rollout-events", in: checks), .pending)
+        XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(from: Data("{}".utf8), identityKey: "new-account"), [])
+    }
+
     func testLiveLocalContractsWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_LIVE_TEST"] == "1" else {
             throw XCTSkip("Set CODEX_DASHBOARD_LIVE_TEST=1 to inspect local Codex contracts.")
@@ -54,7 +66,7 @@ final class LocalCodexCompatibilityCheckerTests: XCTestCase {
 
         XCTAssertEqual(status("thread-database", in: checks), .incompatible)
         XCTAssertEqual(status("unread-state", in: checks), .warning)
-        XCTAssertEqual(status("rollout-events", in: checks), .unavailable)
+        XCTAssertEqual(status("rollout-events", in: checks), .pending)
     }
 
     func testDatabaseInspectionFailureIsNonBlocking() async throws {

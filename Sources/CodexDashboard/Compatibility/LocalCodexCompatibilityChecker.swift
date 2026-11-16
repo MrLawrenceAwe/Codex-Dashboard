@@ -109,6 +109,10 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
         do {
             let data = try Data(contentsOf: globalStateURL, options: .mappedIfSafe)
             _ = try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(from: data, identityKey: nil)
+            if let state = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               state["electron-thread-read-state-v1"] == nil {
+                return check("unread-state", "Unread state", .pending, "Unread markers have not been recorded yet.")
+            }
             return check(
                 "unread-state", "Unread state", .compatible,
                 "The persisted local unread-thread contract is available."
@@ -148,8 +152,8 @@ actor LocalCodexCompatibilityChecker: LocalCompatibilityChecking {
                 .map(String.init)
             guard !paths.isEmpty else {
                 return check(
-                    "rollout-events", "Activity events", .unavailable,
-                    "There are no recent activity logs to inspect."
+                    "rollout-events", "Activity events", .pending,
+                    "No chats have recorded activity logs yet."
                 )
             }
             var foundLifecycle = false

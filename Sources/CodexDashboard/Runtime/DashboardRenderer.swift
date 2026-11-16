@@ -59,6 +59,11 @@ final class DashboardRenderer {
         )
     }
 
+    func disconnect() async {
+        clearMountState()
+        await devTools.disconnect()
+    }
+
     func targets(forceRefresh: Bool = false) async -> [DevToolsTarget] {
         if
             !forceRefresh,
@@ -321,7 +326,7 @@ final class DashboardRenderer {
     }
 
     func compatibilityChecks() async -> [CompatibilityCheck] {
-        await compatibilityChecker.check()
+        await compatibilityChecker.check(hasThreads: lastSnapshot.map { !$0.threads.isEmpty } ?? true)
     }
 
     private func deliverThreads(

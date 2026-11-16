@@ -17,6 +17,7 @@ final class AccountCoordinator: ObservableObject {
     @Published private(set) var usageErrorsByAccountID: [UUID: String] = [:]
     @Published private(set) var accountsRequiringSignIn: Set<UUID> = []
 
+    let isAccountWindow: Bool
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
     private let accountOperationQueue = DispatchQueue(label: "codex-dashboard.account-operations")
@@ -28,9 +29,11 @@ final class AccountCoordinator: ObservableObject {
     init(
         manager: CodexAccountManager,
         usageProvider: any AccountUsageProviding,
-        usageCacheStore: (any UsageCaching)? = nil
+        usageCacheStore: (any UsageCaching)? = nil,
+        isAccountWindow: Bool = false
     ) {
         self.manager = manager
+        self.isAccountWindow = isAccountWindow
         usageSession = AccountUsageSession(
             provider: usageProvider,
             cache: usageCacheStore ?? manager.usageCacheStore
@@ -54,6 +57,10 @@ final class AccountCoordinator: ObservableObject {
                 continuation.resume(with: Result { try operation(manager) })
             }
         }
+    }
+
+    func credentialForSeparateWindow(_ accountID: UUID) async throws -> Data {
+        try await withManager { try $0.savedCredential(for: accountID, interactionAllowed: true) }
     }
 
     func refreshState() async {
@@ -153,8 +160,10 @@ final class AccountCoordinator: ObservableObject {
         }
     }
 
-    func activate(_ accountID: UUID) async throws -> AccountTransition {
-        let transition = try await withManager { try $0.activate(accountID: accountID) }
+    func activate(_ accountID: UUID, expectedAccountIdentifier: String? = nil) async throws -> AccountTransition {
+        let transition = try await withManager {
+            try $0.activate(accountID: accountID, expectedAccountIdentifier: expectedAccountIdentifier)
+        }
         stateRefresh = nil
         return transition
     }
@@ -358,7 +367,11 @@ final class AccountCoordinator: ObservableObject {
             activeAccountID: activeSavedAccountID,
             statusMessage: statusMessage,
             isBusy: isBusy || !refreshingUsageAccountIDs.isEmpty,
-            usageBlockage: AccountUsageFormatter.blockage(for: activeUsageStatus)
+            usageBlockage: AccountUsageFormatter.blockage(for: activeUsageStatus),
+            accountWindow: isAccountWindow,
+            sharedChats: ChatHandoffService.isEnabled,
+            sharedAccountSwitchAvailable: !isAccountWindow && ChatHandoffService.isEnabled
+                && ChatHandoffService.supportsAccountSwitch
         )
     }
 }

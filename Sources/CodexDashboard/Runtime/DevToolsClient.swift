@@ -32,6 +32,7 @@ struct DevToolsTarget: Decodable, Identifiable, Sendable {
 }
 
 protocol DevToolsServing: Sendable {
+    func disconnect() async
     func mainRendererTargets() async -> [DevToolsTarget]
     func evaluateBoolean(_ expression: String, in target: DevToolsTarget) async throws -> Bool
     func evaluateString(
@@ -42,6 +43,7 @@ protocol DevToolsServing: Sendable {
 }
 
 extension DevToolsServing {
+    func disconnect() async {}
     func evaluateString(_ expression: String, in target: DevToolsTarget) async throws -> String? {
         try await evaluateString(expression, in: target, timeout: .seconds(4))
     }
@@ -56,6 +58,11 @@ enum DevToolsEvaluationValue: Equatable, Sendable {
 protocol DevToolsConnectionServing: Sendable {
     func evaluate(_ expression: String) async throws -> DevToolsEvaluationValue
     func cancel() async
+    func bringToFront() async throws
+}
+
+extension DevToolsConnectionServing {
+    func bringToFront() async throws { throw DashboardError.invalidDevToolsResponse }
 }
 
 actor PersistentDevToolsConnection: DevToolsConnectionServing {
@@ -64,6 +71,7 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
     private var pending: [Int: CheckedContinuation<DevToolsEvaluationValue, any Error>] = [:]
     private var readerTask: Task<Void, Never>?
     private var isClosed = false
+    private var windowCommands = Set<Int>()
 
     init(session: URLSession, webSocketURL: URL) {
         task = session.webSocketTask(with: webSocketURL)
@@ -94,6 +102,23 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
         } onCancel: {
             Task { await self.cancelRequest(commandID) }
         }
+    }
+
+    func bringToFront() async throws {
+        guard !isClosed else { throw DashboardError.invalidDevToolsResponse }
+        startReaderIfNeeded()
+        nextCommandID += 1
+        let id = nextCommandID
+        let data = try JSONSerialization.data(withJSONObject: ["id": id, "method": "Page.bringToFront"])
+        let request = URLSessionWebSocketTask.Message.string(String(decoding: data, as: UTF8.self))
+        let _: DevToolsEvaluationValue = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<DevToolsEvaluationValue, any Error>) in
+                if Task.isCancelled { continuation.resume(throwing: CancellationError()); return }
+                windowCommands.insert(id)
+                pending[id] = continuation
+                Task { await self.send(request) }
+            }
+        } onCancel: { Task { await self.cancelRequest(id) } }
     }
 
     func cancel() {
@@ -135,6 +160,7 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
         else { return }
         let commandID = (payload["id"] as? NSNumber)?.intValue ?? payload["id"] as? Int
         guard let commandID, let continuation = pending.removeValue(forKey: commandID) else { return }
+        let isWindowCommand = windowCommands.remove(commandID) != nil
         if let error = payload["error"] as? [String: Any] {
             continuation.resume(throwing: DashboardError.devToolsCommandFailed(
                 error["message"] as? String ?? "Unknown DevTools error"
@@ -143,6 +169,10 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
         }
         guard let result = payload["result"] as? [String: Any] else {
             continuation.resume(throwing: DashboardError.invalidDevToolsResponse)
+            return
+        }
+        if isWindowCommand {
+            continuation.resume(returning: .null)
             return
         }
         if result["exceptionDetails"] != nil {
@@ -181,6 +211,7 @@ actor PersistentDevToolsConnection: DevToolsConnectionServing {
     }
 
     private func cancelRequest(_ commandID: Int) {
+        windowCommands.remove(commandID)
         pending.removeValue(forKey: commandID)?.resume(throwing: CancellationError())
     }
 
@@ -223,11 +254,13 @@ actor DevToolsClient: DevToolsServing {
     }
 
     private let session: URLSession
+    private let portProvider: @Sendable () -> Int
     private let connectionFactory: @Sendable (URLSession, URL) -> any DevToolsConnectionServing
     private var connectionsByTargetID: [String: CachedConnection] = [:]
 
     init(
         session: URLSession? = nil,
+        portProvider: @escaping @Sendable () -> Int = { CodexConfiguration.devToolsPort },
         connectionFactory: @escaping @Sendable (URLSession, URL) -> any DevToolsConnectionServing = {
             PersistentDevToolsConnection(session: $0, webSocketURL: $1)
         }
@@ -237,6 +270,7 @@ actor DevToolsClient: DevToolsServing {
         } else {
             self.session = URLSession(configuration: Self.sessionConfiguration())
         }
+        self.portProvider = portProvider
         self.connectionFactory = connectionFactory
     }
 
@@ -251,9 +285,28 @@ actor DevToolsClient: DevToolsServing {
         session.invalidateAndCancel()
     }
 
+    func disconnect() async {
+        let connections = Array(connectionsByTargetID.values)
+        connectionsByTargetID.removeAll()
+        for cached in connections { await cached.connection.cancel() }
+    }
+
+    func bringToFront(_ target: DevToolsTarget) async throws {
+        let cached = try connection(for: target)
+        do {
+            try await withDevToolsTimeout(.seconds(4)) { try await cached.connection.bringToFront() }
+        } catch {
+            if connectionsByTargetID[target.id]?.id == cached.id {
+                connectionsByTargetID.removeValue(forKey: target.id)
+                await cached.connection.cancel()
+            }
+            throw error
+        }
+    }
+
     func mainRendererTargets() async -> [DevToolsTarget] {
         guard let endpoint = URL(
-            string: "http://\(CodexConfiguration.devToolsAddress):\(CodexConfiguration.devToolsPort)/json/list"
+            string: "http://\(CodexConfiguration.devToolsAddress):\(portProvider())/json/list"
         ) else { return [] }
         var request = URLRequest(url: endpoint)
         request.timeoutInterval = 1

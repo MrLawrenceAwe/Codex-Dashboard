@@ -19,11 +19,13 @@ enum CodexConfiguration {
     }
 
     static var launchArguments: [String] {
-        [
-            "--remote-debugging-address=\(devToolsAddress)",
-            "--remote-debugging-port=\(devToolsPort)",
-            "--remote-allow-origins=http://localhost",
-        ]
+        debugArguments(port: devToolsPort)
+    }
+
+    static func debugArguments(port: Int) -> [String] {
+        ["--remote-debugging-address=\(devToolsAddress)",
+         "--remote-debugging-port=\(port)",
+         "--remote-allow-origins=http://localhost"]
     }
 
     // A port that worked for a prior Codex process is not necessarily free once
@@ -70,7 +72,7 @@ enum CodexConfiguration {
             .flatMap { (1...65_535).contains($0) ? $0 : nil }
     }
 
-    private static func randomDevToolsPort(excluding: Int? = nil) -> Int {
+    static func randomDevToolsPort(excluding: Int? = nil) -> Int {
         var port: Int
         repeat {
             port = Int.random(in: 49_152...65_535)
@@ -78,24 +80,39 @@ enum CodexConfiguration {
         return port
     }
 
+    // Explicit desktop profiles are separate account instances. Never restart,
+    // foreground, or adopt their renderer as the main Dashboard connection.
+    static func isMainApplicationArguments(_ arguments: String) -> Bool {
+        !arguments.contains("--user-data-dir")
+    }
+
+    static func processArguments(for identifier: pid_t) -> String? {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-ww", "-p", String(identifier), "-o", "args="]
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func isMainApplication(_ application: NSRunningApplication) -> Bool {
+        guard let arguments = processArguments(for: application.processIdentifier) else { return false }
+        return isMainApplicationArguments(arguments)
+    }
+
     private static func runningCodexDevToolsPort() -> Int? {
         let applications = NSRunningApplication.runningApplications(
             withBundleIdentifier: bundleIdentifier
         ).sorted { ($0.launchDate ?? .distantPast) > ($1.launchDate ?? .distantPast) }
         for application in applications {
-            let process = Process()
-            let output = Pipe()
-            process.executableURL = URL(fileURLWithPath: "/bin/ps")
-            process.arguments = ["-p", String(application.processIdentifier), "-o", "args="]
-            process.standardOutput = output
-            process.standardError = FileHandle.nullDevice
-            guard (try? process.run()) != nil else { continue }
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard
-                process.terminationStatus == 0,
-                let arguments = String(data: data, encoding: .utf8),
-                let port = devToolsPort(inProcessArguments: arguments)
+            guard let arguments = processArguments(for: application.processIdentifier),
+                  isMainApplicationArguments(arguments),
+                  let port = devToolsPort(inProcessArguments: arguments)
             else { continue }
             return port
         }
@@ -103,7 +120,7 @@ enum CodexConfiguration {
     }
 }
 
-private final class DevToolsPortStorage: @unchecked Sendable {
+final class DevToolsPortStorage: @unchecked Sendable {
     private let lock = NSLock()
     private var selectedPort: Int
 

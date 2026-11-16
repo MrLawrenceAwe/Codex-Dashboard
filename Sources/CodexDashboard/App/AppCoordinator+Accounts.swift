@@ -31,6 +31,10 @@ extension AppCoordinator {
         case .saveCurrentAccount:
             await saveCurrentAccount()
             presentationAlreadyUpdated = false
+        case .openAccountWindow:
+            guard let accountID = action.accountID else { return .unavailable }
+            await openAccountWindow(accountID)
+            presentationAlreadyUpdated = false
         case .switchAccount:
             guard let accountID = action.accountID else { return .unavailable }
             await switchAccount(to: accountID)
@@ -72,12 +76,52 @@ extension AppCoordinator {
         }
     }
 
+    func openAccountWindow(_ accountID: UUID) async {
+        guard !isPerformingAction else { return }
+        isPerformingAction = true
+        defer { isPerformingAction = false }
+        do {
+            try await accountWindows.open(accountID: accountID, accounts: accounts)
+            accounts.setStatusMessage("Opened the account window. Dashboard connects automatically.")
+        } catch {
+            accounts.setStatusMessage(error.localizedDescription)
+        }
+    }
+
     func switchAccount(to accountID: UUID) async {
-        await performAccountTransition { try await accounts.activate(accountID) }
+        if accounts.isAccountWindow {
+            await openAccountWindow(accountID)
+            return
+        }
+        if ChatHandoffService.isEnabled {
+            guard ChatHandoffService.supportsAccountSwitch else {
+                accounts.setStatusMessage("Use Update Shared Chats in the Dashboard menu to enable Switch.")
+                return
+            }
+            guard let account = accounts.savedAccounts.first(where: { $0.id == accountID }),
+                  let identity = account.codexAccountID, ChatHandoffService.permitsAccountSwitch(to: identity) else {
+                accounts.setStatusMessage("This account is unavailable on the shared chat connection.")
+                return
+            }
+            await performAccountTransition(applyAfterQuit: true) {
+                try ChatHandoffService.prepareMainWindowForAccountSwitch()
+                return try await self.accounts.activate(accountID, expectedAccountIdentifier: identity)
+            }
+        } else {
+            await performAccountTransition { try await self.accounts.activate(accountID) }
+        }
     }
 
     func prepareForSignIn() async {
-        await performAccountTransition { try await accounts.prepareForSignIn() }
+        if ChatHandoffService.isEnabled {
+            accounts.setStatusMessage("Disable Shared Chats from the Dashboard menu before adding another account.")
+            return
+        }
+        guard !accounts.isAccountWindow else {
+            accounts.setStatusMessage("Add saved accounts in the main window. To renew this window’s sign-in, use Codex’s own account menu.")
+            return
+        }
+        await performAccountTransition { try await self.accounts.prepareForSignIn() }
     }
 
     func dashboardSnapshotPayload() -> DashboardSnapshot {
@@ -88,7 +132,8 @@ extension AppCoordinator {
     }
 
     private func performAccountTransition(
-        transaction: () async throws -> AccountTransition
+        applyAfterQuit: Bool = false,
+        transaction: @escaping () async throws -> AccountTransition
     ) async {
         guard !isPerformingAction else {
             accounts.setStatusMessage("Another dashboard action is in progress. Try again when it finishes.")
@@ -120,14 +165,16 @@ extension AppCoordinator {
         }
 
         accounts.persistUsageCache(force: true)
-        let accountTransaction: AccountTransition
-        do {
-            accountTransaction = try await transaction()
-        } catch {
-            accounts.setStatusMessage(error.localizedDescription)
-            accounts.restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
-            await accounts.refreshState()
-            return
+        var accountTransaction: AccountTransition?
+        if !applyAfterQuit {
+            do {
+                accountTransaction = try await transaction()
+            } catch {
+                accounts.setStatusMessage(error.localizedDescription)
+                accounts.restoreUsageStatus(afterAbortedTransition: previousUsageStatus)
+                await accounts.refreshState()
+                return
+            }
         }
 
         dashboardRuntime.prepareForRestart()
@@ -135,10 +182,16 @@ extension AppCoordinator {
         connectionError = nil
         let targets: [DevToolsTarget]
         do {
-            targets = try await dashboardRuntime.restartCodex(activate: true)
+            if applyAfterQuit {
+                targets = try await dashboardRuntime.restartCodex(activate: true) {
+                    accountTransaction = try await transaction()
+                }
+            } else {
+                targets = try await dashboardRuntime.restartCodex(activate: true)
+            }
         } catch let restartError {
             do {
-                try await accounts.rollback(accountTransaction)
+                if let accountTransaction { try await accounts.rollback(accountTransaction) }
             } catch let rollbackError {
                 accounts.invalidateUsage()
                 await accounts.refreshState()
@@ -151,9 +204,13 @@ extension AppCoordinator {
             }
             accounts.invalidateUsage()
             await accounts.refreshState()
-            accounts.setStatusMessage("Codex could not restart, so the account change was rolled back.")
-            dashboardRuntime.prepareForRestart()
-            _ = try? await dashboardRuntime.restartCodex(activate: true)
+            accounts.setStatusMessage(accountTransaction == nil
+                ? restartError.localizedDescription
+                : "Codex could not restart, so the account change was rolled back.")
+            if accountTransaction != nil || !dashboardRuntime.codexIsRunning {
+                dashboardRuntime.prepareForRestart()
+                _ = try? await dashboardRuntime.restartCodex(activate: true)
+            }
             setFailure(restartError, lastKnownState: .codexClosed)
             return
         }

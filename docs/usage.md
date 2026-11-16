@@ -97,10 +97,95 @@ cannot apply the preset, check the warning and model settings before sending.
 2. Choose **Add another account**. Codex restarts signed out; complete sign-in.
 3. Save that account, then use **Switch** to change between saved accounts.
 
-Finish or cancel running chats before switching. Codex uses one active account;
+Finish or cancel running chats before switching the main window's account.
 Dashboard does not merge accounts or rotate them automatically. Removing a saved
 active account leaves Codex signed in. Save it again explicitly to restore it to
 the list. Do not commit, export, or manually copy `~/.codex/auth.json`.
+
+### Shared chats across account windows
+
+Use the menu-bar app’s **Enable Shared Chats (Restarts Codex Windows)** to let saved
+account windows continue the same existing chats. Dashboard queues activation
+until all running windows have been idle for two checks, then closes the
+independent instances and reconnects them to one
+history writer. No chat database or rollout is copied or merged. A separate
+profile containing its own chats blocks activation rather than hiding or merging
+that history.
+
+Each window keeps its own sign-in and allowance. When it starts a turn, Dashboard
+waits for the previous writer process to exit, verifies the selected account,
+resumes the original chat, and sends the turn once. Turns are serialized across
+all windows. An overlapping send is rejected; send it again after the running
+turn finishes. Both windows receive the live chat updates. A failed or timed-out
+request is never automatically replayed.
+
+Account information and usage are read with that window’s credentials. In the
+main window, choose **Accounts → Switch** under a saved account. Dashboard
+reopens the main window using that account and reconnects it to the same shared
+history. The separate windows keep their own sign-ins. If Dashboard offers
+**Update Shared Chats (Restarts Codex Windows)** in its menu, choose it once to
+enable **Switch**. To add a new account, first use
+**Disable Shared Chats (Restarts Codex Windows)**. Disabling retains all shared
+history in the main window and restores independent secondary histories.
+
+The broker continues running when Dashboard closes. Finder/Dock launches use the
+same connection through a session-local `CODEX_APP_SERVER_WS_URL` launchd setting;
+disabling restores the previous setting. After logout or a reboot, use **Enable
+Shared Chats** again to reconnect all windows. Dashboard never starts a replacement
+writer automatically beside an unmanaged desktop instance. A missing shared
+endpoint fails closed; use the menu to reconnect rather than launching an
+independent CLI writer against the shared history.
+
+### Separate account windows
+
+Choose **Open separate window** on a saved account, or use the menu-bar app's
+**Open Account Window → account name**. This opens an independent desktop instance
+without restarting the main window. Selecting it again focuses that account's
+existing instance. Dashboard brings the specific account renderer to the front
+and switches it into Codex mode. It verifies that the window is visible and
+focused before reporting success. A running instance whose window was closed
+is reopened. Keychain access may require approval
+on the first launch.
+
+Each account window has a persistent Codex home and desktop profile under
+`~/Library/Application Support/Codex Dashboard/account-windows/<saved-account-id>/`.
+With Shared Chats disabled, its chat history and settings are independent.
+Its sign-in stays separate in both modes.
+The local project list is shared automatically across the main window and running
+account windows. Additions, names, folder roots, project metadata, pinned projects, ordering, and
+removals propagate in both directions, normally within a few seconds. Closed
+windows catch up when reopened. Existing registrations are adopted on the first
+sync, including distinct project groups that point to the same folder.
+
+Project removal unregisters the group in each window; it does not delete its files
+or chat contents. Without Shared Chats, chats and thread assignments stay
+separate. Sign-ins, remote connections, and account-specific global state stay separate. For simultaneous edits, changed fields
+merge; if the same field changes in multiple windows, the last observed edit wins.
+Removal wins over a stale offline copy.
+The first launch seeds its sign-in from the saved account. Later launches preserve
+its refreshed credentials and respect signing out. Sign in within that window if
+its session expires. Credentials remain local, with private directory and file permissions.
+
+Dashboard connects to each running account window automatically. Chat overview,
+Git controls, prompts, to-dos, review loops, account controls, and usage tracking
+operate against that window’s state; with Shared Chats enabled, chat controls
+operate on the shared catalog. Prompts are seeded from the main library
+once, then saved independently; to-dos and review loops also remain independent.
+Saved-account registrations are shared, while the active account comes from each
+window's sign-in. Open another account from its **Open separate window** button;
+account switching in a secondary window opens or focuses that account's window.
+Add saved accounts in the main window, and renew a secondary window's sign-in
+through Codex's own account menu. Background allowance notifications remain managed
+by the main Dashboard.
+
+Use **Account Window Dashboards → account → Open Dashboard**, **Restart & Enable**,
+or **Disable dashboard integration** in the menu bar to target a specific window.
+Older account windows launched without a Dashboard connection need one scoped
+restart. Dashboard waits for the window to be idle and in the background before
+recovering it automatically; the main Codex window stays running.
+
+Removing a saved account does not delete its independent profile or sign that
+window out. Quit a secondary instance from its own app menu when finished.
 
 **Restart to sign in…** restarts Codex signed out when a saved account needs
 reauthentication. Sign in to that account, then choose **Save current account**

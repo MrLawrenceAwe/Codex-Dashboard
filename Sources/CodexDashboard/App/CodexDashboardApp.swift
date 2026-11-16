@@ -9,6 +9,7 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
         phoneUsageNotifier: NtfyUsageNotifier()
     )
     let launchAtLogin = LaunchAtLoginController()
+    let accountWindowDashboards = AccountWindowDashboards()
     private var statusItemController: DashboardStatusItemController?
     private var diagnosticsWindowController: DiagnosticsWindowController?
 
@@ -28,13 +29,16 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
         self.diagnosticsWindowController = diagnosticsWindowController
         statusItemController = DashboardStatusItemController(
             coordinator: coordinator,
+            accountWindowDashboards: accountWindowDashboards,
             launchAtLogin: launchAtLogin,
             showDiagnostics: { diagnosticsWindowController.showDiagnostics() }
         )
         coordinator.startMonitoring()
+        accountWindowDashboards.start(main: coordinator)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        accountWindowDashboards.stop()
         coordinator.stopMonitoring()
     }
 }
@@ -42,8 +46,18 @@ final class CodexDashboardAppDelegate: NSObject, NSApplicationDelegate {
 @main
 enum CodexDashboardMain {
     @MainActor
-    static func main() throws {
+    static func main() async throws {
         let arguments = CommandLine.arguments.dropFirst()
+        if arguments.first == "--shared-chat-server", arguments.count == 2, let path = arguments.last {
+            let configuration = try JSONDecoder().decode(ChatHandoffServer.Configuration.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+            let server = ChatHandoffServer(configuration: configuration)
+            let endpoints = try await server.start()
+            let ready = configuration.root.appendingPathComponent("ready.json")
+            try JSONEncoder().encode(endpoints).write(to: ready, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ready.path)
+            server.handleTermination(readyFile: ready)
+            while true { try await Task.sleep(for: .seconds(60)) }
+        }
         if arguments.first == "--export-preview-injection" {
             guard arguments.count == 2, let path = arguments.last else {
                 throw CocoaError(.fileWriteInvalidFileName)

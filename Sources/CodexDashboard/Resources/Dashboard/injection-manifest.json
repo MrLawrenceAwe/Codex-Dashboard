@@ -53,7 +53,7 @@
     "Sidebar/thread-usage-limit-indicators",
     "Threads/running-chats-popover",
     "Threads/chat-overview-controller",
-    "Reviews/review-rpc-client",
+    "Core/codex-rpc-client",
     "Reviews/review-presentation",
     "Reviews/review-loop-setup-view",
     "Reviews/review-loop-card-view",

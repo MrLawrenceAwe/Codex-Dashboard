@@ -5,6 +5,95 @@ import XCTest
 
 @MainActor
 final class AccountPopoverWebTests: SerializedDashboardWebTestCase {
+    func testAccountWindowOffersOtherWindowsWithoutReplacingItsSignIn() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button>Settings</button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyAccountPopoverSnapshot({accounts: [
+            {id: 'current', name: 'Current', isActive: true, usageRows: [], isRefreshing: false},
+            {id: 'other', name: 'Other', isActive: false, usageRows: [], isRefreshing: false},
+          ], activeAccountID: 'current', isBusy: false, accountWindow: true});
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const panel = document.getElementById('codex-accounts-panel');
+          const hasSwitch = !!panel.querySelector('[data-account-action="switchAccount"]');
+          const hasAdd = !!panel.querySelector('[data-account-global="restartForSignIn"]');
+          const buttons = panel.querySelectorAll('[data-account-action="openAccountWindow"]');
+          buttons[0].click();
+          const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+          return [hasSwitch, hasAdd, buttons.length, action.kind, action.accountID];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Bool, false)
+        XCTAssertEqual(values[1] as? Bool, false)
+        XCTAssertEqual(values[2] as? Int, 1)
+        XCTAssertEqual(values[3] as? String, "openAccountWindow")
+        XCTAssertEqual(values[4] as? String, "other")
+    }
+
+    func testSharedChatsMainWindowCanSwitchSavedAccountsWithAnUpdatedServer() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button>Settings</button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          window.__codexDashboard.applyAccountPopoverSnapshot({accounts: [
+            {id: 'current', name: 'Current', isActive: true, usageRows: [], isRefreshing: false},
+            {id: 'other', name: 'Other', isActive: false, usageRows: [], isRefreshing: false},
+            {id: 'expired', name: 'Expired', isActive: false, usageRows: [], requiresSignIn: true}
+          ], activeAccountID: 'current', isBusy: false, accountWindow: false, sharedChats: true,
+            sharedAccountSwitchAvailable: true});
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          const panel = document.getElementById('codex-accounts-panel');
+          const buttons = panel.querySelectorAll('[data-account-action="switchAccount"]');
+          buttons[0].click();
+          const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+          return [buttons.length,
+            !!panel.querySelector('[data-account-global="restartForSignIn"], [data-account-action="restartForSignIn"]'),
+            panel.querySelectorAll('[data-account-action="openAccountWindow"]').length,
+            action.kind, action.accountID];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? Int, 1)
+        XCTAssertEqual(values[1] as? Bool, false)
+        XCTAssertEqual(values[2] as? Int, 2)
+        XCTAssertEqual(values[3] as? String, "switchAccount")
+        XCTAssertEqual(values[4] as? String, "other")
+    }
+
+    func testSeparateWindowButtonQueuesSelectedAccountWithoutSwitching() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: """
+        <!doctype html><html><body><main>Conversation</main>
+          <div role="menu"><button>Settings</button><button>Log out</button></div>
+        </body></html>
+        """)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const id = '11111111-1111-1111-1111-111111111111';
+          window.__codexDashboard.applyAccountPopoverSnapshot({accounts: [{
+            id, name: 'Second account', isActive: false, usageRows: [],
+            isRefreshing: false, requiresSignIn: false,
+          }], activeAccountID: null, statusMessage: null, isBusy: false});
+          document.querySelector('[data-codex-accounts-trigger]').click();
+          document.querySelector('[data-account-action="openAccountWindow"]').click();
+          const action = JSON.parse(window.__codexDashboard.readQueuedAccountPopoverAction());
+          return [action.kind, action.accountID,
+            document.querySelector('[data-account-action="switchAccount"]').disabled];
+        })()
+        """) as? [Any]
+        let values = try XCTUnwrap(result)
+        XCTAssertEqual(values[0] as? String, "openAccountWindow")
+        XCTAssertEqual(values[1] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(values[2] as? Bool, true)
+    }
+
     func testLostPollResponseKeepsRequestUntilExplicitCompletion() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body><main>Conversation</main>

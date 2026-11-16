@@ -10,7 +10,10 @@ final class CodexAccountManager: @unchecked Sendable {
     private let activeCredentialFile: ActiveCodexCredentialFile
     private let documentStore: SavedAccountDocumentStore
     private let now: () -> Date
-    private let lock = NSLock()
+    // All per-window managers share the saved-account registry and vault. Serialize
+    // whole transactions across managers, not just calls within one window.
+    private static let registryLock = NSLock()
+    private var lock: NSLock { Self.registryLock }
     let usageCacheStore: any UsageCaching
 
     init(
@@ -137,7 +140,7 @@ final class CodexAccountManager: @unchecked Sendable {
         }
     }
 
-    func activate(accountID: UUID) throws -> AccountTransition {
+    func activate(accountID: UUID, expectedAccountIdentifier: String? = nil) throws -> AccountTransition {
         try lock.withLock {
             var document = try documentStore.loadAndReconcile()
             guard let index = document.accounts.firstIndex(where: { $0.id == accountID }) else {
@@ -145,6 +148,10 @@ final class CodexAccountManager: @unchecked Sendable {
             }
             guard let targetCredential = try vault.credential(for: accountID) else {
                 throw CodexAccountError.missingCredential(document.accounts[index].name)
+            }
+            if let expectedAccountIdentifier,
+               AccountIdentityDecoder.identity(in: targetCredential)?.identifier != expectedAccountIdentifier {
+                throw CodexAccountError.credentialAccountMismatch
             }
             let transaction = AccountTransition(
                 previousCredential: try activeCredentialFile.read(), previousDocument: document

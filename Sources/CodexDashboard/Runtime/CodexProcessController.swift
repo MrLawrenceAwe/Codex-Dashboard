@@ -19,6 +19,7 @@ final class CodexProcessController {
     private let applicationURL: URL
     private let runningApplicationsProvider: () -> [any RunningCodexApplication]
     private let applicationLauncher: (URL, NSWorkspace.OpenConfiguration) async throws -> Void
+    private let makeLaunchConfiguration: () -> NSWorkspace.OpenConfiguration
     private let sleep: (Duration) async throws -> Void
 
     init(
@@ -26,11 +27,12 @@ final class CodexProcessController {
         runningApplicationsProvider: @escaping () -> [any RunningCodexApplication] = {
             NSRunningApplication.runningApplications(
                 withBundleIdentifier: CodexConfiguration.bundleIdentifier
-            )
+            ).filter { CodexConfiguration.isMainApplication($0) }
         },
         applicationLauncher: @escaping (URL, NSWorkspace.OpenConfiguration) async throws -> Void = { url, configuration in
             _ = try await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
         },
+        makeLaunchConfiguration: (() -> NSWorkspace.OpenConfiguration)? = nil,
         sleep: @escaping (Duration) async throws -> Void = { duration in
             try await Task.sleep(for: duration)
         }
@@ -39,6 +41,14 @@ final class CodexProcessController {
         self.runningApplicationsProvider = runningApplicationsProvider
         self.applicationLauncher = applicationLauncher
         self.sleep = sleep
+        self.makeLaunchConfiguration = makeLaunchConfiguration ?? {
+            CodexConfiguration.selectFreshDevToolsPortForLaunch()
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.createsNewApplicationInstance = true
+            configuration.arguments = CodexConfiguration.launchArguments
+            configuration.environment = ChatHandoffService.environment(windowID: "main")
+            return configuration
+        }
     }
 
     var isRunning: Bool {
@@ -49,7 +59,7 @@ final class CodexProcessController {
         runningApplications.compactMap(\.launchDate).max()
     }
 
-    func restart(activate: Bool = true) async throws {
+    func restart(activate: Bool = true, beforeLaunch: (() async throws -> Void)? = nil) async throws {
         guard FileManager.default.fileExists(atPath: applicationURL.path) else {
             throw DashboardError.missingCodexApplication
         }
@@ -61,6 +71,7 @@ final class CodexProcessController {
             gracefulQuitPollsRemaining -= 1
         }
         if isRunning {
+            guard beforeLaunch == nil else { throw DashboardError.codexQuitTimedOut }
             runningApplications.forEach { _ = $0.forceTerminate() }
         }
         var forcedQuitPollsRemaining = Self.forcedQuitPollLimit
@@ -72,9 +83,8 @@ final class CodexProcessController {
             throw DashboardError.codexQuitTimedOut
         }
 
-        CodexConfiguration.selectFreshDevToolsPortForLaunch()
-        let launchConfiguration = NSWorkspace.OpenConfiguration()
-        launchConfiguration.arguments = CodexConfiguration.launchArguments
+        try await beforeLaunch?()
+        let launchConfiguration = makeLaunchConfiguration()
         launchConfiguration.activates = activate
         try await applicationLauncher(applicationURL, launchConfiguration)
     }

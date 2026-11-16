@@ -10,7 +10,7 @@ struct RendererCompatibilityChecker {
         self.contractSource = contractSource
     }
 
-    func check() async -> [CompatibilityCheck] {
+    func check(hasThreads: Bool = true) async -> [CompatibilityCheck] {
         let targets = await devTools.mainRendererTargets()
         guard let target = targets.first else {
             return [CompatibilityCheck(
@@ -42,7 +42,7 @@ struct RendererCompatibilityChecker {
             id: "thread-navigation",
             title: "Thread navigation",
             expression: contractExpression("codexUIContracts.threadRows().length > 0"),
-            failureStatus: .warning,
+            failureStatus: hasThreads ? .warning : .pending,
             compatibleDetail: "Codex exposes sidebar thread actions used for direct navigation.",
             failureDetail: "No sidebar thread action is currently mounted; route fallback remains available.",
             in: target
@@ -51,7 +51,7 @@ struct RendererCompatibilityChecker {
             id: "sidebar-unread",
             title: "Sidebar unread sync",
             expression: contractExpression("codexUIContracts.threadUnreadStates().size > 0"),
-            failureStatus: .warning,
+            failureStatus: hasThreads ? .warning : .pending,
             compatibleDetail: "Codex's mounted thread rows expose the unread state used for immediate synchronization.",
             failureDetail: "The React unread-state contract was not found; persisted unread state remains available.",
             in: target
@@ -60,7 +60,7 @@ struct RendererCompatibilityChecker {
             id: "sidebar-bulk-read",
             title: "Bulk read action",
             expression: contractExpression("codexUIContracts.markThreadsRead([]).available"),
-            failureStatus: .warning,
+            failureStatus: hasThreads ? .warning : .pending,
             compatibleDetail: "Codex exposes its direct task read-state action.",
             failureDetail: "The direct read-state action was not found; Mark all as read is unavailable.",
             in: target
