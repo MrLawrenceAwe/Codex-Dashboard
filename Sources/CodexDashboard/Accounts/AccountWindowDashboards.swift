@@ -113,7 +113,8 @@ final class AccountWindowDashboards {
         }
         do {
             for coordinator in coordinators { _ = try await coordinator.refreshThreadState() }
-            guard coordinators.allSatisfy({ !$0.threads.contains(where: { $0.runState == .running }) }) else {
+            guard coordinators.allSatisfy({ !$0.threads.contains(where: { $0.runState == .running }) })
+                    || ChatHandoffService.stoppedWriterNeedsRecovery else {
                 activationGate.reset()
                 main.accounts.setStatusMessage("Shared Chats is waiting for running turns to finish. Your history remains in the main window.")
                 return false

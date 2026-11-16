@@ -65,10 +65,9 @@ struct SharedProjectCatalog: Codable, Equatable {
                 sharedID = marker
             }
             if sharedID == nil, fresh {
-                // Adopt previously imported folders once, keeping duplicate
-                // registrations distinct by claiming each shared ID at most once.
+                // Adopt identical imports once. A folder can belong to multiple
+                // groups with different names or metadata.
                 sharedID = order.first { !claimed.contains($0) && projects[$0] == value }
-                    ?? order.first { !claimed.contains($0) && projects[$0]?.roots == value.roots }
             }
             if sharedID == nil {
                 let id = UUID().uuidString
@@ -111,27 +110,21 @@ struct SharedProjectCatalog: Codable, Equatable {
         replicas[replicaID] = replica
     }
 
-    mutating func acknowledgePinned(replicaID: String) {
-        replicas[replicaID]?.pinned = pinned
-    }
-
     mutating func retire(replicaID: String, localID: String) {
         replicas[replicaID]?.retiredLocalIDs.insert(localID)
+        replicas[replicaID]?.links.removeValue(forKey: localID)
+        replicas[replicaID]?.observed.removeValue(forKey: localID)
     }
 
-    mutating func link(replicaID: String, localID: String, sharedID: String) {
-        replicas[replicaID, default: Replica()].links[localID] = sharedID
+    mutating func acknowledgeProject(replicaID: String, localID: String, sharedID: String, value: Value) {
+        replicas[replicaID]?.links[localID] = sharedID
+        replicas[replicaID]?.observed[localID] = value
     }
 
-    /// Acknowledges applied remote changes without treating them as local edits.
-    mutating func acknowledge(replicaID: String, snapshot: [CodexProject], includeOrder: Bool = true) {
+    mutating func acknowledgePresentation(replicaID: String, order: [String], pinned: [String]) {
         guard var replica = replicas[replicaID] else { return }
-        let present = Set(snapshot.map(\.id))
-        replica.links = replica.links.filter { present.contains($0.key) }
-        replica.observed = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.id, Value($0)) })
-        if includeOrder {
-            replica.order = snapshot.compactMap { replica.links[$0.id] }.filter { projects[$0] != nil }
-        }
+        replica.order = order.compactMap { replica.links[$0] }
+        replica.pinned = pinned.compactMap { replica.links[$0] }
         replicas[replicaID] = replica
     }
 }

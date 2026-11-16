@@ -105,8 +105,16 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
 
         let sharedRunning = ChatHandoffService.isRunning
         let sharedCurrent = sharedRunning && ChatHandoffService.supportsAccountSwitch
-        let sharedTitle = sharedCurrent ? "Shared Chats Enabled"
-            : sharedRunning ? "Update Shared Chats (Restarts Codex Windows)" : "Enable Shared Chats (Restarts Codex Windows)"
+        let sharedTitle: String
+        if sharedCurrent {
+            sharedTitle = "Shared Chats Enabled"
+        } else if ChatHandoffService.isEnabled && (!sharedRunning || !ChatHandoffService.hasReadyEndpoint) {
+            sharedTitle = "Reconnect Shared Chats (Restarts Codex Windows)"
+        } else if sharedRunning {
+            sharedTitle = "Update Shared Chats (Restarts Codex Windows)"
+        } else {
+            sharedTitle = "Enable Shared Chats (Restarts Codex Windows)"
+        }
         let shared = actionItem(sharedTitle, action: #selector(enableSharedChats))
         shared.isEnabled = !sharedCurrent && !coordinator.isPerformingAction
         menu.addItem(shared)
@@ -185,9 +193,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
     @objc private func enableSharedChats() {
         do {
             try ChatHandoffService.requestActivationWhenIdle()
-            coordinator.accounts.setStatusMessage(ChatHandoffService.isRunning
-                ? "Shared Chats will update automatically when running turns finish."
-                : "Shared Chats will activate automatically when running turns finish.")
+            coordinator.accounts.setStatusMessage("Shared Chats will connect automatically when the windows are idle.")
         } catch { coordinator.accounts.setStatusMessage(error.localizedDescription) }
     }
 

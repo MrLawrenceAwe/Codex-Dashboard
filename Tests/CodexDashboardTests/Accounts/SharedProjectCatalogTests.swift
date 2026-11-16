@@ -33,12 +33,45 @@ final class SharedProjectCatalogTests: XCTestCase {
         XCTAssertEqual(catalog.projects.count, 2)
         XCTAssertEqual(catalog.replicas["main"]?.links["a"], catalog.replicas["other"]?.links["x"])
     }
+
+    func testFirstSyncKeepsDifferentRegistrationsForTheSameFolder() throws {
+        var catalog = SharedProjectCatalog()
+        let main = project("a", "Client delivery")
+        let renamed = project("b", "Personal experiments")
+        var annotated = project("c", "Client delivery")
+        annotated.metadata["color"] = "blue"
+        catalog.observe(replicaID: "main", snapshot: [main])
+        catalog.observe(replicaID: "other", snapshot: [renamed, annotated])
+        XCTAssertEqual(catalog.order.compactMap { catalog.projects[$0] },
+                       [main, renamed, annotated].map(SharedProjectCatalog.Value.init))
+        XCTAssertNotEqual(catalog.replicas["main"]?.links["a"], catalog.replicas["other"]?.links["b"])
+        XCTAssertNotEqual(catalog.replicas["main"]?.links["a"], catalog.replicas["other"]?.links["c"])
+    }
+
+    func testPresentationAcknowledgementPreservesConcurrentProjectChanges() throws {
+        var catalog = setup()
+        let id = try XCTUnwrap(catalog.replicas["main"]?.links["a"])
+        let applied = project("a", "Merged name")
+        catalog.observe(replicaID: "other", snapshot: [project("b", applied.name)])
+        catalog.acknowledgeProject(replicaID: "main", localID: "a", sharedID: id, value: .init(applied))
+
+        // The user can change the catalog while the order and pins are saved.
+        catalog.acknowledgePresentation(replicaID: "main", order: ["a"], pinned: [])
+        catalog.observe(replicaID: "main", snapshot: [project("a", "Concurrent rename")])
+        XCTAssertEqual(catalog.projects[id]?.name, "Concurrent rename")
+        catalog.acknowledgePresentation(replicaID: "main", order: ["a"], pinned: [])
+        catalog.observe(replicaID: "main", snapshot: [])
+        XCTAssertNil(catalog.projects[id])
+        XCTAssertTrue(catalog.deleted.contains(id))
+    }
+
     func testRenamesPropagateBothWaysAndRemoteAcknowledgementDoesNotEcho() throws {
         var catalog = setup()
         let id = try XCTUnwrap(catalog.replicas["main"]?.links["a"])
         catalog.observe(replicaID: "other", snapshot: [project("b", "Renamed from other")])
         XCTAssertEqual(catalog.projects[id]?.name, "Renamed from other")
-        catalog.acknowledge(replicaID: "main", snapshot: [project("a", "Renamed from other")])
+        catalog.acknowledgeProject(replicaID: "main", localID: "a", sharedID: id,
+                                   value: .init(project("a", "Renamed from other")))
         catalog.observe(replicaID: "main", snapshot: [project("a", "Renamed from main")])
         catalog.observe(replicaID: "other", snapshot: [project("b", "Renamed from other")])
         XCTAssertEqual(catalog.projects[id]?.name, "Renamed from main")
@@ -49,7 +82,7 @@ final class SharedProjectCatalogTests: XCTestCase {
         catalog.observe(replicaID: "other", snapshot: [])
         catalog.observe(replicaID: "main", snapshot: [project("a", "Original")])
         XCTAssertNil(catalog.projects[id]); XCTAssertTrue(catalog.deleted.contains(id))
-        catalog.acknowledge(replicaID: "main", snapshot: [])
+        catalog.retire(replicaID: "main", localID: "a")
         catalog.observe(replicaID: "main", snapshot: [project("new-id", "Added again")])
         XCTAssertEqual(catalog.projects.count, 1)
         XCTAssertNotEqual(catalog.replicas["main"]?.links["new-id"], id)
@@ -76,10 +109,10 @@ final class SharedProjectCatalogTests: XCTestCase {
         catalog.observePinned(replicaID: "main", localIDs: ["a"])
         catalog.observePinned(replicaID: "other", localIDs: [])
         XCTAssertEqual(catalog.pinned, [id])
-        catalog.acknowledgePinned(replicaID: "other")
+        catalog.acknowledgePresentation(replicaID: "other", order: ["b"], pinned: ["b"])
         catalog.observePinned(replicaID: "other", localIDs: [])
         XCTAssertEqual(catalog.pinned, [])
-        catalog.acknowledgePinned(replicaID: "main")
+        catalog.acknowledgePresentation(replicaID: "main", order: ["a"], pinned: [])
         catalog.observePinned(replicaID: "main", localIDs: ["a"])
         XCTAssertEqual(catalog.pinned, [id])
     }

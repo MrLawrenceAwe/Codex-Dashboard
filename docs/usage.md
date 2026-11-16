@@ -130,8 +130,8 @@ history in the main window and restores independent secondary histories.
 
 The broker continues running when Dashboard closes. Finder/Dock launches use the
 same connection through a session-local `CODEX_APP_SERVER_WS_URL` launchd setting;
-disabling restores the previous setting. After logout or a reboot, use **Enable
-Shared Chats** again to reconnect all windows. Dashboard never starts a replacement
+disabling restores the previous setting. After logout, a reboot, or a writer
+failure, use **Reconnect Shared Chats** to reconnect all windows. Dashboard never starts a replacement
 writer automatically beside an unmanaged desktop instance. A missing shared
 endpoint fails closed; use the menu to reconnect rather than launching an
 independent CLI writer against the shared history.

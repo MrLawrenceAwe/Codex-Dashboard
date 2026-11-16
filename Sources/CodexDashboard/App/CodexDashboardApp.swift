@@ -52,10 +52,10 @@ enum CodexDashboardMain {
             let configuration = try JSONDecoder().decode(ChatHandoffServer.Configuration.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
             let server = ChatHandoffServer(configuration: configuration)
             let endpoints = try await server.start()
-            let ready = configuration.root.appendingPathComponent("ready.json")
+            let ready = server.readyFile
             try JSONEncoder().encode(endpoints).write(to: ready, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ready.path)
-            server.handleTermination(readyFile: ready)
+            server.handleTermination()
             while true { try await Task.sleep(for: .seconds(60)) }
         }
         if arguments.first == "--export-preview-injection" {

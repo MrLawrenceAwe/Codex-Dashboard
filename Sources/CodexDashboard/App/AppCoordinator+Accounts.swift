@@ -95,7 +95,7 @@ extension AppCoordinator {
         }
         if accounts.hasSharedChats {
             guard ChatHandoffService.supportsAccountSwitch else {
-                accounts.setStatusMessage("Use Update Shared Chats in the Dashboard menu to enable Switch.")
+                accounts.setStatusMessage("Use Reconnect Shared Chats or Update Shared Chats in the Dashboard menu before switching accounts.")
                 return
             }
             guard let account = accounts.savedAccounts.first(where: { $0.id == accountID }),

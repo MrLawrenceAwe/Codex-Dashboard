@@ -8,10 +8,12 @@ final class ChatHandoffServerTests: XCTestCase {
         let socket: URLSessionWebSocketTask
         var nextID = 0
         let binary: Bool
+        let automaticallyApproves: Bool
         var notifications: [String] = []
         var approvals = 0
-        init(_ endpoint: ChatHandoffServer.Endpoint, binary: Bool = false) {
+        init(_ endpoint: ChatHandoffServer.Endpoint, binary: Bool = false, automaticallyApproves: Bool = true) {
             self.binary = binary
+            self.automaticallyApproves = automaticallyApproves
             var components = URLComponents(string: endpoint.url)!
             let secret = components.password!
             components.user = nil; components.password = nil
@@ -34,8 +36,10 @@ final class ChatHandoffServerTests: XCTestCase {
                     notifications.append(method)
                     if method == "item/commandExecution/requestApproval", let approvalID = object["id"] as? String {
                         approvals += 1
-                        let response = try JSONSerialization.data(withJSONObject: ["id": approvalID, "result": ["decision": "accept"]])
-                        try await socket.send(.data(response))
+                        if automaticallyApproves {
+                            let response = try JSONSerialization.data(withJSONObject: ["id": approvalID, "result": ["decision": "accept"]])
+                            try await socket.send(.data(response))
+                        }
                     }
                 }
                 if (object["id"] as? Int) == id { return object }
@@ -43,7 +47,7 @@ final class ChatHandoffServerTests: XCTestCase {
         }
     }
 
-    func testRoutesAccountsWithoutOverlappingWritersOrReplayingRejectedTurns() async throws {
+    private func makeServer() throws -> ChatHandoffServer {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("handoff-test-\(UUID())")
         let history = root.appendingPathComponent("history")
         try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
@@ -59,7 +63,14 @@ final class ChatHandoffServerTests: XCTestCase {
             try JSONSerialization.data(withJSONObject: credential).write(to: home.appendingPathComponent("auth.json"))
             windows.append(.init(id: name == "A" ? "main" : name, home: home, accountIdentifier: name, token: UUID().uuidString))
         }
-        let server = ChatHandoffServer(configuration: .init(root: root.appendingPathComponent("broker"), historyHome: history, executable: fake, windows: windows))
+        return ChatHandoffServer(configuration: .init(root: root.appendingPathComponent("broker"), historyHome: history, executable: fake, windows: windows))
+    }
+
+    func testRoutesAccountsWithoutOverlappingWritersOrReplayingRejectedTurns() async throws {
+        let server = try makeServer()
+        let history = server.configuration.historyHome
+        let root = history.deletingLastPathComponent()
+        let windows = server.configuration.windows
         defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: root) } }
         let endpoints = try await server.start()
         let a = Client(endpoints[0]), b = Client(endpoints[1], binary: true)
@@ -132,6 +143,70 @@ final class ChatHandoffServerTests: XCTestCase {
         XCTAssertFalse(resumes.contains("ephemeral"), "An ephemeral chat is never restored on another writer")
     }
 
+    func testApprovalSurvivesReconnectOnTheSameWindowAndAccount() async throws {
+        let server = try makeServer()
+        let history = server.configuration.historyHome
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: history.deletingLastPathComponent()) } }
+        let endpoints = try await server.start()
+        let original = Client(endpoints[0], automaticallyApproves: false)
+        let other = Client(endpoints[1])
+        defer { original.socket.cancel(); other.socket.cancel() }
+        _ = try await original.call("initialize")
+        _ = try await original.call("turn/start", ["threadId": "same"])
+        XCTAssertEqual(original.approvals, 1)
+        original.socket.cancel(with: .goingAway, reason: nil)
+
+        let mainAuth = server.configuration.windows[0].home.appendingPathComponent("auth.json")
+        let originalCredential = try Data(contentsOf: mainAuth)
+        let otherAuth = server.configuration.windows[1].home.appendingPathComponent("auth.json")
+        try Data(contentsOf: otherAuth).write(to: mainAuth, options: .atomic)
+        let wrongAccount = Client(endpoints[0])
+        defer { wrongAccount.socket.cancel() }
+        _ = try await wrongAccount.call("initialize")
+        _ = try await wrongAccount.call("thread/read")
+        _ = try await other.call("initialize")
+        _ = try await other.call("thread/read")
+        XCTAssertEqual(wrongAccount.approvals, 0)
+        XCTAssertEqual(other.approvals, 0)
+
+        try originalCredential.write(to: mainAuth, options: .atomic)
+        let reconnected = Client(endpoints[0])
+        defer { reconnected.socket.cancel() }
+        _ = try await reconnected.call("initialize")
+        let deadline = ContinuousClock.now + .seconds(2)
+        while reconnected.approvals == 0, ContinuousClock.now < deadline {
+            _ = try await reconnected.call("thread/read")
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(reconnected.approvals, 1)
+        _ = try await reconnected.call("turn/interrupt")
+        try await server.shutdown()
+        XCTAssertEqual(try String(contentsOf: history.appendingPathComponent("approvals"), encoding: .utf8), "A\n")
+    }
+
+    func testWriterExitInvalidatesPublishedEndpointAndAllowsReplacement() async throws {
+        let server = try makeServer()
+        let root = server.configuration.historyHome.deletingLastPathComponent()
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: root) } }
+        let endpoints = try await server.start()
+        try JSONEncoder().encode(endpoints).write(to: server.readyFile)
+        let original = Client(endpoints[0])
+        defer { original.socket.cancel() }
+        _ = try await original.call("initialize")
+        let failure = try await original.call("test/exitWriter")
+        XCTAssertNotNil(failure["error"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: server.readyFile.path))
+        try await server.shutdown()
+
+        let replacement = ChatHandoffServer(configuration: server.configuration)
+        defer { Task { try? await replacement.shutdown() } }
+        let recovered = Client(try await replacement.start()[0])
+        defer { recovered.socket.cancel() }
+        let initialized = try await recovered.call("initialize")
+        XCTAssertNil(initialized["error"])
+        try await replacement.shutdown()
+    }
+
     private static let fakeServer = #"""
 #!/usr/bin/env python3
 import os,json,sys,pathlib,uuid
@@ -141,6 +216,7 @@ history=pathlib.Path(os.environ['CODEX_SQLITE_HOME'])
 def send(obj): print(json.dumps(obj),flush=True)
 for line in sys.stdin:
  r=json.loads(line);m=r.get('method');i=r.get('id');result={}
+ if m=='test/exitWriter': sys.exit(1)
  if m is None and r.get('result',{}).get('decision')=='accept':
   assert i==1
   with (history/'approvals').open('a') as f:f.write(account+'\n')

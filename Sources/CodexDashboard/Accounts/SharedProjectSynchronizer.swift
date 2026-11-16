@@ -75,21 +75,28 @@ final class SharedProjectSynchronizer {
                 if catalog.deleted.contains(sharedID) {
                     try await connection.delete(localID: project.id)
                     catalog.retire(replicaID: id, localID: project.id)
-                    changed = true
                 } else if let value = catalog.projects[sharedID],
                           value != SharedProjectCatalog.Value(project) || project.metadata[SharedProjectCatalog.marker] != sharedID {
-                    try await connection.update(localID: project.id, sharedID: sharedID, value: value); changed = true
+                    try await connection.update(localID: project.id, sharedID: sharedID, value: value)
+                    catalog.acknowledgeProject(replicaID: id, localID: project.id, sharedID: sharedID, value: value)
+                } else {
+                    continue
                 }
+                try save()
+                changed = true
             }
             let mapped = Set(snapshot.compactMap { replica.links[$0.id] })
             for sharedID in catalog.order where !mapped.contains(sharedID) {
                 guard let value = catalog.projects[sharedID] else { continue }
                 let localID = try await connection.create(sharedID: sharedID, value: value)
-                catalog.link(replicaID: id, localID: localID, sharedID: sharedID)
-                try save(); changed = true
+                catalog.acknowledgeProject(replicaID: id, localID: localID, sharedID: sharedID, value: value)
+                try save()
+                changed = true
             }
         }
-        var actual = changed ? try await connection.snapshot() : snapshot
+        // A read after our writes can include concurrent user edits. Keep the
+        // baseline tied to the operations we acknowledged.
+        let actual = changed ? try await connection.snapshot() : snapshot
         let links = catalog.replicas[id]?.links ?? [:]
         var localByShared: [String: String] = [:]
         for project in actual {
@@ -99,8 +106,6 @@ final class SharedProjectSynchronizer {
         }
         let desired = catalog.order.compactMap { localByShared[$0] }
         let desiredPinned = catalog.pinned.compactMap { localByShared[$0] }
-        catalog.acknowledge(replicaID: id, snapshot: actual, includeOrder: false)
-        try save()
         // A mode change switches this window to a different server's IDs. Drop
         // only the old presentation entries, never delete those registrations.
         let otherBackend = id == "main" ? nil : id.hasPrefix("shared:") ? String(id.dropFirst("shared:".count)) : "shared:" + id
@@ -109,9 +114,7 @@ final class SharedProjectSynchronizer {
         let removed = (catalog.replicas[id]?.retiredLocalIDs ?? []).union(obsoletePresentation)
         try await connection.refreshSidebar(snapshot: actual, removing: removed)
         try await connection.setPresentation(order: desired, pinned: desiredPinned, snapshot: actual, removing: removed)
-        actual = try await connection.snapshot()
-        catalog.acknowledge(replicaID: id, snapshot: actual)
-        catalog.acknowledgePinned(replicaID: id)
+        catalog.acknowledgePresentation(replicaID: id, order: desired, pinned: desiredPinned)
         try save()
     }
 

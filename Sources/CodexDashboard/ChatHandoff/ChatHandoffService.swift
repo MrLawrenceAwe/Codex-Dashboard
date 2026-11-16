@@ -31,8 +31,18 @@ enum ChatHandoffService {
 
     static var configurationURL: URL { root.appendingPathComponent("configuration.json") }
     static var isEnabled: Bool { FileManager.default.fileExists(atPath: root.appendingPathComponent("enabled").path) }
+    static var hasReadyEndpoint: Bool { endpoints.contains { $0.id == "main" } }
     static var supportsAccountSwitch: Bool {
         isRunning && endpoints.contains { $0.id == "main" && $0.supportsAccountSwitch == true }
+    }
+
+    static var stoppedWriterNeedsRecovery: Bool {
+        guard isEnabled, isRunning, !hasReadyEndpoint else { return false }
+        let ownerPID = root.appendingPathComponent("owner-pid")
+        guard FileManager.default.fileExists(atPath: ownerPID.path) else { return true }
+        guard let text = try? String(contentsOf: ownerPID, encoding: .utf8),
+              let pid = pid_t(text), pid > 0 else { return false }
+        return Darwin.kill(pid, 0) == -1 && errno == ESRCH
     }
 
     private static var endpoints: [ChatHandoffServer.Endpoint] {
@@ -80,7 +90,9 @@ enum ChatHandoffService {
             for coordinator in coordinators {
                 await coordinator.cancelSynchronization()
                 _ = try await coordinator.refreshThreadState()
-                guard !coordinator.threads.contains(where: { $0.runState == .running }) else { throw CodexAccountError.activeTasks }
+                // A crashed writer can leave a rollout ending in task_started.
+                guard !coordinator.threads.contains(where: { $0.runState == .running })
+                    || stoppedWriterNeedsRecovery else { throw CodexAccountError.activeTasks }
             }
             let mainCredential = try Data(contentsOf: CodexConfiguration.authenticationURL)
             guard let identity = AccountIdentityDecoder.identity(in: mainCredential) else { throw ChatHandoffError.identity }
@@ -140,10 +152,10 @@ enum ChatHandoffService {
             changedEnvironment = true
             _ = try launchEnvironment(["setenv", "CODEX_APP_SERVER_FORCE_CLI", "0"])
             _ = try launchEnvironment(["setenv", "CODEX_APP_SERVER_WS_URL", "ws://127.0.0.1:1"])
-            changedEnvironment = true
             for coordinator in coordinators {
                 _ = try await coordinator.refreshThreadState()
-                guard !coordinator.threads.contains(where: { $0.runState == .running }) else { throw CodexAccountError.activeTasks }
+                guard !coordinator.threads.contains(where: { $0.runState == .running })
+                    || stoppedWriterNeedsRecovery else { throw CodexAccountError.activeTasks }
             }
             applications.forEach { _ = $0.terminate() }
             for _ in 0..<200 {
