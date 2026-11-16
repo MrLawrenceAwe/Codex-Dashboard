@@ -47,7 +47,7 @@ final class ChatHandoffServerTests: XCTestCase {
         }
     }
 
-    private func makeServer() throws -> ChatHandoffServer {
+    private func makeServer(readTimeout: Duration = .seconds(60)) throws -> ChatHandoffServer {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("handoff-test-\(UUID())")
         let history = root.appendingPathComponent("history")
         try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
@@ -63,7 +63,8 @@ final class ChatHandoffServerTests: XCTestCase {
             try JSONSerialization.data(withJSONObject: credential).write(to: home.appendingPathComponent("auth.json"))
             windows.append(.init(id: name == "A" ? "main" : name, home: home, accountIdentifier: name, token: UUID().uuidString))
         }
-        return ChatHandoffServer(configuration: .init(root: root.appendingPathComponent("broker"), historyHome: history, executable: fake, windows: windows))
+        return ChatHandoffServer(configuration: .init(root: root.appendingPathComponent("broker"), historyHome: history, executable: fake, windows: windows),
+                                 readTimeout: readTimeout)
     }
 
     func testRoutesAccountsWithoutOverlappingWritersOrReplayingRejectedTurns() async throws {
@@ -79,6 +80,8 @@ final class ChatHandoffServerTests: XCTestCase {
         _ = try await b.call("initialize")
         let empty = try await a.call("thread/start")
         XCTAssertNil(empty["error"])
+        let emptyThread = try XCTUnwrap((empty["result"] as? [String: Any])?["thread"] as? [String: Any])
+        let emptyID = try XCTUnwrap(emptyThread["id"] as? String)
         let ephemeral = try await a.call("thread/start", ["ephemeral": true])
         XCTAssertNil(ephemeral["error"])
         let first = try await a.call("turn/start", ["threadId": "same"])
@@ -139,8 +142,56 @@ final class ChatHandoffServerTests: XCTestCase {
         let approvals = try String(contentsOf: history.appendingPathComponent("approvals"), encoding: .utf8).split(separator: "\n")
         XCTAssertEqual(approvals, ["A", "B", "A", "B", "B"], "Approvals are routed back with the original server IDs")
         let resumes = try String(contentsOf: history.appendingPathComponent("resumes"), encoding: .utf8).split(separator: "\n")
-        XCTAssertEqual(resumes.filter { $0 == "empty" }.count, 1, "An empty chat is forgotten after its missing rollout is detected")
+        XCTAssertTrue(resumes.contains(Substring(emptyID)), "An empty chat is resumed after its rollout is saved")
         XCTAssertFalse(resumes.contains("ephemeral"), "An ephemeral chat is never restored on another writer")
+    }
+
+    func testFirstTurnSurvivesSwitchBeforeAnyMessages() async throws {
+        let server = try makeServer()
+        let history = server.configuration.historyHome
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: history.deletingLastPathComponent()) } }
+        let endpoints = try await server.start()
+        let a = Client(endpoints[0]), b = Client(endpoints[1])
+        defer { a.socket.cancel(); b.socket.cancel() }
+        _ = try await a.call("initialize")
+        _ = try await b.call("initialize")
+        let draft = try await a.call("thread/start")
+        let thread = try XCTUnwrap((draft["result"] as? [String: Any])?["thread"] as? [String: Any])
+        let threadID = try XCTUnwrap(thread["id"] as? String)
+        let rollout = try XCTUnwrap(thread["path"] as? String)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rollout))
+        let otherDraft = try await b.call("thread/start")
+        XCTAssertNil(otherDraft["error"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: rollout))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: history.appendingPathComponent("writers").path))
+        let firstTurn = try await a.call("turn/start", ["threadId": threadID])
+        XCTAssertEqual((firstTurn["result"] as? [String: Any])?["account"] as? String, "A")
+        _ = try await a.call("turn/interrupt")
+        try await server.shutdown()
+    }
+
+    func testReadTimeoutLeavesBothClientsConnectedAndTurnInterruptible() async throws {
+        let server = try makeServer(readTimeout: .milliseconds(250))
+        let history = server.configuration.historyHome
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: history.deletingLastPathComponent()) } }
+        let endpoints = try await server.start()
+        try JSONEncoder().encode(endpoints).write(to: server.readyFile)
+        let a = Client(endpoints[0]), b = Client(endpoints[1])
+        defer { a.socket.cancel(); b.socket.cancel() }
+        _ = try await a.call("initialize")
+        _ = try await b.call("initialize")
+        let turn = try await a.call("turn/start", ["threadId": "same"])
+        XCTAssertNil(turn["error"])
+        let stalled = try await b.call("thread/list", ["stall": true])
+        XCTAssertEqual((stalled["error"] as? [String: Any])?["message"] as? String,
+                       ChatHandoffError.readTimedOut.localizedDescription)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: server.readyFile.path))
+        let nextRead = try await b.call("thread/list")
+        XCTAssertNil(nextRead["error"])
+        let interrupted = try await a.call("turn/interrupt")
+        XCTAssertNil(interrupted["error"])
+        XCTAssertTrue(a.notifications.contains("turn/completed"))
+        try await server.shutdown()
     }
 
     func testApprovalSurvivesReconnectOnTheSameWindowAndAccount() async throws {
@@ -213,6 +264,8 @@ import os,json,sys,pathlib,uuid
 home=pathlib.Path(os.environ['CODEX_HOME'])
 account=json.loads((home/'auth.json').read_text())['tokens']['account_id']
 history=pathlib.Path(os.environ['CODEX_SQLITE_HOME'])
+stalled=None
+def rollout(thread): return history/(thread+'.jsonl')
 def send(obj): print(json.dumps(obj),flush=True)
 for line in sys.stdin:
  r=json.loads(line);m=r.get('method');i=r.get('id');result={}
@@ -226,15 +279,27 @@ for line in sys.stdin:
   result={'userAgent':'fake'}
  elif m=='thread/start':
   ephemeral=r['params'].get('ephemeral',False)
-  result={'thread':{'id':'ephemeral' if ephemeral else 'empty','ephemeral':ephemeral}}
+  thread='ephemeral' if ephemeral else str(uuid.uuid4())
+  result={'thread':{'id':thread,'ephemeral':ephemeral,'path':None if ephemeral else str(rollout(thread))}}
+ elif m=='thread/inject_items':
+  assert r['params']['items']==[{'type':'other'}]
+  rollout(r['params']['threadId']).touch()
  elif m=='thread/resume':
   thread=r['params']['threadId']
   with (history/'resumes').open('a') as f:f.write(thread+'\n')
-  if thread!='same':
+  if thread!='same' and not rollout(thread).is_file():
    send({'id':i,'error':{'code':-32600,'message':'no rollout found for thread id '+thread}})
    continue
   result={'thread':{'id':thread,'turns':[]}}
  elif m=='thread/read':result={'thread':{'id':'same','turns':[]}}
+ elif m=='thread/list':
+  if r['params'].get('stall'):
+   stalled=i
+   continue
+  if stalled is not None:
+   send({'id':stalled,'result':{'data':[]}})
+   stalled=None
+  result={'data':[]}
  elif m=='turn/start':
   with (history/'writers').open('a') as f:f.write(account+'\n')
   active=str(uuid.uuid4())

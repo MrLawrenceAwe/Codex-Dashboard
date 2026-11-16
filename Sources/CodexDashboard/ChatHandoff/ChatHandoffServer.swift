@@ -47,6 +47,7 @@ final class ChatHandoffServer {
         }
     }
     let configuration: Configuration
+    private let readTimeout: Duration
     private var listeners: [NWListener] = []
     private var clients: [UUID: Client] = [:]
     private var initializedClients: Set<UUID> = []
@@ -64,6 +65,7 @@ final class ChatHandoffServer {
     private var turnClient: UUID?
     private var turnWindow: Window?
     private var loadedThreads: [String: Bool] = [:] // Value indicates an ephemeral thread.
+    private var newThreadRollouts: [String: String] = [:]
     private var initializeResult: [String: Any]?
     private var forwarding = 0
     private var writerLock: Int32 = -1
@@ -72,7 +74,10 @@ final class ChatHandoffServer {
     private var authCache: [String: (expires: Date, credential: Data, response: Data)] = [:]
     private var terminationSource: DispatchSourceSignal?
 
-    init(configuration: Configuration) { self.configuration = configuration }
+    init(configuration: Configuration, readTimeout: Duration = .seconds(60)) {
+        self.configuration = configuration
+        self.readTimeout = readTimeout
+    }
     var ownerHome: URL { configuration.root.appendingPathComponent("owner") }
     var readyFile: URL { configuration.root.appendingPathComponent("ready.json") }
 
@@ -286,13 +291,18 @@ final class ChatHandoffServer {
             }
             forwarding += 1
             defer { forwarding -= 1 }
-            let result = try await call(method, params: params)
+            let result = try await call(method, params: params, readOnly: reads)
             if startsTurn { policy.observe(method: "turn/started", params: result) }
             if ["thread/resume", "thread/start"].contains(method), let thread = result["thread"] as? [String: Any], let threadID = thread["id"] as? String {
-                loadedThreads[threadID] = thread["ephemeral"] as? Bool ?? (params["ephemeral"] as? Bool == true)
+                let ephemeral = thread["ephemeral"] as? Bool ?? (params["ephemeral"] as? Bool == true)
+                loadedThreads[threadID] = ephemeral
+                if method == "thread/start", !ephemeral {
+                    newThreadRollouts[threadID] = thread["path"] as? String
+                }
             }
             if ["thread/unsubscribe", "thread/archive", "thread/delete"].contains(method), let threadID = params["threadId"] as? String {
                 loadedThreads.removeValue(forKey: threadID)
+                newThreadRollouts.removeValue(forKey: threadID)
             }
             send(["id": requestID, "result": result], to: id)
         } catch {
@@ -351,9 +361,17 @@ final class ChatHandoffServer {
     }
 
     private func select(_ window: Window) async throws {
+        if owner?.isRunning == true {
+            for (threadID, path) in newThreadRollouts where !FileManager.default.fileExists(atPath: path) {
+                // Codex creates rollouts lazily. A no-op response item flushes
+                // the native thread metadata without adding messages or turns.
+                _ = try await call("thread/inject_items", params: ["threadId": threadID, "items": [["type": "other"]]])
+            }
+        }
         try await stopOwner()
         let previousThreads = loadedThreads
         loadedThreads.removeAll()
+        newThreadRollouts.removeAll()
         let fm = FileManager.default
         try fm.createDirectory(at: ownerHome, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         // The shared catalog keeps its original paths. No rollout or database is
@@ -436,16 +454,23 @@ final class ChatHandoffServer {
         owner = nil; input = nil; output = nil; buffer = Data()
     }
 
-    private func call(_ method: String, params: [String: Any]) async throws -> [String: Any] {
+    private func call(_ method: String, params: [String: Any], readOnly: Bool = false) async throws -> [String: Any] {
         nextID += 1; let id = "broker-\(nextID)"; let current = generation
+        let timeout = readOnly ? readTimeout : .seconds(60)
         let data: Data = try await withCheckedThrowingContinuation { continuation in
             pending[id] = Pending(continuation: continuation, generation: current)
             do { try write(["id": id, "method": method, "params": params]) }
             catch { pending.removeValue(forKey: id)?.continuation.resume(throwing: error) }
             Task { [weak self] in
-                try? await Task.sleep(for: .seconds(60))
-                guard let self, self.pending[id]?.generation == current, self.generation == current else { return }
-                self.fail()
+                try? await Task.sleep(for: timeout)
+                guard let self, let request = self.pending[id],
+                      request.generation == current, self.generation == current else { return }
+                if readOnly {
+                    self.pending.removeValue(forKey: id)
+                    request.continuation.resume(throwing: ChatHandoffError.readTimedOut)
+                } else {
+                    self.fail()
+                }
             }
         }
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]

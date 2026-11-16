@@ -180,6 +180,45 @@ final class ReviewRemotePushTests: XCTestCase {
         XCTAssertEqual(published, remoteHead)
     }
 
+    func testRemoteRevertRequiresVerificationBeforePublication() async throws {
+        let (checkout, remote) = try await fixture()
+        let file = URL(fileURLWithPath: checkout).appendingPathComponent("behavior.txt")
+        try Data("bug\n".utf8).write(to: file)
+        _ = try await git(["add", "behavior.txt"], at: checkout)
+        _ = try await git(["commit", "-m", "Reproduce bug"], at: checkout)
+        try Data("fixed\n".utf8).write(to: file)
+        _ = try await git(["commit", "-am", "Fix"], at: checkout)
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        let checkpoint = ReviewWorkspaceCheckpoint()
+        let fix = try await checkpoint.workspace(at: checkout)
+        let other = try await otherCheckout(remote)
+        _ = try await git(["revert", "--no-edit", fix.revision], at: other)
+        _ = try await git(["push", "origin", "main"], at: other)
+        let reverted = try await git(["rev-parse", "HEAD"], at: other)
+
+        let publisher = ReviewGitPublisher(workspaceCheckpoint: checkpoint)
+        let outcome = try await publisher.reconcileAndPublishFix(
+            fix.revision, at: checkout, expectedWorkspace: fix
+        )
+        guard case .verificationRequired(let workspace) = outcome else {
+            return XCTFail("An unverified remote tree must not be reported as published")
+        }
+        XCTAssertEqual(workspace.revision, reverted)
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "bug\n")
+        let beforeVerification = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(beforeVerification, reverted)
+
+        try Data("fixed\n".utf8).write(to: file)
+        _ = try await git(["commit", "-am", "Restore fix"], at: checkout)
+        let restored = try await checkpoint.workspace(at: checkout)
+        let publication = try await publisher.reconcileAndPublishFix(
+            fix.revision, at: checkout, expectedWorkspace: restored
+        )
+        XCTAssertEqual(publication, .published)
+        let published = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        XCTAssertEqual(published, restored.revision)
+    }
+
     func testFetchMergeThenVerifiedRetryPreservesRemoteAndOriginalFix() async throws {
         let (checkout, remote) = try await fixture()
         _ = try await git(["push", "-u", "origin", "main"], at: checkout)

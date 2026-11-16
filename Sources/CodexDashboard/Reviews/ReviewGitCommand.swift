@@ -7,7 +7,9 @@ enum ReviewGitCommand {
         guard result.terminationStatus == 0 else {
             throw ReviewLoopError("Git checkpoint failed: " + String(decoding: result.standardError, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        return String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        var output = result.standardOutput
+        if output.last == 0x0a { output.removeLast() }
+        return String(decoding: output, as: UTF8.self)
     }
 
     static func run(_ arguments: [String], at path: String, timeout: TimeInterval = 5) async throws -> SubprocessOutput {

@@ -3,7 +3,7 @@ import XCTest
 
 final class ReviewWorkspaceCheckpointTests: XCTestCase {
     func testRealGitCheckpointIncludesUntrackedFilesAndCommitAncestry() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("review-git-\(UUID().uuidString)")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("review-git-\(UUID().uuidString) ")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         func git(_ arguments: [String]) async throws {
@@ -17,6 +17,7 @@ final class ReviewWorkspaceCheckpointTests: XCTestCase {
         XCTAssertEqual(initial.git?.isClean, true)
         XCTAssertEqual(initial.git?.branch, "main")
         XCTAssertEqual(initial.kind, .git)
+        XCTAssertEqual(FileSystemPath.canonicalPath(initial.root), FileSystemPath.canonicalPath(directory.path))
         let nested = directory.appendingPathComponent("nested", isDirectory: true)
         try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
         let nestedState = try await checkpoint.workspace(at: nested.path)

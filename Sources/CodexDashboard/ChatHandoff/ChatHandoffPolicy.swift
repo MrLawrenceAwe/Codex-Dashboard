@@ -32,11 +32,12 @@ struct ChatHandoffPolicy {
 }
 
 enum ChatHandoffError: LocalizedError {
-    case busy, disconnected, identity, unsafeOwner, unsupported, independentHistory, projectAliases
+    case busy, disconnected, readTimedOut, identity, unsafeOwner, unsupported, independentHistory, projectAliases
     var errorDescription: String? {
         switch self {
         case .busy: "Another account window is using the shared chat server. Wait for its turn to finish, then send again."
         case .disconnected: "The shared chat server disconnected. Check the chat history before sending again; your message was not retried."
+        case .readTimedOut: "The shared chat request timed out."
         case .identity: "The selected window’s account could not be verified. No turn was started."
         case .unsafeOwner: "Shared chats cannot start while an independent Codex window still owns this history. Restart all Codex windows through Dashboard first."
         case .projectAliases: "Some project registrations could not be matched to the original project list. Shared Chats activation stopped."

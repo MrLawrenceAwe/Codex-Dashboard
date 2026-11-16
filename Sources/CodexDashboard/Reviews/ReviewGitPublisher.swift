@@ -60,7 +60,10 @@ struct ReviewGitPublisher: ReviewGitPublishing {
                 let pushTarget = pushURLs.count == 1 ? remote : url
                 var revision = commit
                 if let remoteCommit = try await remoteRevision(destination, from: fetchTarget, at: path) {
-                    if try await workspaceCheckpoint.isAncestor(commit, of: remoteCommit, at: path) { continue }
+                    if try await workspaceCheckpoint.isAncestor(commit, of: remoteCommit, at: path),
+                       try await hasVerifiedTree(remoteCommit, fix: commit, head: expectedWorkspace.revision, at: path) {
+                        continue
+                    }
                     if !(try await workspaceCheckpoint.isAncestor(remoteCommit, of: commit, at: path)) {
                         guard try await workspaceCheckpoint.isAncestor(remoteCommit, of: expectedWorkspace.revision, at: path) else {
                             guard try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace else {
@@ -97,6 +100,17 @@ struct ReviewGitPublisher: ReviewGitPublishing {
             _ = try await ReviewGitCommand.output(["config", "branch.\(branch).merge", destination], at: path)
         }
         return .published
+    }
+
+    private func hasVerifiedTree(_ remote: String, fix: String, head: String, at path: String) async throws -> Bool {
+        if remote == fix || remote == head { return true }
+        // A descendant can revert the fix. Skip only a tree we have already verified.
+        let remoteTree = try await ReviewGitCommand.output(["rev-parse", "\(remote)^{tree}"], at: path)
+        let fixTree = try await ReviewGitCommand.output(["rev-parse", "\(fix)^{tree}"], at: path)
+        if remoteTree == fixTree { return true }
+        guard head != fix else { return false }
+        let headTree = try await ReviewGitCommand.output(["rev-parse", "\(head)^{tree}"], at: path)
+        return remoteTree == headTree
     }
 
     private func remoteURLs(_ arguments: [String], at path: String) async throws -> [String] {
@@ -136,7 +150,7 @@ struct ReviewGitPublisher: ReviewGitPublishing {
             }
         }
         do {
-            let merge = try await ReviewGitCommand.run(["merge", "--no-edit", "--no-ff", "--no-autostash", commit], at: path, timeout: 60)
+            let merge = try await ReviewGitCommand.run(["merge", "--no-edit", "--ff", "--no-autostash", commit], at: path, timeout: 60)
             guard merge.terminationStatus == 0 else {
                 throw ReviewLoopError("Remote changes could not be merged automatically. Resolve the histories in the review chat, then resume. "
                     + String(decoding: merge.standardOutput + merge.standardError, as: UTF8.self))
