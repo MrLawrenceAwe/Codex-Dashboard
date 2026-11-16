@@ -51,50 +51,39 @@ struct ReviewGitPublisher: ReviewGitPublishing {
         // Push only the verified commit to one branch, regardless of push.default,
         // followTags, mirror, or force settings. Git rejects non-fast-forward updates.
         do {
-            let remoteRef = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
-                arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
-                            "ls-remote", "--exit-code", "--refs", "--", remote, destination], timeout: 60)
-            guard remoteRef.terminationStatus == 0 || remoteRef.terminationStatus == 2 else {
-                throw ReviewLoopError(String(decoding: remoteRef.standardError, as: UTF8.self))
-            }
-            var remoteCommit: String?
-            if remoteRef.terminationStatus == 0 {
-                // Fetch the actual destination, including commits absent from this checkout.
-                // Never fetch into or rewrite the local branch.
-                let fetched = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
-                    arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
-                                "fetch", "--no-tags", "--no-recurse-submodules", "--", remote, destination], timeout: 60)
-                guard fetched.terminationStatus == 0 else {
-                    throw ReviewLoopError(String(decoding: fetched.standardError, as: UTF8.self))
-                }
-                remoteCommit = try await ReviewGitCommand.output(["rev-parse", "FETCH_HEAD^{commit}"], at: path)
-            }
-            var alreadyPublished = false
-            var commitToPublish = commit
-            if let remoteCommit {
-                alreadyPublished = try await workspaceCheckpoint.isAncestor(commit, of: remoteCommit, at: path)
-                if !alreadyPublished, !(try await workspaceCheckpoint.isAncestor(remoteCommit, of: commit, at: path)) {
-                    if try await workspaceCheckpoint.isAncestor(remoteCommit, of: expectedWorkspace.revision, at: path) {
+            let fetchURL = try await remoteURLs(["remote", "get-url", "--", remote], at: path).first
+            let pushURLs = try await remoteURLs(["remote", "get-url", "--push", "--all", "--", remote], at: path)
+            guard !pushURLs.isEmpty else { throw ReviewLoopError("The remote has no push destination.") }
+            var updates: [(target: String, revision: String)] = []
+            for url in pushURLs {
+                let fetchTarget = url == fetchURL ? remote : url
+                let pushTarget = pushURLs.count == 1 ? remote : url
+                var revision = commit
+                if let remoteCommit = try await remoteRevision(destination, from: fetchTarget, at: path) {
+                    if try await workspaceCheckpoint.isAncestor(commit, of: remoteCommit, at: path) { continue }
+                    if !(try await workspaceCheckpoint.isAncestor(remoteCommit, of: commit, at: path)) {
+                        guard try await workspaceCheckpoint.isAncestor(remoteCommit, of: expectedWorkspace.revision, at: path) else {
+                            guard try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace else {
+                                throw ReviewLoopError("The checkout changed during remote synchronization.")
+                            }
+                            try await mergeRemote(remoteCommit, at: path)
+                            return .verificationRequired(try await workspaceCheckpoint.workspace(at: path))
+                        }
                         // The current HEAD has been reverified by the coordinator and includes
                         // both histories. Publish it rather than retrying the pre-merge fix.
-                        commitToPublish = expectedWorkspace.revision
-                    } else {
-                        guard try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace else {
-                            throw ReviewLoopError("The checkout changed during remote synchronization.")
-                        }
-                        try await mergeRemote(remoteCommit, at: path)
-                        return .verificationRequired(try await workspaceCheckpoint.workspace(at: path))
+                        revision = expectedWorkspace.revision
                     }
                 }
+                updates.append((pushTarget, revision))
             }
-            if !alreadyPublished {
+            for update in updates {
                 guard try await workspaceCheckpoint.workspace(at: path) == expectedWorkspace else {
                     throw ReviewLoopError("The checkout changed during remote synchronization.")
                 }
                 let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
                     arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
                                 "push", "--no-force", "--no-mirror", "--no-follow-tags", "--recurse-submodules=no",
-                                "--", remote, commitToPublish + ":" + destination], timeout: 60)
+                                "--", update.target, update.revision + ":" + destination], timeout: 60)
                 guard result.terminationStatus == 0 else {
                     throw ReviewLoopError(String(decoding: result.standardError, as: UTF8.self)
                         .trimmingCharacters(in: .whitespacesAndNewlines))
@@ -108,6 +97,32 @@ struct ReviewGitPublisher: ReviewGitPublishing {
             _ = try await ReviewGitCommand.output(["config", "branch.\(branch).merge", destination], at: path)
         }
         return .published
+    }
+
+    private func remoteURLs(_ arguments: [String], at path: String) async throws -> [String] {
+        let result = try await ReviewGitCommand.run(arguments, at: path)
+        guard result.terminationStatus == 0 else {
+            throw ReviewLoopError("Could not resolve the configured Git remote.")
+        }
+        return String(decoding: result.standardOutput, as: UTF8.self).split(separator: "\n").map(String.init)
+    }
+
+    private func remoteRevision(_ ref: String, from target: String, at path: String) async throws -> String? {
+        let advertised = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
+                        "ls-remote", "--exit-code", "--refs", "--", target, ref], timeout: 60)
+        if advertised.terminationStatus == 2 { return nil }
+        guard advertised.terminationStatus == 0 else {
+            throw ReviewLoopError(String(decoding: advertised.standardError, as: UTF8.self))
+        }
+        // Fetch the destination's history without changing the local branch.
+        let fetched = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["GIT_TERMINAL_PROMPT=0", GitExecutable.url.path, "-C", path,
+                        "fetch", "--no-tags", "--no-recurse-submodules", "--", target, ref], timeout: 60)
+        guard fetched.terminationStatus == 0 else {
+            throw ReviewLoopError(String(decoding: fetched.standardError, as: UTF8.self))
+        }
+        return try await ReviewGitCommand.output(["rev-parse", "FETCH_HEAD^{commit}"], at: path)
     }
 
     private func mergeRemote(_ commit: String, at path: String) async throws {

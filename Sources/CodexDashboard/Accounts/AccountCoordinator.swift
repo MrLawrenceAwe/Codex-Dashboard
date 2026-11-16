@@ -18,6 +18,7 @@ final class AccountCoordinator: ObservableObject {
     @Published private(set) var accountsRequiringSignIn: Set<UUID> = []
 
     let isAccountWindow: Bool
+    private let sharedChatsEnabled: () -> Bool
     private let manager: CodexAccountManager
     private let usageSession: AccountUsageSession
     private let accountOperationQueue = DispatchQueue(label: "codex-dashboard.account-operations")
@@ -30,10 +31,12 @@ final class AccountCoordinator: ObservableObject {
         manager: CodexAccountManager,
         usageProvider: any AccountUsageProviding,
         usageCacheStore: (any UsageCaching)? = nil,
-        isAccountWindow: Bool = false
+        isAccountWindow: Bool = false,
+        sharedChatsEnabled: @escaping () -> Bool = { ChatHandoffService.isEnabled }
     ) {
         self.manager = manager
         self.isAccountWindow = isAccountWindow
+        self.sharedChatsEnabled = sharedChatsEnabled
         usageSession = AccountUsageSession(
             provider: usageProvider,
             cache: usageCacheStore ?? manager.usageCacheStore
@@ -44,6 +47,8 @@ final class AccountCoordinator: ObservableObject {
     var activeAccountName: String? {
         savedAccounts.first { $0.id == activeSavedAccountID }?.name
     }
+
+    var hasSharedChats: Bool { sharedChatsEnabled() }
 
     // Keychain reads (including document migrations) and mutations run away from
     // the main actor, in submission order. The manager's lock also protects callers
@@ -369,8 +374,8 @@ final class AccountCoordinator: ObservableObject {
             isBusy: isBusy || !refreshingUsageAccountIDs.isEmpty,
             usageBlockage: AccountUsageFormatter.blockage(for: activeUsageStatus),
             accountWindow: isAccountWindow,
-            sharedChats: ChatHandoffService.isEnabled,
-            sharedAccountSwitchAvailable: !isAccountWindow && ChatHandoffService.isEnabled
+            sharedChats: hasSharedChats,
+            sharedAccountSwitchAvailable: !isAccountWindow && hasSharedChats
                 && ChatHandoffService.supportsAccountSwitch
         )
     }

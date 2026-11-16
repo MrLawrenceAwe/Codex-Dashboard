@@ -462,6 +462,7 @@ extension XCTestCase {
             compatibilityChecker: compatibilityChecker,
             userDefaults: userDefaults,
             observeFileChanges: observeFileChanges,
+            sharedChatsEnabled: { false },
             installedCodexVersion: installedCodexVersion,
             codexForegrounder: codexForegrounder,
             keyboardActivityDetector: keyboardActivityDetector,

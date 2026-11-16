@@ -84,6 +84,7 @@ final class AppCoordinator: ObservableObject {
         codexHome: URL = CodexConfiguration.codexDirectory,
         pollInactiveAccountUsage: Bool = true,
         isAccountWindow: Bool = false,
+        sharedChatsEnabled: @escaping () -> Bool = { ChatHandoffService.isEnabled },
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         keyboardActivityDetector: any KeyboardActivityDetecting = SystemKeyboardActivityDetector(),
@@ -114,7 +115,8 @@ final class AppCoordinator: ObservableObject {
             manager: accountManager,
             usageProvider: accountUsageProvider,
             usageCacheStore: accountUsageCacheStore,
-            isAccountWindow: isAccountWindow
+            isAccountWindow: isAccountWindow,
+            sharedChatsEnabled: sharedChatsEnabled
         )
         notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
         automaticallyOpenCompletedChats = userDefaults.object(forKey: Self.automaticallyOpenCompletedChatsKey) as? Bool ?? true

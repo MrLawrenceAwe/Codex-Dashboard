@@ -49,15 +49,18 @@ actor AppServerUsageProvider: AccountUsageProviding {
     private var session: CodexAppServerSession?
     private var activeUsageTask: Task<CodexAccountUsage, Error>?
     private var activeUsageTaskID: UUID?
+    private let sharedChatsEnabled: @Sendable () -> Bool
 
     init(
         executableURL: URL = CodexConfiguration.codexExecutableURL,
         codexHomeURL: URL = CodexConfiguration.codexDirectory,
-        timeout: Duration = .seconds(12)
+        timeout: Duration = .seconds(12),
+        sharedChatsEnabled: @escaping @Sendable () -> Bool = { ChatHandoffService.isEnabled }
     ) {
         self.executableURL = executableURL
         self.codexHomeURL = codexHomeURL
         self.timeout = timeout
+        self.sharedChatsEnabled = sharedChatsEnabled
     }
 
     func usage() async throws -> CodexAccountUsage {
@@ -93,7 +96,7 @@ actor AppServerUsageProvider: AccountUsageProviding {
     }
 
     private func fetchUsage() async throws -> CodexAccountUsage {
-        if ChatHandoffService.isEnabled {
+        if sharedChatsEnabled() {
             session?.terminate()
             session = nil
             let file = ActiveCodexCredentialFile(url: codexHomeURL.appendingPathComponent("auth.json"), fileManager: .default)

@@ -82,7 +82,7 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     return status === 'uncommittedChanges' || status === 'uncommittedChangesAndUnpushedCommits';
   }
 
-  function reconcileOperation(context, checks, hasChanges, readCount) {
+  function reconcileOperation(context, checks, hasChanges, readCount, { clearOnSnapshot = true } = {}) {
     const check = checks.get(context.path);
     if (!check) return;
     const status = repositoryStatus(context);
@@ -90,7 +90,8 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
     if (['clean', 'uncommittedChanges', 'unpushedCommits', 'uncommittedChangesAndUnpushedCommits'].includes(status)
       && !hasChanges(status)) {
       clearTimeout(check.timer);
-      checks.delete(context.path);
+      check.timer = undefined;
+      if (clearOnSnapshot) checks.delete(context.path);
       return;
     }
     if (!hasChanges(status) || check.running || check.timer !== undefined) return;
@@ -326,7 +327,9 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
       refreshProjectStatus(context);
       projectRefreshTimer = setTimeout(sync, 2000);
     }
-    reconcileOperation(context, combinedPushChecks, hasUnpushedCommits, checkBranchAhead);
+    // A snapshot can miss the commit and then catch it before the push. Keep
+    // requiring a fresh ahead count whenever a snapshot claims commits remain.
+    reconcileOperation(context, combinedPushChecks, hasUnpushedCommits, checkBranchAhead, { clearOnSnapshot: false });
     reconcileOperation(context, commitChecks, hasUncommittedChanges, checkWorkingTree);
     if (!toolbar) {
       toolbar = document.createElement('div');

@@ -63,7 +63,7 @@ test('Local changes counts, filtering, and labels agree for every Git status', (
       assert.ok(markup.includes(`<span>${expectedLabel}</span>`), projectGitStatus);
       const action = projectGitStatus === 'unpushedCommits' ? 'Push' : 'Commit';
       assert.equal(state.changedProjects.get('/project').action, action);
-      assert.match(markup, new RegExp(`title="Open Codex’s ${action} flow for this project"><span>${action}</span>`));
+      assert.match(markup, new RegExp(`title="${action} in this project’s repository"><span>${action}</span>`));
     }
     assert.equal(query.summarizeActivity([{ ...thread, projectGroupPath: null }], () => false, new Set()).changedProjects.size, 0, projectGitStatus);
   }

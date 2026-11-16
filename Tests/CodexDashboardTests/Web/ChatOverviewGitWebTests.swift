@@ -256,6 +256,8 @@ extension ChatOverviewWebTests {
           </aside><main>Conversation surface</main>
           <script>
             window.pushes = 0;
+            let requestSequence = 0;
+            crypto.randomUUID = () => `project-git-${++requestSequence}`;
             const listeners = new Set();
             window.electronBridge = {
               subscribeToWorkerMessages(worker, listener) { listeners.add(listener); return () => listeners.delete(listener); },
@@ -265,6 +267,7 @@ extension ChatOverviewWebTests {
                 let value;
                 switch (method) {
                   case 'current-branch': value = { branch: 'main', isDetached: false }; break;
+                  case 'git-context': value = { status: 'complete', remotes: [{ name: 'origin' }], remotesOmitted: 0 }; break;
                   case 'upstream-branch': value = { branch: 'main', upstream: { branch: 'origin/main' } }; break;
                   case 'push':
                     window.pushes++;

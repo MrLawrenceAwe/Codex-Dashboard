@@ -56,11 +56,11 @@ extension DashboardRendererTests {
             checks.map(\.id),
             [
                 "renderer", "sidebar-host", "thread-navigation", "sidebar-unread", "sidebar-bulk-read",
-                "composer", "composer-controls", "profile-menu", "model-picker", "disable-push-without-remote",
+                "composer", "composer-controls", "profile-menu", "model-picker", "git-toolbar", "disable-push-without-remote",
             ]
         )
-        XCTAssertTrue(checks.filter { $0.id != "disable-push-without-remote" }.allSatisfy { $0.status == .compatible })
-        XCTAssertEqual(checks.last?.status, .pending)
+        XCTAssertTrue(checks.dropLast(2).allSatisfy { $0.status == .compatible })
+        XCTAssertEqual(checks.suffix(2).map(\.status), [.pending, .pending])
         let expressions = await devTools.expressions()
         let composerControlsExpression = try XCTUnwrap(
             expressions.first { $0.contains("Boolean(codexUIContracts.composerAddButton())") }

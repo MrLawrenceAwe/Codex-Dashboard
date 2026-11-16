@@ -32,6 +32,16 @@ final class ChatHandoffServer {
         let continuation: CheckedContinuation<Data, Error>
         let generation: UUID
     }
+    private struct RequestError: LocalizedError {
+        let code: Int?
+        let message: String
+
+        var errorDescription: String? { DashboardError.synchronizationFailed(message).localizedDescription }
+
+        func isMissingRollout(for threadID: String) -> Bool {
+            code == -32600 && message == "no rollout found for thread id \(threadID)"
+        }
+    }
     let configuration: Configuration
     private var listeners: [NWListener] = []
     private var clients: [UUID: Client] = [:]
@@ -47,7 +57,7 @@ final class ChatHandoffServer {
     private var selected: Window?
     private var ownerCredential: Data?
     private var turnClient: UUID?
-    private var loaded: [String: [String: Any]] = [:]
+    private var loadedThreads: [String: Bool] = [:] // Value indicates an ephemeral thread.
     private var initializeResult: [String: Any]?
     private var forwarding = 0
     private var writerLock: Int32 = -1
@@ -219,19 +229,19 @@ final class ChatHandoffServer {
                 try await select(client.window)
             }
             if method == "thread/list" { params["currentAccountOnly"] = false }
-            if startsTurn, let threadID = params["threadId"] as? String, loaded[threadID] == nil {
+            if startsTurn, let threadID = params["threadId"] as? String, loadedThreads[threadID] == nil {
                 _ = try await call("thread/resume", params: ["threadId": threadID])
-                loaded[threadID] = ["threadId": threadID]
+                loadedThreads[threadID] = false
             }
             forwarding += 1
             defer { forwarding -= 1 }
             let result = try await call(method, params: params)
             if startsTurn { policy.observe(method: "turn/started", params: result) }
             if ["thread/resume", "thread/start"].contains(method), let thread = result["thread"] as? [String: Any], let threadID = thread["id"] as? String {
-                loaded[threadID] = ["threadId": threadID]
+                loadedThreads[threadID] = thread["ephemeral"] as? Bool ?? (params["ephemeral"] as? Bool == true)
             }
             if ["thread/unsubscribe", "thread/archive", "thread/delete"].contains(method), let threadID = params["threadId"] as? String {
-                loaded.removeValue(forKey: threadID)
+                loadedThreads.removeValue(forKey: threadID)
             }
             send(["id": requestID, "result": result], to: id)
         } catch {
@@ -291,6 +301,8 @@ final class ChatHandoffServer {
 
     private func select(_ window: Window) async throws {
         try await stopOwner()
+        let previousThreads = loadedThreads
+        loadedThreads.removeAll()
         let fm = FileManager.default
         try fm.createDirectory(at: ownerHome, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         // The shared catalog keeps its original paths. No rollout or database is
@@ -334,7 +346,15 @@ final class ChatHandoffServer {
         try write(["method": "initialized"])
         _ = try await call("account/read", params: ["refreshToken": false])
         guard AccountIdentityDecoder.identity(in: try Data(contentsOf: ownerHome.appendingPathComponent("auth.json")))?.identifier == window.accountIdentifier else { throw ChatHandoffError.identity }
-        for params in loaded.values { _ = try await call("thread/resume", params: params) }
+        for (threadID, ephemeral) in previousThreads where !ephemeral {
+            do {
+                _ = try await call("thread/resume", params: ["threadId": threadID])
+                loadedThreads[threadID] = false
+            } catch let error as RequestError where error.isMissingRollout(for: threadID) {
+                // A newly opened chat may never have written history before the switch.
+                continue
+            }
+        }
     }
 
     private func stopOwner() async throws {
@@ -374,7 +394,8 @@ final class ChatHandoffServer {
         }
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         if let error = object["error"] as? [String: Any] {
-            throw DashboardError.synchronizationFailed(error["message"] as? String ?? "The shared chat request failed.")
+            throw RequestError(code: error["code"] as? Int,
+                               message: error["message"] as? String ?? "The shared chat request failed.")
         }
         return object["result"] as? [String: Any] ?? [:]
     }

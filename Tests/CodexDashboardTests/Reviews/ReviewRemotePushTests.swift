@@ -84,6 +84,47 @@ final class ReviewRemotePushTests: XCTestCase {
         XCTAssertEqual(pushed, current.revision)
     }
 
+    func testPushPublishesToSeparatePushURLWhenFetchRemoteAlreadyHasFix() async throws {
+        let (checkout, remote) = try await fixture()
+        let pushURL = URL(fileURLWithPath: remote).deletingLastPathComponent().appendingPathComponent("push.git").path
+        _ = try await git(["init", "--bare", pushURL], at: checkout)
+        _ = try await git(["push", pushURL, "main"], at: checkout)
+        _ = try await git(["commit", "--allow-empty", "-m", "Fix"], at: checkout)
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        _ = try await git(["remote", "set-url", "--push", "origin", pushURL], at: checkout)
+
+        let workspace = try await ReviewWorkspaceCheckpoint().workspace(at: checkout)
+        let publication = try await ReviewGitPublisher().reconcileAndPublishFix(
+            workspace.revision, at: checkout, expectedWorkspace: workspace
+        )
+
+        XCTAssertEqual(publication, .published)
+        let pushed = try await git(["rev-parse", "refs/heads/main"], at: pushURL)
+        XCTAssertEqual(pushed, workspace.revision)
+    }
+
+    func testPushSkipsPublishedDestinationAndUpdatesRemainingPushURL() async throws {
+        let (checkout, remote) = try await fixture()
+        let other = URL(fileURLWithPath: remote).deletingLastPathComponent().appendingPathComponent("other.git").path
+        _ = try await git(["init", "--bare", other], at: checkout)
+        _ = try await git(["push", other, "main"], at: checkout)
+        _ = try await git(["commit", "--allow-empty", "-m", "Fix"], at: checkout)
+        let fix = try await git(["rev-parse", "HEAD"], at: checkout)
+        _ = try await git(["commit", "--allow-empty", "-m", "Later work"], at: checkout)
+        _ = try await git(["push", "-u", "origin", "main"], at: checkout)
+        _ = try await git(["remote", "set-url", "--push", "origin", remote], at: checkout)
+        _ = try await git(["remote", "set-url", "--add", "--push", "origin", other], at: checkout)
+
+        let workspace = try await ReviewWorkspaceCheckpoint().workspace(at: checkout)
+        let publication = try await ReviewGitPublisher().reconcileAndPublishFix(fix, at: checkout, expectedWorkspace: workspace)
+
+        XCTAssertEqual(publication, .published)
+        let original = try await git(["rev-parse", "refs/heads/main"], at: remote)
+        let pushed = try await git(["rev-parse", "refs/heads/main"], at: other)
+        XCTAssertEqual(original, workspace.revision)
+        XCTAssertEqual(pushed, fix)
+    }
+
     func testPushUsesConfiguredUpstreamBranchAndReverifiesDivergence() async throws {
         let (checkout, remote) = try await fixture()
         _ = try await git(["push", "-u", "origin", "main:published"], at: checkout)

@@ -175,7 +175,7 @@ function createPushControls() {
     if (selected?.dialog !== context?.dialog || selected?.path !== context?.path
       || selected?.threadID !== context?.threadID) {
       restore();
-      // A matching dialog can use the request started by the Projects page.
+      // A matching dialog can reuse the toolbar's in-flight request.
       if (pendingRemote && (pendingRemote.generation !== null
         || (selected && pendingRemote.path !== selected.path))) cancelRemote();
       context = selected;

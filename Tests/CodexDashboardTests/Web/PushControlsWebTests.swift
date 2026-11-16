@@ -6,10 +6,15 @@ import XCTest
 @MainActor
 final class PushControlsWebTests: SerializedDashboardWebTestCase {
 
-    private func fixture(dialogOpen: Bool = true) async throws -> WKWebView {
+    private func fixture(dialogOpen: Bool = true, prefetchProject: Bool = false) async throws -> WKWebView {
         try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
-        <aside role="navigation"><button class="sidebar-item">New chat</button></aside>
+        <aside role="navigation"><button class="sidebar-item">New chat</button>
+          <div data-app-action-sidebar-project-row data-app-action-sidebar-project-id="project">Project</div>
+        </aside>
+        <div data-app-shell-header-slot="end">
+          <div data-app-shell-header-slot-content>Chat controls</div>
+        </div>
         <main><div id="composer"><textarea placeholder="Do anything"></textarea></div></main>
         <div role="dialog" id="commit-dialog"><div class="command-menu-dialog">
           <div cmdk-root data-codex-shortcut-capture><input id="message">
@@ -20,8 +25,15 @@ final class PushControlsWebTests: SerializedDashboardWebTestCase {
         </div></div>
         <script>
           window.activeProps = { conversationId: 'thread' };
+          if (\(prefetchProject)) {
+            activeProps.conversationId = 'client-new-thread:project';
+            activeProps.selectedProject = { type: 'local', projectId: 'project' };
+            document.querySelector('[data-app-action-sidebar-project-row]').__reactFiber$test = {
+              memoizedProps: { group: { projectId: 'project', projectKind: 'local', path: '/tmp/repository' } },
+            };
+          }
           document.getElementById('composer').__reactFiber$test = { memoizedProps: activeProps };
-          window.modalProps = { open: \(dialogOpen), conversationId: 'thread', enablePushActions: true,
+          window.modalProps = { open: \(dialogOpen), conversationId: activeProps.conversationId, enablePushActions: true,
             onOpenChange() {}, target: { root: '/tmp/repository', hostConfig: { id: 'local' } } };
           document.getElementById('commit-dialog').__reactFiber$test = { memoizedProps: modalProps };
           window.requestSequence = 0;
@@ -54,18 +66,11 @@ final class PushControlsWebTests: SerializedDashboardWebTestCase {
         """)
     }
 
-    func testProjectsCommitPrefetchDisablesPushOnOpeningAndReusesPendingRequest() async throws {
+    func testProjectToolbarPrefetchDisablesPushOnOpeningAndReusesPendingRequest() async throws {
         for replyBeforeOpening in [true, false] {
-            let webView = try await fixture(dialogOpen: false)
-            let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-                .fixture(checkoutPath: "/tmp/repository", projectGitStatus: .uncommittedChanges),
-            ])
+            let webView = try await fixture(dialogOpen: false, prefetchProject: true)
             let immediate = try await webView.evaluateJavaScript("""
             (() => {
-              window.__codexDashboard.applyThreads((\(payload)).threads);
-              window.__codexDashboard.openChatOverview();
-              document.querySelector('[data-filter="changedProjects"]').click();
-              document.querySelector('[data-project-git-action]').click();
               const requested = remoteRequests.filter(r => r.type === 'worker-request').length;
               if (\(replyBeforeOpening)) respondRemote(false);
               modalProps.open = true;
@@ -88,17 +93,10 @@ final class PushControlsWebTests: SerializedDashboardWebTestCase {
         }
     }
 
-    func testProjectsCommitPrefetchCannotDisableAnotherRepository() async throws {
-        let webView = try await fixture(dialogOpen: false)
-        let payload = try DashboardWebTestHarness.snapshotPayload(for: [
-            .fixture(checkoutPath: "/tmp/repository", projectGitStatus: .uncommittedChanges),
-        ])
+    func testProjectToolbarPrefetchCannotDisableAnotherRepository() async throws {
+        let webView = try await fixture(dialogOpen: false, prefetchProject: true)
         let result = try await webView.evaluateJavaScript("""
         (() => {
-          window.__codexDashboard.applyThreads((\(payload)).threads);
-          window.__codexDashboard.openChatOverview();
-          document.querySelector('[data-filter="changedProjects"]').click();
-          document.querySelector('[data-project-git-action]').click();
           const prefetch = lastRemoteRequest;
           modalProps.target.root = '/tmp/another-repository';
           modalProps.open = true;

@@ -66,6 +66,10 @@ final class ChatHandoffServerTests: XCTestCase {
         defer { a.socket.cancel(); b.socket.cancel() }
         _ = try await a.call("initialize")
         _ = try await b.call("initialize")
+        let empty = try await a.call("thread/start")
+        XCTAssertNil(empty["error"])
+        let ephemeral = try await a.call("thread/start", ["ephemeral": true])
+        XCTAssertNil(ephemeral["error"])
         let first = try await a.call("turn/start", ["threadId": "same"])
         XCTAssertNil(first["error"])
         let accountA = (first["result"] as? [String: Any])?["account"] as? String
@@ -123,6 +127,9 @@ final class ChatHandoffServerTests: XCTestCase {
         XCTAssertEqual(switched.approvals, 1)
         let approvals = try String(contentsOf: history.appendingPathComponent("approvals"), encoding: .utf8).split(separator: "\n")
         XCTAssertEqual(approvals, ["A", "B", "A", "B", "B"], "Approvals are routed back with the original server IDs")
+        let resumes = try String(contentsOf: history.appendingPathComponent("resumes"), encoding: .utf8).split(separator: "\n")
+        XCTAssertEqual(resumes.filter { $0 == "empty" }.count, 1, "An empty chat is forgotten after its missing rollout is detected")
+        XCTAssertFalse(resumes.contains("ephemeral"), "An ephemeral chat is never restored on another writer")
     }
 
     private static let fakeServer = #"""
@@ -141,7 +148,17 @@ for line in sys.stdin:
  if m=='initialize':
   send({'method':'account/updated','params':{'accountId':account}})
   result={'userAgent':'fake'}
- elif m in ['thread/resume','thread/read']:result={'thread':{'id':'same','turns':[]}}
+ elif m=='thread/start':
+  ephemeral=r['params'].get('ephemeral',False)
+  result={'thread':{'id':'ephemeral' if ephemeral else 'empty','ephemeral':ephemeral}}
+ elif m=='thread/resume':
+  thread=r['params']['threadId']
+  with (history/'resumes').open('a') as f:f.write(thread+'\n')
+  if thread!='same':
+   send({'id':i,'error':{'code':-32600,'message':'no rollout found for thread id '+thread}})
+   continue
+  result={'thread':{'id':thread,'turns':[]}}
+ elif m=='thread/read':result={'thread':{'id':'same','turns':[]}}
  elif m=='turn/start':
   with (history/'writers').open('a') as f:f.write(account+'\n')
   active=str(uuid.uuid4())

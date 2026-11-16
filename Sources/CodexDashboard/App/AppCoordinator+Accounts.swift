@@ -93,7 +93,7 @@ extension AppCoordinator {
             await openAccountWindow(accountID)
             return
         }
-        if ChatHandoffService.isEnabled {
+        if accounts.hasSharedChats {
             guard ChatHandoffService.supportsAccountSwitch else {
                 accounts.setStatusMessage("Use Update Shared Chats in the Dashboard menu to enable Switch.")
                 return
@@ -113,7 +113,7 @@ extension AppCoordinator {
     }
 
     func prepareForSignIn() async {
-        if ChatHandoffService.isEnabled {
+        if accounts.hasSharedChats {
             accounts.setStatusMessage("Disable Shared Chats from the Dashboard menu before adding another account.")
             return
         }

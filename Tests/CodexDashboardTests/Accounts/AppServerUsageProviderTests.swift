@@ -76,7 +76,8 @@ final class AppServerUsageProviderTests: XCTestCase {
         let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
-            timeout: .seconds(1)
+            timeout: .seconds(1),
+            sharedChatsEnabled: { false }
         )
 
         let usage = try await provider.usage()
@@ -117,7 +118,8 @@ final class AppServerUsageProviderTests: XCTestCase {
         let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
-            timeout: .milliseconds(100)
+            timeout: .milliseconds(100),
+            sharedChatsEnabled: { false }
         )
 
         do {
