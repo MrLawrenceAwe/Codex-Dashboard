@@ -11,6 +11,27 @@ final class SharedProjectCatalogTests: XCTestCase {
         catalog.observe(replicaID: "other", snapshot: [project("b", "Original")])
         return catalog
     }
+    func testPresentationKeepsCanonicalSidebarEntryInsteadOfUnusedLegacyAlias() {
+        let presentation = ProjectListPresentation.read(state: [
+            "local-projects": ["server": [:]],
+            "project-order": ["server"],
+            "app-server-project-id-by-legacy-project-id-by-host": ["shared": ["old-import": "server"]]
+        ], projects: [project("server", "Original")])
+        XCTAssertEqual(presentation.legacyByServer["server"], "server")
+        XCTAssertTrue(presentation.duplicateAliases.isEmpty)
+    }
+
+    func testPresentationCollapsesTwoSidebarAliasesForTheSameRegistration() {
+        let presentation = ProjectListPresentation.read(state: [
+            "local-projects": ["server": [:], "old-import": [:]],
+            "project-order": ["old-import", "server"],
+            "app-server-project-id-by-legacy-project-id-by-host": ["shared": ["old-import": "server"]]
+        ], projects: [project("server", "Original")])
+        XCTAssertEqual(presentation.duplicateAliases, ["old-import"])
+        XCTAssertEqual(presentation.order, ["server"])
+        XCTAssertEqual(presentation.merging(localIDs: ["server"], into: presentation.rawOrder), ["server"])
+    }
+
     func testSharedBackendUsesOneIdentityForNewUnmarkedProject() throws {
         var catalog = setup()
         let snapshot = [project("a", "Original"), project("new", "New")]

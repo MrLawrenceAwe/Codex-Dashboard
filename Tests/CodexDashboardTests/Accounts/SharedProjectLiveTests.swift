@@ -32,14 +32,14 @@ final class SharedProjectLiveTests: XCTestCase {
             try await waitForSidebar(connection: main, label: "Dashboard sync verification", present: true)
             step = "pin and reorder the project"
             let initialMain = try await main.snapshot()
-            let initialPins = try main.pinned(in: initialMain)
+            let initialPins = try await main.pinned(in: initialMain)
             try await main.setPresentation(order: [id] + initialMain.map(\.id).filter { $0 != id },
                 pinned: initialPins + [id], snapshot: initialMain)
             let pinDeadline = ContinuousClock.now + .seconds(25)
             var presentationSynced = false
             while ContinuousClock.now < pinDeadline {
                 let snapshot = try await other.snapshot()
-                if snapshot.first?.id == replica.id, try other.pinned(in: snapshot).contains(replica.id) {
+                if snapshot.first?.id == replica.id, try await other.pinned(in: snapshot).contains(replica.id) {
                     presentationSynced = true; break
                 }
                 try await Task.sleep(for: .milliseconds(300))

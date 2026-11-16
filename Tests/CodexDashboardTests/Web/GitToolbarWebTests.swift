@@ -5,6 +5,46 @@ import XCTest
 
 @MainActor
 final class GitToolbarWebTests: SerializedDashboardWebTestCase {
+    func testRestoredProjectChatKeepsGitActionsWhenComposerProjectIsNull() async throws {
+        let webView = try await fixture(restoredProject: true)
+        let labels = try await webView.evaluateJavaScript("""
+        [...document.querySelectorAll('#header-actions .dashboard-git-toolbar button')].map(button => button.textContent)
+        """) as? [String]
+        XCTAssertEqual(labels, ["Commit", "Commit & push", "Push"])
+
+        var unassigned = ThreadSummary.fixture(id: "current", checkoutPath: "/tmp/current")
+        unassigned.projectID = nil
+        unassigned.projectGroupPath = nil
+        unassigned.sharesGroupRepository = false
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [unassigned])
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(payload)).threads)")
+        let removed = try await webView.evaluateJavaScript("!document.querySelector('.dashboard-git-toolbar')") as? Bool
+        XCTAssertEqual(removed, true)
+    }
+
+    func testPinnedSummaryHeaderShowsGitActionsForRestoredProjectChat() async throws {
+        let webView = try await fixture(restoredProject: true, pinnedSummary: true)
+        let labels = try await webView.evaluateJavaScript("""
+        [...document.querySelectorAll('#header-actions .dashboard-git-toolbar button')].map(button => button.textContent)
+        """) as? [String]
+        XCTAssertEqual(labels, ["Commit", "Commit & push", "Push"])
+    }
+
+    func testLegacyFolderGroupedChatShowsGitActionsWithoutExplicitProjectID() async throws {
+        let webView = try await fixture(restoredProject: true, pinnedSummary: true)
+        var legacy = ThreadSummary.fixture(
+            id: "current", checkoutPath: "/tmp/current",
+            projectGitStatus: .uncommittedChangesAndUnpushedCommits
+        )
+        legacy.projectID = nil
+        let payload = try DashboardWebTestHarness.snapshotPayload(for: [legacy])
+        _ = try await webView.evaluateJavaScript("window.__codexDashboard.applyThreads((\(payload)).threads)")
+        let labels = try await webView.evaluateJavaScript("""
+        [...document.querySelectorAll('#header-actions .dashboard-git-toolbar button')].map(button => button.textContent)
+        """) as? [String]
+        XCTAssertEqual(labels, ["Commit", "Commit & push", "Push"])
+    }
+
     func testFileChangesBlockActionsAcrossInterruptionUntilSuccessfulCompletion() async throws {
         let webView = try await fixture()
         try await DashboardWebTestHarness.waitForJavaScript("!document.querySelector('[data-git-action=Push]').disabled", in: webView)
@@ -35,13 +75,14 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(actionCount, 1)
     }
 
-    private func fixture(noRemote: Bool = false, deferredGit: Bool = false) async throws -> WKWebView {
+    private func fixture(noRemote: Bool = false, deferredGit: Bool = false,
+                         restoredProject: Bool = false, pinnedSummary: Bool = false) async throws -> WKWebView {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body>
           <aside><nav><div class="sidebar-item"><button>New chat</button></div></nav></aside>
           <main>
             <div data-app-shell-header-toolbar><div>Chat title</div><div id="header-actions">
-              <div data-app-shell-focus-area="main"><button aria-label="Toggle summary">…</button></div>
+              <div data-app-shell-focus-area="main"><button aria-label="\(pinnedSummary ? "Toggle pinned summary" : "Toggle summary")">…</button></div>
             </div></div>
             <div id="composer"><textarea></textarea></div>
             <div hidden><button id="other-git" aria-label="Git actions"></button></div>
@@ -91,7 +132,8 @@ final class GitToolbarWebTests: SerializedDashboardWebTestCase {
             window.allowCommit = true;
             window.delayMenu = 0;
             document.getElementById('composer').__reactFiber$test = {
-              get memoizedProps() { return { conversationId: window.selected }; }
+              get memoizedProps() { return { conversationId: window.selected,
+                ...(\(restoredProject) ? { selectedProject: null } : {}) }; }
             };
             function attachGit(id, threadID, path) {
               const trigger = document.getElementById(id);

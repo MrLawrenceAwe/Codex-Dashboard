@@ -10,19 +10,34 @@ struct ProjectListPresentation {
     let unmapped: Set<String>
     let inactiveAliasesByServer: [String: Set<String>]
     let legacyByServer: [String: String]
+    let duplicateAliases: Set<String>
     static func read(home: URL, projects: [CodexProject]) throws -> Self {
         let file = home.appendingPathComponent(".codex-global-state.json")
         let state = FileManager.default.fileExists(atPath: file.path)
             ? (try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] ?? [:]) : [:]
+        return read(state: state, projects: projects)
+    }
+
+    static func read(state: [String: Any], projects: [CodexProject]) -> Self {
         let ids = Set(projects.map(\.id))
         let hosts = state["app-server-project-id-by-legacy-project-id-by-host"] as? [String: [String: String]] ?? [:]
+        let cached = state["local-projects"] as? [String: Any] ?? [:]
+        let active = Set(cached.keys)
+            .union(state["project-order"] as? [String] ?? [])
+            .union(state["pinned-project-ids"] as? [String] ?? [])
         var serverByLegacy: [String: String] = [:], legacyByServer: [String: String] = [:]
         for host in hosts.keys.sorted() {
             for (legacy, server) in hosts[host]!.sorted(by: { $0.key < $1.key }) where ids.contains(server) {
                 serverByLegacy[legacy] = server
-                if legacyByServer[server] == nil { legacyByServer[server] = legacy }
+                if active.contains(legacy), legacyByServer[server] == nil { legacyByServer[server] = legacy }
             }
         }
+        // A canonical entry already in use wins over historical aliases.
+        for id in ids where active.contains(id) { legacyByServer[id] = id }
+        let duplicates = Set(cached.keys.filter { key in
+            guard let server = ids.contains(key) ? key : serverByLegacy[key] else { return false }
+            return key != (legacyByServer[server] ?? server)
+        })
         func translate(_ key: String) -> [String] {
             var seen = Set<String>()
             return (state[key] as? [String] ?? []).compactMap {
@@ -40,7 +55,7 @@ struct ProjectListPresentation {
             }
         }
         return .init(order: translate("project-order"), pinned: translate("pinned-project-ids"),
-                     rawOrder: rawOrder, rawPinned: rawPinned, unmapped: unmapped, inactiveAliasesByServer: inactiveAliases, legacyByServer: legacyByServer)
+                     rawOrder: rawOrder, rawPinned: rawPinned, unmapped: unmapped, inactiveAliasesByServer: inactiveAliases, legacyByServer: legacyByServer, duplicateAliases: duplicates)
     }
     func merging(localIDs: [String], into original: [String], removing: Set<String> = []) -> [String] {
         let desired = localIDs.map { legacyByServer[$0] ?? $0 }

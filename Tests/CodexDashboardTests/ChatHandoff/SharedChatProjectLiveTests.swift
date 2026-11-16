@@ -63,7 +63,8 @@ final class SharedChatProjectLiveTests: XCTestCase {
         try await other.setPresentation(order: [added.id, originalID], pinned: [added.id], snapshot: projects)
         try await synchronize()
         let pinnedSnapshot = try await main.snapshot()
-        XCTAssertTrue(try main.pinned(in: pinnedSnapshot).contains(added.id))
+        let pins = try await main.pinned(in: pinnedSnapshot)
+        XCTAssertTrue(pins.contains(added.id))
         _ = try await other.request("project/update", ["projectId": added.id, "name": "Renamed through other window"])
         try await synchronize()
         for connection in [main, other] {

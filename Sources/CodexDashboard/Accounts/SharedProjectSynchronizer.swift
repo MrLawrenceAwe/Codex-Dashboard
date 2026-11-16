@@ -48,7 +48,7 @@ final class SharedProjectSynchronizer {
                 if id.hasPrefix("shared:") { catalog.alignSharedBackend(replicaID: id, snapshot: snapshots[id]!) }
                 catalog.observe(replicaID: id, snapshot: snapshots[id]!)
                 if let connection = connections[id] {
-                    catalog.observePinned(replicaID: id, localIDs: try connection.pinned(in: snapshots[id]!))
+                    catalog.observePinned(replicaID: id, localIDs: try await connection.pinned(in: snapshots[id]!))
                 }
             }
             // Persist the merged intent before writes. Create requests are
@@ -60,6 +60,35 @@ final class SharedProjectSynchronizer {
                 catch { readError = error.localizedDescription }
             }
             lastError = readError
+        } catch { lastError = error.localizedDescription }
+    }
+
+    /// Shared windows use one server catalog and one persisted presentation.
+    /// Mirroring its sidebar never imports, updates, or deletes registrations.
+    func synchronizeSharedPresentation(endpoints: [(id: String, home: URL, port: @Sendable () -> Int)]) async {
+        let live = Set(endpoints.map(\.id))
+        for id in Array(connections.keys) where !live.contains(id) {
+            if let connection = connections.removeValue(forKey: id) { await connection.disconnect() }
+        }
+        for endpoint in endpoints {
+            if let connection = connections[endpoint.id], connection.home != endpoint.home {
+                connections.removeValue(forKey: endpoint.id)
+                await connection.disconnect()
+            }
+            if connections[endpoint.id] == nil {
+                connections[endpoint.id] = ProjectSyncConnection(id: endpoint.id, home: endpoint.home, port: endpoint.port)
+            }
+        }
+        guard let main = connections["main"] else { return }
+        do {
+            let projects = try await main.snapshot()
+            let pinned = try await main.pinned(in: projects)
+            for endpoint in endpoints {
+                guard let connection = connections[endpoint.id], try await main.snapshot() == projects else { continue }
+                try await connection.refreshSidebar(snapshot: projects, removing: [])
+                try await connection.setPresentation(order: projects.map(\.id), pinned: pinned, snapshot: projects)
+            }
+            lastError = nil
         } catch { lastError = error.localizedDescription }
     }
 

@@ -27,9 +27,12 @@ function createGitToolbar({ findThread, prefetchRemote, remoteState, subscribeRe
 
   function isProjectChat(threadID) {
     if (threadID !== codexUIContracts.selectedThreadID()) return false;
+    // Older chats can belong to a project through folder grouping without an
+    // explicit project ID on either the server thread or its composer.
+    const thread = findThread(threadID);
+    if (thread?.projectID || (thread?.projectGroupPath && thread.sharesGroupRepository)) return true;
     if (codexUIContracts.activeComposerExplicitlyHasNoProject()) return false;
-    if (codexUIContracts.activeComposerProjectID()) return true;
-    return Boolean(findThread(threadID)?.projectID);
+    return Boolean(codexUIContracts.activeComposerProjectID());
   }
 
   function selectedProjectContext() {

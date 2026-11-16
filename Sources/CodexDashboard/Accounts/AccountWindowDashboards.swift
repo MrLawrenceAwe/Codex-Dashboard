@@ -81,14 +81,19 @@ final class AccountWindowDashboards {
             }
         }
         var endpoints: [(id: String, home: URL, port: @Sendable () -> Int)] = [
-            ("main", CodexConfiguration.codexDirectory, { CodexConfiguration.devToolsPort })
+            ("main", ChatHandoffService.isEnabled ? ChatHandoffService.root.appendingPathComponent("owner") : CodexConfiguration.codexDirectory, { CodexConfiguration.devToolsPort })
         ]
         for (id, entry) in entries where !entry.coordinator.isPerformingAction {
             let port = entry.context.port
             let replicaID = (entry.context.sharedChats ? "shared:" : "") + id.uuidString
-            endpoints.append((replicaID, entry.context.profile.codexHome, { port.port }))
+            let stateHome = entry.context.sharedChats ? ChatHandoffService.root.appendingPathComponent("owner") : entry.context.profile.codexHome
+            endpoints.append((replicaID, stateHome, { port.port }))
         }
-        if !entries.isEmpty { await projectSync?.synchronize(endpoints: endpoints) }
+        if ChatHandoffService.isEnabled {
+            await projectSync?.synchronizeSharedPresentation(endpoints: endpoints)
+        } else if !entries.isEmpty {
+            await projectSync?.synchronize(endpoints: endpoints)
+        }
         for entry in entries.values {
             writeStatus(profile: entry.context.profile,
                 state: entry.coordinator.statusPresentation.title,

@@ -539,7 +539,9 @@ const codexUIContracts = (() => {
       return [...document.querySelectorAll('[data-app-shell-header-slot="end"] [data-app-shell-header-slot-content]')]
         .find(element => isVisible(element) && !element.closest('[aria-hidden="true"], [inert]')) || null;
     }
-    const buttons = document.querySelectorAll('button[aria-label="Toggle summary"]');
+    const buttons = document.querySelectorAll(
+      'button[aria-label="Toggle summary"], button[aria-label="Toggle pinned summary"]',
+    );
     for (const button of buttons) {
       const header = button.closest(chatHeaderSelector);
       if (!header || !isVisible(button) || button.closest('[aria-hidden="true"], [inert]')) continue;

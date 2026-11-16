@@ -40,18 +40,18 @@ final class ProjectSyncConnection {
         } while cursor != nil
         // Account-bound remote projects are not part of the shared local list.
         let local = projects.filter { !$0.roots.isEmpty && $0.roots.allSatisfy { $0.path.hasPrefix("/") } }
-        let presentation = try ProjectListPresentation.read(home: home, projects: local)
+        let presentation = try await presentation(projects: local)
         let byID = Dictionary(uniqueKeysWithValues: local.map { ($0.id, $0) })
         let known = Set(presentation.order)
         return presentation.order.compactMap { byID[$0] } + local.filter { !known.contains($0.id) }
     }
 
-    func pinned(in snapshot: [CodexProject]) throws -> [String] {
-        try ProjectListPresentation.read(home: home, projects: snapshot).pinned
+    func pinned(in snapshot: [CodexProject]) async throws -> [String] {
+        try await presentation(projects: snapshot).pinned
     }
 
     func setPresentation(order: [String], pinned: [String], snapshot: [CodexProject], removing: Set<String> = []) async throws {
-        let current = try ProjectListPresentation.read(home: home, projects: snapshot)
+        let current = try await presentation(projects: snapshot)
         let rawOrder = current.merging(localIDs: order, into: current.rawOrder, removing: removing)
         let rawPinned = current.merging(localIDs: pinned, into: current.rawPinned, removing: removing)
         guard current.rawOrder != rawOrder || current.rawPinned != rawPinned else { return }
@@ -71,7 +71,7 @@ final class ProjectSyncConnection {
         """)
         let deadline = ContinuousClock.now + .seconds(3)
         repeat {
-            let saved = try ProjectListPresentation.read(home: home, projects: snapshot)
+            let saved = try await presentation(projects: snapshot)
             if saved.rawOrder == rawOrder && saved.rawPinned == rawPinned { return }
             try await Task.sleep(for: .milliseconds(50))
         } while ContinuousClock.now < deadline
@@ -79,21 +79,16 @@ final class ProjectSyncConnection {
     }
 
     func refreshSidebar(snapshot: [CodexProject], removing: Set<String>) async throws {
-        let presentation = try ProjectListPresentation.read(home: home, projects: snapshot)
-        let stateFile = home.appendingPathComponent(".codex-global-state.json")
-        let state = try JSONSerialization.jsonObject(with: Data(contentsOf: stateFile)) as? [String: Any]
-        let native = state?["local-projects"] as? [String: [String: Any]] ?? [:]
-        let removedIDs = removing.reduce(into: removing) {
+        let presentation = try await presentation(projects: snapshot)
+        let removedIDs = removing.reduce(into: removing.union(presentation.duplicateAliases)) {
             $0.formUnion(presentation.inactiveAliasesByServer[$1] ?? [])
         }
         let projects: [[String: Any]] = snapshot.compactMap { project in
             let localID = presentation.legacyByServer[project.id] ?? project.id
             let folders = project.roots.map(\.path)
-            if native[localID]?["name"] as? String == project.name,
-               native[localID]?["rootPaths"] as? [String] == folders { return nil }
             return ["id": localID, "name": project.name, "rootPaths": folders]
         }
-        let deletions = removedIDs.filter { native[$0] != nil }
+        let deletions = removedIDs
         guard !projects.isEmpty || !deletions.isEmpty else { return }
         let data = try JSONSerialization.data(withJSONObject: ["projects": projects, "removed": Array(deletions)])
         try await useNativeProjectServices(input: data, body: """
@@ -101,21 +96,53 @@ final class ProjectSyncConnection {
               typeof services.projectCatalog?.readLocalProjects !== 'function') return false;
           const current = await services.projectCatalog.readLocalProjects() ?? {};
           const next = { ...current };
-          for (const id of request.removed) delete next[id];
+          let changed = false;
+          for (const id of request.removed) {
+            if (next[id] === undefined) continue;
+            delete next[id];
+            changed = true;
+          }
           for (const project of request.projects) {
             const existing = current[project.id];
+            if (existing?.name === project.name &&
+                JSON.stringify(existing.rootPaths) === JSON.stringify(project.rootPaths)) continue;
+            changed = true;
             next[project.id] = {
               ...existing, ...project, createdAt: existing?.createdAt ?? Date.now(), updatedAt: Date.now()
             };
           }
+          if (!changed) return true;
           const result = await services.applicationState.write('local-projects', next);
           return result?.success === true;
         """)
     }
 
+    private func presentation(projects: [CodexProject]) async throws -> ProjectListPresentation {
+        guard let target = await client.mainRendererTargets().first else { throw DashboardError.rendererTimedOut }
+        let input = try JSONSerialization.data(withJSONObject: ["project-order", "pinned-project-ids", "app-server-project-id-by-legacy-project-id-by-host"])
+        let script = Self.nativeProjectServicesExpression(input: input, body: """
+          const values = await Promise.all(request.map(key => services.applicationState.read(key)));
+          const state = Object.fromEntries(request.map((key, i) => [key, values[i]?.value]));
+          state['local-projects'] = await services.projectCatalog.readLocalProjects() ?? {};
+          return JSON.stringify(state);
+        """)
+        guard let raw = try await client.evaluateString(script, in: target, timeout: .seconds(10)),
+              let state = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else {
+            throw DashboardError.synchronizationFailed("Codex’s live project presentation is unavailable.")
+        }
+        return ProjectListPresentation.read(state: state, projects: projects)
+    }
+
     private func useNativeProjectServices(input: Data, body: String) async throws {
         guard let target = await client.mainRendererTargets().first else { throw DashboardError.rendererTimedOut }
-        let accepted = try await client.evaluateBoolean("""
+        let script = Self.nativeProjectServicesExpression(input: input, body: body)
+        guard try await client.evaluateBoolean(script, in: target) else {
+            throw DashboardError.synchronizationFailed("Codex’s native project controls are unavailable.")
+        }
+    }
+
+    private static func nativeProjectServicesExpression(input: Data, body: String) -> String {
+        """
         (async () => {
           const request = \(String(decoding: input, as: UTF8.self));
           // Use the already loaded renderer runtime. Codex hashes the entry
@@ -133,10 +160,7 @@ final class ProjectSyncConnection {
           if (!services) return false;
           \(body)
         })()
-        """, in: target)
-        guard accepted else {
-            throw DashboardError.synchronizationFailed("Codex’s native project controls are unavailable.")
-        }
+        """
     }
 
     func create(sharedID: String, value: SharedProjectCatalog.Value) async throws -> String {
