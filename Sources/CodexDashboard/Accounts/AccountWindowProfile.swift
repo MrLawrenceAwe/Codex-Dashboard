@@ -25,7 +25,6 @@ struct AccountWindowProfile {
     var arguments: [String] { ["--user-data-dir=\(desktopData.path)"] }
     var environment: [String: String] {
         ["CODEX_HOME": codexHome.path, "CODEX_ELECTRON_USER_DATA_PATH": desktopData.path]
-            .merging(ChatHandoffService.environment(windowID: accountID.uuidString.lowercased())) { _, shared in shared }
     }
 
     var isInitialized: Bool {

@@ -1,5 +1,11 @@
 # Shared chat verification — 16 November 2026
 
+Historical verification of the retired implementation. On 17 November 2026, its
+production activation controls and login-session routing were removed after a
+sleep/wake startup incident. These successful short-cycle tests did not verify
+failure isolation. See [architecture](architecture.md#shared-chat-isolation-and-recovery)
+for the current contract.
+
 The live tests used saved Lawrence and Oluwatoyin credentials in private,
 disposable homes. Existing chat databases and rollouts were not modified.
 The model was selected from the live catalog (`gpt-6-luna`).

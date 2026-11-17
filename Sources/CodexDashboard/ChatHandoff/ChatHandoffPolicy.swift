@@ -32,27 +32,16 @@ struct ChatHandoffPolicy {
 }
 
 enum ChatHandoffError: LocalizedError {
-    case busy, disconnected, readTimedOut, identity, unsafeOwner, unsupported, independentHistory, projectAliases
+    case busy, disconnected, readTimedOut, identity, unsafeOwner, nativeHistory, unsupported
     var errorDescription: String? {
         switch self {
         case .busy: "Another account window is using the shared chat server. Wait for its turn to finish, then send again."
         case .disconnected: "The shared chat server disconnected. Check the chat history before sending again; your message was not retried."
         case .readTimedOut: "The shared chat request timed out."
         case .identity: "The selected window’s account could not be verified. No turn was started."
-        case .unsafeOwner: "Shared chats cannot start while an independent Codex window still owns this history. Restart all Codex windows through Dashboard first."
-        case .projectAliases: "Some project registrations could not be matched to the original project list. Shared Chats activation stopped."
-        case .independentHistory: "A separate account window has its own chats. Shared chats were not enabled; no history was merged or removed."
+        case .unsafeOwner: "An existing shared writer may still be running. Finish its turns and stop it before retiring the connection."
+        case .nativeHistory: "Shared Chats cannot own normal ChatGPT history. Use isolated managed storage."
         case .unsupported: "Change saved accounts through Dashboard. Native sign-in changes are disabled on the shared chat connection."
         }
-    }
-}
-
-/// Require a stable idle boundary; a busy or unavailable window resets the gate.
-struct ChatHandoffActivationGate {
-    private var idleObservations = 0
-    mutating func reset() { idleObservations = 0 }
-    mutating func observeIdle() -> Bool {
-        idleObservations += 1
-        return idleObservations >= 2
     }
 }

@@ -20,9 +20,6 @@ final class CodexProcessControllerLiveTests: XCTestCase {
         let original = try XCTUnwrap(applications.first)
         let arguments = try XCTUnwrap(CodexConfiguration.processArguments(for: original.processIdentifier))
         let port = try XCTUnwrap(CodexConfiguration.devToolsPort(inProcessArguments: arguments))
-        let ready = ChatHandoffService.root.appendingPathComponent("ready.json")
-        let endpoints = try JSONDecoder().decode([ChatHandoffServer.Endpoint].self, from: Data(contentsOf: ready))
-        let endpoint = try XCTUnwrap(endpoints.first { $0.id.lowercased() == scope.lowercased() })
         var reopened: NSRunningApplication?
         var preparedAfterQuit = false
         let controller = CodexProcessController(
@@ -38,9 +35,6 @@ final class CodexProcessControllerLiveTests: XCTestCase {
                 configuration.environment = [
                     "CODEX_HOME": profile.codexHome.path,
                     "CODEX_ELECTRON_USER_DATA_PATH": profile.desktopData.path,
-                    "CODEX_APP_SERVER_WS_URL": endpoint.url,
-                    "CODEX_APP_SERVER_FORCE_CLI": "0",
-                    "CODEX_APP_SERVER_USE_LOCAL_DAEMON": "0",
                 ]
                 return configuration
             }

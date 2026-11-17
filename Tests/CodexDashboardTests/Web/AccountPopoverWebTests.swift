@@ -35,7 +35,7 @@ final class AccountPopoverWebTests: SerializedDashboardWebTestCase {
         XCTAssertEqual(values[4] as? String, "other")
     }
 
-    func testSharedChatsMainWindowCanSwitchSavedAccountsWithAnUpdatedServer() async throws {
+    func testMainWindowOffersIndependentAccountSwitchAndSignIn() async throws {
         let webView = try await DashboardWebTestHarness.mountedWebView(html: """
         <!doctype html><html><body><main>Conversation</main>
           <div role="menu"><button>Settings</button><button>Log out</button></div>
@@ -47,8 +47,7 @@ final class AccountPopoverWebTests: SerializedDashboardWebTestCase {
             {id: 'current', name: 'Current', isActive: true, usageRows: [], isRefreshing: false},
             {id: 'other', name: 'Other', isActive: false, usageRows: [], isRefreshing: false},
             {id: 'expired', name: 'Expired', isActive: false, usageRows: [], requiresSignIn: true}
-          ], activeAccountID: 'current', isBusy: false, accountWindow: false, sharedChats: true,
-            sharedAccountSwitchAvailable: true});
+          ], activeAccountID: 'current', isBusy: false, accountWindow: false});
           document.querySelector('[data-codex-accounts-trigger]').click();
           const panel = document.getElementById('codex-accounts-panel');
           const buttons = panel.querySelectorAll('[data-account-action="switchAccount"]');
@@ -62,7 +61,7 @@ final class AccountPopoverWebTests: SerializedDashboardWebTestCase {
         """) as? [Any]
         let values = try XCTUnwrap(result)
         XCTAssertEqual(values[0] as? Int, 1)
-        XCTAssertEqual(values[1] as? Bool, false)
+        XCTAssertEqual(values[1] as? Bool, true)
         XCTAssertEqual(values[2] as? Int, 2)
         XCTAssertEqual(values[3] as? String, "switchAccount")
         XCTAssertEqual(values[4] as? String, "other")

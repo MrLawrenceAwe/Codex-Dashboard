@@ -3,7 +3,7 @@ const accountPopover = (() => {
   const panelID = 'codex-accounts-panel';
   const requestPrefix = [...crypto.getRandomValues(new Uint32Array(4))].join('-');
   let requestSequence = 0;
-  let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false, accountWindow: false, sharedChats: false };
+  let snapshot = { accounts: [], activeAccountID: null, statusMessage: null, isBusy: false, accountWindow: false };
   let snapshotFingerprint = '';
   let observer;
   let outsidePointerHandler;
@@ -72,8 +72,7 @@ const accountPopover = (() => {
     const disabled = snapshot.isBusy || pendingAction || account.isRefreshing ? ' disabled' : '';
     const initial = domUtils.escapeHTML(account.name.trim().slice(0, 1).toUpperCase() || '?');
     const usage = account.usageRows.map(usageMarkup).join('');
-    const canSwitch = !account.isActive && !snapshot.accountWindow
-      && (!snapshot.sharedChats || (snapshot.sharedAccountSwitchAvailable && !account.requiresSignIn));
+    const canSwitch = !account.isActive && !snapshot.accountWindow;
     return `<section class="codex-accounts-card" data-account-id="${account.id}">
       <div class="codex-accounts-heading">
         <span class="codex-accounts-avatar">${initial}</span>
@@ -85,7 +84,8 @@ const accountPopover = (() => {
       ${account.requiresSignIn && !account.isActive && !snapshot.accountWindow ? '<div class="codex-accounts-usage-note">Codex will restart signed out. Sign in to this account, then choose Save current account.</div>' : ''}
       <div class="codex-accounts-actions">
         ${canSwitch ? `<button class="is-primary" data-account-action="${account.requiresSignIn ? 'restartForSignIn' : 'switchAccount'}"${disabled}>${account.requiresSignIn ? 'Restart to sign in…' : 'Switch'}</button>` : ''}
-        ${(account.requiresSignIn && !snapshot.accountWindow) || (account.isActive && snapshot.accountWindow) ? '' : `<button data-account-action="openAccountWindow"${disabled}>Open separate window</button>`}
+        ${(account.requiresSignIn && !snapshot.accountWindow) || (account.isActive && snapshot.accountWindow) ? '' : `<button data-account-action="openAccountWindow"${disabled}>${snapshot.managedWindow ? 'Open shared chat window' : 'Open separate window'}</button>`}
+        ${!snapshot.managedWindow && !account.requiresSignIn ? `<button data-account-action="openManagedWindow"${disabled}>Open shared chat window</button>` : ''}
         <button data-account-action="refreshUsage"${disabled}>${account.isRefreshing ? 'Refreshing usage…' : 'Refresh usage'}</button>
         <button class="is-danger" data-account-action="removeSavedAccount"${disabled}>Remove saved account</button>
       </div>
@@ -119,9 +119,9 @@ const accountPopover = (() => {
         : '<div class="codex-accounts-empty">No saved accounts yet.</div>'}</div>
       ${progress || snapshot.statusMessage ? `<div class="codex-accounts-status">${domUtils.escapeHTML(progress || snapshot.statusMessage)}</div>` : ''}
       <footer>
+        ${snapshot.managedWindow ? '<div class="codex-accounts-usage-note">Shared turns run one at a time. This window uses its own account.</div>' : ''}
         <button data-account-global="saveCurrentAccount"${disabled}><span>✓</span>Save current account</button>
-        ${snapshot.sharedChats ? '<div class="codex-accounts-usage-note">Disable Shared Chats from the Dashboard menu to add another account.</div>' : snapshot.accountWindow ? '<div class="codex-accounts-usage-note">Add saved accounts from Accounts in the main window.</div>' : `<button data-account-global="restartForSignIn"${disabled}><span>＋</span>Add another account</button>`}
-        ${snapshot.sharedChats && !snapshot.accountWindow && !snapshot.sharedAccountSwitchAvailable ? '<div class="codex-accounts-usage-note">Choose Update Shared Chats in the Dashboard menu to enable Switch.</div>' : ''}
+        ${snapshot.accountWindow ? '<div class="codex-accounts-usage-note">Add saved accounts from Accounts in the main window.</div>' : `<button data-account-global="restartForSignIn"${disabled}><span>＋</span>Add another account</button>`}
         ${snapshot.accounts.length > 1 ? `<button data-account-global="refreshInactiveUsage"${disabled}><span>↻</span>Refresh other accounts’ usage</button>` : ''}
       </footer>`;
     panel.querySelector('[data-account-close]')?.addEventListener('click', closePanel);

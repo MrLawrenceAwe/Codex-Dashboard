@@ -4,7 +4,7 @@ import AppKit
 struct AccountWindowPresenter {
     /// Target the renderer as well as the PID. App-wide activation alone can
     /// select a different window when several instances share a bundle ID.
-    func present(_ application: NSRunningApplication, profile: AccountWindowProfile) async throws {
+    func present(_ application: NSRunningApplication, profile: AccountWindowProfile, environment: [String: String]) async throws {
         guard let arguments = CodexConfiguration.processArguments(for: application.processIdentifier),
               profile.matches(processArguments: arguments),
               let port = CodexConfiguration.devToolsPort(inProcessArguments: arguments) else {
@@ -57,7 +57,7 @@ struct AccountWindowPresenter {
                     let configuration = NSWorkspace.OpenConfiguration()
                     configuration.createsNewApplicationInstance = true
                     configuration.arguments = profile.arguments + CodexConfiguration.debugArguments(port: port)
-                    configuration.environment = profile.environment
+                    configuration.environment = environment
                     configuration.activates = true
                     _ = try await NSWorkspace.shared.openApplication(at: CodexConfiguration.codexApplicationURL,
                                                                      configuration: configuration)

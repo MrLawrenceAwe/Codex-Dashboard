@@ -2,16 +2,6 @@ import XCTest
 @testable import CodexDashboard
 
 final class ChatHandoffPolicyTests: XCTestCase {
-    func testPendingActivationWaitsForTwoIdleSnapshotsAndResetsOnActivity() {
-        var gate = ChatHandoffActivationGate()
-        XCTAssertFalse(gate.observeIdle())
-        gate.reset()
-        XCTAssertFalse(gate.observeIdle())
-        XCTAssertTrue(gate.observeIdle())
-        gate.reset()
-        XCTAssertFalse(gate.observeIdle())
-    }
-
     func testSettingsReadsRemainAvailableButMutationsAreNotReads() {
         for method in ["configRequirements/read", "permissionProfile/list", "thread/attachment/list", "fs/readFile", "plugin/installed"] {
             XCTAssertTrue(ChatHandoffPolicy.isReadOnly(method))

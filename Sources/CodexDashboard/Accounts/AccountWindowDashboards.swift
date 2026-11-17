@@ -4,21 +4,26 @@ import AppKit
 /// coordinators independent also scopes reviews, account actions, and file watches.
 @MainActor
 final class AccountWindowDashboards {
+    struct WindowID: Hashable {
+        let accountID: UUID
+        let managed: Bool
+    }
     struct Entry {
         let context: AccountWindowRuntimeContext
         let coordinator: AppCoordinator
     }
-    private(set) var entries: [UUID: Entry] = [:]
+    private(set) var entries: [WindowID: Entry] = [:]
     private var projectSync: SharedProjectSynchronizer?
     private var projectSyncError: String?
-    private weak var mainCoordinator: AppCoordinator?
-    private var activationGate = ChatHandoffActivationGate()
+    private var managedPresentation: SharedProjectSynchronizer?
     private var monitorTask: Task<Void, Never>?
 
-    func start(main: AppCoordinator) {
-        mainCoordinator = main
+    func start() {
         guard monitorTask == nil else { return }
-        do { projectSync = try SharedProjectSynchronizer() }
+        do {
+            projectSync = try SharedProjectSynchronizer()
+            managedPresentation = try SharedProjectSynchronizer(file: ManagedChatWorkspace().root.appendingPathComponent("presentation.json"))
+        }
         catch { projectSyncError = error.localizedDescription }
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -38,19 +43,27 @@ final class AccountWindowDashboards {
         entries.removeAll()
         if let sync = projectSync { Task { await sync.disconnect() } }
         projectSync = nil
+        if let sync = managedPresentation { Task { await sync.disconnect() } }
+        managedPresentation = nil
     }
 
     private func reconcile() async {
-        let profiles = CodexConfiguration.dashboardSupportDirectory().appendingPathComponent("account-windows")
-        let directories = (try? FileManager.default.contentsOfDirectory(at: profiles,
-            includingPropertiesForKeys: nil)) ?? []
+        let workspace = ManagedChatWorkspace()
         let applications = NSRunningApplication.runningApplications(withBundleIdentifier: CodexConfiguration.bundleIdentifier)
-        var running: [UUID: String] = [:]
-        for directory in directories {
-            guard let id = UUID(uuidString: directory.lastPathComponent) else { continue }
-            let profile = AccountWindowProfile(accountID: id)
-            if let arguments = applications.compactMap({ CodexConfiguration.processArguments(for: $0.processIdentifier) })
-                .first(where: { profile.matches(processArguments: $0) }) { running[id] = arguments }
+        let arguments = applications.compactMap { CodexConfiguration.processArguments(for: $0.processIdentifier) }
+        var running: [WindowID: (profile: AccountWindowProfile, arguments: String)] = [:]
+        for (directory, managed) in [
+            (CodexConfiguration.dashboardSupportDirectory().appendingPathComponent("account-windows"), false),
+            (workspace.windows, true),
+        ] {
+            let profiles = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+            for path in profiles {
+                guard let id = UUID(uuidString: path.lastPathComponent) else { continue }
+                let profile = AccountWindowProfile(accountID: id, profilesDirectory: directory)
+                if let argument = arguments.first(where: { profile.matches(processArguments: $0) }) {
+                    running[WindowID(accountID: id, managed: managed)] = (profile, argument)
+                }
+            }
         }
         for id in Array(entries.keys) where running[id] == nil {
             // A scoped restart briefly has no process; keep its coordinator and
@@ -60,19 +73,19 @@ final class AccountWindowDashboards {
             entry.coordinator.stopMonitoring()
             await entry.coordinator.disconnectRuntime()
         }
-        for (id, arguments) in running {
+        for (id, window) in running {
             guard let entry = entries[id], !entry.coordinator.isPerformingAction,
-                  !entry.context.matches(arguments: arguments, sharedChats: ChatHandoffService.isEnabled) else { continue }
+                  !entry.context.matches(arguments: window.arguments) else { continue }
             entries.removeValue(forKey: id)
             entry.coordinator.stopMonitoring()
             await entry.coordinator.disconnectRuntime()
         }
-        for (id, arguments) in running where entries[id] == nil {
+        for (id, window) in running where entries[id] == nil {
             guard !Task.isCancelled else { return }
-            let profile = AccountWindowProfile(accountID: id)
+            let profile = window.profile
             guard !Task.isCancelled else { return }
             do {
-                let context = AccountWindowRuntimeContext(profile: profile, arguments: arguments)
+                let context = AccountWindowRuntimeContext(profile: profile, arguments: window.arguments, managedWorkspace: id.managed ? workspace : nil)
                 let coordinator = try context.makeCoordinator()
                 entries[id] = Entry(context: context, coordinator: coordinator)
                 coordinator.startMonitoring()
@@ -81,62 +94,29 @@ final class AccountWindowDashboards {
             }
         }
         var endpoints: [(id: String, home: URL, port: @Sendable () -> Int)] = [
-            ("main", ChatHandoffService.isEnabled ? ChatHandoffService.root.appendingPathComponent("owner") : CodexConfiguration.codexDirectory, { CodexConfiguration.devToolsPort })
+            ("main", CodexConfiguration.codexDirectory, { CodexConfiguration.devToolsPort })
         ]
-        for (id, entry) in entries where !entry.coordinator.isPerformingAction {
+        for (id, entry) in entries where !id.managed && !entry.coordinator.isPerformingAction {
             let port = entry.context.port
-            let replicaID = (entry.context.sharedChats ? "shared:" : "") + id.uuidString
-            let stateHome = entry.context.sharedChats ? ChatHandoffService.root.appendingPathComponent("owner") : entry.context.profile.codexHome
+            let replicaID = id.accountID.uuidString
+            let stateHome = entry.context.profile.codexHome
             endpoints.append((replicaID, stateHome, { port.port }))
         }
-        if ChatHandoffService.isEnabled {
-            await projectSync?.synchronizeSharedPresentation(endpoints: endpoints)
-        } else if !entries.isEmpty {
-            await projectSync?.synchronize(endpoints: endpoints)
+        if endpoints.count > 1 { await projectSync?.synchronize(endpoints: endpoints) }
+        let managed = entries.filter { $0.key.managed && !$0.value.coordinator.isPerformingAction }
+            .sorted { $0.key.accountID.uuidString < $1.key.accountID.uuidString }
+        if !managed.isEmpty {
+            let shared = managed.enumerated().map { index, window in
+                let port = window.value.context.port
+                return (id: index == 0 ? "main" : "shared:" + window.key.accountID.uuidString,
+                        home: workspace.server.appendingPathComponent("owner"), port: { @Sendable in port.port })
+            }
+            await managedPresentation?.synchronizeSharedPresentation(endpoints: shared)
         }
         for entry in entries.values {
             writeStatus(profile: entry.context.profile,
                 state: entry.coordinator.statusPresentation.title,
                 detail: entry.coordinator.connectionError ?? entry.coordinator.connectionNotice ?? projectSync?.lastError ?? projectSyncError)
-        }
-        _ = await activateSharedChatsWhenIdle(expectedAccounts: Set(running.keys))
-    }
-
-    private func activateSharedChatsWhenIdle(expectedAccounts: Set<UUID>) async -> Bool {
-        guard ChatHandoffService.activationRequested, let main = mainCoordinator else {
-            activationGate.reset()
-            return false
-        }
-        guard expectedAccounts.allSatisfy({ entries[$0] != nil }) else {
-            activationGate.reset()
-            return false
-        }
-        let coordinators = [main] + entries.values.map(\.coordinator)
-        guard coordinators.allSatisfy({ !$0.isPerformingAction }) else {
-            activationGate.reset()
-            return false
-        }
-        do {
-            for coordinator in coordinators { _ = try await coordinator.refreshThreadState() }
-            guard coordinators.allSatisfy({ !$0.threads.contains(where: { $0.runState == .running }) })
-                    || ChatHandoffService.stoppedWriterNeedsRecovery else {
-                activationGate.reset()
-                main.accounts.setStatusMessage("Shared Chats is waiting for running turns to finish. Your history remains in the main window.")
-                return false
-            }
-            guard activationGate.observeIdle() else { return false }
-            let outcome = await ChatHandoffService.enable(main: main, windows: self)
-            if case .waitingForIdle = outcome {
-                activationGate.reset()
-                return false
-            }
-            try ChatHandoffService.consumeActivationRequest()
-            activationGate.reset()
-            return true
-        } catch {
-            activationGate.reset()
-            main.accounts.setStatusMessage("Shared Chats is waiting because active chats could not be checked. " + error.localizedDescription)
-            return false
         }
     }
 

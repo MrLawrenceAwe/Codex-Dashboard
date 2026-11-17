@@ -102,39 +102,17 @@ Dashboard does not merge accounts or rotate them automatically. Removing a saved
 active account leaves Codex signed in. Save it again explicitly to restore it to
 the list. Do not commit, export, or manually copy `~/.codex/auth.json`.
 
-### Shared chats across account windows
+### Shared chat recovery
 
-Use the menu-bar app’s **Enable Shared Chats (Restarts Codex Windows)** to let saved
-account windows continue the same existing chats. Dashboard queues activation
-until all running windows have been idle for two checks, then closes the
-independent instances and reconnects them to one
-history writer. No chat database or rollout is copied or merged. A separate
-profile containing its own chats blocks activation rather than hiding or merging
-that history.
+The old shared-chat mode has been retired because a broker failure could prevent
+normal ChatGPT from opening. Its enable, reconnect, and update controls have been
+removed. Normal launches use ChatGPT's native app-server.
 
-Each window keeps its own sign-in and allowance. When it starts a turn, Dashboard
-waits for the previous writer process to exit, verifies the selected account,
-resumes the original chat, and sends the turn once. Turns are serialized across
-all windows. An overlapping send is rejected; send it again after the running
-turn finishes. Both windows receive the live chat updates. A failed or timed-out
-request is never automatically replayed.
-
-Account information and usage are read with that window’s credentials. In the
-main window, choose **Accounts → Switch** under a saved account. Dashboard
-reopens the main window using that account and reconnects it to the same shared
-history. The separate windows keep their own sign-ins. If Dashboard offers
-**Update Shared Chats (Restarts Codex Windows)** in its menu, choose it once to
-enable **Switch**. To add a new account, first use
-**Disable Shared Chats (Restarts Codex Windows)**. Disabling retains all shared
-history in the main window and restores independent secondary histories.
-
-The broker continues running when Dashboard closes. Finder/Dock launches use the
-same connection through a session-local `CODEX_APP_SERVER_WS_URL` launchd setting;
-disabling restores the previous setting. After logout, a reboot, or a writer
-failure, use **Reconnect Shared Chats** to reconnect all windows. Dashboard never starts a replacement
-writer automatically beside an unmanaged desktop instance. A missing shared
-endpoint fails closed; use the menu to reconnect rather than launching an
-independent CLI writer against the shared history.
+On upgrade, Dashboard archives the old routing metadata and removes only its own
+login-session redirect. An active old writer blocks retirement until it has
+stopped, so a second writer cannot open the same history. Existing chats and
+credentials remain in their original locations. Shared chats are unavailable in
+the Dashboard UI while isolated managed operation is being developed.
 
 ### Separate account windows
 
@@ -149,8 +127,7 @@ on the first launch.
 
 Each account window has a persistent Codex home and desktop profile under
 `~/Library/Application Support/Codex Dashboard/account-windows/<saved-account-id>/`.
-With Shared Chats disabled, its chat history and settings are independent.
-Its sign-in stays separate in both modes.
+Its chat history, settings, and sign-in are independent.
 The local project list is shared automatically across the main window and running
 account windows. Additions, names, folder roots, project metadata, pinned projects, ordering, and
 removals propagate in both directions, normally within a few seconds. Closed
@@ -158,7 +135,7 @@ windows catch up when reopened. Existing registrations are adopted on the first
 sync, including distinct project groups that point to the same folder.
 
 Project removal unregisters the group in each window; it does not delete its files
-or chat contents. Without Shared Chats, chats and thread assignments stay
+or chat contents. Chats and thread assignments stay
 separate. Sign-ins, remote connections, and account-specific global state stay separate. For simultaneous edits, changed fields
 merge; if the same field changes in multiple windows, the last observed edit wins.
 Removal wins over a stale offline copy.
@@ -168,8 +145,7 @@ its session expires. Credentials remain local, with private directory and file p
 
 Dashboard connects to each running account window automatically. Chat overview,
 Git controls, prompts, to-dos, review loops, account controls, and usage tracking
-operate against that window’s state; with Shared Chats enabled, chat controls
-operate on the shared catalog. Prompts are seeded from the main library
+operate against that window’s own state. Prompts are seeded from the main library
 once, then saved independently; to-dos and review loops also remain independent.
 Saved-account registrations are shared, while the active account comes from each
 window's sign-in. Open another account from its **Open separate window** button;

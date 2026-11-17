@@ -7,8 +7,7 @@ struct AccountPopoverSnapshot: Codable, Equatable, Sendable {
     let isBusy: Bool
     let usageBlockage: AccountUsageBlockage?
     var accountWindow = false
-    var sharedChats = false
-    var sharedAccountSwitchAvailable = false
+    var managedWindow = false
 }
 
 struct AccountUsageBlockage: Codable, Equatable, Sendable {
@@ -42,6 +41,7 @@ struct AccountPopoverAction: Codable, Equatable, Sendable {
         case refreshInactiveUsage
         case saveCurrentAccount
         case openAccountWindow
+        case openManagedWindow
         case switchAccount
         case restartForSignIn
         case removeSavedAccount

@@ -290,40 +290,29 @@ details propagate to the menu, notification, copied diagnostics, and Diagnostics
 window. This integration uses private contracts that may require maintenance after
 Codex updates.
 
-### Shared chat handoff
+### Shared chat isolation and recovery
 
-`ChatHandoffServer` runs as a separate Dashboard executable mode, using one
-app-server child for the original catalog and rollout paths. Native windows
-connect through authenticated loopback WebSocket endpoints, one per saved
-account. Their own homes retain the credentials and presentation preferences.
-The writer has a private credential home and uses `CODEX_SQLITE_HOME` plus the
-original session directories. No history migration or copy is involved.
+Normal ChatGPT and separate account windows use native app-server launches. The
+Dashboard has no shared-chat activation UI and never sets login-session routing.
+Each secondary coordinator reads its own profile database.
 
-`ChatHandoffPolicy` reserves a send before any asynchronous account transition,
-tracks all parent and child turn notifications, and rejects overlapping starts
-and cross-window steering. A transition waits for the previous child to exit,
-loads and checks the next credential, initializes the replacement server, and
-resumes loaded chats. Request IDs and approval IDs have separate routing tables;
-approvals return only through the initiating client. Notifications fan out to
-the windows; private writer account-change events are consumed, while quota
-and auth-recovery notifications are restricted to the selected account.
-Account reads use isolated credential homes rather than the writer’s identity.
+`LegacySharedChatRecovery` runs before the Dashboard starts monitoring windows.
+It checks that the old broker and writer have stopped, archives their routing
+files and project merge ledger, and unsets only a matching Dashboard-owned
+launchctl redirect. Credentials, databases, rollouts, and existing native
+presentation remain in place. Failed cleanup retains the source metadata for a
+safe retry. Unrelated app-server settings are preserved.
 
-`ChatHandoffService` checks for idle windows and unmerged secondary chat stores,
-then terminates native instances and verifies their descendants exited before
-starting the broker. A catalog lock excludes another Dashboard broker. A
-launchd environment override routes normal GUI launches to the broker for the
-current login; a disabled or missing endpoint never falls back to a native
-writer. The previous override is restored when shared chats are disabled.
-Native login mutations are rejected while shared mode is enabled.
+`ChatHandoffServer` remains an experimental executable mode for isolated managed
+storage. It rejects native ChatGPT history, including symlinked history paths.
+Backend initialization precedes publication of ready endpoints. Its receive loop
+continues reading while requests await replies, and request deadlines use a
+suspending clock so sleep alone cannot exhaust a pending operation's timeout.
+Lifecycle, exit, and timeout diagnostics are bounded and private. Raw stderr is
+classified by category without storing its content, request parameters, or tokens.
 
-The broker never retries model turns. An uncertain response fails closed so a
-user can inspect history before sending again. A normal termination request is
-ignored while a turn or account transition is in progress.
-
-Project sync uses distinct presentation replicas for independent and shared
-backends. Shared clients adopt the main server's project IDs before observation,
-including newly created projects without markers. Backend changes retire only
-obsolete sidebar cache entries, so the independent store's IDs are not mistaken
-for project deletions. Window coordinators are rebuilt when either the debug
-port or the backend mode changes.
+`ChatHandoffPolicy` still excludes overlapping turns and writer handoffs. An
+uncertain write is never replayed automatically. A writer failure invalidates
+readiness; a replacement must obtain exclusive ownership before opening history.
+Account usage probes run in temporary credential-only homes rather than opening
+normal ChatGPT history.

@@ -16,10 +16,18 @@ This is an independent personal project and is not affiliated with OpenAI.
 
 - **Chats:** activity, unread status, completion and question tracking.
 - **Projects and Git:** a shared local project list across account windows, sidebar colours, change indicators, and native Commit, Commit & push, and Push shortcuts.
-- **Accounts:** saved-account switching, separate account windows with optional shared-chat handoff, allowance tracking, reset countdowns, and macOS or optional ntfy phone alerts.
+- **Accounts:** saved-account switching, independent separate account windows, allowance tracking, reset countdowns, and macOS or optional ntfy phone alerts.
+
 - **Review loops:** queued reviews and automatic fixes for repositories or ordinary folders, with model choices, verification, and optional Git commits and pushing.
 - **Dictation:** dictate into sent-message edits using your existing sign-in.
 - **Prompts and to-dos:** reusable prompts and persistent tasks with tags, projects, images, and model settings.
+
+Normal ChatGPT launches use their native app-server. The old shared-chat mode and
+its login-session routing have been retired after a startup failure. On upgrade,
+Dashboard archives its old routing metadata after checking that the old writer
+has stopped. Chats and credentials stay in their original locations. Separate
+account windows have independent histories. The experimental shared-chat broker
+accepts only isolated managed storage and is unavailable from the Dashboard UI.
 
 See [Using Codex Dashboard](docs/usage.md) for feature behaviour and controls.
 

@@ -12,7 +12,7 @@ final class AccountWindowPresenterTests: XCTestCase {
         let profile = AccountWindowProfile(accountID: id)
         let application = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: CodexConfiguration.bundleIdentifier)
             .first { CodexConfiguration.processArguments(for: $0.processIdentifier).map { profile.matches(processArguments: $0) } == true })
-        try await AccountWindowPresenter().present(application, profile: profile)
+        try await AccountWindowPresenter().present(application, profile: profile, environment: profile.environment)
         XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, application.processIdentifier)
     }
 }

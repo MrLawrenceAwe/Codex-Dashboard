@@ -41,6 +41,7 @@ final class AppCoordinator: ObservableObject {
     let keyboardActivityDetector: any KeyboardActivityDetecting
     let promptLibraryStore: PromptLibraryFileStore
     let accountWindows = AccountWindowLauncher()
+    let accountWindowOpener: (@MainActor (UUID, AccountCoordinator) async throws -> Void)?
     let accounts: AccountCoordinator
     let notificationUsageRefresher: NotificationUsageRefresher
     let compatibilityIssueNotifier: any CompatibilityIssueNotifying
@@ -84,7 +85,8 @@ final class AppCoordinator: ObservableObject {
         codexHome: URL = CodexConfiguration.codexDirectory,
         pollInactiveAccountUsage: Bool = true,
         isAccountWindow: Bool = false,
-        sharedChatsEnabled: @escaping () -> Bool = { ChatHandoffService.isEnabled },
+        managedWindow: Bool = false,
+        accountWindowOpener: (@MainActor (UUID, AccountCoordinator) async throws -> Void)? = nil,
         installedCodexVersion: @escaping () -> String? = { CodexConfiguration.installedVersion },
         codexForegrounder: any CodexForegrounding = CodexApplicationForegroundController(),
         keyboardActivityDetector: any KeyboardActivityDetecting = SystemKeyboardActivityDetector(),
@@ -104,6 +106,7 @@ final class AppCoordinator: ObservableObject {
             projectGitStatusProvider: projectGitStatusProvider,
             unreadThreadIDProvider: unreadThreadIDProvider
         )
+        self.accountWindowOpener = accountWindowOpener
         self.userDefaults = userDefaults
         self.codexForegrounder = codexForegrounder
         self.keyboardActivityDetector = keyboardActivityDetector
@@ -115,8 +118,7 @@ final class AppCoordinator: ObservableObject {
             manager: accountManager,
             usageProvider: accountUsageProvider,
             usageCacheStore: accountUsageCacheStore,
-            isAccountWindow: isAccountWindow,
-            sharedChatsEnabled: sharedChatsEnabled
+            isAccountWindow: isAccountWindow, managedWindow: managedWindow
         )
         notificationUsageRefresher = NotificationUsageRefresher(accounts: accounts)
         automaticallyOpenCompletedChats = userDefaults.object(forKey: Self.automaticallyOpenCompletedChatsKey) as? Bool ?? true

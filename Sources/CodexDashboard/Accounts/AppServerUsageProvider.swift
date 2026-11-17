@@ -46,21 +46,17 @@ actor AppServerUsageProvider: AccountUsageProviding {
     private let executableURL: URL
     private let codexHomeURL: URL
     private let timeout: Duration
-    private var session: CodexAppServerSession?
     private var activeUsageTask: Task<CodexAccountUsage, Error>?
     private var activeUsageTaskID: UUID?
-    private let sharedChatsEnabled: @Sendable () -> Bool
 
     init(
         executableURL: URL = CodexConfiguration.codexExecutableURL,
         codexHomeURL: URL = CodexConfiguration.codexDirectory,
-        timeout: Duration = .seconds(12),
-        sharedChatsEnabled: @escaping @Sendable () -> Bool = { ChatHandoffService.isEnabled }
+        timeout: Duration = .seconds(12)
     ) {
         self.executableURL = executableURL
         self.codexHomeURL = codexHomeURL
         self.timeout = timeout
-        self.sharedChatsEnabled = sharedChatsEnabled
     }
 
     func usage() async throws -> CodexAccountUsage {
@@ -91,44 +87,17 @@ actor AppServerUsageProvider: AccountUsageProviding {
         activeUsageTask?.cancel()
         activeUsageTask = nil
         activeUsageTaskID = nil
-        session?.terminate()
-        session = nil
     }
 
     private func fetchUsage() async throws -> CodexAccountUsage {
-        if sharedChatsEnabled() {
-            session?.terminate()
-            session = nil
-            let file = ActiveCodexCredentialFile(url: codexHomeURL.appendingPathComponent("auth.json"), fileManager: .default)
-            guard let credential = try file.read() else { throw CodexAccountUsageError.authenticationExpired }
-            let result = try await fetchUsage(using: credential)
-            guard AccountIdentityDecoder.identity(in: result.credential)?.identifier == AccountIdentityDecoder.identity(in: credential)?.identifier else {
-                throw CodexAccountError.credentialAccountMismatch
-            }
-            if result.credential != credential, try file.read() == credential { try file.write(result.credential) }
-            return result.usage
+        let file = ActiveCodexCredentialFile(url: codexHomeURL.appendingPathComponent("auth.json"), fileManager: .default)
+        guard let credential = try file.read() else { throw CodexAccountUsageError.authenticationExpired }
+        let result = try await fetchUsage(using: credential)
+        guard AccountIdentityDecoder.identity(in: result.credential)?.identifier == AccountIdentityDecoder.identity(in: credential)?.identifier else {
+            throw CodexAccountError.credentialAccountMismatch
         }
-        let activeSession: CodexAppServerSession
-        if let session, session.isRunning {
-            activeSession = session
-        } else {
-            activeSession = try await startSession(codexHomeURL: codexHomeURL)
-            session = activeSession
-        }
-
-        do {
-            let responseData = try await activeSession.request(
-                id: 2,
-                method: "account/rateLimits/read",
-                timeout: timeout
-            )
-            let response = try JSONDecoder().decode(RateLimitsResponse.self, from: responseData)
-            return response.result.accountUsage
-        } catch {
-            if session === activeSession { session = nil }
-            activeSession.terminate()
-            throw error
-        }
+        if result.credential != credential, try file.read() == credential { try file.write(result.credential) }
+        return result.usage
     }
 
     private func fetchUsage(using credential: Data) async throws -> SavedAccountUsageResult {

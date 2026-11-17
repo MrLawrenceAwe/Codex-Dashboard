@@ -24,6 +24,7 @@ final class AccountWindowProfileTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: auth.path)[.posixPermissions] as? Int, 0o600)
         XCTAssertEqual(first.environment["CODEX_HOME"], first.codexHome.path)
         XCTAssertEqual(first.environment["CODEX_ELECTRON_USER_DATA_PATH"], first.desktopData.path)
+        XCTAssertEqual(Set(first.environment.keys), ["CODEX_HOME", "CODEX_ELECTRON_USER_DATA_PATH"])
     }
 
     func testRejectsAnotherAccountsCredentialAndExistingIdentity() throws {

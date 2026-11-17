@@ -26,7 +26,9 @@ final class CodexAppServerSession: @unchecked Sendable {
         environment["CODEX_HOME"] = codexHomeURL.path
         // Account probes must never inherit a shared history directory.
         environment.removeValue(forKey: "CODEX_SQLITE_HOME")
-        environment.removeValue(forKey: "CODEX_APP_SERVER_WS_URL")
+        for key in ["CODEX_APP_SERVER_WS_URL", "CODEX_APP_SERVER_FORCE_CLI", "CODEX_APP_SERVER_USE_LOCAL_DAEMON"] {
+            environment.removeValue(forKey: key)
+        }
         process.environment = environment
 
         let outputReader = try AsyncPipeReader(handle: outputPipe.fileHandleForReading)

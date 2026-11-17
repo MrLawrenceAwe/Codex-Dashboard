@@ -73,11 +73,11 @@ final class AppServerUsageProviderTests: XCTestCase {
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700], ofItemAtPath: executableURL.path
         )
+        try testAccountCredential(accountID: "usage-test", name: "Test").write(to: directory.appendingPathComponent("auth.json"))
         let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
-            timeout: .seconds(1),
-            sharedChatsEnabled: { false }
+            timeout: .seconds(1)
         )
 
         let usage = try await provider.usage()
@@ -90,7 +90,7 @@ final class AppServerUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.bankedResets?.availableCount, 2)
         XCTAssertEqual(usage.bankedResets?.nextExpiration, Date(timeIntervalSince1970: 4_000))
         let requests = try String(contentsOf: requestsURL, encoding: .utf8)
-        XCTAssertEqual(requests.components(separatedBy: "\"method\":\"initialize\"").count - 1, 1)
+        XCTAssertEqual(requests.components(separatedBy: "\"method\":\"initialize\"").count - 1, 2)
         XCTAssertEqual(requests.components(separatedBy: "rateLimits").count - 1, 2)
     }
 
@@ -115,11 +115,11 @@ final class AppServerUsageProviderTests: XCTestCase {
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700], ofItemAtPath: executableURL.path
         )
+        try testAccountCredential(accountID: "usage-test", name: "Test").write(to: directory.appendingPathComponent("auth.json"))
         let provider = AppServerUsageProvider(
             executableURL: executableURL,
             codexHomeURL: directory,
-            timeout: .milliseconds(100),
-            sharedChatsEnabled: { false }
+            timeout: .milliseconds(100)
         )
 
         do {

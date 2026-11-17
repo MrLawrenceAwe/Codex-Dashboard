@@ -23,7 +23,7 @@ final class CodexProcessController {
     private let applicationURL: URL
     private let runningApplicationsProvider: () -> [any RunningCodexApplication]
     private let applicationLauncher: (URL, NSWorkspace.OpenConfiguration) async throws -> Void
-    private let makeLaunchConfiguration: () -> NSWorkspace.OpenConfiguration
+    private let makeLaunchConfiguration: () throws -> NSWorkspace.OpenConfiguration
     private let sleep: (Duration) async throws -> Void
     private var quitRecoveryTask: Task<Void, Never>?
 
@@ -37,7 +37,7 @@ final class CodexProcessController {
         applicationLauncher: @escaping (URL, NSWorkspace.OpenConfiguration) async throws -> Void = { url, configuration in
             _ = try await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
         },
-        makeLaunchConfiguration: (() -> NSWorkspace.OpenConfiguration)? = nil,
+        makeLaunchConfiguration: (() throws -> NSWorkspace.OpenConfiguration)? = nil,
         sleep: @escaping (Duration) async throws -> Void = { duration in
             try await Task.sleep(for: duration)
         }
@@ -51,7 +51,6 @@ final class CodexProcessController {
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.createsNewApplicationInstance = true
             configuration.arguments = CodexConfiguration.launchArguments
-            configuration.environment = ChatHandoffService.environment(windowID: "main")
             return configuration
         }
     }
@@ -100,7 +99,7 @@ final class CodexProcessController {
 
         Self.logger.notice("Codex exited; preparing replacement window")
         try await beforeLaunch?()
-        let launchConfiguration = makeLaunchConfiguration()
+        let launchConfiguration = try makeLaunchConfiguration()
         launchConfiguration.activates = activate
         try await applicationLauncher(applicationURL, launchConfiguration)
         Self.logger.notice("Replacement Codex window launched")
@@ -115,9 +114,9 @@ final class CodexProcessController {
                 guard !Task.isCancelled else { return }
                 if applications.allSatisfy(\.isTerminated) {
                     guard !isRunning else { return }
-                    let configuration = makeLaunchConfiguration()
-                    configuration.activates = false
                     do {
+                        let configuration = try makeLaunchConfiguration()
+                        configuration.activates = false
                         try await applicationLauncher(applicationURL, configuration)
                         Self.logger.notice("Restored original Codex window after delayed shutdown")
                     } catch {

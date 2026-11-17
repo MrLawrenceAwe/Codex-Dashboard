@@ -31,6 +31,7 @@ final class ChatHandoffServer {
     private struct Pending {
         let continuation: CheckedContinuation<Data, Error>
         let generation: UUID
+        let method: String
     }
     private struct Approval {
         let serverID: Any
@@ -54,6 +55,7 @@ final class ChatHandoffServer {
     private var owner: Process?
     private var input: FileHandle?
     private var output: FileHandle?
+    private var errorOutput: FileHandle?
     private var buffer = Data()
     private var generation = UUID()
     private var nextID = 0
@@ -64,6 +66,7 @@ final class ChatHandoffServer {
     private var ownerCredential: Data?
     private var turnClient: UUID?
     private var turnWindow: Window?
+    private var runningThreadIDs: Set<String> = []
     private var loadedThreads: [String: Bool] = [:] // Value indicates an ephemeral thread.
     private var newThreadRollouts: [String: String] = [:]
     private var initializeResult: [String: Any]?
@@ -82,10 +85,35 @@ final class ChatHandoffServer {
     var readyFile: URL { configuration.root.appendingPathComponent("ready.json") }
 
     func start() async throws -> [Endpoint] {
+        let native = FileSystemPath.canonicalPath(CodexConfiguration.codexDirectory.path)
+        let isolatedPaths = [configuration.root, configuration.historyHome,
+                             configuration.historyHome.appendingPathComponent("sessions"),
+                             configuration.historyHome.appendingPathComponent("archived_sessions"),
+                             configuration.historyHome.appendingPathComponent("state_5.sqlite"),
+                             ownerHome, ownerHome.appendingPathComponent("sessions"),
+                             ownerHome.appendingPathComponent("archived_sessions")]
+        guard isolatedPaths.allSatisfy({ !FileSystemPath.overlaps(FileSystemPath.canonicalPath($0.path), native) }) else {
+            throw ChatHandoffError.nativeHistory
+        }
+        // A copied database can still refer to the original absolute rollouts.
+        // Reject it before a resumed thread can open those original files.
+        let database = configuration.historyHome.appendingPathComponent("state_5.sqlite")
+        if FileManager.default.fileExists(atPath: database.path) {
+            let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+                arguments: ["-readonly", "-json", database.path, "SELECT rollout_path FROM threads WHERE rollout_path IS NOT NULL AND rollout_path <> '';"],
+                timeout: 5)
+            guard result.terminationStatus == 0 else { throw ChatHandoffError.unsafeOwner }
+            let rows = result.standardOutput.isEmpty ? [] : try JSONDecoder().decode([[String: String]].self, from: result.standardOutput)
+            let history = FileSystemPath.canonicalPath(configuration.historyHome.path)
+            guard rows.allSatisfy({ row in
+                guard let path = row["rollout_path"] else { return false }
+                return FileSystemPath.contains(FileSystemPath.canonicalPath(path), in: history)
+            }) else { throw ChatHandoffError.nativeHistory }
+        }
         let fm = FileManager.default
         try fm.createDirectory(at: configuration.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         // Advisory lock protects against two Dashboard brokers adopting the same
-        // history. The activation controller separately excludes native owners.
+        // history. Native ChatGPT history is excluded before taking this lock.
         let lock = configuration.historyHome.appendingPathComponent(".dashboard-chat-writer.lock")
         writerLock = Darwin.open(lock.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
         guard writerLock >= 0 else { throw ChatHandoffError.unsafeOwner }
@@ -93,54 +121,60 @@ final class ChatHandoffServer {
             Darwin.close(writerLock); writerLock = -1
             throw ChatHandoffError.unsafeOwner
         }
-        var endpoints: [Endpoint] = []
-        for window in configuration.windows {
-            let options = NWProtocolWebSocket.Options()
-            options.autoReplyPing = true
-            // Each window has a private loopback endpoint and bearer credential.
-            options.setClientRequestHandler(.main) { _, headers in
-                let expected = "Basic " + Data("dashboard:\(window.token)".utf8).base64EncodedString()
-                let authenticated = headers.contains { $0.name.lowercased() == "authorization" && $0.value == expected }
-                return .init(status: authenticated ? .accept : .reject, subprotocol: nil)
-            }
-            let parameters = NWParameters.tcp
-            parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
-            parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
-            let listener = try NWListener(using: parameters)
-            listener.newConnectionHandler = { [weak self] connection in
-                Task { @MainActor in self?.accept(connection, window: window) }
-            }
-            let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
-                let completion = ListenerCompletion(continuation)
-                listener.stateUpdateHandler = { state in
-                    Task { @MainActor in
-                        switch state {
-                        case .ready:
-                            guard let continuation = completion.take() else { return }
-                            continuation.resume(returning: listener.port!.rawValue)
-                        case .failed(let error): completion.take()?.resume(throwing: error)
-                        default: break
+        try Data(String(ProcessInfo.processInfo.processIdentifier).utf8).write(
+            to: configuration.root.appendingPathComponent("pid"), options: .atomic)
+        do {
+            guard let first = configuration.windows.first else { throw ChatHandoffError.identity }
+            trace("startup.initialize")
+            try await select(first)
+            var endpoints: [Endpoint] = []
+            for window in configuration.windows {
+                let options = NWProtocolWebSocket.Options()
+                options.autoReplyPing = true
+                // Each window has a private loopback endpoint and bearer credential.
+                options.setClientRequestHandler(.main) { _, headers in
+                    let expected = "Basic " + Data("dashboard:\(window.token)".utf8).base64EncodedString()
+                    let authenticated = headers.contains { $0.name.lowercased() == "authorization" && $0.value == expected }
+                    return .init(status: authenticated ? .accept : .reject, subprotocol: nil)
+                }
+                let parameters = NWParameters.tcp
+                parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+                parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
+                let listener = try NWListener(using: parameters)
+                listener.newConnectionHandler = { [weak self] connection in
+                    Task { @MainActor in self?.accept(connection, window: window) }
+                }
+                let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
+                    let completion = ListenerCompletion(continuation)
+                    listener.stateUpdateHandler = { state in
+                        Task { @MainActor in
+                            switch state {
+                            case .ready:
+                                guard let continuation = completion.take() else { return }
+                                continuation.resume(returning: listener.port!.rawValue)
+                            case .failed(let error): completion.take()?.resume(throwing: error)
+                            default: break
+                            }
                         }
                     }
+                    listener.start(queue: .main)
                 }
-                listener.start(queue: .main)
+                listeners.append(listener)
+                // Store endpoint URLs only in the private activation file; never log them.
+                endpoints.append(Endpoint(id: window.id, url: "ws://dashboard:\(window.token)@127.0.0.1:\(port)",
+                                          supportsAccountSwitch: window.id == "main"))
             }
-            listeners.append(listener)
-            // Store endpoint URLs only in the private activation file; never log them.
-            endpoints.append(Endpoint(id: window.id, url: "ws://dashboard:\(window.token)@127.0.0.1:\(port)",
-                                      supportsAccountSwitch: window.id == "main"))
+            trace("startup.ready")
+            return endpoints
+        } catch {
+            trace("startup.failed")
+            try? await shutdown()
+            throw error
         }
-        return endpoints
     }
 
     private func trace(_ message: String) {
-        guard ProcessInfo.processInfo.environment["CODEX_DASHBOARD_HANDOFF_TRACE"] == "1" else { return }
-        let file = configuration.root.appendingPathComponent("trace.log")
-        if !FileManager.default.fileExists(atPath: file.path) { FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600]) }
-        guard let handle = try? FileHandle(forWritingTo: file) else { return }
-        defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: Data((message + "\n").utf8))
+        ChatHandoffDiagnostics(root: configuration.root).record(message)
     }
 
     private func accept(_ connection: NWConnection, window: Window) {
@@ -179,7 +213,9 @@ final class ChatHandoffServer {
                     return
                 }
                 if let data, metadata?.opcode == .text || metadata?.opcode == .binary {
-                    await self.handle(data, from: id)
+                    // Keep receiving control frames and approval replies while a
+                    // request waits on the writer. Admission is guarded in handle.
+                    Task { @MainActor in await self.handle(data, from: id) }
                 }
                 self.receive(id)
             }
@@ -208,6 +244,7 @@ final class ChatHandoffServer {
     private func finishTurnRouting() {
         turnClient = nil
         turnWindow = nil
+        runningThreadIDs.removeAll()
         approvals.removeAll()
     }
 
@@ -233,7 +270,30 @@ final class ChatHandoffServer {
             return
         }
         guard let requestID = request["id"] else { return }
-        trace("request " + method)
+        trace("request " + ChatHandoffDiagnostics.method(method))
+        if method == "dashboard/status" {
+            send(["id": requestID, "result": [
+                "healthy": !failed && !shuttingDown && owner?.isRunning == true,
+                "safeToStop": (policy.isIdle && forwarding == 0) || (failed && owner?.isRunning != true),
+                "activeTurns": policy.runningTurns.count,
+            ]], to: id)
+            return
+        }
+        if method == "dashboard/interrupt" {
+            do {
+                for threadID in Array(runningThreadIDs) {
+                    _ = try await call("turn/interrupt", params: ["threadId": threadID], readOnly: true)
+                }
+                let deadline = SuspendingClock.now + .seconds(10)
+                while !policy.isIdle, SuspendingClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+                guard policy.isIdle else { throw ChatHandoffError.busy }
+                send(["id": requestID, "result": ["stopped": true]], to: id)
+            } catch {
+                send(["id": requestID, "error": ["code": -32001, "message": error.localizedDescription]], to: id)
+            }
+            return
+        }
+
         do {
             guard !failed, !shuttingDown else { throw ChatHandoffError.disconnected }
             var params = request["params"] as? [String: Any] ?? [:]
@@ -268,6 +328,7 @@ final class ChatHandoffServer {
                 try policy.beginTurn()
                 turnWindow = client.window
                 turnClient = id
+                if let threadID = params["threadId"] as? String { runningThreadIDs.insert(threadID) }
             } else if !policy.isIdle {
                 guard !policy.switching && (reads || method == "turn/interrupt" || (method == "turn/steer" && turnClient == id)) else { throw ChatHandoffError.busy }
             }
@@ -291,6 +352,7 @@ final class ChatHandoffServer {
             }
             forwarding += 1
             defer { forwarding -= 1 }
+            if startsTurn { trace("turn.admitted window=" + client.window.id) }
             let result = try await call(method, params: params, readOnly: reads)
             if startsTurn { policy.observe(method: "turn/started", params: result) }
             if ["thread/resume", "thread/start"].contains(method), let thread = result["thread"] as? [String: Any], let threadID = thread["id"] as? String {
@@ -306,15 +368,15 @@ final class ChatHandoffServer {
             }
             send(["id": requestID, "result": result], to: id)
         } catch {
-            trace("request failed " + method + (method == "fs/readFile" ? ": " + error.localizedDescription : ""))
+            trace("request.failed " + ChatHandoffDiagnostics.method(method))
             send(["id": requestID, "error": ["code": -32001, "message": error.localizedDescription]], to: id)
         }
     }
 
     private func waitForTransition() async throws {
-        let deadline = ContinuousClock.now + .seconds(60)
+        let deadline = SuspendingClock.now + .seconds(60)
         while policy.switching {
-            guard !failed, ContinuousClock.now < deadline else { throw ChatHandoffError.disconnected }
+            guard !failed, SuspendingClock.now < deadline else { throw ChatHandoffError.disconnected }
             try await Task.sleep(for: .milliseconds(50))
         }
         guard !failed else { throw ChatHandoffError.disconnected }
@@ -388,7 +450,7 @@ final class ChatHandoffServer {
         }
         let selectedCredential = try credential(window)
         try ActiveCodexCredentialFile(url: ownerHome.appendingPathComponent("auth.json"), fileManager: .default).write(selectedCredential)
-        let incoming = Pipe(), outgoing = Pipe()
+        let incoming = Pipe(), outgoing = Pipe(), errors = Pipe()
         let process = Process()
         process.executableURL = configuration.executable
         process.arguments = ["-c", "cli_auth_credentials_store=\"file\"", "app-server", "--stdio"]
@@ -396,15 +458,23 @@ final class ChatHandoffServer {
         environment["CODEX_HOME"] = ownerHome.path
         environment["CODEX_SQLITE_HOME"] = configuration.historyHome.path
         environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "Codex Desktop"
-        for key in ["CODEX_APP_SERVER_WS_URL", "CODEX_APP_SERVER_USE_LOCAL_DAEMON"] { environment.removeValue(forKey: key) }
+        for key in ["CODEX_APP_SERVER_WS_URL", "CODEX_APP_SERVER_FORCE_CLI", "CODEX_APP_SERVER_USE_LOCAL_DAEMON"] { environment.removeValue(forKey: key) }
         process.environment = environment
-        process.standardInput = incoming; process.standardOutput = outgoing; process.standardError = FileHandle.nullDevice
+        process.standardInput = incoming; process.standardOutput = outgoing; process.standardError = errors
         generation = UUID(); let current = generation
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self] process in
             Task { @MainActor in
                 guard let self, self.generation == current else { return }
+                self.trace("writer.exit status=\(process.terminationStatus) reason=\(process.terminationReason.rawValue)")
                 self.fail()
             }
+        }
+        let diagnostics = ChatHandoffDiagnostics(root: configuration.root)
+        errorOutput = errors.fileHandleForReading
+        errorOutput?.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil }
+            else { Task { @MainActor in diagnostics.stderr(data) } }
         }
         output = outgoing.fileHandleForReading
         output?.readabilityHandler = { [weak self] handle in
@@ -412,6 +482,7 @@ final class ChatHandoffServer {
             Task { @MainActor in self?.consume(data, generation: current) }
         }
         try process.run()
+        try errors.fileHandleForWriting.close()
         try outgoing.fileHandleForWriting.close()
         try incoming.fileHandleForReading.close()
         owner = process; input = incoming.fileHandleForWriting; selected = window; ownerCredential = selectedCredential
@@ -437,6 +508,7 @@ final class ChatHandoffServer {
         guard policy.runningTurns.isEmpty || !process.isRunning else { throw ChatHandoffError.busy }
         // Wait for exit before importing another account. A process which refuses
         // to stop leaves the switch failed, never starts a competing writer.
+        trace("writer.stop requested")
         generation = UUID()
         output?.readabilityHandler = nil
         try? input?.close()
@@ -450,6 +522,9 @@ final class ChatHandoffServer {
         pending.removeAll()
         for continuation in abandoned { continuation.resume(throwing: ChatHandoffError.disconnected) }
         try? FileManager.default.removeItem(at: configuration.root.appendingPathComponent("owner-pid"))
+        errorOutput?.readabilityHandler = nil
+        try? errorOutput?.close()
+        errorOutput = nil
         ownerCredential = nil
         owner = nil; input = nil; output = nil; buffer = Data()
     }
@@ -458,13 +533,14 @@ final class ChatHandoffServer {
         nextID += 1; let id = "broker-\(nextID)"; let current = generation
         let timeout = readOnly ? readTimeout : .seconds(60)
         let data: Data = try await withCheckedThrowingContinuation { continuation in
-            pending[id] = Pending(continuation: continuation, generation: current)
+            pending[id] = Pending(continuation: continuation, generation: current, method: method)
             do { try write(["id": id, "method": method, "params": params]) }
             catch { pending.removeValue(forKey: id)?.continuation.resume(throwing: error) }
             Task { [weak self] in
-                try? await Task.sleep(for: timeout)
+                try? await Task.sleep(for: timeout, clock: .suspending)
                 guard let self, let request = self.pending[id],
                       request.generation == current, self.generation == current else { return }
+                self.trace("request.timeout " + ChatHandoffDiagnostics.method(request.method) + " readOnly=\(readOnly)")
                 if readOnly {
                     self.pending.removeValue(forKey: id)
                     request.continuation.resume(throwing: ChatHandoffError.readTimedOut)
@@ -486,6 +562,7 @@ final class ChatHandoffServer {
         try input.write(contentsOf: data)
     }
     private func fail() {
+        if !failed { trace("broker.failed pending=\(pending.count) writerRunning=\(owner?.isRunning == true)") }
         failed = true
         try? FileManager.default.removeItem(at: readyFile)
         let abandoned = pending.values.map(\.continuation)
@@ -514,8 +591,10 @@ final class ChatHandoffServer {
                     if let turnClient { send(object, to: turnClient) }
                     continue
                 }
-                trace("notification " + method)
-                policy.observe(method: method, params: object["params"] as? [String: Any] ?? [:])
+                if !method.hasSuffix("/delta") { trace("notification " + ChatHandoffDiagnostics.method(method)) }
+                let parameters = object["params"] as? [String: Any] ?? [:]
+                if method == "turn/started", let threadID = parameters["threadId"] as? String { runningThreadIDs.insert(threadID) }
+                policy.observe(method: method, params: parameters)
                 if method == "turn/completed", policy.isIdle { finishTurnRouting() }
                 // Restarting the private writer changes its global account, but
                 // never changes a desktop client's sign-in. Forwarding this
@@ -556,6 +635,9 @@ final class ChatHandoffServer {
         for client in clients.values { client.connection.cancel() }
         clients.removeAll()
         initializedClients.removeAll()
+        for name in ["ready.json", "connections.json", "pid"] {
+            try? FileManager.default.removeItem(at: configuration.root.appendingPathComponent(name))
+        }
         if writerLock >= 0 { Darwin.close(writerLock); writerLock = -1 }
     }
 }

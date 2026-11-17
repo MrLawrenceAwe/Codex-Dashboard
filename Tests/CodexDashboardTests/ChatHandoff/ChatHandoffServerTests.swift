@@ -4,6 +4,7 @@ import Foundation
 
 @MainActor
 final class ChatHandoffServerTests: XCTestCase {
+    @MainActor
     private final class Client {
         let socket: URLSessionWebSocketTask
         var nextID = 0
@@ -256,6 +257,121 @@ final class ChatHandoffServerTests: XCTestCase {
         let initialized = try await recovered.call("initialize")
         XCTAssertNil(initialized["error"])
         try await replacement.shutdown()
+    }
+
+    func testNormalChatGPTHistoryIsRejectedBeforeOpeningAWriter() async throws {
+        let server = try makeServer()
+        let configuration = server.configuration
+        let root = configuration.historyHome.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let unsafe = ChatHandoffServer(configuration: .init(
+            root: configuration.root, historyHome: CodexConfiguration.codexDirectory,
+            executable: configuration.executable, windows: configuration.windows
+        ))
+        do {
+            _ = try await unsafe.start()
+            XCTFail("A broker must never adopt normal ChatGPT history")
+        } catch {
+            guard case ChatHandoffError.nativeHistory = error else { return XCTFail("Unexpected error") }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: configuration.root.path))
+    }
+
+    func testFailedBackendInitializationNeverPublishesReadinessAndReleasesOwnership() async throws {
+        let server = try makeServer()
+        let configuration = server.configuration
+        let root = configuration.historyHome.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let failing = "#!/bin/sh\nprintf '%s\\n' 'configuration error secret-do-not-log' >&2\nexit 3\n"
+        try failing.write(to: configuration.executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configuration.executable.path)
+        do {
+            _ = try await server.start()
+            XCTFail("An uninitialized backend must not publish endpoints")
+        } catch { }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: server.readyFile.path))
+        try Self.fakeServer.write(to: configuration.executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configuration.executable.path)
+        let replacement = ChatHandoffServer(configuration: configuration)
+        _ = try await replacement.start()
+        try await replacement.shutdown()
+        let diagnostics = try String(contentsOf: configuration.root.appendingPathComponent("diagnostics.log"), encoding: .utf8)
+        XCTAssertTrue(diagnostics.contains("startup.failed"))
+        XCTAssertFalse(diagnostics.contains("secret-do-not-log"))
+        XCTAssertFalse(diagnostics.contains(configuration.windows[0].token))
+    }
+
+    func testIsolatedHistoryCannotRedirectSessionsIntoNormalHistory() async throws {
+        let server = try makeServer()
+        let configuration = server.configuration
+        let root = configuration.historyHome.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createSymbolicLink(
+            at: configuration.historyHome.appendingPathComponent("sessions"),
+            withDestinationURL: CodexConfiguration.codexDirectory.appendingPathComponent("sessions")
+        )
+        do {
+            _ = try await server.start()
+            XCTFail("A symlink must not bypass native history isolation")
+        } catch {
+            guard case ChatHandoffError.nativeHistory = error else { return XCTFail("Unexpected error") }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: configuration.root.path))
+    }
+
+    func testCopiedDatabaseCannotResumeOriginalRolloutPaths() async throws {
+        let server = try makeServer()
+        let configuration = server.configuration
+        let root = configuration.historyHome.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = configuration.historyHome.appendingPathComponent("state_5.sqlite")
+        let result = try await Subprocess.run(executableURL: URL(fileURLWithPath: "/usr/bin/sqlite3"),
+            arguments: [database.path, "CREATE TABLE threads (rollout_path TEXT); INSERT INTO threads VALUES ('/tmp/other-owner/session.jsonl');"], timeout: 5)
+        XCTAssertEqual(result.terminationStatus, 0)
+        do {
+            _ = try await server.start()
+            XCTFail("A copied history must not open another owner's rollout")
+        } catch {
+            guard case ChatHandoffError.nativeHistory = error else { return XCTFail("Unexpected error") }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: configuration.root.path))
+    }
+
+    func testSlowRequestDoesNotBlockLaterRequestsOrWebSocketPings() async throws {
+        let server = try makeServer(readTimeout: .seconds(2))
+        let root = server.configuration.historyHome.deletingLastPathComponent()
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: root) } }
+        let client = Client(try await server.start()[0])
+        defer { client.socket.cancel() }
+        _ = try await client.call("initialize")
+        let first = Task { try await client.call("thread/list", ["stall": true])["error"] == nil }
+        try await Task.sleep(for: .milliseconds(30))
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            client.socket.sendPing { error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            }
+        }
+        let second = try await client.call("thread/list")
+        let initial = try await first.value
+        XCTAssertTrue(initial)
+        XCTAssertNil(second["error"])
+    }
+
+    func testManagedHealthAndExplicitInterruptionAreAvailableDuringATurn() async throws {
+        let server = try makeServer()
+        let root = server.configuration.historyHome.deletingLastPathComponent()
+        defer { Task { try? await server.shutdown(); try? FileManager.default.removeItem(at: root) } }
+        let client = Client(try await server.start()[0])
+        defer { client.socket.cancel() }
+        _ = try await client.call("initialize")
+        _ = try await client.call("turn/start", ["threadId": "same"])
+        let busy = try await client.call("dashboard/status")["result"] as? [String: Any]
+        XCTAssertEqual(busy?["healthy"] as? Bool, true)
+        XCTAssertEqual(busy?["safeToStop"] as? Bool, false)
+        _ = try await client.call("dashboard/interrupt")
+        let idle = try await client.call("dashboard/status")["result"] as? [String: Any]
+        XCTAssertEqual(idle?["safeToStop"] as? Bool, true)
     }
 
     private static let fakeServer = #"""

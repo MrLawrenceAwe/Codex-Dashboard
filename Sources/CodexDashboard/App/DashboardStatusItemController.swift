@@ -103,26 +103,19 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(compatibility)
         menu.addItem(.separator())
 
-        let sharedRunning = ChatHandoffService.isRunning
-        let sharedCurrent = sharedRunning && ChatHandoffService.supportsAccountSwitch
-        let sharedTitle: String
-        if sharedCurrent {
-            sharedTitle = "Shared Chats Enabled"
-        } else if ChatHandoffService.isEnabled && (!sharedRunning || !ChatHandoffService.hasReadyEndpoint) {
-            sharedTitle = "Reconnect Shared Chats (Restarts Codex Windows)"
-        } else if sharedRunning {
-            sharedTitle = "Update Shared Chats (Restarts Codex Windows)"
-        } else {
-            sharedTitle = "Enable Shared Chats (Restarts Codex Windows)"
-        }
-        let shared = actionItem(sharedTitle, action: #selector(enableSharedChats))
-        shared.isEnabled = !sharedCurrent && !coordinator.isPerformingAction
-        menu.addItem(shared)
-        if ChatHandoffService.isEnabled {
-            let disableShared = actionItem("Disable Shared Chats (Restarts Codex Windows)", action: #selector(disableSharedChats))
-            disableShared.isEnabled = !coordinator.isPerformingAction
-            menu.addItem(disableShared)
-        }
+        let managed = NSMenuItem(title: "Shared Chat Windows", action: nil, keyEquivalent: "")
+        let managedMenu = NSMenu()
+        let openShared = actionItem("Open shared account windows", action: #selector(openManagedWindows))
+        openShared.isEnabled = !ManagedChatController.shared.isBusy && !coordinator.accounts.savedAccounts.isEmpty
+        managedMenu.addItem(openShared)
+        let recoverShared = actionItem("Recover shared windows", action: #selector(recoverManagedWindows))
+        recoverShared.isEnabled = !ManagedChatController.shared.isBusy
+        managedMenu.addItem(recoverShared)
+        let stopShared = actionItem("Stop managed work and recover…", action: #selector(stopAndRecoverManagedWindows))
+        stopShared.isEnabled = !ManagedChatController.shared.isBusy
+        managedMenu.addItem(stopShared)
+        managed.submenu = managedMenu
+        menu.addItem(managed)
         let accountWindows = NSMenuItem(title: "Open Account Window", action: nil, keyEquivalent: "")
         let accountWindowMenu = NSMenu()
         for account in coordinator.accounts.savedAccounts {
@@ -139,9 +132,9 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         if let sessions = accountWindowDashboards, !sessions.entries.isEmpty {
             let windows = NSMenuItem(title: "Account Window Dashboards", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
-            for (id, entry) in sessions.entries.sorted(by: { $0.key.uuidString < $1.key.uuidString }) {
+            for (id, entry) in sessions.entries.sorted(by: { $0.key.accountID.uuidString < $1.key.accountID.uuidString }) {
                 let name = entry.coordinator.accounts.activeAccountName
-                    ?? coordinator.accounts.savedAccounts.first(where: { $0.id == id })?.name ?? "Account window"
+                    ?? coordinator.accounts.savedAccounts.first(where: { $0.id == id.accountID })?.name ?? "Account window"
                 let accountMenu = NSMenu()
                 let status = NSMenuItem(title: entry.coordinator.statusPresentation.title, action: nil, keyEquivalent: "")
                 status.isEnabled = false
@@ -156,7 +149,7 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
                     item.isEnabled = !entry.coordinator.isPerformingAction
                     accountMenu.addItem(item)
                 }
-                let accountItem = NSMenuItem(title: name, action: nil, keyEquivalent: "")
+                let accountItem = NSMenuItem(title: name + (id.managed ? " · Shared chats" : ""), action: nil, keyEquivalent: "")
                 accountItem.submenu = accountMenu
                 submenu.addItem(accountItem)
             }
@@ -186,37 +179,53 @@ final class DashboardStatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(actionItem("Quit Codex Dashboard", action: #selector(quit)))
     }
 
-    @objc private func disableSharedChats() {
-        Task { await ChatHandoffService.disable(main: coordinator, windows: accountWindowDashboards) }
+    @objc private func openManagedWindows() {
+        Task {
+            do { try await ManagedChatController.shared.openAll(accounts: coordinator.accounts) }
+            catch { coordinator.accounts.setStatusMessage(error.localizedDescription) }
+        }
     }
 
-    @objc private func enableSharedChats() {
-        do {
-            try ChatHandoffService.requestActivationWhenIdle()
-            coordinator.accounts.setStatusMessage("Shared Chats will connect automatically when the windows are idle.")
-        } catch { coordinator.accounts.setStatusMessage(error.localizedDescription) }
+    @objc private func recoverManagedWindows() {
+        recoverManaged(interrupt: false)
+    }
+
+    @objc private func stopAndRecoverManagedWindows() {
+        let alert = NSAlert()
+        alert.messageText = "Stop the current managed work and recover shared windows?"
+        alert.informativeText = "The current turn will be interrupted. Check its history before resending. Normal ChatGPT stays running."
+        alert.addButton(withTitle: "Stop and recover")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { recoverManaged(interrupt: true) }
+    }
+
+    private func recoverManaged(interrupt: Bool) {
+        Task {
+            do { try await ManagedChatController.shared.recover(accounts: coordinator.accounts, interrupt: interrupt) }
+            catch { coordinator.accounts.setStatusMessage(error.localizedDescription) }
+        }
     }
 
     @objc private func openWindowDashboard(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
+        guard let id = sender.representedObject as? AccountWindowDashboards.WindowID,
               let entry = accountWindowDashboards?.entries[id] else { return }
         Task {
             do {
                 guard let application = entry.context.applications().first else { throw AccountWindowError.windowNotPresented }
-                try await AccountWindowPresenter().present(application, profile: entry.context.profile)
+                try await AccountWindowPresenter().present(application, profile: entry.context.profile, environment: entry.context.launchEnvironment())
                 await entry.coordinator.openChatOverview()
             } catch { entry.coordinator.connectionNotice = error.localizedDescription }
         }
     }
 
     @objc private func restartWindowDashboard(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
+        guard let id = sender.representedObject as? AccountWindowDashboards.WindowID,
               let entry = accountWindowDashboards?.entries[id] else { return }
         Task { await entry.coordinator.restartCodexAndEnableDashboard() }
     }
 
     @objc private func disableWindowDashboard(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
+        guard let id = sender.representedObject as? AccountWindowDashboards.WindowID,
               let entry = accountWindowDashboards?.entries[id] else { return }
         Task { await entry.coordinator.disableIntegration() }
     }

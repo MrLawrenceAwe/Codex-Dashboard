@@ -18,7 +18,7 @@ final class AccountWindowLauncher {
             CodexConfiguration.processArguments(for: $0.processIdentifier)
                 .map { profile.matches(processArguments: $0) } == true
         }) {
-            try await AccountWindowPresenter().present(existing, profile: profile)
+            try await AccountWindowPresenter().present(existing, profile: profile, environment: profile.environment)
             return
         }
         let credential = profile.isInitialized ? nil : try await accounts.credentialForSeparateWindow(accountID)
@@ -36,6 +36,6 @@ final class AccountWindowLauncher {
         guard !application.isTerminated,
               CodexConfiguration.processArguments(for: application.processIdentifier)
                 .map({ profile.matches(processArguments: $0) }) == true else { throw AccountWindowError.launchFailed }
-        try await AccountWindowPresenter().present(application, profile: profile)
+        try await AccountWindowPresenter().present(application, profile: profile, environment: profile.environment)
     }
 }
