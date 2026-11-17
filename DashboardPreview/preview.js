@@ -45,7 +45,7 @@ const threads = [
     isPinned: false,
     isUnread: false,
     latestLifecycleEventKind: 'completed',
-    model: 'gpt-6.1-terra',
+    model: 'gpt-6.2-sol',
     runState: 'idle',
     projectGitStatus: 'clean',
     sharesGroupRepository: true,

@@ -1,7 +1,7 @@
 import Foundation
 
 enum ComposerPresetSchema {
-    static let defaultModel = "gpt-6.1-terra"
+    static let defaultModel = "gpt-6.2-sol"
     static let defaultReasoningEffort = "medium"
     static let defaultSpeed = "standard"
     static let reasoningEfforts = ["low", "medium", "high", "xhigh", "max", "ultra"]
