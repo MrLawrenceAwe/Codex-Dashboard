@@ -125,6 +125,16 @@ const codexUIContracts = (() => {
     return sharedParent && sharedParent.contains(settings) ? sharedParent : logout.parentElement;
   }
 
+  function usageResetAction() {
+    return [...document.querySelectorAll('button')].find((button) => (
+      button.textContent.trim() === 'Reset usage'
+        && !button.closest('#codex-usage-blockage')
+        && isVisible(button)
+        && !button.matches(':disabled, [aria-disabled="true"]')
+        && !button.closest('[inert], [aria-hidden="true"]')
+    )) || null;
+  }
+
   function profileMenuTrigger() {
     return [...document.querySelectorAll('button[aria-haspopup="menu"]')].find((button) => (
       isVisible(button) && button.getAttribute('aria-label') === 'Open profile menu'
@@ -630,6 +640,7 @@ const codexUIContracts = (() => {
     sidebar,
     navigation,
     profileMenu,
+    usageResetAction,
     profileMenuTrigger,
     profileMenuAccountAnchor,
     threadRows,

@@ -31,7 +31,13 @@ const usageResetNotice = (() => {
       <button type="button" data-reset-toggle aria-controls="codex-usage-reset-details"></button>
       </header><div data-reset-countdown role="timer" aria-live="off"></div>
       <div id="codex-usage-reset-details"><div data-reset-date></div>
-      <div data-reset-status></div></div>`;
+      <div data-reset-status></div>
+      <button type="button" data-reset-use hidden>Use a banked reset</button></div>`;
+    notice.querySelector('[data-reset-use]').addEventListener('click', () => {
+      // Let Codex own the confirmation and consumption of the reset credit.
+      codexUIContracts.usageResetAction()?.click();
+      renderCountdown();
+    });
     const toggle = notice.querySelector('[data-reset-toggle]');
     toggle.addEventListener('click', () => {
       countdownCollapsed = !countdownCollapsed;
@@ -117,6 +123,7 @@ const usageResetNotice = (() => {
     const status = notice.querySelector('[data-reset-status]');
     status.textContent = blockage.isStale ? 'Usage may be stale.' : '';
     status.hidden = !blockage.isStale;
+    notice.querySelector('[data-reset-use]').hidden = !codexUIContracts.usageResetAction();
     const position = countdownPosition || notice.getBoundingClientRect();
     positionCountdown(notice, position.left, position.top);
     if (countdownTimer === undefined) countdownTimer = setInterval(renderCountdown, 1000);

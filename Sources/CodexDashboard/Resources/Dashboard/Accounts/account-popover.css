@@ -46,6 +46,9 @@
 #codex-usage-blockage button:disabled { opacity:.5; cursor:default; }
 #codex-usage-blockage button:hover:not(:disabled) { background:var(--reset-hover); }
 #codex-usage-blockage button:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+#codex-usage-blockage [data-reset-use] { margin-top:8px; padding:0; border:0; border-radius:2px; color:#8db8ff; text-decoration:underline; text-underline-offset:3px; }
+#codex-usage-blockage [data-reset-use][hidden] { display:none; }
+#codex-usage-blockage.is-light [data-reset-use] { color:#065fc7; }
 #codex-usage-blockage.is-light { --reset-muted:#737373; --reset-hover:rgba(0,0,0,.05); --reset-border:rgba(0,0,0,.12); background:#fafafa; color:#262626; border-color:var(--reset-border); box-shadow:0 6px 24px rgba(0,0,0,.1); }
 #codex-usage-blockage.is-collapsed { padding:10px 12px; }
 #codex-usage-blockage.is-collapsed [data-reset-countdown] { margin:3px 0 0; font-size:14px; letter-spacing:0; }

@@ -6,13 +6,60 @@ import XCTest
 
 @MainActor
 final class UsageResetCountdownWebTests: SerializedDashboardWebTestCase {
+    func testBankedResetLinkTracksNativeAvailabilityAndOpensHostFlow() async throws {
+        let webView = try await DashboardWebTestHarness.mountedWebView(html: DashboardWebTestHarness.basicHostHTML)
+        let result = try await webView.evaluateJavaScript("""
+        (() => {
+          const apply = () => window.__codexDashboard.applyAccountPopoverSnapshot({
+            accounts: [], activeAccountID: null, isBusy: false,
+            usageBlockage: { windows: [{ resetsAtMilliseconds: Date.now() + 7200000 }], isStale: false },
+          });
+          apply();
+          const link = document.querySelector('#codex-usage-blockage [data-reset-use]');
+          const unavailable = getComputedStyle(link).display === 'none';
+          const host = document.createElement('button');
+          host.textContent = 'Reset usage';
+          document.querySelector('main').append(host);
+          let opened = 0;
+          host.addEventListener('click', () => { opened++; });
+          apply();
+          const available = !link.hidden && getComputedStyle(link).display !== 'none';
+          link.focus();
+          apply();
+          const focusRetained = document.activeElement === link;
+          link.click();
+          const routed = opened === 1;
+          host.disabled = true;
+          apply();
+          const disabled = link.hidden;
+          link.click();
+          host.disabled = false;
+          host.setAttribute('aria-disabled', 'true');
+          apply();
+          const ariaDisabled = link.hidden;
+          host.removeAttribute('aria-disabled');
+          host.hidden = true;
+          apply();
+          const hidden = link.hidden;
+          host.hidden = false;
+          apply();
+          host.remove();
+          // Recheck at activation even before the next countdown tick.
+          link.click();
+          const removed = link.hidden && opened === 1;
+          return [unavailable, available, focusRetained, routed, disabled, ariaDisabled, hidden, removed];
+        })()
+        """) as? [Bool]
+        XCTAssertEqual(result, Array(repeating: true, count: 8))
+    }
+
     func testUsageResetNoticeFitsNarrowAndWideLightAndDarkWindows() async throws {
         for (width, background, theme) in [(360, "#171817", "dark"), (900, "#f5f5f3", "light")] {
             let webView = try await DashboardWebTestHarness.mountedWebView(html: """
             <!doctype html><html><head><style>
               body { margin:0; background:\(background); font-family:system-ui; }
               main { padding:20px; color:#888; }
-            </style></head><body><main>Codex</main></body></html>
+            </style></head><body><main>Codex <button>Reset usage</button></main></body></html>
             """)
             webView.frame = NSRect(x: 0, y: 0, width: width, height: 600)
             let result = try await webView.evaluateJavaScript("""
