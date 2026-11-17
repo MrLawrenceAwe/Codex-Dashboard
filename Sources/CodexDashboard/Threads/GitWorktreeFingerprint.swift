@@ -14,6 +14,21 @@ enum GitWorktreeFingerprint {
             )
             guard files.terminationStatus == 0 else { return nil }
             let names = Set(files.standardOutput.split(separator: 0).map { String(decoding: $0, as: UTF8.self) }).sorted()
+            let staged = try await Subprocess.run(executableURL: GitExecutable.url,
+                arguments: ["--no-optional-locks", "-C", path, "ls-files", "--stage", "-z", "--", "."], timeout: 3)
+            guard staged.terminationStatus == 0 else { return nil }
+            var submodules: [String: String] = [:]
+            for record in staged.standardOutput.split(separator: 0) {
+                guard let tab = record.firstIndex(of: 9) else { return nil }
+                let metadata = String(decoding: record[..<tab], as: UTF8.self).split(separator: " ")
+                guard metadata.count == 3 else { return nil }
+                guard metadata[0] == "160000" else { continue }
+                guard metadata[2] == "0" else { return nil } // Unresolved gitlinks cannot establish a checkpoint.
+                let name = String(decoding: record[record.index(after: tab)...], as: UTF8.self)
+                let directory = URL(fileURLWithPath: path, isDirectory: true).appendingPathComponent(name)
+                guard let identity = try await submoduleIdentity(at: directory, indexRevision: String(metadata[1])) else { return nil }
+                submodules[name] = identity
+            }
             return try await Task.detached(priority: .utility) {
                 let root = URL(fileURLWithPath: path, isDirectory: true)
                 let manager = FileManager.default
@@ -25,6 +40,12 @@ enum GitWorktreeFingerprint {
                 }
                 for name in names {
                     try Task.checkCancellation()
+                    if let identity = submodules[name] {
+                        append(name)
+                        append("submodule")
+                        append(identity)
+                        continue
+                    }
                     let file = root.appendingPathComponent(name)
                     let attributes: [FileAttributeKey: Any]
                     do { attributes = try manager.attributesOfItem(atPath: file.path) }
@@ -45,12 +66,38 @@ enum GitWorktreeFingerprint {
                         }
                         append(content.finalize().map { String(format: "%02x", $0) }.joined())
                     } else {
-                        // A submodule or special file needs a separate contract.
+                        // Special files cannot establish a content checkpoint.
                         return nil
                     }
                 }
                 return hash.finalize().map { String(format: "%02x", $0) }.joined()
             }.value
         } catch { return nil }
+    }
+
+    private static func submoduleIdentity(at directory: URL, indexRevision: String) async throws -> String? {
+        let manager = FileManager.default
+        let attributes: [FileAttributeKey: Any]
+        do { attributes = try manager.attributesOfItem(atPath: directory.path) }
+        catch CocoaError.fileReadNoSuchFile {
+            // A deinitialized submodule may have no working directory.
+            return "unpopulated:" + indexRevision
+        }
+        guard attributes[.type] as? FileAttributeType == .typeDirectory else { return nil }
+        if !manager.fileExists(atPath: directory.appendingPathComponent(".git").path) {
+            guard try manager.contentsOfDirectory(atPath: directory.path).isEmpty else { return nil }
+            return "unpopulated:" + indexRevision
+        }
+        let root = try await Subprocess.run(executableURL: GitExecutable.url,
+            arguments: ["--no-optional-locks", "-C", directory.path, "rev-parse", "--show-toplevel"], timeout: 3)
+        var rootBytes = root.standardOutput
+        if rootBytes.last == 10 { rootBytes.removeLast() }
+        guard root.terminationStatus == 0,
+              FileSystemPath.canonicalPath(String(decoding: rootBytes, as: UTF8.self)) == FileSystemPath.canonicalPath(directory.path)
+        else { return nil }
+        let head = try await Subprocess.run(executableURL: GitExecutable.url,
+            arguments: ["--no-optional-locks", "-C", directory.path, "rev-parse", "--verify", "HEAD"], timeout: 3)
+        guard head.terminationStatus == 0, let contents = await load(at: directory.path) else { return nil }
+        return "populated:" + String(decoding: head.standardOutput, as: UTF8.self) + contents
     }
 }
