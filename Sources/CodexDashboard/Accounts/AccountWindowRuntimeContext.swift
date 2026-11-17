@@ -34,6 +34,9 @@ final class AccountWindowRuntimeContext {
         let state = (managedWorkspace?.history ?? home).appendingPathComponent("state_5.sqlite")
         let global = home.appendingPathComponent(".codex-global-state.json")
         let auth = home.appendingPathComponent("auth.json")
+        let executionHostKey = CodexUnreadThreadIDProvider.localExecutionHostKey(
+            websocketURL: try managedWorkspace?.environment(profile.accountID)["CODEX_APP_SERVER_WS_URL"]
+        )
         let store = PromptLibraryFileStore(documentURL: profile.dashboardDirectory.appendingPathComponent("prompt-library.json"))
         // Seed reusable prompts once; later saves belong to this window.
         if !FileManager.default.fileExists(atPath: store.documentURL.path),
@@ -61,7 +64,7 @@ final class AccountWindowRuntimeContext {
         } else { opener = nil }
         return AppCoordinator(
             catalogProvider: CodexThreadCatalogProvider(stateDatabaseURL: state),
-            unreadThreadIDProvider: CodexUnreadThreadIDProvider(stateURL: global, identityKeyLoader: {
+            unreadThreadIDProvider: CodexUnreadThreadIDProvider(stateURL: global, executionHostKey: executionHostKey, identityKeyLoader: {
                 guard FileManager.default.fileExists(atPath: auth.path) else { return nil }
                 return try CodexUnreadThreadIDProvider.identityKey(from: Data(contentsOf: auth))
             }),

@@ -18,7 +18,8 @@ on the same page. Recent stays clearly labelled when no chats are running.
 500 most recent chats as a baseline, plus required unread chats and chats with activity
 since the current Codex launch, including those now idle. Older history remains
 available in Codex. **Unread** groups unread chats by project; **Mark all as read** uses
-Codex's read-state action. **Local changes** shows projects with uncommitted changes
+Codex's read-state action. Unread status belongs to the current account and local
+server instance; saved unread entries from other instances are excluded. **Local changes** shows projects with uncommitted changes
 or unpushed commits, with separate labels for each.
 
 Projects use Codex's saved names and roots. Removed projects' chats appear under

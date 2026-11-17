@@ -28,7 +28,7 @@ final class UnreadThreadIDProviderTests: XCTestCase {
           "electron-thread-read-state-v1": {
             "unreadByIdentity": {
               "identity": {
-                "local:one": ["thread-one", "thread-two"],
+                "local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c": ["thread-one", "thread-two"],
                 "remote:one": ["cloud-thread"]
               }
             }
@@ -44,8 +44,33 @@ final class UnreadThreadIDProviderTests: XCTestCase {
         XCTAssertEqual(unreadThreadIDs, ["thread-one", "thread-two"])
     }
 
+    func testUnreadStateUsesOnlyTheCurrentExecutionHost() throws {
+        let nativeKey = CodexUnreadThreadIDProvider.localExecutionHostKey()
+        let websocketKey = CodexUnreadThreadIDProvider.localExecutionHostKey(websocketURL: "ws://127.0.0.1:4500")
+        XCTAssertEqual(nativeKey, "local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c")
+        XCTAssertEqual(websocketKey, "local:52949e8f3f5cc245e7f8a2088838f327fb35569f0e4c967160746a00aa6508f0")
+        let state = try JSONSerialization.data(withJSONObject: [
+            "electron-thread-read-state-v1": ["unreadByIdentity": ["identity": [
+                nativeKey: ["current-unread"], websocketKey: ["stuck-chat"],
+                "local": ["legacy-chat"], "remote:host": ["remote-chat"],
+            ]]],
+        ])
+        XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(
+            from: state, identityKey: "identity"), ["current-unread"])
+        XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(
+            from: state, identityKey: "identity", executionHostKey: websocketKey), ["stuck-chat"])
+
+        let markedRead = try JSONSerialization.data(withJSONObject: [
+            "electron-thread-read-state-v1": ["unreadByIdentity": ["identity": [
+                nativeKey: [], websocketKey: ["stuck-chat"],
+            ]]],
+        ])
+        XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(
+            from: markedRead, identityKey: "identity"), [])
+    }
+
     func testUnreadStateIsScopedToTheActiveIdentity() throws {
-        let state = Data(#"{"electron-thread-read-state-v1":{"unreadByIdentity":{"first":{"local:host":["old-unread"]},"second":{"local:host":[],"remote:host":["remote-unread"]}}}}"#.utf8)
+        let state = Data(#"{"electron-thread-read-state-v1":{"unreadByIdentity":{"first":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":["old-unread"]},"second":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":[],"remote:host":["remote-unread"]}}}}"#.utf8)
         XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(
             from: state, identityKey: "first"), ["old-unread"])
         XCTAssertEqual(try CodexUnreadThreadIDProvider.decodeUnreadThreadIDs(
@@ -60,7 +85,7 @@ final class UnreadThreadIDProviderTests: XCTestCase {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-switch-\(UUID().uuidString).json")
         let identityURL = stateURL.appendingPathExtension("identity")
-        try Data(#"{"electron-thread-read-state-v1":{"unreadByIdentity":{"first":{"local:host":["old-unread"]},"second":{"local:host":[]}}}}"#.utf8).write(to: stateURL)
+        try Data(#"{"electron-thread-read-state-v1":{"unreadByIdentity":{"first":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":["old-unread"]},"second":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":[]}}}}"#.utf8).write(to: stateURL)
         try Data("first".utf8).write(to: identityURL)
         defer {
             try? FileManager.default.removeItem(at: stateURL)
@@ -107,7 +132,7 @@ final class UnreadThreadIDProviderTests: XCTestCase {
     func testReusesDecodedStateWhileFileSignatureIsUnchanged() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-cached-global-state-\(UUID().uuidString).json")
-        let state = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["thread-one"]}}}}"#
+        let state = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":["thread-one"]}}}}"#
         try Data(state.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
         let loader = CountingStateLoader()
@@ -123,8 +148,8 @@ final class UnreadThreadIDProviderTests: XCTestCase {
     func testReloadsDecodedStateWhenFileSignatureChanges() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-dashboard-updated-global-state-\(UUID().uuidString).json")
-        let firstState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["one"]}}}}"#
-        let secondState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:one":["two"]}}}}"#
+        let firstState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":["one"]}}}}"#
+        let secondState = #"{"electron-thread-read-state-v1":{"unreadByIdentity":{"identity":{"local:092af2cb59bdd804c6f7f1cd1d85464b682974e43cd517397d25510024034d1c":["two"]}}}}"#
         try Data(firstState.utf8).write(to: stateURL)
         addTeardownBlock { try? FileManager.default.removeItem(at: stateURL) }
         let provider = CodexUnreadThreadIDProvider(stateURL: stateURL, identityKeyLoader: { "identity" })

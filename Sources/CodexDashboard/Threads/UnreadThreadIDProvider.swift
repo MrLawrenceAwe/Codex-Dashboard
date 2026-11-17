@@ -37,6 +37,7 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
     }
 
     private let stateURL: URL
+    private let executionHostKey: String
     private let dataLoader: @Sendable (URL) throws -> Data
     private let identityKeyLoader: @Sendable () throws -> String?
     private var cachedIdentityKey: String?
@@ -45,6 +46,7 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
 
     init(
         stateURL: URL = CodexConfiguration.globalStateURL,
+        executionHostKey: String = CodexUnreadThreadIDProvider.localExecutionHostKey(),
         identityKeyLoader: @escaping @Sendable () throws -> String? = {
             guard FileManager.default.fileExists(atPath: CodexConfiguration.authenticationURL.path)
             else { return nil }
@@ -55,6 +57,7 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
         }
     ) {
         self.stateURL = stateURL
+        self.executionHostKey = executionHostKey
         self.identityKeyLoader = identityKeyLoader
         self.dataLoader = dataLoader
     }
@@ -75,7 +78,7 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
 
         do {
             let data = try dataLoader(stateURL)
-            let unreadThreadIDs = try Self.decodeUnreadThreadIDs(from: data, identityKey: identityKey)
+            let unreadThreadIDs = try Self.decodeUnreadThreadIDs(from: data, identityKey: identityKey, executionHostKey: executionHostKey)
             cachedSignature = signature
             cachedIdentityKey = identityKey
             cachedUnreadThreadIDs = unreadThreadIDs
@@ -86,14 +89,24 @@ actor CodexUnreadThreadIDProvider: UnreadThreadIDProviding {
         }
     }
 
-    static func decodeUnreadThreadIDs(from data: Data, identityKey: String?) throws -> Set<String> {
+    static func decodeUnreadThreadIDs(
+        from data: Data,
+        identityKey: String?,
+        executionHostKey: String = localExecutionHostKey()
+    ) throws -> Set<String> {
         let state = try JSONDecoder().decode(GlobalState.self, from: data)
         guard let identityKey, let readState = state.threadReadState else { return [] }
-        return Set(
-            (readState.unreadByIdentity[identityKey] ?? [:])
-                .filter { hostID, _ in hostID == "local" || hostID.hasPrefix("local:") }
-                .flatMap(\.value)
-        )
+        // Read and mark-read must address the same execution host. Other local
+        // transports retain independent state even when they share thread storage.
+        return Set(readState.unreadByIdentity[identityKey]?[executionHostKey] ?? [])
+    }
+
+    // Codex hashes JSON [kind, hostId, websocketURL] for a local execution host.
+    // A normal native app-server has no websocket URL.
+    static func localExecutionHostKey(websocketURL: String? = nil) -> String {
+        let components: [Any] = ["local", "local", websocketURL as Any? ?? NSNull()]
+        let data = try! JSONSerialization.data(withJSONObject: components, options: [.withoutEscapingSlashes])
+        return "local:" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // Codex keys read state by SHA-256 of JSON [kind, accountId, userId].
