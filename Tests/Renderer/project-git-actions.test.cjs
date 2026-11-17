@@ -4,12 +4,13 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function fixture({ failPush = false, switchProject = false } = {}) {
+function fixture({ failPush = false, switchProject = false, diffResponses = [] } = {}) {
   const workerCalls = [];
   const rpcCalls = [];
   const listeners = new Set();
   const notifications = new Set();
   let current = true;
+  let diffRequestCount = 0;
   const source = fs.readFileSync(path.join(__dirname,
     '../../Sources/CodexDashboard/Resources/Dashboard/Core/project-git-actions.js'), 'utf8');
   const createProjectGitActions = vm.runInNewContext(source + '\ncreateProjectGitActions', {
@@ -32,7 +33,9 @@ function fixture({ failPush = false, switchProject = false } = {}) {
         switch (method) {
           case 'current-branch': value = { branch: 'main', isDetached: false }; break;
           case 'git-context': value = { remotes: [{ name: 'origin' }] }; break;
-          case 'commit-message-diff': value = { type: 'success', unifiedDiff: '+Added a change' }; break;
+          case 'commit-message-diff':
+            value = diffResponses[diffRequestCount++] ?? { type: 'success', unifiedDiff: '+Added a change' };
+            break;
           case 'review-summary': value = { type: 'success', files: [{ path: 'app.js' }] }; break;
           case 'commit': value = { status: 'success', commitSha: 'abc' }; break;
           case 'upstream-branch': value = { branch: 'main', upstream: { branch: 'origin/main' } }; break;
@@ -114,5 +117,33 @@ test('Leaving the project during message generation prevents Git writes and rele
     assert.equal(workerCalls.some(call => ['commit', 'push'].includes(call.method)), false);
     assert.equal(rpcCalls.some(call => call.method === 'turn/interrupt'), true);
     assert.equal(rpcCalls.at(-1).method, 'thread/unsubscribe');
+  } finally { actions.destroy(); }
+});
+
+for (const action of ['Commit', 'Commit & push']) {
+  for (const stage of ['initial', 'verification']) {
+    test(`${action} stops when the ${stage} diff is too large to verify`, async () => {
+      const tooLarge = { type: 'error', error: { type: 'diff-too-large' } };
+      const diffResponses = stage === 'initial'
+        ? [tooLarge, tooLarge]
+        : [{ type: 'success', unifiedDiff: '+Added a change' }, tooLarge];
+      const { actions, workerCalls, rpcCalls, notifications, options } = fixture({ diffResponses });
+      try {
+        await assert.rejects(actions.run('/project', action, options), /diff is too large to verify/i);
+        assert.equal(workerCalls.some(call => ['commit', 'push'].includes(call.method)), false);
+        assert.equal(actions.isRunning('/project'), false);
+        assert.equal(notifications.size, 0);
+        if (stage === 'initial') assert.equal(rpcCalls.length, 0);
+        else assert.equal(rpcCalls.at(-1).method, 'thread/unsubscribe');
+      } finally { actions.destroy(); }
+    });
+  }
+}
+
+test('Commit rejects a successful response without diff content', async () => {
+  const { actions, workerCalls, options } = fixture({ diffResponses: [{ type: 'success' }, { type: 'success' }] });
+  try {
+    await assert.rejects(actions.run('/project', 'Commit', options), /did not provide a diff/i);
+    assert.equal(workerCalls.some(call => call.method === 'commit'), false);
   } finally { actions.destroy(); }
 });

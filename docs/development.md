@@ -155,6 +155,8 @@ actions directly through the Git worker, independently of mounted chat menus. Me
 read-only app-server session through the existing RPC client. Worker requests are
 tracked by ID, mutation requests are never retried automatically, and teardown
 cancels pending requests and releases message-generation sessions.
+Commit actions require a diff before and after message generation. Oversized or
+missing diffs stop the action and direct the user to Codex's native commit dialog.
 
 `Core/git-toolbar.js` mounts repository actions in the header group containing
 the Summary button. `codex-ui-contracts.js` identifies the summary Git menu by its action

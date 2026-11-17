@@ -25,11 +25,15 @@ function createProjectGitActions({ requestRPC }) {
         }
         const value = response.result.value;
         if (method === 'commit-message-diff' && value?.error?.type === 'diff-too-large') {
-          resolve(value);
+          reject(new Error('The diff is too large to verify safely. Use Codex’s native commit dialog for this commit.'));
           return;
         }
         if (value?.status === 'error' || value?.type === 'error') {
           reject(new Error(value.execOutput?.output || value.error?.message || value.error || value.failureReason || 'Git operation failed.'));
+          return;
+        }
+        if (method === 'commit-message-diff' && typeof value?.unifiedDiff !== 'string') {
+          reject(new Error('Git did not provide a diff to verify. Use Codex’s native commit dialog for this commit.'));
           return;
         }
         resolve(value);
@@ -197,7 +201,7 @@ function createProjectGitActions({ requestRPC }) {
       if (action !== 'Push') {
         const before = await workerRequest(path, 'commit-message-diff', { includeUnstaged: true });
         const summary = await workerRequest(path, 'review-summary', { source: 'uncommitted', includeUntrackedFiles: true });
-        const context = [before.unifiedDiff || '', 'Changed files', ...(summary.files || []).map(file => file.path)].join('\n');
+        const context = [before.unifiedDiff, 'Changed files', ...(summary.files || []).map(file => file.path)].join('\n');
         const message = await generateMessage(operation, context);
         assertCurrent(operation);
         const current = await workerRequest(path, 'commit-message-diff', { includeUnstaged: true });
