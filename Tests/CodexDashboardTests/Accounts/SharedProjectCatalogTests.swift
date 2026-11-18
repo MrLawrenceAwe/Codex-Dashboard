@@ -11,13 +11,14 @@ final class SharedProjectCatalogTests: XCTestCase {
         catalog.observe(replicaID: "other", snapshot: [project("b", "Original")])
         return catalog
     }
-    func testPresentationKeepsCanonicalSidebarEntryInsteadOfUnusedLegacyAlias() {
+    func testPresentationIgnoresAliasFromAnotherBackend() {
         let presentation = ProjectListPresentation.read(state: [
-            "local-projects": ["server": [:]],
-            "project-order": ["server"],
-            "app-server-project-id-by-legacy-project-id-by-host": ["shared": ["old-import": "server"]]
-        ], projects: [project("server", "Original")])
+            "local-projects": ["server": [:], "foreign-import": [:]],
+            "project-order": ["foreign-import", "server"],
+            "app-server-project-id-by-legacy-project-id-by-host": ["shared": ["foreign-import": "server"]]
+        ], projects: [project("server", "Original")], hostID: "local")
         XCTAssertEqual(presentation.legacyByServer["server"], "server")
+        XCTAssertEqual(presentation.unmapped, ["foreign-import"])
         XCTAssertTrue(presentation.duplicateAliases.isEmpty)
     }
 
@@ -25,11 +26,26 @@ final class SharedProjectCatalogTests: XCTestCase {
         let presentation = ProjectListPresentation.read(state: [
             "local-projects": ["server": [:], "old-import": [:]],
             "project-order": ["old-import", "server"],
-            "app-server-project-id-by-legacy-project-id-by-host": ["shared": ["old-import": "server"]]
-        ], projects: [project("server", "Original")])
-        XCTAssertEqual(presentation.duplicateAliases, ["old-import"])
+            "app-server-project-id-by-legacy-project-id-by-host": ["local": ["old-import": "server"]]
+        ], projects: [project("server", "Original")], hostID: "local")
+        XCTAssertEqual(presentation.duplicateAliases, ["server"])
         XCTAssertEqual(presentation.order, ["server"])
-        XCTAssertEqual(presentation.merging(localIDs: ["server"], into: presentation.rawOrder), ["server"])
+        XCTAssertEqual(presentation.merging(localIDs: ["server"], into: presentation.rawOrder), ["old-import"])
+    }
+
+    func testPresentationReusesNativeAliasEvenIfOnlyServerIDIsCached() {
+        let presentation = ProjectListPresentation.read(state: [
+            "local-projects": ["server": [:]],
+            "project-order": ["server"],
+            "pinned-project-ids": ["server"],
+            "app-server-project-id-by-legacy-project-id-by-host": [
+                "local": ["own-import": "server"], "shared": ["foreign-import": "server"]
+            ]
+        ], projects: [project("server", "Original")], hostID: "local")
+        XCTAssertEqual(presentation.legacyByServer["server"], "own-import")
+        XCTAssertEqual(presentation.duplicateAliases, ["server"])
+        XCTAssertEqual(presentation.pinned, ["server"])
+        XCTAssertEqual(presentation.merging(localIDs: presentation.pinned, into: presentation.rawPinned), ["own-import"])
     }
 
     func testSharedBackendUsesOneIdentityForNewUnmarkedProject() throws {
@@ -145,7 +161,9 @@ final class SharedProjectCatalogTests: XCTestCase {
         let data = try JSONSerialization.data(withJSONObject: [
             "project-order": ["legacy-a", "remote-project", "legacy-b"],
             "pinned-project-ids": ["legacy-a", "remote-project"],
-            "app-server-project-id-by-legacy-project-id-by-host": ["local": ["legacy-a": "a", "legacy-b": "b"]]
+            "app-server-project-id-by-legacy-project-id-by-host": [
+                ProjectListPresentation.hostID(home: home): ["legacy-a": "a", "legacy-b": "b"]
+            ]
         ])
         try data.write(to: home.appendingPathComponent(".codex-global-state.json"))
         let value = try ProjectListPresentation.read(home: home, projects: [project("a", "A"), project("b", "B")])

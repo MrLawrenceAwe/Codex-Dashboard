@@ -130,7 +130,7 @@ final class ProjectSyncConnection {
               let state = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else {
             throw DashboardError.synchronizationFailed("Codex’s live project presentation is unavailable.")
         }
-        return ProjectListPresentation.read(state: state, projects: projects)
+        return ProjectListPresentation.read(state: state, projects: projects, hostID: ProjectListPresentation.hostID(home: home))
     }
 
     private func useNativeProjectServices(input: Data, body: String) async throws {

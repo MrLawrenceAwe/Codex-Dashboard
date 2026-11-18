@@ -15,25 +15,30 @@ struct ProjectListPresentation {
         let file = home.appendingPathComponent(".codex-global-state.json")
         let state = FileManager.default.fileExists(atPath: file.path)
             ? (try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] ?? [:]) : [:]
-        return read(state: state, projects: projects)
+        return read(state: state, projects: projects, hostID: hostID(home: home))
     }
 
-    static func read(state: [String: Any], projects: [CodexProject]) -> Self {
+    static func hostID(home: URL) -> String {
+        "local:" + home.standardizedFileURL.path
+    }
+
+    static func read(state: [String: Any], projects: [CodexProject], hostID: String) -> Self {
         let ids = Set(projects.map(\.id))
         let hosts = state["app-server-project-id-by-legacy-project-id-by-host"] as? [String: [String: String]] ?? [:]
+        let aliases = hosts[hostID] ?? [:]
         let cached = state["local-projects"] as? [String: Any] ?? [:]
         let active = Set(cached.keys)
             .union(state["project-order"] as? [String] ?? [])
             .union(state["pinned-project-ids"] as? [String] ?? [])
         var serverByLegacy: [String: String] = [:], legacyByServer: [String: String] = [:]
-        for host in hosts.keys.sorted() {
-            for (legacy, server) in hosts[host]!.sorted(by: { $0.key < $1.key }) where ids.contains(server) {
-                serverByLegacy[legacy] = server
-                if active.contains(legacy), legacyByServer[server] == nil { legacyByServer[server] = legacy }
-            }
+        for (legacy, server) in aliases.sorted(by: { $0.key < $1.key }) where ids.contains(server) && !ids.contains(legacy) {
+            serverByLegacy[legacy] = server
+            if let preferred = legacyByServer[server], active.contains(preferred) || !active.contains(legacy) { continue }
+            legacyByServer[server] = legacy
         }
-        // A canonical entry already in use wins over historical aliases.
-        for id in ids where active.contains(id) { legacyByServer[id] = id }
+        // The native importer indexes a mapped project by its legacy ID.
+        // Caching a second entry under its server ID makes that entry importable.
+        for id in ids where legacyByServer[id] == nil && active.contains(id) { legacyByServer[id] = id }
         let duplicates = Set(cached.keys.filter { key in
             guard let server = ids.contains(key) ? key : serverByLegacy[key] else { return false }
             return key != (legacyByServer[server] ?? server)
@@ -49,10 +54,8 @@ struct ProjectListPresentation {
         let rawPinned = state["pinned-project-ids"] as? [String] ?? []
         let unmapped = Set(rawOrder + rawPinned).filter { !ids.contains($0) && serverByLegacy[$0] == nil }
         var inactiveAliases: [String: Set<String>] = [:]
-        for host in hosts.values {
-            for (legacy, server) in host where serverByLegacy[legacy] == nil {
-                inactiveAliases[server, default: []].insert(legacy)
-            }
+        for (legacy, server) in aliases where serverByLegacy[legacy] == nil && !ids.contains(legacy) {
+            inactiveAliases[server, default: []].insert(legacy)
         }
         return .init(order: translate("project-order"), pinned: translate("pinned-project-ids"),
                      rawOrder: rawOrder, rawPinned: rawPinned, unmapped: unmapped, inactiveAliasesByServer: inactiveAliases, legacyByServer: legacyByServer, duplicateAliases: duplicates)
